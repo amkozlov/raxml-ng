@@ -27,3 +27,11 @@
 *.exe
 *.out
 *.app
+
+# binaries
+build/
+bin/
+
+# Eclipse project files
+.cproject
+.project

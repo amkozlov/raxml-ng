@@ -1,0 +1,3 @@
+[submodule "libs/pll-modules"]
+	path = libs/pll-modules
+	url = https://github.com/ddarriba/pll-modules.git
