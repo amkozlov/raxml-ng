@@ -62,7 +62,7 @@ message(STATUS "Using flags: ${CMAKE_CXX_FLAGS}")
 
 #include_directories(${PROJECT_SOURCE_DIR}/libs/cereal/include)
 #include_directories(${PROJECT_SOURCE_DIR}/libs/cxxopts/src)
-include_directories(${PROJECT_SOURCE_DIR}/libs/include/libpll)
+#include_directories(${PROJECT_SOURCE_DIR}/libs/include/libpll)
 
 
 set(pll_dir ${PROJECT_SOURCE_DIR}/libs/pll-modules/libs/libpll/src)
@@ -73,6 +73,8 @@ set(pll_msa_dir ${PROJECT_SOURCE_DIR}/libs/pll-modules/src/msa)
 # build dependencies
 set(RAXML_LOCALDEPS_DIR ${PROJECT_BINARY_DIR}/localdeps)
 add_subdirectory(${PROJECT_SOURCE_DIR}/libs)
+
+include_directories(${RAXML_LOCALDEPS_DIR}/include)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/src)
 
