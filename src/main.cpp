@@ -45,11 +45,11 @@ int main(int argc, char** argv)
   print_banner();
 
   Options opts;
-  CommandLineParser cmdline(argc, argv);
+  CommandLineParser cmdline;
 
   try
   {
-    cmdline.parse_options(opts);
+    cmdline.parse_options(argc, argv, opts);
   }
   catch (OptionException &e)
   {

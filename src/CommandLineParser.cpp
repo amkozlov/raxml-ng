@@ -33,7 +33,7 @@ static struct option long_options[] =
   { 0, 0, 0, 0 }
 };
 
-void CommandLineParser::parse_options(Options &opts)
+void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 {
   /* if no command specified, default to --search (or --help if no args were given) */
   opts.command = (argc > 1) ? Command::search : Command::help;
@@ -73,6 +73,11 @@ void CommandLineParser::parse_options(Options &opts)
   int option_index = 0;
   int c;
   int num_commands = 0;
+
+  /* getopt_long_only() uses this global variable to track progress;
+   * need this re-initialization to make function re-enterable... */
+  optind = 0;
+
   while ((c = getopt_long_only(argc, argv, "", long_options, &option_index)) == 0)
   {
     switch (option_index)

@@ -36,15 +36,11 @@ public:
 class CommandLineParser
 {
 public:
-  CommandLineParser(int argc, char** argv) : argc(argc), argv(argv) {};
+  CommandLineParser() {};
   ~CommandLineParser() = default;
 
-  void parse_options(Options &opts);
+  void parse_options(int argc, char** argv, Options &opts);
   void print_help();
-
-private:
-  int argc;
-  char** argv;
 };
 
 #endif /* SRC_COMMANDLINEPARSER_HPP_ */
