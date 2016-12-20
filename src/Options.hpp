@@ -19,14 +19,35 @@ enum class Command
   search
 };
 
+enum class FileFormat
+{
+  autodetect = 0,
+  fasta,
+  phylip,
+  vcf,
+  catg,
+  binary
+};
+
+enum class DataType
+{
+  autodetect = 0,
+  dna,
+  protein,
+  binary,
+  multistate,
+  diploid10
+};
+
+
 class Options
 {
 public:
   Options() : command(Command::none), use_tip_inner(true), use_pattern_compression(true),
-  use_prob_msa(false), optimize_model(true),  optimize_brlen(true), random_seed(0),
-  start_tree(StartingTree::random), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),  spr_cutoff(1.0),
-  brlen_linkage(PLLMOD_TREE_BRLEN_SCALED), simd_arch(PLL_ATTRIB_ARCH_CPU),
-  tree_file(""), msa_file(""), model_file(""), outfile_prefix(""),
+  use_prob_msa(false), optimize_model(true),  optimize_brlen(true), data_type(DataType::autodetect),
+  random_seed(0), start_tree(StartingTree::random), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
+  spr_cutoff(1.0), brlen_linkage(PLLMOD_TREE_BRLEN_SCALED), simd_arch(PLL_ATTRIB_ARCH_CPU),
+  tree_file(""), msa_file(""), model_file(""), outfile_prefix(""), msa_format(FileFormat::autodetect),
   num_threads(1), thread_id(0), num_processes(1), process_id(0)
   {};
 
@@ -41,6 +62,7 @@ public:
   bool optimize_model;
   bool optimize_brlen;
 
+  DataType data_type;
   long random_seed;
   StartingTree start_tree;
   double lh_epsilon;
@@ -54,6 +76,7 @@ public:
   std::string msa_file;
   std::string model_file;     /* could be also model string */
   std::string outfile_prefix;
+  FileFormat msa_format;
 
 //  partition_info_t ** part_info;
 //  int part_count;

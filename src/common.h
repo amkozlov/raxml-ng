@@ -4,21 +4,24 @@
 #include <string>
 #include <iostream>
 
+extern "C" {
 //#include <libpll/pll.h>
 #include <libpll/pll_optimize.h>
 #include <libpll/pll_msa.h>
 #include <libpll/pll_tree.h>
 #include <libpll/pllmod_util.h>
 #include <libpll/pllmod_algorithm.h>
+}
 
 #include "log.hpp"
 
 // defaults
-#define DEF_LH_EPSILON      0.1
-#define OPT_LH_EPSILON      0.1
-#define RAXML_PARAM_EPSILON   0.01
-#define RAXML_BFGS_FACTOR     1e7
-
+#define RAXML_BRLEN_SMOOTHINGS    32
+#define RAXML_BRLEN_DEFAULT       0.1
+#define DEF_LH_EPSILON            0.1
+#define OPT_LH_EPSILON            0.1
+#define RAXML_PARAM_EPSILON       0.01
+#define RAXML_BFGS_FACTOR         1e7
 
 // cpu features
 #define RAXML_CPU_SSE3  (1<<0)

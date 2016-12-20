@@ -30,6 +30,9 @@ static struct option long_options[] =
   {"seed",               required_argument, 0, 0 },  /*  18 */
   {"threads",            required_argument, 0, 0 },  /*  19 */
   {"simd",               required_argument, 0, 0 },  /*  20 */
+
+  {"msa-format",         required_argument, 0, 0 },  /*  21 */
+
   { 0, 0, 0, 0 }
 };
 
@@ -127,20 +130,20 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
 
       case 8:  /* data-type */
-//        if (strcasecmp(optarg, "dna") == 0)
-//          opts.data_type = RAXML_DATATYPE_DNA;
-//        else if (strcasecmp(optarg, "aa") == 0)
-//          opts.data_type = RAXML_DATATYPE_AA;
-//        else if (strcasecmp(optarg, "binary") == 0)
-//          opts.data_type = RAXML_DATATYPE_BINARY;
-//        else if (strcasecmp(optarg, "diploid10") == 0)
-//          opts.data_type = RAXML_DATATYPE_DIPLOID10;
-//        else if (strcasecmp(optarg, "multi") == 1)
-//          opts.data_type = RAXML_DATATYPE_MULTI;
-//        else if (strcasecmp(optarg, "auto") == 0)
-//          opts.data_type = RAXML_DATATYPE_AUTO;
-//        else
-//          sysutil_fatal("\nUnknown data type: %s\n\n", optarg);
+        if (strcasecmp(optarg, "dna") == 0)
+          opts.data_type = DataType::dna;
+        else if (strcasecmp(optarg, "aa") == 0)
+          opts.data_type = DataType::protein;
+        else if (strcasecmp(optarg, "binary") == 0)
+          opts.data_type = DataType::binary;
+        else if (strcasecmp(optarg, "diploid10") == 0)
+          opts.data_type = DataType::diploid10;
+        else if (strcasecmp(optarg, "multi") == 0)
+          opts.data_type = DataType::multistate;
+        else if (strcasecmp(optarg, "auto") == 0)
+          opts.data_type = DataType::autodetect;
+        else
+          throw InvalidOptionValueException("Unknown data type: %s", optarg);
         break;
 
       case 9: /* optimize model */
@@ -236,7 +239,37 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         }
         else
         {
-          sysutil_fatal("\nUnknown SIMD instruction set: %s!\n\n", optarg);
+          throw InvalidOptionValueException("Unknown SIMD instruction set: %s!", optarg);
+        }
+        break;
+      case 21: /* MSA file format */
+        if (strcasecmp(optarg, "auto") == 0 )
+        {
+          opts.msa_format = FileFormat::autodetect;
+        }
+        else if (strcasecmp(optarg, "fasta") == 0)
+        {
+          opts.msa_format = FileFormat::fasta;
+        }
+        else if (strcasecmp(optarg, "phylip") == 0)
+        {
+          opts.msa_format = FileFormat::phylip;
+        }
+        else if (strcasecmp(optarg, "vcf") == 0)
+        {
+          opts.msa_format = FileFormat::vcf;
+        }
+        else if (strcasecmp(optarg, "catg") == 0)
+        {
+          opts.msa_format = FileFormat::catg;
+        }
+        else if (strcasecmp(optarg, "binary") == 0)
+        {
+          opts.msa_format = FileFormat::binary;
+        }
+        else
+        {
+          throw InvalidOptionValueException("Unknown MSA file format: %s!", optarg);
         }
         break;
       default:
@@ -277,9 +310,10 @@ void CommandLineParser::print_help()
             "  --search                                  ML tree search.\n\n"
             "Input and output options:\n"
             "  --tree        FILENAME | rand | pars      starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
-            "  --msa         FILENAME                    alignment in FASTA, PHYLIP, VCF or CATG format.\n"
+            "  --msa         FILENAME                    alignment file\n"
+            "  --msa-format  VALUE                       alignment file type: FASTA, PHYLIP, VCF, CATG or AUTO-detect (default)\n\n"
+            "  --data-type   VALUE                       data type: DNA, AA, MULTI-state or AUTO-detect (default)\n\n"
             "  --prefix STRING                           prefix for output files (default: MSA file name)\n"
-            "  --data-type   dna | aa | multi<X> | auto  data type: DNA, AA, MULTI-state with X states or AUTO-detect (default)\n\n"
             "General options:\n"
             "  --seed                                    seed for pseudo-random number generator (default: current time)\n"
             "  --pat-comp on | off                       alignment pattern compression (default: ON)\n"
