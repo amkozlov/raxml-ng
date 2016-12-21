@@ -1,8 +1,13 @@
 #ifndef RAXML_COMMON_H_
 #define RAXML_COMMON_H_
 
+#include <unistd.h>
+
 #include <string>
 #include <iostream>
+#include <sstream>
+#include <vector>
+#include <unordered_map>
 
 extern "C" {
 //#include <libpll/pll.h>
@@ -13,6 +18,7 @@ extern "C" {
 #include <libpll/pllmod_algorithm.h>
 }
 
+#include "types.hpp"
 #include "log.hpp"
 
 // defaults

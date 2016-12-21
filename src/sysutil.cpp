@@ -2,6 +2,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <stdarg.h>
+#include <limits.h>
 
 #include "common.h"
 
@@ -95,7 +96,7 @@ unsigned long sysutil_get_memtotal()
   long pagesize = sysconf(_SC_PAGESIZE);
 
   if ((phys_pages == -1) || (pagesize == -1))
-    fatal("Cannot determine amount of RAM");
+    sysutil_fatal("Cannot determine amount of RAM");
 
   // sysconf(3) notes that pagesize * phys_pages can overflow, such as
   // when long is 32-bits and there's more than 4GB RAM.  Since vsearch
@@ -113,7 +114,7 @@ unsigned long sysutil_get_memtotal()
   int64_t ram = 0;
   size_t length = sizeof(ram);
   if(-1 == sysctl(mib, 2, &ram, &length, NULL, 0))
-    fatal("Cannot determine amount of RAM");
+    sysutil_fatal("Cannot determine amount of RAM");
   return ram;
 
 #else

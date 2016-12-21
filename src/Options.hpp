@@ -2,43 +2,7 @@
 #define RAXML_OPTIONS_HPP_
 
 #include "common.h"
-
-enum class StartingTree
-{
-  random,
-  parsimony,
-  user
-};
-
-enum class Command
-{
-  none = 0,
-  help,
-  version,
-  evaluate,
-  search
-};
-
-enum class FileFormat
-{
-  autodetect = 0,
-  fasta,
-  phylip,
-  vcf,
-  catg,
-  binary
-};
-
-enum class DataType
-{
-  autodetect = 0,
-  dna,
-  protein,
-  binary,
-  multistate,
-  diploid10
-};
-
+#include "PartitionInfo.hpp"
 
 class Options
 {
@@ -78,8 +42,8 @@ public:
   std::string outfile_prefix;
   FileFormat msa_format;
 
-//  partition_info_t ** part_info;
-//  int part_count;
+  std::vector<PartitionInfo> part_list;
+  size_t part_count() const { return part_list.size(); };
 
   /* parallelization stuff */
   unsigned int num_threads;     /* number of threads */

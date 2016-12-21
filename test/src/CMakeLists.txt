@@ -19,13 +19,13 @@ set (EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/test/bin)
 
 add_executable        (raxml_test_module ${raxml_test_sources})
 
-target_link_libraries (raxml_test_module ${RAXML_LOCALDEPS_DIR}/lib/libpll.a)
 target_link_libraries (raxml_test_module ${RAXML_LOCALDEPS_DIR}/lib/libpll_algorithm.a)
 target_link_libraries (raxml_test_module ${RAXML_LOCALDEPS_DIR}/lib/libpll_binary.a)
 target_link_libraries (raxml_test_module ${RAXML_LOCALDEPS_DIR}/lib/libpll_optimize.a)
 target_link_libraries (raxml_test_module ${RAXML_LOCALDEPS_DIR}/lib/libpll_msa.a)
 target_link_libraries (raxml_test_module ${RAXML_LOCALDEPS_DIR}/lib/libpll_tree.a)
 target_link_libraries (raxml_test_module ${RAXML_LOCALDEPS_DIR}/lib/libpll_util.a)
+target_link_libraries (raxml_test_module ${RAXML_LOCALDEPS_DIR}/lib/libpll.a)
 target_link_libraries (raxml_test_module m)
 
 target_link_libraries (raxml_test_module ${GTEST_BOTH_LIBRARIES} -pthread)
