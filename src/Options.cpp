@@ -44,6 +44,21 @@ void print_options(const Options &opts)
   }
   LOG_INFO << endl;
 
+  LOG_INFO << "  start tree: ";
+  switch(opts.start_tree)
+  {
+    case StartingTree::random:
+      LOG_INFO << "random";
+      break;
+    case StartingTree::parsimony:
+      LOG_INFO << "parsimony";
+      break;
+    case StartingTree::user:
+      LOG_INFO << "user";
+      break;
+  }
+  LOG_INFO << endl;
+
   LOG_INFO << "  random seed: " << opts.random_seed << endl;
   LOG_INFO << "  tip-inner: " << (opts.use_tip_inner ? "ON" : "OFF") << endl;
   LOG_INFO << "  pattern compression: " << (opts.use_pattern_compression ? "ON" : "OFF") << endl;

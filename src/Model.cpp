@@ -12,6 +12,12 @@ const unordered_map<DataType,unsigned int,EnumClassHash>  DATATYPE_STATES { {Dat
                                                                             {DataType::diploid10, 10}
                                                                           };
 
+const unordered_map<DataType, const unsigned int *,EnumClassHash>  DATATYPE_MAPS {
+  {DataType::dna, pll_map_nt},
+  {DataType::protein, pll_map_aa},
+  {DataType::binary, pll_map_bin},
+  {DataType::diploid10, pll_map_diploid10}
+};
 
 Model::Model (DataType data_type, const std::string &model_string) : _data_type(data_type)
 {
@@ -21,6 +27,11 @@ Model::Model (DataType data_type, const std::string &model_string) : _data_type(
 Model::~Model ()
 {
   // TODO Auto-generated destructor stub
+}
+
+const unsigned int * Model::charmap() const
+{
+  return DATATYPE_MAPS.at(_data_type);
 }
 
 void Model::init_from_string(const std::string &model_string)

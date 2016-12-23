@@ -15,6 +15,7 @@ public:
   /* getters */
   DataType data_type() const { return _data_type; };
   unsigned int num_states() const { return _num_states; };
+  const unsigned int * charmap() const;
   unsigned int ratehet_mode() const { return _rate_het; };
   unsigned int num_ratecats() const { return _num_ratecats; };
   double alpha() const { return _alpha; };

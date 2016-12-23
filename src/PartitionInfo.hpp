@@ -3,13 +3,14 @@
 
 #include "common.h"
 #include "Model.hpp"
+#include "MSA.hpp"
 
 class PartitionInfo
 {
 public:
   PartitionInfo (const std::string &name, DataType data_type,
                  const std::string &model_string, const std::string &range_string = "") :
-    _name(name), _model(data_type, model_string), _range_string(range_string) {};
+    _name(name), _range_string(range_string), _model(data_type, model_string) {};
   virtual
   ~PartitionInfo ();
 
@@ -20,8 +21,9 @@ public:
 
 private:
   std::string _name;
-  Model _model;
   std::string _range_string;
+  Model _model;
+  MSA _msa;
 };
 
 #endif /* RAXML_PARTITIONINFO_HPP_ */

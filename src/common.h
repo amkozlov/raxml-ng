@@ -19,6 +19,7 @@ extern "C" {
 }
 
 #include "types.hpp"
+#include "constants.hpp"
 #include "log.hpp"
 
 // defaults
