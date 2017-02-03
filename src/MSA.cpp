@@ -4,7 +4,8 @@
 
 using namespace std;
 
-MSA::MSA(const pll_msa_t *pll_msa) : _num_sites(pll_msa->length), _dirty(false)
+MSA::MSA(const pll_msa_t *pll_msa) :
+    _length(pll_msa->length), _num_sites(pll_msa->length), _pll_msa(nullptr)
 {
   for (auto i = 0; i < pll_msa->count; ++i)
   {
@@ -16,6 +17,35 @@ MSA::MSA(const pll_msa_t *pll_msa) : _num_sites(pll_msa->length), _dirty(false)
 
 MSA::~MSA()
 {
+  free_pll_msa();
+//  printf("MSA destructor\n");
+}
+
+MSA& MSA::operator=(MSA&& other)
+{
+  if (this != &other)
+  {
+    // release the current object’s resources
+    free_pll_msa();
+    _weights.clear();
+    _sequence_map.clear();
+
+    // steal other’s resource
+    _length = other._length;
+    _num_sites = other._num_sites;
+    _pll_msa = other._pll_msa;
+    _weights = std::move(other._weights);
+    _sequence_map = std::move(other._sequence_map);
+
+    // reset other
+    other._length = other._num_sites = 0;
+    other._pll_msa = nullptr;
+  }
+  return *this;
+}
+
+void MSA::free_pll_msa() noexcept
+{
   if (_pll_msa)
   {
     free(_pll_msa->label);
@@ -23,7 +53,6 @@ MSA::~MSA()
     free(_pll_msa);
   }
 }
-
 
 const string& MSA::operator[](const std::string& name)
 {
@@ -35,13 +64,17 @@ const string& MSA::operator[](const std::string& name)
 
 void MSA::append(const string& header, const string& sequence)
 {
-  if(_num_sites && sequence.length() != (size_t) _num_sites)
+  if(_length && sequence.length() != (size_t) _length)
     throw runtime_error{string("Tried to insert sequence to MSA of unequal length: ") + sequence};
 
   _sequence_map[header] = sequence;
 
-  if (!_num_sites)
-    _num_sites = sequence.length();
+  if (!_length)
+  {
+    _length = sequence.length();
+    if (!_num_sites)
+      _num_sites = _length;
+  }
 
   _dirty = true;
 }
@@ -58,7 +91,7 @@ void MSA::compress_patterns(const unsigned int * charmap)
   if (!w)
     throw runtime_error("Pattern compression failed!");
 
-  _num_sites = _pll_msa->length;
+  _length = _pll_msa->length;
   _weights = std::vector<unsigned int>(w, w + _pll_msa->length);
 
   _dirty = false;
@@ -82,7 +115,7 @@ void MSA::update_pll_msa() const
   if (_dirty)
   {
     _pll_msa->count = size();
-    _pll_msa->length = num_sites();
+    _pll_msa->length = length();
 
     _pll_msa->label = (char **) calloc(_pll_msa->count, sizeof(char *));
     _pll_msa->sequence = (char **) calloc(_pll_msa->count, sizeof(char *));
@@ -125,7 +158,9 @@ MSA msa_load_from_fasta(const std::string &filename)
   if (sites == -1 || sites == 0)
     throw runtime_error{"Unable to read MSA file"};
 
-  auto msa = MSA(sites);
+  MSA msa(sites);
+
+  //  MSA&& msa = MSA(sites);
   msa.append(header, sequence);
 
   free(sequence);
@@ -158,7 +193,7 @@ MSA msa_load_from_phylip(const std::string &filename)
   pll_msa_t * pll_msa = pll_phylip_parse_msa(filename.c_str(), &sequence_count);
   if (pll_msa)
   {
-    auto msa = MSA(pll_msa);
+    MSA msa(pll_msa);
     free(pll_msa);
     return msa;
   }
@@ -169,14 +204,11 @@ MSA msa_load_from_phylip(const std::string &filename)
 MSA msa_load_from_file(const std::string &filename, const FileFormat format)
 {
   vector<FileFormat> fmt_list;
-  MSA msa;
 
   if (format == FileFormat::autodetect)
     fmt_list = {FileFormat::phylip, FileFormat::fasta, FileFormat::catg, FileFormat::vcf, FileFormat::binary};
   else
     fmt_list = {format};
-
-  bool msa_loaded = false;
 
   for (auto fmt: fmt_list)
   {
@@ -185,24 +217,20 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format)
       switch (fmt)
       {
         case FileFormat::fasta:
-          msa = msa_load_from_fasta(filename);
+          return msa_load_from_fasta(filename);
           break;
         case FileFormat::phylip:
-          msa = msa_load_from_phylip(filename);
+          return msa_load_from_phylip(filename);
           break;
         default:
           throw runtime_error("Unsupported MSA file format!");
       }
-      msa_loaded = true;
     }
     catch(exception &e)
     {
-
+//      LOG_INFO << "Failed to load as: " << e.what() << endl;
     }
   }
 
-  if (!msa_loaded)
-    throw runtime_error("Error loading MSA!");
-
-  return msa;
+  throw runtime_error("Error loading MSA!");
 }

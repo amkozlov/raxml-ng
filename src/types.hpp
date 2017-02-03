@@ -60,5 +60,32 @@ struct EnumClassHash
   }
 };
 
+/* generic exception class */
+class RaxmlException : public std::exception
+{
+public:
+  RaxmlException(const std::string& message)
+  : _message(message)
+  {
+  }
+
+  virtual const char* what() const noexcept { return message().c_str(); }
+
+  virtual const std::string message() const { return _message; };
+
+protected:
+  std::string _message;
+
+  template<typename ... Args>
+  std::string format_message(const std::string& fmt, Args ... args) const
+  {
+    size_t size = std::snprintf(nullptr, 0, fmt.c_str(), args ...) + 1;
+    std::string msg;
+    msg.reserve(size);
+    std::snprintf(&msg[0], size, fmt.c_str(), args ...);
+    return msg;
+  }
+};
+
 
 #endif /* RAXML_TYPES_HPP_ */

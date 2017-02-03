@@ -3,22 +3,13 @@
 
 #include "Options.hpp"
 
-class OptionException : public std::exception
+class OptionException : public RaxmlException
 {
 public:
   OptionException(const std::string& message)
-  : message(message)
+  : RaxmlException(message)
   {
   }
-
-virtual const char*
-  what() const noexcept
-  {
-    return message.c_str();
-  }
-
-protected:
-  std::string message;
 };
 
 
@@ -28,8 +19,8 @@ public:
   InvalidOptionValueException(const std::string& format, const std::string& value) :
     OptionException("")
   {
-    message.reserve(format.size() + value.size());
-    sprintf(&message[0], format.c_str(), value.c_str());
+    _message.reserve(format.size() + value.size());
+    sprintf(&_message[0], format.c_str(), value.c_str());
   }
 };
 

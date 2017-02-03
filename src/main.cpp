@@ -25,6 +25,8 @@
 //
 //#include "mpihead.hpp"
 
+#include <memory>
+
 #include "common.h"
 #include "MSA.hpp"
 #include "Options.hpp"
@@ -35,7 +37,7 @@ using namespace std;
 
 void print_banner()
 {
-  LOG_INFO << "RAxML-NG v. 0.1alpha (c) 2016 The Exelixis Lab" << endl;
+  LOG_INFO << "RAxML-NG v. 0.1alpha (c) 2017 The Exelixis Lab" << endl;
   LOG_INFO << endl <<
       "WARNING: This is an EXPERIMENTAL version of RAxML which has not been released yet!"
       << endl << endl;
@@ -66,10 +68,12 @@ pll_utree_t * load_unrooted_tree(const char * filename,
   return utree;
 }
 
-pll_utree_t * get_start_tree(const Options &opts, MSA &msa)
+pll_utree_t * get_start_tree(const Options &opts, PartitionedMSA& part_msa)
 {
   unsigned int tip_nodes_count;
   pll_utree_t * tree = NULL;
+
+  const MSA& msa = part_msa.full_msa();
 
   switch (opts.start_tree)
   {
@@ -105,17 +109,13 @@ pll_utree_t * get_start_tree(const Options &opts, MSA &msa)
       LOG_INFO << "Generating a parsimony starting tree with " << msa.size() << " taxa" << endl;
 
       // temporary workaround
-      unsigned int num_states = opts.part_list[0].model().num_states();
-      const unsigned int * map = opts.part_list[0].model().charmap();
+      unsigned int num_states = part_msa.model(0).num_states();
+      const unsigned int * map = part_msa.model(0).charmap();
 
       unsigned int score;
 
-      // TODO: this should be a copy of MSA, partitioned by DATATYPE (dna/aa/etc)
-      if (opts.use_pattern_compression)
-        msa.compress_patterns(map);
-
       tree = pllmod_utree_create_parsimony(msa.size(),
-                                           msa.num_sites(),
+                                           msa.length(),
                                            msa.pll_msa()->label,
                                            msa.pll_msa()->sequence,
                                            msa.weights(),
@@ -144,9 +144,11 @@ pll_utree_t * get_start_tree(const Options &opts, MSA &msa)
   return tree;
 }
 
-void init_part_info(Options &opts)
+PartitionedMSA init_part_info(const Options &opts)
 {
-  /* check if we model is a file */
+  PartitionedMSA part_msa;
+
+  /* check if model is a file */
   if (access(opts.model_file.c_str(), F_OK) != -1)
   {
     // read partition definitions from file
@@ -158,22 +160,21 @@ void init_part_info(Options &opts)
   else
   {
     // create and init single pseudo-partition
-    auto part_info = PartitionInfo("noname", opts.data_type, opts.model_file);
-    opts.part_list.push_back(part_info);
+    part_msa.emplace_part_info("noname", opts.data_type, opts.model_file);
   }
 
   /* make sure that linked branch length mode is set for unpartitioned alignments */
-  if (opts.part_count() == 1)
-    opts.brlen_linkage = PLLMOD_TREE_BRLEN_LINKED;
+//  if (opts.part_count == 1)
+//    opts.brlen_linkage = PLLMOD_TREE_BRLEN_LINKED;
 
   int lg4x_count = 0;
 
-  for (auto part_info: opts.part_list)
+  for (const auto& pinfo: part_msa.part_list())
   {
-    LOG_INFO << "|" << part_info.name() << "|   |" << part_info.model().to_string() << "|   |" <<
-        part_info.range_string() << "|" << endl;
+    LOG_INFO << "|" << pinfo.name() << "|   |" << pinfo.model().to_string() << "|   |" <<
+        pinfo.range_string() << "|" << endl;
 
-    if (part_info.model().name() == "LG4X")
+    if (pinfo.model().name() == "LG4X")
       lg4x_count++;
   }
 
@@ -181,98 +182,102 @@ void init_part_info(Options &opts)
   {
     throw runtime_error("LG4X model is not supported in linked branch length mode, sorry :(");
   }
+
+  return part_msa;
 }
 
-#ifdef none
-void split_msa(const Options &opts, const MSA &msa)
+#ifdef aaa
+void PartitionedMSA::split_msa()
 {
   pll_msa_t ** part_msa_list = NULL;
-  if (opts.part_count() > 1 && is_master_thread)
+  if (opts.part_count() > 1)
   {
-    unsigned int * site_part = get_site_part_assignment(msa->length, useropt);
+    unsigned int * site_part = get_site_part_assignment(opts.part_msa);
 
     /* split MSA into partitions */
     part_msa_list = pllmod_msa_split(msa.pll_msa(), site_part, opts.part_count());
   }
 
-  parallel_thread_broadcast(useropt, 0, &part_msa_list, sizeof(pll_msa_t **));
-
   /* compute per-partition stats & compress patterns if needed */
   unsigned int ** pattern_weights = NULL;
   pllmod_msa_stats_t ** stats = NULL;
 
-  if (is_master_thread)
+  stats = (pllmod_msa_stats_t **) calloc(useropt->part_count, sizeof(pllmod_msa_stats_t *));
+  if (opts.use_pattern_compression)
+    pattern_weights = (unsigned int **) calloc(useropt->part_count, sizeof(unsigned int *));
+
+  for (p = 0; p < useropt->part_count; ++p)
   {
-    stats = (pllmod_msa_stats_t **) calloc(useropt->part_count, sizeof(pllmod_msa_stats_t *));
+    const partition_info_t * part_info = useropt->part_info[p];
+    pll_msa_t * part_msa = part_msa_list ? part_msa_list[p] : &pll_msa;
+    const unsigned int * map = get_datatype_map(part_info->data_type);
+    const long num_sites = part_msa->length;
+
+    if (!map)
+      fatal("Datatype not supported: %d", part_info->data_type);
+
+    assert(map != NULL);
+    assert(msa->msa_type == RAXML_MSA_DISCRETE);
+
     if (opts.use_pattern_compression)
-      pattern_weights = (unsigned int **) calloc(useropt->part_count, sizeof(unsigned int *));
-
-    for (p = 0; p < useropt->part_count; ++p)
     {
-      const partition_info_t * part_info = useropt->part_info[p];
-      pll_msa_t * part_msa = part_msa_list ? part_msa_list[p] : &pll_msa;
-      const unsigned int * map = get_datatype_map(part_info->data_type);
-      const long num_sites = part_msa->length;
+      //      print_progress(0, "Compressing site patterns...\n");
+      pattern_weights[p] = pll_compress_site_patterns(part_msa->sequence,
+                                                      map,
+                                                      part_msa->count,
+                                                      &part_msa->length);
+      if (!pattern_weights[p])
+        fatal_libpll();
+    }
 
-      if (!map)
-        fatal("Datatype not supported: %d", part_info->data_type);
+    stats[p] = compute_partition_stats(part_msa, part_info->num_states, map,
+                                       pattern_weights ? pattern_weights[p] : NULL);
 
-      assert(map != NULL);
-      assert(msa->msa_type == RAXML_MSA_DISCRETE);
+    validate_partition_stats(useropt, part_info, stats[p]);
 
-      if (opts.use_pattern_compression)
-      {
-        //      print_progress(0, "Compressing site patterns...\n");
-        pattern_weights[p] = pll_compress_site_patterns(part_msa->sequence,
-                                                        map,
-                                                        part_msa->count,
-                                                        &part_msa->length);
-        if (!pattern_weights[p])
-          fatal_libpll();
-      }
-
-      stats[p] = compute_partition_stats(part_msa, part_info->num_states, map,
-                                         pattern_weights ? pattern_weights[p] : NULL);
-
-      validate_partition_stats(useropt, part_info, stats[p]);
-
-      /* print partition info */
-      print_info("\nPartition %d: %s\n", p, part_info->part_name);
-      print_info("Model: %s\n", part_info->model_str);
-      print_info("Alignment sites / patterns: %ld / %ld\n", num_sites, part_msa->length);
-      print_info("Gaps: %.2f %%\n", stats[p]->gap_prop * 100);
-      print_info("Invariant sites: %.2f %%\n", stats[p]->inv_prop * 100);
+    /* print partition info */
+    print_info("\nPartition %d: %s\n", p, part_info->part_name);
+    print_info("Model: %s\n", part_info->model_str);
+    print_info("Alignment sites / patterns: %ld / %ld\n", num_sites, part_msa->length);
+    print_info("Gaps: %.2f %%\n", stats[p]->gap_prop * 100);
+    print_info("Invariant sites: %.2f %%\n", stats[p]->inv_prop * 100);
 
 //      print_progress(0, "Unique site patterns: %d\n", part_msa->length);
-    }
   }
-
-  /* broadcast stats & weight patterns */
-  parallel_thread_broadcast(useropt, 0, &stats, sizeof(pllmod_msa_stats_t **));
-  parallel_thread_broadcast(useropt, 0, &pattern_weights, sizeof(unsigned int **));
-
-  /* get number of compressed patterns from master thread */
-  if (!part_msa_list)
-    parallel_thread_broadcast(useropt, 0, &pll_msa.length, sizeof(int));
-
 }
 #endif
 
-
-pllmod_treeinfo_t * load_msa_and_tree(const Options &opts)
+pllmod_treeinfo_t * load_msa_and_tree(const Options &opts, PartitionedMSA& part_msa)
 {
   LOG_INFO << "Loading alignment from file: " << opts.msa_file << endl;
 
   /* load MSA */
   auto msa = msa_load_from_file(opts.msa_file, opts.msa_format);
 
+//  auto msa = std::make_shared<MSA>( msa_load_from_file(opts.msa_file, opts.msa_format));
+
   LOG_INFO << "Taxa: " << msa.size() << ", sites: " << msa.num_sites() << endl;
 
   /* check alignment */
 //  check_msa(useropt, msa);
 
+  part_msa.full_msa(std::move(msa));
+
+//  LOG_INFO << "Splitting MSA... " << endl;
+
+  part_msa.split_msa();
+
+  if (opts.use_pattern_compression)
+    part_msa.compress_patterns();
+
+  LOG_INFO << endl;
+
+  print_partition_info(part_msa);
+
+  LOG_INFO << endl;
+
   /* load/create starting tree */
-  pll_utree_t * tree = get_start_tree(opts, msa);
+  pll_utree_t * tree = get_start_tree(opts, part_msa);
 
 #ifdef _USE_PTHREADS
   parallel_thread_broadcast(useropt, 0, &msa, sizeof(msa_data_t *));
@@ -287,7 +292,7 @@ pllmod_treeinfo_t * load_msa_and_tree(const Options &opts)
 //  assert(msa != NULL && local_tree != NULL);
 //
 
-  pllmod_treeinfo_t * treeinfo = pllmod_treeinfo_create(local_tree, msa.size(),
+  pllmod_treeinfo_t * treeinfo = pllmod_treeinfo_create(local_tree, part_msa.full_msa().size(),
                                                         opts.part_count(),
                                                         opts.brlen_linkage);
 
@@ -331,11 +336,13 @@ int main(int argc, char** argv)
       return EXIT_SUCCESS;
     case Command::evaluate:
     case Command::search:
+    {
       // parse model string & init partitions
       print_options(opts);
-      init_part_info(opts);
-      load_msa_and_tree(opts);
+      auto part_msa = init_part_info(opts);
+      load_msa_and_tree(opts, part_msa);
       return EXIT_SUCCESS;
+    }
     case Command::none:
     default:
       LOG_INFO << "Unknown command!" << endl;

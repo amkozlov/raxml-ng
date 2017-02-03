@@ -2,7 +2,7 @@
 #define RAXML_OPTIONS_HPP_
 
 #include "common.h"
-#include "PartitionInfo.hpp"
+#include "PartitionedMSA.hpp"
 
 class Options
 {
@@ -42,8 +42,8 @@ public:
   std::string outfile_prefix;
   FileFormat msa_format;
 
-  std::vector<PartitionInfo> part_list;
-  size_t part_count() const { return part_list.size(); };
+  PartitionedMSA part_msa;
+  size_t part_count() const { return part_msa.part_count(); };
 
   /* parallelization stuff */
   unsigned int num_threads;     /* number of threads */
