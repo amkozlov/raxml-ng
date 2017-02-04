@@ -19,14 +19,16 @@ const unordered_map<DataType, const unsigned int *,EnumClassHash>  DATATYPE_MAPS
   {DataType::diploid10, pll_map_diploid10}
 };
 
-Model::Model (DataType data_type, const std::string &model_string) : _data_type(data_type)
+Model::Model (DataType data_type, const std::string &model_string) :
+    _data_type(data_type), _mix_model(nullptr)
 {
   init_from_string(model_string);
 }
 
 Model::~Model ()
 {
-  // TODO Auto-generated destructor stub
+  if (_mix_model)
+    pllmod_util_model_mixture_destroy(_mix_model);
 }
 
 const unsigned int * Model::charmap() const
@@ -206,23 +208,49 @@ void Model::init_model_opts(const std::string &model_opts)
       s++;
   }
 
+  /* default: equal rates & weights */
+  _ratecat_rates.assign(_num_ratecats, 1.0);
+  _ratecat_weights.assign(_num_ratecats, 1.0 / _num_ratecats);
+  _ratecat_submodels.assign(_num_ratecats, 0);
+
   if (_num_ratecats > 1)
   {
-    if (_rate_het == PLLMOD_UTIL_MIXTYPE_GAMMA)
+    /* init rate & weights according to the selected mode */
+    switch (_rate_het)
     {
-      if (_param_mode[PLLMOD_OPT_PARAM_ALPHA] == ParamValue::undefined)
-        _param_mode[PLLMOD_OPT_PARAM_ALPHA] = ParamValue::ML;
-    }
-    else
-    {
-      if (_rate_het == PLLMOD_UTIL_MIXTYPE_FREE)
-      {
+      case PLLMOD_UTIL_MIXTYPE_FIXED:
+        assert(_num_ratecats == _mix_model->ncomp);
+        /* set rates and weights from the mixture model definition */
+        _ratecat_rates.assign(_mix_model->mix_rates, _mix_model->mix_rates + _num_ratecats);
+        _ratecat_weights.assign(_mix_model->mix_weights, _mix_model->mix_weights + _num_ratecats);
+        break;
+
+      case PLLMOD_UTIL_MIXTYPE_GAMMA:
+        /* compute the discretized category rates from a gamma distribution
+           with given alpha shape and store them in rate_cats  */
+        pll_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data());
+        if (_param_mode[PLLMOD_OPT_PARAM_ALPHA] == ParamValue::undefined)
+          _param_mode[PLLMOD_OPT_PARAM_ALPHA] = ParamValue::ML;
+        break;
+
+      case PLLMOD_UTIL_MIXTYPE_FREE:
+        /* use GAMMA rates as inital values -> can be changed */
+        pll_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data());
         _param_mode[PLLMOD_OPT_PARAM_FREE_RATES] = ParamValue::ML;
         _param_mode[PLLMOD_OPT_PARAM_RATE_WEIGHTS] = ParamValue::ML;
-      }
+        break;
+
+      default:
+        throw runtime_error("Unknown rate heterogeneity model");
+    }
+
+    /* link rate categories to corresponding mixture components (R-matrix + freqs)*/
+    if (_mix_model->ncomp == _num_ratecats)
+    {
+      for (size_t i = 0; i < _num_ratecats; ++i)
+        _ratecat_submodels[i] = i;
     }
   }
-
 }
 
 std::string Model::to_string() const

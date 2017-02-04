@@ -42,9 +42,6 @@ public:
   std::string outfile_prefix;
   FileFormat msa_format;
 
-  PartitionedMSA part_msa;
-  size_t part_count() const { return part_msa.part_count(); };
-
   /* parallelization stuff */
   unsigned int num_threads;     /* number of threads */
   unsigned int thread_id;       /* ID of current threads [0..num_threads-1] */

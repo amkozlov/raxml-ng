@@ -5,12 +5,15 @@
 #include "Model.hpp"
 #include "MSA.hpp"
 
+class Options;
+
 class PartitionInfo
 {
 public:
   PartitionInfo (const std::string &name, DataType data_type,
                  const std::string &model_string, const std::string &range_string = "") :
-    _name(name), _range_string(range_string), _model(data_type, model_string), _msa() {};
+    _name(name), _range_string(range_string), _model(data_type, model_string), _msa(),
+    _stats(nullptr) {};
   virtual
   ~PartitionInfo ();
 
@@ -20,6 +23,8 @@ public:
     _range_string = std::move(other._range_string);
     _model = std::move(other._model);
     _msa = std::move(_msa);
+    _stats = other._stats;
+    other._stats = nullptr;
   }
 
   // getters
@@ -27,6 +32,7 @@ public:
   const Model& model() const { return _model; };
   const std::string& range_string() const { return _range_string; };
   const MSA& msa() const { return _msa; };
+  const pllmod_msa_stats_t * stats() const { return _stats ?_stats : compute_stats(); };
 
   // setters
   void msa(MSA&& msa) { _msa = std::move(msa); };
@@ -40,6 +46,9 @@ private:
   std::string _range_string;
   Model _model;
   MSA _msa;
+  mutable pllmod_msa_stats_t * _stats;
+
+  pllmod_msa_stats_t * compute_stats() const;
 };
 
 
@@ -97,6 +106,10 @@ public:
 private:
   std::vector<size_t> _unassigned_sites;
 };
+
+pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& pinfo,
+                                      pll_utree_t* tree);
+
 
 
 #endif /* RAXML_PARTITIONINFO_HPP_ */

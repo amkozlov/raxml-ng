@@ -94,8 +94,9 @@ void print_partition_info(const PartitionedMSA& part_msa)
     else
       LOG_INFO << "Alignment sites: " << pinfo.msa().num_sites() << endl;
 
-//    print_info("Gaps: %.2f %%\n", stats[p]->gap_prop * 100);
-//    print_info("Invariant sites: %.2f %%\n", stats[p]->inv_prop * 100);
+    LOG_INFO << fixed;
+    LOG_INFO << "Gaps: " << setprecision(2) << (pinfo.stats()->gap_prop * 100) << " %" << endl;
+    LOG_INFO << "Invariant sites: " << setprecision(2) << (pinfo.stats()->inv_prop * 100) << " %" << endl;
   }
 }
 

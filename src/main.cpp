@@ -178,7 +178,7 @@ PartitionedMSA init_part_info(const Options &opts)
       lg4x_count++;
   }
 
-  if (opts.part_count() > 1 && lg4x_count > 0 && opts.brlen_linkage == PLLMOD_TREE_BRLEN_LINKED)
+  if (part_msa.part_count() > 1 && lg4x_count > 0 && opts.brlen_linkage == PLLMOD_TREE_BRLEN_LINKED)
   {
     throw runtime_error("LG4X model is not supported in linked branch length mode, sorry :(");
   }
@@ -186,68 +186,7 @@ PartitionedMSA init_part_info(const Options &opts)
   return part_msa;
 }
 
-#ifdef aaa
-void PartitionedMSA::split_msa()
-{
-  pll_msa_t ** part_msa_list = NULL;
-  if (opts.part_count() > 1)
-  {
-    unsigned int * site_part = get_site_part_assignment(opts.part_msa);
-
-    /* split MSA into partitions */
-    part_msa_list = pllmod_msa_split(msa.pll_msa(), site_part, opts.part_count());
-  }
-
-  /* compute per-partition stats & compress patterns if needed */
-  unsigned int ** pattern_weights = NULL;
-  pllmod_msa_stats_t ** stats = NULL;
-
-  stats = (pllmod_msa_stats_t **) calloc(useropt->part_count, sizeof(pllmod_msa_stats_t *));
-  if (opts.use_pattern_compression)
-    pattern_weights = (unsigned int **) calloc(useropt->part_count, sizeof(unsigned int *));
-
-  for (p = 0; p < useropt->part_count; ++p)
-  {
-    const partition_info_t * part_info = useropt->part_info[p];
-    pll_msa_t * part_msa = part_msa_list ? part_msa_list[p] : &pll_msa;
-    const unsigned int * map = get_datatype_map(part_info->data_type);
-    const long num_sites = part_msa->length;
-
-    if (!map)
-      fatal("Datatype not supported: %d", part_info->data_type);
-
-    assert(map != NULL);
-    assert(msa->msa_type == RAXML_MSA_DISCRETE);
-
-    if (opts.use_pattern_compression)
-    {
-      //      print_progress(0, "Compressing site patterns...\n");
-      pattern_weights[p] = pll_compress_site_patterns(part_msa->sequence,
-                                                      map,
-                                                      part_msa->count,
-                                                      &part_msa->length);
-      if (!pattern_weights[p])
-        fatal_libpll();
-    }
-
-    stats[p] = compute_partition_stats(part_msa, part_info->num_states, map,
-                                       pattern_weights ? pattern_weights[p] : NULL);
-
-    validate_partition_stats(useropt, part_info, stats[p]);
-
-    /* print partition info */
-    print_info("\nPartition %d: %s\n", p, part_info->part_name);
-    print_info("Model: %s\n", part_info->model_str);
-    print_info("Alignment sites / patterns: %ld / %ld\n", num_sites, part_msa->length);
-    print_info("Gaps: %.2f %%\n", stats[p]->gap_prop * 100);
-    print_info("Invariant sites: %.2f %%\n", stats[p]->inv_prop * 100);
-
-//      print_progress(0, "Unique site patterns: %d\n", part_msa->length);
-  }
-}
-#endif
-
-pllmod_treeinfo_t * load_msa_and_tree(const Options &opts, PartitionedMSA& part_msa)
+pllmod_treeinfo_t * load_msa_and_tree(const Options& opts, PartitionedMSA& part_msa)
 {
   LOG_INFO << "Loading alignment from file: " << opts.msa_file << endl;
 
@@ -293,7 +232,7 @@ pllmod_treeinfo_t * load_msa_and_tree(const Options &opts, PartitionedMSA& part_
 //
 
   pllmod_treeinfo_t * treeinfo = pllmod_treeinfo_create(local_tree, part_msa.full_msa().size(),
-                                                        opts.part_count(),
+                                                        part_msa.part_count(),
                                                         opts.brlen_linkage);
 
   if (!treeinfo)
@@ -304,6 +243,30 @@ pllmod_treeinfo_t * load_msa_and_tree(const Options &opts, PartitionedMSA& part_
 #endif
 
   // init partitions
+  for (size_t p = 0; p < part_msa.part_count(); ++p)
+  {
+    const PartitionInfo& pinfo = part_msa.part_info(p);
+
+    /* create and init PLL partition structure */
+    pll_partition_t * partition = create_pll_partition(opts, pinfo, local_tree);
+
+#ifdef _USE_PTHREADS
+    parallel_thread_barrier(useropt);
+#endif
+
+    int retval = pllmod_treeinfo_init_partition(treeinfo, p, partition,
+                                                pinfo.model().params_to_optimize(),
+                                                pinfo.model().alpha(),
+                                                pinfo.model().ratecat_submodels().data(),
+                                                pinfo.model().submodel(0)->rate_sym);
+
+    if (!retval)
+      sysutil_fatal_libpll();
+  }
+
+  double loglh = pllmod_treeinfo_compute_loglh(treeinfo, 0);
+
+  LOG_INFO << "\nInitial LogLikelihood: " << loglh << endl;
 
   // TODO: set BRLEN and BRLEN scaler opt. flags!
 
