@@ -32,6 +32,7 @@
 #include "Options.hpp"
 #include "CommandLineParser.hpp"
 #include "PartitionInfo.hpp"
+#include "TreeInfo.hpp"
 
 using namespace std;
 
@@ -43,92 +44,48 @@ void print_banner()
       << endl << endl;
 }
 
-pll_utree_t * load_unrooted_tree(const char * filename,
-                                 unsigned int * tip_count)
+Tree get_start_tree(const Options &opts, const PartitionedMSA& part_msa)
 {
-  pll_utree_t * utree;
-  pll_rtree_t * rtree;
-
-  if (!(rtree = pll_rtree_parse_newick(filename, tip_count)))
-  {
-    if (!(utree = pll_utree_parse_newick(filename, tip_count)))
-    {
-      return NULL;
-    }
-  }
-  else
-  {
-    LOG_INFO << "NOTE: You provided a rooted tree; it will be automatically unrooted." << endl;
-    utree = pll_rtree_unroot(rtree);
-
-    /* optional step if using default PLL clv/pmatrix index assignments */
-    pll_utree_reset_template_indices(utree, *tip_count);
-  }
-
-  return utree;
-}
-
-pll_utree_t * get_start_tree(const Options &opts, PartitionedMSA& part_msa)
-{
-  unsigned int tip_nodes_count;
-  pll_utree_t * tree = NULL;
+  Tree tree;
 
   const MSA& msa = part_msa.full_msa();
 
   switch (opts.start_tree)
   {
     case StartingTree::user:
+    {
       assert(!opts.tree_file.empty());
 
       /* parse the unrooted binary tree in newick format, and store the number
          of tip nodes in tip_nodes_count */
-      tree = load_unrooted_tree(opts.tree_file.c_str(), &tip_nodes_count);
-      if (!tree)
-        sysutil_fatal("ERROR reading tree file: %s\n", pll_errmsg);
+      tree = Tree::loadFromFile(opts.tree_file);
 
-      if (msa.size() > tip_nodes_count)
+      if (msa.size() > tree.num_tips())
         sysutil_fatal("Alignment file contains more sequences than expected");
-      else if (msa.size() != tip_nodes_count)
+      else if (msa.size() != tree.num_tips())
         sysutil_fatal("Some taxa are missing from the alignment file");
 
-      LOG_INFO << "Loaded user starting tree with " << tip_nodes_count << " taxa from: "
+      LOG_INFO << "Loaded user starting tree with " << tree.num_tips() << " taxa from: "
                      << opts.tree_file << endl;
       break;
-
+    }
     case StartingTree::random:
       /* no starting tree provided, generate a random one */
       assert(opts.command != Command::evaluate);
 
       LOG_INFO << "Generating a random starting tree with " << msa.size() << " taxa" << endl;
 
-      tree = pllmod_utree_create_random(msa.size(), (const char * const*) msa.pll_msa()->label);
-      break;
+      tree = Tree::buildRandom(msa.size(), (const char * const*) msa.pll_msa()->label);
 
+      break;
     case StartingTree::parsimony:
     {
       LOG_INFO << "Generating a parsimony starting tree with " << msa.size() << " taxa" << endl;
 
-      // temporary workaround
-      unsigned int num_states = part_msa.model(0).num_states();
-      const unsigned int * map = part_msa.model(0).charmap();
-
       unsigned int score;
+      tree = Tree::buildParsimony(part_msa, opts.random_seed, opts.simd_arch, &score);
 
-      tree = pllmod_utree_create_parsimony(msa.size(),
-                                           msa.length(),
-                                           msa.pll_msa()->label,
-                                           msa.pll_msa()->sequence,
-                                           msa.weights(),
-                                           map,
-                                           num_states,
-                                           opts.simd_arch,
-                                           opts.random_seed,
-                                           &score);
-
-      if (tree)
-        LOG_INFO << "Parsimony score of the starting tree: " << score << endl;
-      else
-        sysutil_fatal_libpll();
+      LOG_INFO << "Parsimony score of the starting tree: " << score << endl;
 
       break;
     }
@@ -136,10 +93,10 @@ pll_utree_t * get_start_tree(const Options &opts, PartitionedMSA& part_msa)
       sysutil_fatal("Unknown starting tree type: %d\n", opts.start_tree);
   }
 
-  assert(tree != NULL);
+  assert(!tree.empty());
 
   /* fix missing branch lengths */
-  pllmod_utree_set_length_recursive(tree, RAXML_BRLEN_DEFAULT, 1);
+  tree.fix_missing_brlens();
 
   return tree;
 }
@@ -186,7 +143,7 @@ PartitionedMSA init_part_info(const Options &opts)
   return part_msa;
 }
 
-pllmod_treeinfo_t * load_msa_and_tree(const Options& opts, PartitionedMSA& part_msa)
+TreeInfo load_msa_and_tree(const Options& opts, PartitionedMSA& part_msa)
 {
   LOG_INFO << "Loading alignment from file: " << opts.msa_file << endl;
 
@@ -209,6 +166,8 @@ pllmod_treeinfo_t * load_msa_and_tree(const Options& opts, PartitionedMSA& part_
   if (opts.use_pattern_compression)
     part_msa.compress_patterns();
 
+  part_msa.set_modeL_empirical_params();
+
   LOG_INFO << endl;
 
   print_partition_info(part_msa);
@@ -216,57 +175,24 @@ pllmod_treeinfo_t * load_msa_and_tree(const Options& opts, PartitionedMSA& part_
   LOG_INFO << endl;
 
   /* load/create starting tree */
-  pll_utree_t * tree = get_start_tree(opts, part_msa);
+  auto tree = get_start_tree(opts, part_msa);
 
 #ifdef _USE_PTHREADS
   parallel_thread_broadcast(useropt, 0, &msa, sizeof(msa_data_t *));
   parallel_thread_broadcast(useropt, 0, &tree, sizeof(pll_utree_t *));
 #endif
 
-  assert(tree != NULL);
+  assert(!tree.empty());
 
-  pll_utree_t * local_tree = opts.thread_id == 0 ? tree : pll_utree_clone(tree);
+//  pll_utree_t * local_tree = opts.thread_id == 0 ? tree : pll_utree_clone(tree);
 
 //
 //  assert(msa != NULL && local_tree != NULL);
 //
 
-  pllmod_treeinfo_t * treeinfo = pllmod_treeinfo_create(local_tree, part_msa.full_msa().size(),
-                                                        part_msa.part_count(),
-                                                        opts.brlen_linkage);
+  TreeInfo treeinfo(opts, tree, part_msa);
 
-  if (!treeinfo)
-    sysutil_fatal("ERROR creating treeinfo structure: %s\n", pll_errmsg);
-
-#if (defined(_USE_PTHREADS) || defined(_USE_MPI))
-  pllmod_treeinfo_set_parallel_context(treeinfo, (void *) useropt, parallel_reduce_cb);
-#endif
-
-  // init partitions
-  for (size_t p = 0; p < part_msa.part_count(); ++p)
-  {
-    const PartitionInfo& pinfo = part_msa.part_info(p);
-
-    /* create and init PLL partition structure */
-    pll_partition_t * partition = create_pll_partition(opts, pinfo, local_tree);
-
-#ifdef _USE_PTHREADS
-    parallel_thread_barrier(useropt);
-#endif
-
-    int retval = pllmod_treeinfo_init_partition(treeinfo, p, partition,
-                                                pinfo.model().params_to_optimize(),
-                                                pinfo.model().alpha(),
-                                                pinfo.model().ratecat_submodels().data(),
-                                                pinfo.model().submodel(0)->rate_sym);
-
-    if (!retval)
-      sysutil_fatal_libpll();
-  }
-
-  double loglh = pllmod_treeinfo_compute_loglh(treeinfo, 0);
-
-  LOG_INFO << "\nInitial LogLikelihood: " << loglh << endl;
+  print_model_info(part_msa.model(0));
 
   // TODO: set BRLEN and BRLEN scaler opt. flags!
 
@@ -303,7 +229,8 @@ int main(int argc, char** argv)
       // parse model string & init partitions
       print_options(opts);
       auto part_msa = init_part_info(opts);
-      load_msa_and_tree(opts, part_msa);
+      auto treeinfo = load_msa_and_tree(opts, part_msa);
+      LOG_INFO << "\nInitial LogLikelihood: " << treeinfo.loglh() << endl;
       return EXIT_SUCCESS;
     }
     case Command::none:

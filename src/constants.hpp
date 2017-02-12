@@ -24,5 +24,4 @@ const unsigned int pll_map_diploid10[256] =
  };
 
 
-
 #endif /* RAXML_CONSTANTS_HPP_ */

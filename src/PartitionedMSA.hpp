@@ -39,6 +39,7 @@ public:
 
   void split_msa();
   void compress_patterns();
+  void set_modeL_empirical_params();
 
 private:
   std::vector<PartitionInfo> _part_list;

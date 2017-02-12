@@ -40,6 +40,7 @@ public:
   // operations
   size_t mark_partition_sites(unsigned int part_num, std::vector<unsigned int>& site_part);
   void compress_patterns();
+  void set_modeL_empirical_params();
 
 private:
   std::string _name;
@@ -106,10 +107,6 @@ public:
 private:
   std::vector<size_t> _unassigned_sites;
 };
-
-pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& pinfo,
-                                      pll_utree_t* tree);
-
 
 
 #endif /* RAXML_PARTITIONINFO_HPP_ */

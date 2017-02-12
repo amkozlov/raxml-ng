@@ -51,7 +51,6 @@ void Model::init_from_string(const std::string &model_string)
   init_mix_model(model_name);
 
   init_model_opts(model_opts);
-
 }
 
 
@@ -114,9 +113,17 @@ void Model::init_mix_model(const std::string &model_name)
 
 void Model::init_model_opts(const std::string &model_opts)
 {
+  _alpha = 1.0;
+  _pinv = 0.0;
+
   /* set rate heterogeneity defaults from model */
   _num_ratecats = _mix_model->ncomp;
+  _num_submodels = _mix_model->ncomp;
   _rate_het = _mix_model->mix_type;
+
+  /* allocate space for all subst matrices/base freqs */
+  _base_freqs.resize(_num_submodels);
+  _subst_rates.resize(_num_submodels);
 
   /* set default param optimization modes */
   for (auto param: ALL_MODEL_PARAMS)
@@ -206,6 +213,49 @@ void Model::init_model_opts(const std::string &model_opts)
     // rewind to next term
     while (*s != '+' && *s != '\0')
       s++;
+  }
+
+  switch (_param_mode.at(PLLMOD_OPT_PARAM_FREQUENCIES))
+  {
+    case ParamValue::user:
+    case ParamValue::empirical:
+      /* nothing to do here */
+      break;
+    case ParamValue::equal:
+    case ParamValue::ML:
+      /* use equal frequencies as s a starting value for ML optimization */
+      for (size_t i = 0; i < _base_freqs.size(); ++i)
+        _base_freqs[i].assign(_num_states, 1.0 / _num_states);
+      break;
+    case ParamValue::model:
+      for (size_t i = 0; i < _base_freqs.size(); ++i)
+        _base_freqs[i].assign(_mix_model->models[i]->freqs,
+                              _mix_model->models[i]->freqs + _num_states);
+      break;
+    default:
+      assert(0);
+  }
+
+  const size_t num_srates = pllmod_util_subst_rate_count(_num_states);
+  switch (_param_mode.at(PLLMOD_OPT_PARAM_SUBST_RATES))
+  {
+    case ParamValue::user:
+    case ParamValue::empirical:
+      /* nothing to do here */
+      break;
+    case ParamValue::equal:
+    case ParamValue::ML:
+      /* use equal rates as s a starting value for ML optimization */
+      for (size_t i = 0; i < _subst_rates.size(); ++i)
+        _subst_rates[i].assign(num_srates, 1.0);
+      break;
+    case ParamValue::model:
+      for (size_t i = 0; i < _subst_rates.size(); ++i)
+        _subst_rates[i].assign(_mix_model->models[i]->rates,
+                               _mix_model->models[i]->rates + num_srates);
+      break;
+    default:
+      assert(0);
   }
 
   /* default: equal rates & weights */
@@ -316,5 +366,183 @@ int Model::params_to_optimize() const
   }
 
   return params_to_optimize;
+}
+
+string get_param_mode_str(ParamValue mode)
+{
+  return ParamValueNames[(size_t) mode];
+}
+
+void assign(Model& model, const pllmod_msa_stats_t * stats)
+{
+  /* either compute empirical P-inv, or set the fixed user-specified value */
+  switch (model.param_mode(PLLMOD_OPT_PARAM_PINV))
+  {
+    case ParamValue::empirical:
+      model.pinv(stats->inv_prop);
+      break;
+    case ParamValue::ML:
+      /* use half of empirical pinv as a starting value */
+      model.pinv(stats->inv_prop / 2);
+      break;
+    case ParamValue::user:
+    case ParamValue::undefined:
+      /* nothing to do here */
+      break;
+    default:
+      assert(0);
+  }
+
+   /* assign empirical base frequencies */
+  switch (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES))
+  {
+    case ParamValue::empirical:
+//      if (_model.data_type == DataType::diploid10)
+//        /* for now, use a separate function to compute emp. freqs for diploid10 data*/
+//        alloc_freqs = base_freqs = get_diploid10_empirircal_freqs(msa);
+//      else
+      {
+//        base_freqs = pllmod_msa_empirical_frequencies(partition);
+        assert(stats->freqs && stats->states == model.num_states());
+        model.base_freqs(Model::doubleVector(stats->freqs, stats->freqs + stats->states));
+      }
+      break;
+    case ParamValue::user:
+    case ParamValue::equal:
+    case ParamValue::ML:
+    case ParamValue::model:
+      /* nothing to do here */
+      break;
+    default:
+      assert(0);
+  }
+
+  /* assign empirical substitution rates */
+  switch (model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES))
+  {
+    case ParamValue::empirical:
+    {
+//      double * subst_rates = pllmod_msa_empirical_subst_rates(partition);
+      size_t n_subst_rates = pllmod_util_subst_rate_count(stats->states);
+      model.subst_rates(Model::doubleVector(stats->subst_rates,
+                                            stats->subst_rates + n_subst_rates));
+      break;
+    }
+    case ParamValue::equal:
+    case ParamValue::user:
+    case ParamValue::ML:
+    case ParamValue::model:
+      /* nothing to do here */
+      break;
+    default:
+      assert(0);
+  }
+}
+
+void assign(Model& model, const pll_partition_t * partition)
+{
+  if (model.num_states() == partition->states &&
+      model.num_submodels() == partition->rate_matrices)
+  {
+    model.pinv(partition->prop_invar[0]);
+    for (size_t i = 0; i < model.num_submodels(); ++i)
+    {
+      model.base_freqs(i, Model::doubleVector(partition->frequencies[i],
+                                              partition->frequencies[i] + partition->states));
+
+      size_t n_subst_rates = pllmod_util_subst_rate_count(partition->states);
+      model.subst_rates(i, Model::doubleVector(partition->subst_params[i],
+                                               partition->subst_params[i] + n_subst_rates));
+
+      if (partition->rate_cats > 1)
+      {
+        model.ratecat_rates(Model::doubleVector(partition->rates[i],
+                                                 partition->rates[i] + partition->rate_cats));
+        model.ratecat_weights(Model::doubleVector(partition->rate_weights[i],
+                                                  partition->rate_weights[i] + partition->rate_cats));
+      }
+    }
+  }
+  else
+    throw runtime_error("incompatible partition!");
+}
+
+void assign(pll_partition_t * partition, const Model& model)
+{
+  if (model.num_states() == partition->states &&
+      model.num_submodels() == partition->rate_matrices)
+  {
+    /* set rate categories & weights */
+    pll_set_category_rates(partition, model.ratecat_rates().data());
+    pll_set_category_weights(partition, model.ratecat_weights().data());
+
+    /* now iterate over rate matrices and set all params */
+    for (size_t i = 0; i < partition->rate_matrices; ++i)
+    {
+      /* set base frequencies */
+      assert(!model.base_freqs(i).empty());
+      pll_set_frequencies(partition, i, model.base_freqs(i).data());
+
+      /* set substitution rates */
+      assert(!model.subst_rates(i).empty());
+      pll_set_subst_params(partition, i, model.subst_rates(i).data());
+
+      /* set p-inv value */
+      pll_update_invariant_sites_proportion (partition, i, model.pinv());
+    }
+  }
+  else
+    throw runtime_error("incompatible partition!");
+}
+
+void print_model_info(const Model& m)
+{
+//  if (treeinfo->brlen_linkage == PLLMOD_TREE_BRLEN_SCALED)
+//    print_info("   Speed (%s): %.3f\n",
+//               get_param_mode_str(part_info->paramval_brlen_scaler),
+//               treeinfo->brlen_scalers[p]);
+//
+//  print_info("   Branch lengths (%s): %s\n", get_param_mode_str(part_info->paramval_brlen),
+//             treeinfo->brlen_linkage == PLLMOD_TREE_BRLEN_SCALED ? "proportional" :
+//                 (treeinfo->brlen_linkage == PLLMOD_TREE_BRLEN_UNLINKED ? "unlinked" : "linked"));
+
+//  LOG_INFO << "   Rate heterogeneity: " << get_ratehet_mode_str(part_info);
+  if (m.num_ratecats() > 1)
+  {
+    LOG_INFO << " (" << m.num_ratecats() << " cats)";
+    if (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_GAMMA)
+      LOG_INFO << ",  alpha: " << m.alpha() << " ("  << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_ALPHA))
+                 << ")";
+    LOG_INFO << ",  weights&rates: ";
+    for (size_t i = 0; i < m.num_ratecats(); ++i)
+      LOG_INFO << "(" << m.ratecat_weights()[i] << "," << m.ratecat_rates()[i] << ") ";
+  }
+  LOG_INFO << endl;
+
+  if (m.param_mode(PLLMOD_OPT_PARAM_PINV) != ParamValue::undefined)
+    LOG_INFO << "   P-inv (" << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_PINV)) << "): " <<
+               m.pinv();
+
+  LOG_INFO << "   Base frequencies (" << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES)) << "): ";
+  for (size_t i = 0; i < m.num_submodels(); ++i)
+  {
+    if (m.num_submodels() > 1)
+      LOG_INFO << "\nM " << i << ": ";
+
+    for (size_t j = 0; j < m.base_freqs(i).size(); ++j)
+      LOG_INFO << m.base_freqs(i)[j] << " ";
+  }
+  LOG_INFO << endl;
+
+  LOG_INFO << "   Substitution rates (" << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES)) << "): ";
+  for (size_t i = 0; i < m.num_submodels(); ++i)
+  {
+    if (m.num_submodels() > 1)
+      LOG_INFO << "\nM " << i << ": ";
+
+    for (size_t j = 0; j < m.subst_rates(i).size(); ++j)
+      LOG_INFO << m.subst_rates(i)[j] << " ";
+  }
+  LOG_INFO << endl;
 }
 

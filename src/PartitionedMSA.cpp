@@ -79,6 +79,14 @@ void PartitionedMSA::compress_patterns()
   }
 }
 
+void PartitionedMSA::set_modeL_empirical_params()
+{
+  for (PartitionInfo& pinfo: _part_list)
+  {
+    pinfo.set_modeL_empirical_params();
+  }
+}
+
 void print_partition_info(const PartitionedMSA& part_msa)
 {
   for (size_t p = 0; p < part_msa.part_count(); ++p)

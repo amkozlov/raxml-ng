@@ -40,12 +40,18 @@ enum class DataType
 enum class ParamValue
 {
   undefined = 0,
-  equal,
-  user,
-  model,
-  empirical,
-  ML
+  equal = 1,
+  user = 2,
+  model = 3,
+  empirical = 4,
+  ML = 5
 };
+
+const std::string ParamValueNames[] = {"undefined", "equal", "user", "model", "empirical", "ML"};
+
+typedef std::pair<size_t,std::string> IdNamePair;
+typedef std::vector<IdNamePair> IdNameVector;
+typedef std::unordered_map<size_t,std::string> IdNameMap;
 
 /*
  * workaround needed for using enum as std::map key
