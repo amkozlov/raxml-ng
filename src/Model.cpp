@@ -4,7 +4,9 @@ using namespace std;
 
 const vector<int> ALL_MODEL_PARAMS = {PLLMOD_OPT_PARAM_FREQUENCIES, PLLMOD_OPT_PARAM_SUBST_RATES,
                                       PLLMOD_OPT_PARAM_PINV, PLLMOD_OPT_PARAM_ALPHA,
-                                      PLLMOD_OPT_PARAM_FREE_RATES, PLLMOD_OPT_PARAM_RATE_WEIGHTS};
+                                      PLLMOD_OPT_PARAM_FREE_RATES, PLLMOD_OPT_PARAM_RATE_WEIGHTS,
+                                      PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER,
+                                      PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE};
 
 const unordered_map<DataType,unsigned int,EnumClassHash>  DATATYPE_STATES { {DataType::dna, 4},
                                                                             {DataType::protein, 20},
@@ -20,15 +22,9 @@ const unordered_map<DataType, const unsigned int *,EnumClassHash>  DATATYPE_MAPS
 };
 
 Model::Model (DataType data_type, const std::string &model_string) :
-    _data_type(data_type), _mix_model(nullptr)
+    _data_type(data_type)
 {
   init_from_string(model_string);
-}
-
-Model::~Model ()
-{
-  if (_mix_model)
-    pllmod_util_model_mixture_destroy(_mix_model);
 }
 
 const unsigned int * Model::charmap() const
@@ -48,9 +44,11 @@ void Model::init_from_string(const std::string &model_string)
   /* set number of states based on datatype (unless already set) */
   _num_states = DATATYPE_STATES.at(_data_type);
 
-  init_mix_model(model_name);
+  pllmod_mixture_model_t * mix_model = init_mix_model(model_name);
 
-  init_model_opts(model_opts);
+  init_model_opts(model_opts, *mix_model);
+
+  pllmod_util_model_mixture_destroy(mix_model);
 }
 
 
@@ -72,13 +70,14 @@ void Model::autodetect_data_type(const std::string &model_name)
   }
 }
 
-void Model::init_mix_model(const std::string &model_name)
+pllmod_mixture_model_t * Model::init_mix_model(const std::string &model_name)
 {
   const char * model_cstr = model_name.c_str();
+  pllmod_mixture_model_t * mix_model = nullptr;
 
   if (pllmod_util_model_exists_protmix(model_cstr))
   {
-    _mix_model = pllmod_util_model_info_protmix(model_cstr);
+    mix_model = pllmod_util_model_info_protmix(model_cstr);
   }
   else
   {
@@ -106,34 +105,38 @@ void Model::init_mix_model(const std::string &model_name)
       throw runtime_error("Invalid model name: " + model_name);
 
     /* create pseudo-mixture with 1 component */
-    _mix_model = pllmod_util_model_mixture_create(modinfo->name, 1, &modinfo, NULL, NULL,
+    mix_model = pllmod_util_model_mixture_create(modinfo->name, 1, &modinfo, NULL, NULL,
                                                   PLLMOD_UTIL_MIXTYPE_FIXED);
   }
+
+  return mix_model;
 }
 
-void Model::init_model_opts(const std::string &model_opts)
+void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_model_t& mix_model)
 {
   _alpha = 1.0;
   _pinv = 0.0;
+  _brlen_scaler = 1.0;
+  _name = string(mix_model.name);
 
   /* set rate heterogeneity defaults from model */
-  _num_ratecats = _mix_model->ncomp;
-  _num_submodels = _mix_model->ncomp;
-  _rate_het = _mix_model->mix_type;
+  _num_ratecats = mix_model.ncomp;
+  _num_submodels = mix_model.ncomp;
+  _rate_het = mix_model.mix_type;
 
-  /* allocate space for all subst matrices/base freqs */
-  _base_freqs.resize(_num_submodels);
-  _subst_rates.resize(_num_submodels);
+  /* allocate space for all subst matrices */
+  for (size_t i = 0; i < mix_model.ncomp; ++i)
+    _submodels.emplace_back(*mix_model.models[i]);
 
   /* set default param optimization modes */
   for (auto param: ALL_MODEL_PARAMS)
     _param_mode[param] = ParamValue::undefined;
 
   _param_mode[PLLMOD_OPT_PARAM_FREQUENCIES] =
-      _mix_model->models[0]->freqs ? ParamValue::model : ParamValue::ML;
+      mix_model.models[0]->freqs ? ParamValue::model : ParamValue::ML;
 
   _param_mode[PLLMOD_OPT_PARAM_SUBST_RATES] =
-      _mix_model->models[0]->rates ? ParamValue::model : ParamValue::ML;
+      mix_model.models[0]->rates ? ParamValue::model : ParamValue::ML;
 
   const char *s = model_opts.c_str();
   const char *tmp;
@@ -219,18 +222,14 @@ void Model::init_model_opts(const std::string &model_opts)
   {
     case ParamValue::user:
     case ParamValue::empirical:
+    case ParamValue::model:
       /* nothing to do here */
       break;
     case ParamValue::equal:
     case ParamValue::ML:
       /* use equal frequencies as s a starting value for ML optimization */
-      for (size_t i = 0; i < _base_freqs.size(); ++i)
-        _base_freqs[i].assign(_num_states, 1.0 / _num_states);
-      break;
-    case ParamValue::model:
-      for (size_t i = 0; i < _base_freqs.size(); ++i)
-        _base_freqs[i].assign(_mix_model->models[i]->freqs,
-                              _mix_model->models[i]->freqs + _num_states);
+      for (auto& m: _submodels)
+        m.base_freqs(doubleVector(_num_states, 1.0 / _num_states));
       break;
     default:
       assert(0);
@@ -241,18 +240,14 @@ void Model::init_model_opts(const std::string &model_opts)
   {
     case ParamValue::user:
     case ParamValue::empirical:
+    case ParamValue::model:
       /* nothing to do here */
       break;
     case ParamValue::equal:
     case ParamValue::ML:
       /* use equal rates as s a starting value for ML optimization */
-      for (size_t i = 0; i < _subst_rates.size(); ++i)
-        _subst_rates[i].assign(num_srates, 1.0);
-      break;
-    case ParamValue::model:
-      for (size_t i = 0; i < _subst_rates.size(); ++i)
-        _subst_rates[i].assign(_mix_model->models[i]->rates,
-                               _mix_model->models[i]->rates + num_srates);
+      for (auto& m: _submodels)
+        m.subst_rates(doubleVector(num_srates, 1.0));
       break;
     default:
       assert(0);
@@ -269,10 +264,10 @@ void Model::init_model_opts(const std::string &model_opts)
     switch (_rate_het)
     {
       case PLLMOD_UTIL_MIXTYPE_FIXED:
-        assert(_num_ratecats == _mix_model->ncomp);
+        assert(_num_ratecats == mix_model.ncomp);
         /* set rates and weights from the mixture model definition */
-        _ratecat_rates.assign(_mix_model->mix_rates, _mix_model->mix_rates + _num_ratecats);
-        _ratecat_weights.assign(_mix_model->mix_weights, _mix_model->mix_weights + _num_ratecats);
+        _ratecat_rates.assign(mix_model.mix_rates, mix_model.mix_rates + _num_ratecats);
+        _ratecat_weights.assign(mix_model.mix_weights, mix_model.mix_weights + _num_ratecats);
         break;
 
       case PLLMOD_UTIL_MIXTYPE_GAMMA:
@@ -295,7 +290,7 @@ void Model::init_model_opts(const std::string &model_opts)
     }
 
     /* link rate categories to corresponding mixture components (R-matrix + freqs)*/
-    if (_mix_model->ncomp == _num_ratecats)
+    if (mix_model.ncomp == _num_ratecats)
     {
       for (size_t i = 0; i < _num_ratecats; ++i)
         _ratecat_submodels[i] = i;
@@ -368,9 +363,18 @@ int Model::params_to_optimize() const
   return params_to_optimize;
 }
 
-string get_param_mode_str(ParamValue mode)
+static string get_param_mode_str(ParamValue mode)
 {
   return ParamValueNames[(size_t) mode];
+}
+
+static string get_ratehet_mode_str(const Model& m)
+{
+  if (m.num_ratecats() == 1)
+    return "NONE";
+  else
+    return (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_GAMMA) ? "GAMMA" :
+            (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_FREE) ? "FREE" : "FIXED";
 }
 
 void assign(Model& model, const pllmod_msa_stats_t * stats)
@@ -404,7 +408,7 @@ void assign(Model& model, const pllmod_msa_stats_t * stats)
       {
 //        base_freqs = pllmod_msa_empirical_frequencies(partition);
         assert(stats->freqs && stats->states == model.num_states());
-        model.base_freqs(Model::doubleVector(stats->freqs, stats->freqs + stats->states));
+        model.base_freqs(doubleVector(stats->freqs, stats->freqs + stats->states));
       }
       break;
     case ParamValue::user:
@@ -424,8 +428,8 @@ void assign(Model& model, const pllmod_msa_stats_t * stats)
     {
 //      double * subst_rates = pllmod_msa_empirical_subst_rates(partition);
       size_t n_subst_rates = pllmod_util_subst_rate_count(stats->states);
-      model.subst_rates(Model::doubleVector(stats->subst_rates,
-                                            stats->subst_rates + n_subst_rates));
+      model.subst_rates(doubleVector(stats->subst_rates,
+                                     stats->subst_rates + n_subst_rates));
       break;
     }
     case ParamValue::equal:
@@ -447,20 +451,20 @@ void assign(Model& model, const pll_partition_t * partition)
     model.pinv(partition->prop_invar[0]);
     for (size_t i = 0; i < model.num_submodels(); ++i)
     {
-      model.base_freqs(i, Model::doubleVector(partition->frequencies[i],
-                                              partition->frequencies[i] + partition->states));
+      model.base_freqs(i, doubleVector(partition->frequencies[i],
+                                       partition->frequencies[i] + partition->states));
 
       size_t n_subst_rates = pllmod_util_subst_rate_count(partition->states);
-      model.subst_rates(i, Model::doubleVector(partition->subst_params[i],
-                                               partition->subst_params[i] + n_subst_rates));
+      model.subst_rates(i, doubleVector(partition->subst_params[i],
+                                        partition->subst_params[i] + n_subst_rates));
+    }
 
-      if (partition->rate_cats > 1)
-      {
-        model.ratecat_rates(Model::doubleVector(partition->rates[i],
-                                                 partition->rates[i] + partition->rate_cats));
-        model.ratecat_weights(Model::doubleVector(partition->rate_weights[i],
-                                                  partition->rate_weights[i] + partition->rate_cats));
-      }
+    if (partition->rate_cats > 1)
+    {
+      model.ratecat_rates(doubleVector(partition->rates,
+                                       partition->rates + partition->rate_cats));
+      model.ratecat_weights(doubleVector(partition->rate_weights,
+                                         partition->rate_weights + partition->rate_cats));
     }
   }
   else
@@ -497,16 +501,16 @@ void assign(pll_partition_t * partition, const Model& model)
 
 void print_model_info(const Model& m)
 {
-//  if (treeinfo->brlen_linkage == PLLMOD_TREE_BRLEN_SCALED)
-//    print_info("   Speed (%s): %.3f\n",
-//               get_param_mode_str(part_info->paramval_brlen_scaler),
-//               treeinfo->brlen_scalers[p]);
-//
+  LOG_INFO << endl;
+  if (m.param_mode(PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER) != ParamValue::undefined)
+    LOG_INFO << "   Speed ("  << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER))
+             << "): " << m.brlen_scaler() << endl;
+
 //  print_info("   Branch lengths (%s): %s\n", get_param_mode_str(part_info->paramval_brlen),
 //             treeinfo->brlen_linkage == PLLMOD_TREE_BRLEN_SCALED ? "proportional" :
 //                 (treeinfo->brlen_linkage == PLLMOD_TREE_BRLEN_UNLINKED ? "unlinked" : "linked"));
 
-//  LOG_INFO << "   Rate heterogeneity: " << get_ratehet_mode_str(part_info);
+  LOG_INFO << "   Rate heterogeneity: " << get_ratehet_mode_str(m);
   if (m.num_ratecats() > 1)
   {
     LOG_INFO << " (" << m.num_ratecats() << " cats)";

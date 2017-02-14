@@ -23,13 +23,26 @@ extern "C" {
 #include "constants.hpp"
 #include "log.hpp"
 
+#define RAXML_DOUBLE_TOLERANCE    1e-14
+
 // defaults
-#define RAXML_BRLEN_SMOOTHINGS    32
-#define RAXML_BRLEN_DEFAULT       0.1
 #define DEF_LH_EPSILON            0.1
 #define OPT_LH_EPSILON            0.1
 #define RAXML_PARAM_EPSILON       0.01
 #define RAXML_BFGS_FACTOR         1e7
+
+#define RAXML_BRLEN_SMOOTHINGS    32
+#define RAXML_BRLEN_DEFAULT       0.1
+#define RAXML_BRLEN_MIN           1.0e-6
+#define RAXML_BRLEN_MAX           100.
+#define RAXML_BRLEN_TOLERANCE     1.0e-7
+
+#define RAXML_FREERATE_MIN        0.001
+#define RAXML_FREERATE_MAX        100.
+
+#define RAXML_BRLEN_SCALER_MIN    0.01
+#define RAXML_BRLEN_SCALER_MAX    100.
+
 
 // cpu features
 #define RAXML_CPU_SSE3  (1<<0)
@@ -49,5 +62,6 @@ unsigned long sysutil_get_memtotal();
 unsigned long sysutil_get_cpu_features();
 unsigned int sysutil_simd_autodetect();
 
+double sysutil_elapsed_seconds();
 
 #endif /* RAXML_COMMON_H_ */

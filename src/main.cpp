@@ -31,6 +31,7 @@
 #include "MSA.hpp"
 #include "Options.hpp"
 #include "CommandLineParser.hpp"
+#include "Optimizer.hpp"
 #include "PartitionInfo.hpp"
 #include "TreeInfo.hpp"
 
@@ -199,6 +200,22 @@ TreeInfo load_msa_and_tree(const Options& opts, PartitionedMSA& part_msa)
   return treeinfo;
 }
 
+void search_evaluate(const Options& opts)
+{
+  auto part_msa = init_part_info(opts);
+  auto treeinfo = load_msa_and_tree(opts, part_msa);
+  LOG_INFO << "\nInitial LogLikelihood: " << treeinfo.loglh() << endl;
+  Optimizer optimizer(opts);
+  if (opts.command == Command::search)
+    optimizer.optimize_topology(treeinfo);
+  else
+    optimizer.optimize(treeinfo);
+  assign(part_msa, treeinfo);
+  for (auto const& pinfo: part_msa.part_list())
+    print_model_info(pinfo.model());
+  LOG_INFO << "\nFinal LogLikelihood: " << setprecision(6) << treeinfo.loglh() << endl;
+}
+
 int main(int argc, char** argv)
 {
   print_banner();
@@ -228,9 +245,7 @@ int main(int argc, char** argv)
     {
       // parse model string & init partitions
       print_options(opts);
-      auto part_msa = init_part_info(opts);
-      auto treeinfo = load_msa_and_tree(opts, part_msa);
-      LOG_INFO << "\nInitial LogLikelihood: " << treeinfo.loglh() << endl;
+      search_evaluate(opts);
       return EXIT_SUCCESS;
     }
     case Command::none:

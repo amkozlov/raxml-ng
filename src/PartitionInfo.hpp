@@ -36,6 +36,7 @@ public:
 
   // setters
   void msa(MSA&& msa) { _msa = std::move(msa); };
+  void model(Model&& model) { _model = std::move(model); };
 
   // operations
   size_t mark_partition_sites(unsigned int part_num, std::vector<unsigned int>& site_part);

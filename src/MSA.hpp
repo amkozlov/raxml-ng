@@ -10,14 +10,17 @@ public:
   typedef typename container::iterator        iterator;
   typedef typename container::const_iterator  const_iterator;
 
-  MSA() : _length(0), _num_sites(0), _pll_msa(nullptr), _dirty(false) {};
+  MSA() : _length(0), _num_sites(0), _pll_msa(NULL), _dirty(false) {};
   MSA(const unsigned int num_sites) : _length(0), _num_sites(num_sites),
       _pll_msa(nullptr), _dirty(false) {};
   MSA(const pll_msa_t * pll_msa);
-  MSA(MSA&& other) = default;
+  MSA(MSA&& other);
+  MSA(const MSA& other) = delete;
+
   ~MSA();
 
   MSA& operator=(MSA&& other);
+  MSA& operator=(const MSA& other) = delete;
 
   void append(const std::string& header, const std::string& sequence);
   void erase(iterator begin, iterator end) {_sequence_map.erase(begin, end);};

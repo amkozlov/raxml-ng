@@ -15,10 +15,18 @@ MSA::MSA(const pll_msa_t *pll_msa) :
   update_pll_msa();
 }
 
+MSA::MSA(MSA&& other) : _length(other._length), _num_sites(other._num_sites),
+    _sequence_map(move(other._sequence_map)), _weights(move(other._weights)),
+    _pll_msa(other._pll_msa), _dirty(other._dirty)
+{
+  other._length = other._num_sites = 0;
+  other._pll_msa = nullptr;
+  other._dirty = false;
+};
+
 MSA::~MSA()
 {
   free_pll_msa();
-//  printf("MSA destructor\n");
 }
 
 MSA& MSA::operator=(MSA&& other)
@@ -36,10 +44,12 @@ MSA& MSA::operator=(MSA&& other)
     _pll_msa = other._pll_msa;
     _weights = std::move(other._weights);
     _sequence_map = std::move(other._sequence_map);
+    _dirty = other._dirty;
 
     // reset other
     other._length = other._num_sites = 0;
     other._pll_msa = nullptr;
+    other._dirty = false;
   }
   return *this;
 }
@@ -51,6 +61,7 @@ void MSA::free_pll_msa() noexcept
     free(_pll_msa->label);
     free(_pll_msa->sequence);
     free(_pll_msa);
+    _pll_msa = nullptr;
   }
 }
 
@@ -83,6 +94,8 @@ void MSA::compress_patterns(const unsigned int * charmap)
 {
   update_pll_msa();
 
+  assert(_pll_msa->count && _pll_msa->length);
+
   const unsigned int * w = pll_compress_site_patterns(_pll_msa->sequence,
                                                       charmap,
                                                       _pll_msa->count,
@@ -108,7 +121,7 @@ void MSA::update_pll_msa() const
 {
   if (!_pll_msa)
   {
-    _pll_msa = (pll_msa_t *) malloc(sizeof(pll_msa_t));
+    _pll_msa = (pll_msa_t *) calloc(1, sizeof(pll_msa_t));
     _dirty = true;
   }
 
@@ -220,8 +233,11 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format)
           return msa_load_from_fasta(filename);
           break;
         case FileFormat::phylip:
-          return msa_load_from_phylip(filename);
+        {
+          auto msa = msa_load_from_phylip(filename);
+          return msa;
           break;
+        }
         default:
           throw runtime_error("Unsupported MSA file format!");
       }

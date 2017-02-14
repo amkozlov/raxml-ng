@@ -15,6 +15,9 @@ TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA&
 #endif
 
   // init partitions
+  int optimize_branches = opts.optimize_brlen ? PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE : 0;
+  if (opts.brlen_linkage == PLLMOD_TREE_BRLEN_SCALED && parted_msa.part_count() > 1)
+    optimize_branches |= PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER;
   for (size_t p = 0; p < parted_msa.part_count(); ++p)
   {
     const PartitionInfo& pinfo = parted_msa.part_info(p);
@@ -26,11 +29,12 @@ TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA&
     parallel_thread_barrier(useropt);
 #endif
 
+    const int params_to_optimize = pinfo.model().params_to_optimize() | optimize_branches;
     int retval = pllmod_treeinfo_init_partition(_pll_treeinfo, p, partition,
-                                                pinfo.model().params_to_optimize(),
+                                                params_to_optimize,
                                                 pinfo.model().alpha(),
                                                 pinfo.model().ratecat_submodels().data(),
-                                                pinfo.model().submodel(0)->rate_sym);
+                                                pinfo.model().submodel(0).rate_sym().data());
 
     if (!retval)
       throw runtime_error("ERROR adding treeinfo partition: " + string(pll_errmsg));
@@ -47,6 +51,155 @@ double TreeInfo::loglh(bool incremental)
 {
   return pllmod_treeinfo_compute_loglh(_pll_treeinfo, incremental ? 1 : 0);
 }
+
+//#define DBG printf
+
+double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor)
+{
+  /* update all CLVs and p-matrices before calling BLO */
+  double new_loglh = loglh();
+
+  if (_pll_treeinfo->params_to_optimize[0] & PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE)
+  {
+    new_loglh = -1 * pllmod_opt_optimize_branch_lengths_local_multi(_pll_treeinfo->partitions,
+                                                                    _pll_treeinfo->partition_count,
+                                                                    _pll_treeinfo->root,
+                                                                    _pll_treeinfo->param_indices,
+                                                                    _pll_treeinfo->deriv_precomp,
+                                                                    _pll_treeinfo->brlen_scalers,
+                                                                    RAXML_BRLEN_MIN,
+                                                                    RAXML_BRLEN_MAX,
+                                                                    lh_epsilon,
+                                                                    brlen_smooth_factor * RAXML_BRLEN_SMOOTHINGS,
+                                                                    -1,  /* radius */
+                                                                    1,    /* keep_update */
+                                                                    _pll_treeinfo->parallel_context,
+                                                                    _pll_treeinfo->parallel_reduce_cb
+                                                                    );
+    DBG("\t - after brlen: logLH = %f\n", new_loglh);
+
+    if (pll_errno)
+      throw runtime_error("ERROR in branch lenght optimization: " + string(pll_errmsg));
+  }
+
+  /* optimize brlen scalers, if needed */
+  if (_pll_treeinfo->brlen_linkage == PLLMOD_TREE_BRLEN_SCALED &&
+      _pll_treeinfo->partition_count > 1)
+  {
+    new_loglh = -1 * pllmod_algo_opt_onedim_treeinfo(_pll_treeinfo,
+                                                    PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER,
+                                                    RAXML_BRLEN_SCALER_MIN,
+                                                    RAXML_BRLEN_SCALER_MAX,
+                                                    RAXML_PARAM_EPSILON);
+
+    /* normalize scalers and scale the branches accordingly */
+    pllmod_treeinfo_normalize_brlen_scalers(_pll_treeinfo);
+
+    DBG("\t - after brlen scalers: logLH = %f\n", new_loglh);
+  }
+
+
+  return new_loglh;
+}
+
+double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
+{
+  double new_loglh;
+
+  /* optimize SUBSTITUTION RATES */
+  if (params_to_optimize & PLLMOD_OPT_PARAM_SUBST_RATES)
+  {
+    new_loglh = -1 * pllmod_algo_opt_subst_rates_treeinfo(_pll_treeinfo,
+                                                          0,
+                                                          PLLMOD_OPT_MIN_SUBST_RATE,
+                                                          PLLMOD_OPT_MAX_SUBST_RATE,
+                                                          RAXML_BFGS_FACTOR,
+                                                          RAXML_PARAM_EPSILON);
+    DBG("\t - after rates: logLH = %f\n", new_loglh);
+  }
+
+  /* optimize BASE FREQS */
+  if (params_to_optimize & PLLMOD_OPT_PARAM_FREQUENCIES)
+  {
+    new_loglh = -1 * pllmod_algo_opt_frequencies_treeinfo(_pll_treeinfo,
+                                                          0,
+                                                          PLLMOD_OPT_MIN_FREQ,
+                                                          PLLMOD_OPT_MAX_FREQ,
+                                                          RAXML_BFGS_FACTOR,
+                                                          RAXML_PARAM_EPSILON);
+
+    DBG("\t - after freqs: logLH = %f\n", new_loglh);
+  }
+
+  /* optimize ALPHA */
+  if (params_to_optimize & PLLMOD_OPT_PARAM_ALPHA)
+  {
+    new_loglh = -1 * pllmod_algo_opt_onedim_treeinfo(_pll_treeinfo,
+                                                      PLLMOD_OPT_PARAM_ALPHA,
+                                                      PLLMOD_OPT_MIN_ALPHA,
+                                                      PLLMOD_OPT_MAX_ALPHA,
+                                                      RAXML_PARAM_EPSILON);
+    DBG("\t - after alpha: logLH = %f\n", new_loglh);
+  }
+
+  if (params_to_optimize & PLLMOD_OPT_PARAM_PINV)
+  {
+    new_loglh = -1 * pllmod_algo_opt_onedim_treeinfo(_pll_treeinfo,
+                                                      PLLMOD_OPT_PARAM_PINV,
+                                                      PLLMOD_OPT_MIN_PINV,
+                                                      PLLMOD_OPT_MAX_PINV,
+                                                      RAXML_PARAM_EPSILON);
+
+    DBG("\t - after p-inv: logLH = %f\n", new_loglh);
+  }
+
+  /* optimize FREE RATES and WEIGHTS */
+  if (params_to_optimize & PLLMOD_OPT_PARAM_FREE_RATES)
+  {
+    new_loglh = -1 * pllmod_algo_opt_rates_weights_treeinfo (_pll_treeinfo,
+                                                          RAXML_FREERATE_MIN,
+                                                          RAXML_FREERATE_MAX,
+                                                          RAXML_BFGS_FACTOR,
+                                                          RAXML_PARAM_EPSILON);
+  }
+
+  DBG("\t - after freeR: logLH = %f\n", new_loglh);
+  DBG("\t - after freeR/crosscheck: logLH = %f\n", loglh());
+
+  if (params_to_optimize & PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE)
+  {
+    new_loglh = optimize_branches(1.0, lh_epsilon);
+  }
+
+  return new_loglh;
+}
+
+double TreeInfo::spr_round(spr_round_params& params)
+{
+  return pllmod_algo_spr_round(_pll_treeinfo, params.radius_min, params.radius_max,
+                               params.ntopol_keep, params.thorough,
+                               RAXML_BRLEN_MIN, RAXML_BRLEN_MAX, RAXML_BRLEN_SMOOTHINGS,
+                               0.1,
+                               params.subtree_cutoff > 0. ? &params.cutoff_info : nullptr,
+                               params.subtree_cutoff);
+}
+
+
+void assign(PartitionedMSA& parted_msa, const TreeInfo& treeinfo)
+{
+  if (parted_msa.part_count() != treeinfo.pll_treeinfo().partition_count)
+    throw runtime_error("Incompatible arguments");
+
+  for (size_t p = 0; p < parted_msa.part_count(); ++p)
+  {
+    Model model;
+    assign(model, treeinfo.pll_treeinfo().partitions[p]);
+    model.alpha(treeinfo.pll_treeinfo().alphas[p]);
+    model.brlen_scaler(treeinfo.pll_treeinfo().brlen_scalers[p]);
+    parted_msa.model(p, move(model));
+  }
+}
+
 
 void set_partition_tips(PartitionInfo const& pinfo, pll_partition_t* partition,
                         IdNameVector const& clv_label_map)

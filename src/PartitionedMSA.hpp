@@ -28,6 +28,7 @@ public:
   {
     _part_list.at(index).msa(MSA(pll_msa));
   };
+  void model(size_t index, Model&& m) { return _part_list.at(index).model(std::move(m)); };
 
   // operations
 //  void append_part_info(PartitionInfo&& part_info);

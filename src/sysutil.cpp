@@ -4,9 +4,13 @@
 #include <stdarg.h>
 #include <limits.h>
 
+#include <chrono>
+
 #include "common.h"
 
 using namespace std;
+
+chrono::time_point<chrono::system_clock> start_time = chrono::system_clock::now();
 
 void sysutil_fatal(const char * format, ...)
 {
@@ -227,3 +231,26 @@ unsigned int sysutil_simd_autodetect()
     return PLL_ATTRIB_ARCH_CPU;
 }
 
+double sysutil_elapsed_seconds()
+{
+  chrono::time_point<chrono::system_clock> end_time = chrono::system_clock::now();
+  chrono::duration<double> elapsed_seconds = end_time - start_time;
+  return elapsed_seconds.count();
+}
+
+void print_progress(double loglh, const char* format, ... )
+{
+  const size_t BUF_SIZE = 1024;
+  char buf[BUF_SIZE];
+
+  va_list args;
+  va_start(args, format);
+  vsnprintf(buf, BUF_SIZE, format, args);
+  va_end(args);
+
+  const double secs = sysutil_elapsed_seconds();
+  const unsigned int hh = secs / 3600;
+  const unsigned int mm = (secs - hh * 3600) / 60;
+  const unsigned int ss = (secs - hh * 3600 - mm * 60);
+  printf("[%u:%02u:%02u %f] %s", hh, mm, ss, loglh, buf);
+}
