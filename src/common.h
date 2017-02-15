@@ -64,4 +64,6 @@ unsigned int sysutil_simd_autodetect();
 
 double sysutil_elapsed_seconds();
 
+std::string sysutil_realpath(const std::string& path);
+
 #endif /* RAXML_COMMON_H_ */

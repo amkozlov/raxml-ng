@@ -1,6 +1,12 @@
 #include "Options.hpp"
+//#include <stdlib.h>
 
 using namespace std;
+
+string Options::output_fname(const string& suffix) const
+{
+  return (outfile_prefix.empty() ? msa_file : outfile_prefix) + "." + suffix;
+}
 
 static string get_simd_arch_name(unsigned int simd_arch)
 {

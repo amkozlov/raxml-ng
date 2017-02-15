@@ -34,6 +34,7 @@
 #include "Optimizer.hpp"
 #include "PartitionInfo.hpp"
 #include "TreeInfo.hpp"
+#include "file_io.hpp"
 
 using namespace std;
 
@@ -202,18 +203,30 @@ TreeInfo load_msa_and_tree(const Options& opts, PartitionedMSA& part_msa)
 
 void search_evaluate(const Options& opts)
 {
+  const string tree_fname = opts.output_fname("raxml.bestTree");
+
   auto part_msa = init_part_info(opts);
   auto treeinfo = load_msa_and_tree(opts, part_msa);
   LOG_INFO << "\nInitial LogLikelihood: " << treeinfo.loglh() << endl;
+
   Optimizer optimizer(opts);
   if (opts.command == Command::search)
     optimizer.optimize_topology(treeinfo);
   else
     optimizer.optimize(treeinfo);
+
   assign(part_msa, treeinfo);
   for (auto const& pinfo: part_msa.part_list())
     print_model_info(pinfo.model());
+
   LOG_INFO << "\nFinal LogLikelihood: " << setprecision(6) << treeinfo.loglh() << endl;
+
+  NewickStream nw_result(tree_fname);
+  nw_result << *treeinfo.pll_treeinfo().root;
+
+  LOG_INFO << "\nElapsed time: " << setprecision(3) << sysutil_elapsed_seconds() << " seconds\n";
+
+  LOG_INFO << "\nFinal tree saved to: " << sysutil_realpath(tree_fname) << endl;
 }
 
 int main(int argc, char** argv)

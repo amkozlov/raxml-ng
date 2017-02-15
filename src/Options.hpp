@@ -17,6 +17,8 @@ public:
 
   ~Options() = default;
 
+  std::string output_fname(const std::string& suffix) const;
+
   Command command;
 
   bool use_tip_inner;

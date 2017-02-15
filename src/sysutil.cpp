@@ -254,3 +254,32 @@ void print_progress(double loglh, const char* format, ... )
   const unsigned int ss = (secs - hh * 3600 - mm * 60);
   printf("[%u:%02u:%02u %f] %s", hh, mm, ss, loglh, buf);
 }
+
+std::string sysutil_realpath(const std::string& path)
+{
+  char * real_path = realpath(path.c_str(), NULL);
+  if (real_path)
+  {
+    const string result(real_path);
+    free(real_path);
+    return result;
+  }
+  else
+  {
+    switch(errno)
+    {
+      case EACCES:
+        throw ios_base::failure("Can't access file: " + path);
+        break;
+      case ENOENT:
+        throw ios_base::failure("File doesn't exist: " + path);
+        break;
+      case ELOOP:
+      case ENAMETOOLONG:
+        throw ios_base::failure("Path too long or too many symlinks: " + path);
+        break;
+      default:
+        throw ios_base::failure("Unknown I/O error: " + path);
+    }
+  }
+}
