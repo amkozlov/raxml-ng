@@ -9,7 +9,7 @@ MSA::MSA(const pll_msa_t *pll_msa) :
 {
   for (auto i = 0; i < pll_msa->count; ++i)
   {
-    append(pll_msa->label[i], pll_msa->sequence[i]);
+    append(pll_msa->label[i], string(pll_msa->sequence[i], pll_msa->length));
   }
 
   update_pll_msa();

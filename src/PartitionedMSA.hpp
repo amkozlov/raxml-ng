@@ -31,7 +31,8 @@ public:
   void model(size_t index, Model&& m) { return _part_list.at(index).model(std::move(m)); };
 
   // operations
-//  void append_part_info(PartitionInfo&& part_info);
+  void append_part_info(PartitionInfo&& part_info) { _part_list.push_back(std::move(part_info)); };
+
   template <class... Args>
   void emplace_part_info (Args&&... args)
   {

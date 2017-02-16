@@ -192,7 +192,7 @@ void assign(PartitionedMSA& parted_msa, const TreeInfo& treeinfo)
 
   for (size_t p = 0; p < parted_msa.part_count(); ++p)
   {
-    Model model;
+    Model model(parted_msa.model(p));
     assign(model, treeinfo.pll_treeinfo().partitions[p]);
     model.alpha(treeinfo.pll_treeinfo().alphas[p]);
     model.brlen_scaler(treeinfo.pll_treeinfo().brlen_scalers[p]);
@@ -268,9 +268,9 @@ pll_partition_t* create_pll_partition(Options const& opts, PartitionInfo const& 
   if (msa.weights())
     pll_set_pattern_weights(partition, msa.weights());
 
-  assign(partition, model);
-
   set_partition_tips(pinfo, partition, tree.tip_labels());
+
+  assign(partition, model);
 
   return partition;
 }

@@ -64,7 +64,10 @@ void PartitionedMSA::split_msa()
 
     for (size_t p = 0; p < part_count(); ++p)
     {
+      part_msa_list[p]->label = _full_msa.pll_msa()->label;
       part_msa(p, part_msa_list[p]);
+      part_msa_list[p]->label = nullptr;
+      // TODO pll_msa_destroy -> fix in libpll
     }
   }
   else
@@ -105,6 +108,7 @@ void print_partition_info(const PartitionedMSA& part_msa)
     LOG_INFO << fixed;
     LOG_INFO << "Gaps: " << setprecision(2) << (pinfo.stats()->gap_prop * 100) << " %" << endl;
     LOG_INFO << "Invariant sites: " << setprecision(2) << (pinfo.stats()->inv_prop * 100) << " %" << endl;
+    LOG_INFO << endl;
   }
 }
 

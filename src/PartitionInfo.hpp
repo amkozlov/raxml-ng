@@ -10,12 +10,15 @@ class Options;
 class PartitionInfo
 {
 public:
+  PartitionInfo () :
+    _name(""), _range_string(""), _model(), _msa(), _stats(nullptr) {};
+
   PartitionInfo (const std::string &name, DataType data_type,
                  const std::string &model_string, const std::string &range_string = "") :
     _name(name), _range_string(range_string), _model(data_type, model_string), _msa(),
     _stats(nullptr) {};
-  virtual
-  ~PartitionInfo ();
+
+  virtual ~PartitionInfo ();
 
   PartitionInfo (PartitionInfo&& other)
   {
@@ -37,6 +40,8 @@ public:
   // setters
   void msa(MSA&& msa) { _msa = std::move(msa); };
   void model(Model&& model) { _model = std::move(model); };
+  void name(const std::string& value) { _name = value; };
+  void range_string(const std::string& value) { _range_string = value; };
 
   // operations
   size_t mark_partition_sites(unsigned int part_num, std::vector<unsigned int>& site_part);

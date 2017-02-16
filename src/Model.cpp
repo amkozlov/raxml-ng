@@ -290,7 +290,7 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
     }
 
     /* link rate categories to corresponding mixture components (R-matrix + freqs)*/
-    if (mix_model.ncomp == _num_ratecats)
+    if (_num_submodels == _num_ratecats)
     {
       for (size_t i = 0; i < _num_ratecats; ++i)
         _ratecat_submodels[i] = i;
@@ -525,7 +525,7 @@ void print_model_info(const Model& m)
 
   if (m.param_mode(PLLMOD_OPT_PARAM_PINV) != ParamValue::undefined)
     LOG_INFO << "   P-inv (" << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_PINV)) << "): " <<
-               m.pinv();
+               m.pinv() << endl;
 
   LOG_INFO << "   Base frequencies (" << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES)) << "): ";
   for (size_t i = 0; i < m.num_submodels(); ++i)

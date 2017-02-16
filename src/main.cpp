@@ -111,9 +111,9 @@ PartitionedMSA init_part_info(const Options &opts)
   if (access(opts.model_file.c_str(), F_OK) != -1)
   {
     // read partition definitions from file
-//    int retval = pll_msa_load_raxml_partfile(model_string, &useropt->part_count, &useropt->part_info);
-//    if (!retval)
-//      fatal_libpll();
+    RaxmlPartitionFileStream partfile(opts.model_file);
+    partfile >> part_msa;
+
 //    DBG("partitions found: %d\n", useropt->part_count);
   }
   else
@@ -151,8 +151,6 @@ TreeInfo load_msa_and_tree(const Options& opts, PartitionedMSA& part_msa)
 
   /* load MSA */
   auto msa = msa_load_from_file(opts.msa_file, opts.msa_format);
-
-//  auto msa = std::make_shared<MSA>( msa_load_from_file(opts.msa_file, opts.msa_format));
 
   LOG_INFO << "Taxa: " << msa.size() << ", sites: " << msa.num_sites() << endl;
 
