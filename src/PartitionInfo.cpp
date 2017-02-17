@@ -76,8 +76,9 @@ pllmod_msa_stats_t * PartitionInfo::compute_stats() const
   if (_model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::empirical)
     stats_mask |= PLLMOD_MSA_STATS_SUBST_RATES;
 
+  const unsigned int * weights = _msa.weights().empty() ? nullptr : _msa.weights().data();
   _stats = pllmod_msa_compute_stats(_msa.pll_msa(), _model.num_states(), _model.charmap(),
-                                   _msa.weights(), stats_mask);
+                                    weights, stats_mask);
 
   assert(_stats);
 

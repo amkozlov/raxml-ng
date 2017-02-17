@@ -57,13 +57,16 @@ Tree Tree::buildParsimony(const PartitionedMSA& parted_msa, unsigned int random_
   // temporary workaround
   unsigned int num_states = parted_msa.model(0).num_states();
   const unsigned int * map = parted_msa.model(0).charmap();
+  const unsigned int * weights = msa.weights().empty() ? nullptr : msa.weights().data();
 
   tree._num_tips = msa.size();
+
+
   tree._pll_utree_start = pllmod_utree_create_parsimony(msa.size(),
                                                         msa.length(),
                                                         msa.pll_msa()->label,
                                                         msa.pll_msa()->sequence,
-                                                        msa.weights(),
+                                                        weights,
                                                         map,
                                                         num_states,
                                                         attributes,
@@ -128,6 +131,20 @@ IdNameVector Tree::tip_labels() const
 
   return result;
 }
+
+void Tree::reset_tip_ids(const NameIdMap& label_id_map)
+{
+  if (label_id_map.size() != _num_tips)
+    throw invalid_argument("Invalid map size");
+
+  tip_nodes();
+  for (auto& node: _pll_utree_tips)
+  {
+    const unsigned int tip_id = label_id_map.at(node->label);
+    node->clv_index = node->node_index = tip_id;
+  }
+}
+
 
 void Tree::fix_missing_brlens(double new_brlen)
 {

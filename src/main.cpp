@@ -100,6 +100,9 @@ Tree get_start_tree(const Options &opts, const PartitionedMSA& part_msa)
   /* fix missing branch lengths */
   tree.fix_missing_brlens();
 
+  /* make sure tip indices are consistent between MSA and pll_tree */
+  tree.reset_tip_ids(msa.label_id_map());
+
   return tree;
 }
 

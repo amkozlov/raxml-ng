@@ -64,11 +64,10 @@ void PartitionedMSA::split_msa()
 
     for (size_t p = 0; p < part_count(); ++p)
     {
-      part_msa_list[p]->label = _full_msa.pll_msa()->label;
       part_msa(p, part_msa_list[p]);
-      part_msa_list[p]->label = nullptr;
-      // TODO pll_msa_destroy -> fix in libpll
+      pll_msa_destroy(part_msa_list[p]);
     }
+    free(part_msa_list);
   }
   else
     part_msa(0, _full_msa.pll_msa());

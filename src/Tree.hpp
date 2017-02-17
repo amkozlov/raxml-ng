@@ -32,6 +32,7 @@ public:
   pll_utree_t * pll_utree_start() const { return pll_utree_clone(_pll_utree_start); };
 
   void fix_missing_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
+  void reset_tip_ids(const NameIdMap& label_id_map);
 
 private:
   pll_utree_t* _pll_utree_start;

@@ -18,8 +18,7 @@ public:
 
 NewickStream& operator<<(NewickStream& stream, const pll_utree_t& tree)
 {
-  // TODO: fix in libpll
-  char * newick_str = pll_utree_export_newick((pll_utree_t *) &tree);
+  char * newick_str = pll_utree_export_newick(&tree);
   stream << newick_str << std::endl;
   free(newick_str);
   return stream;

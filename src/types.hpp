@@ -54,6 +54,7 @@ typedef std::vector<int> intVector;
 typedef std::pair<size_t,std::string> IdNamePair;
 typedef std::vector<IdNamePair> IdNameVector;
 typedef std::unordered_map<size_t,std::string> IdNameMap;
+typedef std::unordered_map<std::string,size_t> NameIdMap;
 
 /*
  * workaround needed for using enum as std::map key

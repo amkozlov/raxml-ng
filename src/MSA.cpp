@@ -9,14 +9,15 @@ MSA::MSA(const pll_msa_t *pll_msa) :
 {
   for (auto i = 0; i < pll_msa->count; ++i)
   {
-    append(pll_msa->label[i], string(pll_msa->sequence[i], pll_msa->length));
+    append(string(pll_msa->sequence[i], pll_msa->length), pll_msa->label ? pll_msa->label[i] : "");
   }
 
   update_pll_msa();
 }
 
 MSA::MSA(MSA&& other) : _length(other._length), _num_sites(other._num_sites),
-    _sequence_map(move(other._sequence_map)), _weights(move(other._weights)),
+    _sequences(move(other._sequences)), _labels(move(other._labels)),
+    _label_id_map(move(other._label_id_map)), _weights(move(other._weights)),
     _pll_msa(other._pll_msa), _dirty(other._dirty)
 {
   other._length = other._num_sites = 0;
@@ -36,14 +37,18 @@ MSA& MSA::operator=(MSA&& other)
     // release the current object’s resources
     free_pll_msa();
     _weights.clear();
-    _sequence_map.clear();
+    _sequences.clear();
+    _labels.clear();
+    _label_id_map.clear();
 
     // steal other’s resource
     _length = other._length;
     _num_sites = other._num_sites;
     _pll_msa = other._pll_msa;
     _weights = std::move(other._weights);
-    _sequence_map = std::move(other._sequence_map);
+    _sequences = std::move(other._sequences);
+    _labels = std::move(other._labels);
+    _label_id_map = std::move(other._label_id_map);
     _dirty = other._dirty;
 
     // reset other
@@ -58,8 +63,9 @@ void MSA::free_pll_msa() noexcept
 {
   if (_pll_msa)
   {
-    free(_pll_msa->label);
     free(_pll_msa->sequence);
+    if (_pll_msa->label)
+      free(_pll_msa->label);
     free(_pll_msa);
     _pll_msa = nullptr;
   }
@@ -70,15 +76,21 @@ const string& MSA::operator[](const std::string& name)
 //  if((size_t) i >= sequence_list_.size())
 //    throw runtime_error{string("Trying to access MSA entry out of bounds. i = ") + to_string(i) };
 
-  return _sequence_map[name];
+  return at(name);
 }
 
-void MSA::append(const string& header, const string& sequence)
+void MSA::append(const string& sequence, const string& header)
 {
   if(_length && sequence.length() != (size_t) _length)
     throw runtime_error{string("Tried to insert sequence to MSA of unequal length: ") + sequence};
 
-  _sequence_map[header] = sequence;
+  _sequences.push_back(sequence);
+
+  if (!header.empty())
+  {
+    _labels.push_back(header);
+    _label_id_map[header] = _labels.size() - 1;
+  }
 
   if (!_length)
   {
@@ -125,23 +137,33 @@ void MSA::update_pll_msa() const
     _dirty = true;
   }
 
+  assert(_labels.empty() || _labels.size() == _sequences.size());
+
   if (_dirty)
   {
     _pll_msa->count = size();
     _pll_msa->length = length();
 
-    _pll_msa->label = (char **) calloc(_pll_msa->count, sizeof(char *));
-    _pll_msa->sequence = (char **) calloc(_pll_msa->count, sizeof(char *));
-
     size_t i = 0;
-    for (const auto& entry : _sequence_map)
+    _pll_msa->sequence = (char **) calloc(_pll_msa->count, sizeof(char *));
+    for (const auto& entry : _sequences)
     {
-      _pll_msa->label[i] = (char *) entry.first.c_str();
-      _pll_msa->sequence[i] = (char *) entry.second.c_str();
+      _pll_msa->sequence[i] = (char *) entry.c_str();
       ++i;
     }
-
     assert(i == size());
+
+    if (!_labels.empty())
+    {
+      i = 0;
+      _pll_msa->label = (char **) calloc(_pll_msa->count, sizeof(char *));
+      for (const auto& entry : _labels)
+      {
+        _pll_msa->label[i] = (char *) entry.c_str();
+        ++i;
+      }
+      assert(i == size());
+    }
 
     _dirty = false;
   }
@@ -174,7 +196,7 @@ MSA msa_load_from_fasta(const std::string &filename)
   MSA msa(sites);
 
   //  MSA&& msa = MSA(sites);
-  msa.append(header, sequence);
+  msa.append(sequence, header);
 
   free(sequence);
   free(header);
@@ -187,7 +209,7 @@ MSA msa_load_from_fasta(const std::string &filename)
 
     if (!sites) sites = sequence_length;
 
-    msa.append(header, sequence);
+    msa.append(sequence, header);
     free(sequence);
     free(header);
   }

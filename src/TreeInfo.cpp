@@ -201,20 +201,11 @@ void assign(PartitionedMSA& parted_msa, const TreeInfo& treeinfo)
 }
 
 
-void set_partition_tips(PartitionInfo const& pinfo, pll_partition_t* partition,
-                        IdNameVector const& clv_label_map)
+void set_partition_tips(PartitionInfo const& pinfo, pll_partition_t* partition)
 {
-  for (auto const& entry: clv_label_map)
+  for (size_t i = 0; i < pinfo.msa().size(); ++i)
   {
-    try
-    {
-      pll_set_tip_states(partition, entry.first, partition->map,
-                         pinfo.msa().at(entry.second).c_str());
-    }
-    catch (out_of_range const& ex)
-    {
-      throw runtime_error("Sequence not found in alignment: " + entry.second);
-    }
+    pll_set_tip_states(partition, i, partition->map, pinfo.msa().at(i).c_str());
   }
 }
 
@@ -265,10 +256,10 @@ pll_partition_t* create_pll_partition(Options const& opts, PartitionInfo const& 
     throw runtime_error("ERROR creating pll_partition: " + string(pll_errmsg));
 
   /* set pattern weights */
-  if (msa.weights())
-    pll_set_pattern_weights(partition, msa.weights());
+  if (!msa.weights().empty())
+    pll_set_pattern_weights(partition, msa.weights().data());
 
-  set_partition_tips(pinfo, partition, tree.tip_labels());
+  set_partition_tips(pinfo, partition);
 
   assign(partition, model);
 
