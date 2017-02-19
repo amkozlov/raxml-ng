@@ -85,14 +85,14 @@ void print_options(const Options &opts)
   LOG_INFO << "  SIMD kernels: " << get_simd_arch_name(opts.simd_arch) << endl;
 
   LOG_INFO << "  parallelization: ";
-  if (opts.num_processes > 1 && opts.num_threads > 1)
-  {
-    LOG_INFO << "hybrid MPI+PTHREADS (" << opts.num_processes <<  "ranks x " <<
-        opts.num_threads <<  " threads)" << endl;
-  }
-  else if (opts.num_processes > 1)
-    LOG_INFO <<  "MPI (" << opts.num_processes << " ranks)" << endl;
-  else if (opts.num_threads > 1)
+//  if (opts.num_processes > 1 && opts.num_threads > 1)
+//  {
+//    LOG_INFO << "hybrid MPI+PTHREADS (" << opts.num_processes <<  "ranks x " <<
+//        opts.num_threads <<  " threads)" << endl;
+//  }
+//  else if (opts.num_processes > 1)
+//    LOG_INFO <<  "MPI (" << opts.num_processes << " ranks)" << endl;
+  if (opts.num_threads > 1)
     LOG_INFO << "PTHREADS (" << opts.num_threads << " threads)" << endl;
   else
     LOG_INFO << "NONE/sequential" << endl;

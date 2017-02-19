@@ -22,10 +22,19 @@ struct spr_round_params
   }
 };
 
+struct PartitionRegion
+{
+  size_t start;
+  size_t length;
+};
+
+typedef std::vector<PartitionRegion> PartitionedAssignment;
+
 class TreeInfo
 {
 public:
-  TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa);
+  TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
+            const PartitionedAssignment& part_assign);
   virtual
   ~TreeInfo ();
 
@@ -47,7 +56,7 @@ private:
 void assign(PartitionedMSA& parted_msa, const TreeInfo& treeinfo);
 
 pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& pinfo,
-                                      const Tree& tree);
+                                      const Tree& tree, const PartitionRegion& part_region);
 
 
 #endif /* RAXML_TREEINFO_HPP_ */

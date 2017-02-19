@@ -229,7 +229,7 @@ MSA msa_load_from_phylip(const std::string &filename)
   if (pll_msa)
   {
     MSA msa(pll_msa);
-    free(pll_msa);
+    pll_msa_destroy(pll_msa);
     return msa;
   }
   else

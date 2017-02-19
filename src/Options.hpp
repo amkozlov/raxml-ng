@@ -12,7 +12,7 @@ public:
   random_seed(0), start_tree(StartingTree::random), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
   spr_cutoff(1.0), brlen_linkage(PLLMOD_TREE_BRLEN_SCALED), simd_arch(PLL_ATTRIB_ARCH_CPU),
   tree_file(""), msa_file(""), model_file(""), outfile_prefix(""), msa_format(FileFormat::autodetect),
-  num_threads(1), thread_id(0), num_processes(1), process_id(0)
+  num_threads(1)
   {};
 
   ~Options() = default;
@@ -46,10 +46,6 @@ public:
 
   /* parallelization stuff */
   unsigned int num_threads;     /* number of threads */
-  unsigned int thread_id;       /* ID of current threads [0..num_threads-1] */
-  unsigned int num_processes;   /* number of MPI ranks */
-  unsigned int process_id;      /* ID of current rank [0..num_processes-1] */
-
 };
 
 void print_options(const Options &opts);

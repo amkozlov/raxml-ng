@@ -35,6 +35,7 @@
 #include "PartitionInfo.hpp"
 #include "TreeInfo.hpp"
 #include "file_io.hpp"
+#include "ParallelContext.hpp"
 
 using namespace std;
 
@@ -148,56 +149,78 @@ PartitionedMSA init_part_info(const Options &opts)
   return part_msa;
 }
 
+PartitionedAssignment get_part_assign(const PartitionedMSA& parted_msa,
+                                      size_t num_procs, size_t proc_id)
+{
+  PartitionedAssignment part_assign;
+
+  // TODO: Kassian/Benoit load balancing algorithm
+  for (auto const& pinfo: parted_msa.part_list())
+  {
+    PartitionRegion range;
+    const size_t total_sites = pinfo.msa().num_patterns();
+    const size_t proc_sites = total_sites / num_procs;
+    range.start = proc_id * proc_sites;
+    range.length = proc_id == num_procs-1 ? total_sites - range.start : proc_sites;
+    part_assign.push_back(range);
+  }
+
+  return part_assign;
+}
+
 TreeInfo load_msa_and_tree(const Options& opts, PartitionedMSA& part_msa)
 {
-  LOG_INFO << "Loading alignment from file: " << opts.msa_file << endl;
+  PartitionedMSA* p_parted_msa = nullptr;
+  Tree* p_tree = nullptr;
+  Tree tree;
 
-  /* load MSA */
-  auto msa = msa_load_from_file(opts.msa_file, opts.msa_format);
+  if (ParallelContext::ctx().master())
+  {
+    LOG_INFO << "Loading alignment from file: " << opts.msa_file << endl;
 
-  LOG_INFO << "Taxa: " << msa.size() << ", sites: " << msa.num_sites() << endl;
+    /* load MSA */
+    auto msa = msa_load_from_file(opts.msa_file, opts.msa_format);
 
-  /* check alignment */
-//  check_msa(useropt, msa);
+    LOG_INFO << "Taxa: " << msa.size() << ", sites: " << msa.num_sites() << endl;
 
-  part_msa.full_msa(std::move(msa));
+    /* check alignment */
+  //  check_msa(useropt, msa);
 
-//  LOG_INFO << "Splitting MSA... " << endl;
+    part_msa.full_msa(std::move(msa));
 
-  part_msa.split_msa();
+  //  LOG_INFO << "Splitting MSA... " << endl;
 
-  if (opts.use_pattern_compression)
-    part_msa.compress_patterns();
+    part_msa.split_msa();
 
-  part_msa.set_modeL_empirical_params();
+    if (opts.use_pattern_compression)
+      part_msa.compress_patterns();
 
-  LOG_INFO << endl;
+    part_msa.set_modeL_empirical_params();
 
-  print_partition_info(part_msa);
+    LOG_INFO << endl;
 
-  LOG_INFO << endl;
+    print_partition_info(part_msa);
 
-  /* load/create starting tree */
-  auto tree = get_start_tree(opts, part_msa);
+    LOG_INFO << endl;
+
+    /* load/create starting tree */
+    tree = get_start_tree(opts, part_msa);
+
+    p_tree = &tree;
+    p_parted_msa = &part_msa;
+  }
 
 #ifdef _USE_PTHREADS
-  parallel_thread_broadcast(useropt, 0, &msa, sizeof(msa_data_t *));
-  parallel_thread_broadcast(useropt, 0, &tree, sizeof(pll_utree_t *));
+  ParallelContext::ctx().thread_broadcast(0, &p_parted_msa, sizeof(PartitionedMSA*));
+  ParallelContext::ctx().thread_broadcast(0, &p_tree, sizeof(Tree *));
 #endif
 
-  assert(!tree.empty());
+  assert(!p_tree->empty());
 
-//  pll_utree_t * local_tree = opts.thread_id == 0 ? tree : pll_utree_clone(tree);
+  auto part_assign = get_part_assign(*p_parted_msa, ParallelContext::num_procs(),
+                                     ParallelContext::ctx().thread_id());
 
-//
-//  assert(msa != NULL && local_tree != NULL);
-//
-
-  TreeInfo treeinfo(opts, tree, part_msa);
-
-  print_model_info(part_msa.model(0));
-
-  // TODO: set BRLEN and BRLEN scaler opt. flags!
+  TreeInfo treeinfo(opts, *p_tree, *p_parted_msa, part_assign);
 
   return treeinfo;
 }
@@ -205,6 +228,8 @@ TreeInfo load_msa_and_tree(const Options& opts, PartitionedMSA& part_msa)
 void search_evaluate(const Options& opts)
 {
   const string tree_fname = opts.output_fname("raxml.bestTree");
+
+  printf("thread %u / %u\n", ParallelContext::ctx().thread_id(), ParallelContext::num_procs());
 
   auto part_msa = init_part_info(opts);
   auto treeinfo = load_msa_and_tree(opts, part_msa);
@@ -216,18 +241,23 @@ void search_evaluate(const Options& opts)
   else
     optimizer.optimize(treeinfo);
 
-  assign(part_msa, treeinfo);
-  for (auto const& pinfo: part_msa.part_list())
-    print_model_info(pinfo.model());
+  const double final_loglh = treeinfo.loglh();
 
-  LOG_INFO << "\nFinal LogLikelihood: " << setprecision(6) << treeinfo.loglh() << endl;
+  if (ParallelContext::is_master())
+  {
+    assign(part_msa, treeinfo);
+    for (auto const& pinfo: part_msa.part_list())
+      print_model_info(pinfo.model());
 
-  NewickStream nw_result(tree_fname);
-  nw_result << *treeinfo.pll_treeinfo().root;
+    LOG_INFO << "\nFinal LogLikelihood: " << setprecision(6) << final_loglh << endl;
 
-  LOG_INFO << "\nElapsed time: " << setprecision(3) << sysutil_elapsed_seconds() << " seconds\n";
+    NewickStream nw_result(tree_fname);
+    nw_result << *treeinfo.pll_treeinfo().root;
 
-  LOG_INFO << "\nFinal tree saved to: " << sysutil_realpath(tree_fname) << endl;
+    LOG_INFO << "\nElapsed time: " << setprecision(3) << sysutil_elapsed_seconds() << " seconds\n";
+
+    LOG_INFO << "\nFinal tree saved to: " << sysutil_realpath(tree_fname) << endl;
+  }
 }
 
 int main(int argc, char** argv)
@@ -259,7 +289,13 @@ int main(int argc, char** argv)
     {
       // parse model string & init partitions
       print_options(opts);
+
+      ParallelContext::init(opts, std::bind(search_evaluate, opts));
+
       search_evaluate(opts);
+
+      ParallelContext::finalize();
+
       return EXIT_SUCCESS;
     }
     case Command::none:

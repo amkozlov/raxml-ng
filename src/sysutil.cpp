@@ -240,6 +240,9 @@ double sysutil_elapsed_seconds()
 
 void print_progress(double loglh, const char* format, ... )
 {
+  if (!ParallelContext::is_master())
+    return;
+
   const size_t BUF_SIZE = 1024;
   char buf[BUF_SIZE];
 

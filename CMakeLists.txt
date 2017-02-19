@@ -3,8 +3,11 @@ cmake_minimum_required (VERSION 2.8.10 FATAL_ERROR)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES  ON)
 
+set (ENABLE_PTHREADS ON)
 set (ENABLE_MPI OFF)
 set (ENABLE_VCF OFF)
+
+
 
 project (raxml-ng CXX)
 
@@ -45,6 +48,10 @@ if(HAS_AVX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx -D__AVX")
 elseif(HAS_SSE3)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse3 -D__SSE3")
+endif()
+
+if(ENABLE_PTHREADS)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -D_USE_PTHREADS")
 endif()
 
 if(ENABLE_MPI)

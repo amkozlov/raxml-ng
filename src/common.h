@@ -21,6 +21,7 @@ extern "C" {
 
 #include "types.hpp"
 #include "constants.hpp"
+#include "ParallelContext.hpp"
 #include "log.hpp"
 
 #define RAXML_DOUBLE_TOLERANCE    1e-14

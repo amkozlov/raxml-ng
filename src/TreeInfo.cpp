@@ -1,8 +1,10 @@
 #include "TreeInfo.hpp"
+#include "ParallelContext.hpp"
 
 using namespace std;
 
-TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa)
+TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
+                    const PartitionedAssignment& part_assign)
 {
   _pll_treeinfo = pllmod_treeinfo_create(tree.pll_utree_start(), tree.num_tips(),
                                          parted_msa.part_count(), opts.brlen_linkage);
@@ -11,7 +13,8 @@ TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA&
     throw runtime_error("ERROR creating treeinfo structure: " + string(pll_errmsg));
 
 #if (defined(_USE_PTHREADS) || defined(_USE_MPI))
-  pllmod_treeinfo_set_parallel_context(treeinfo, (void *) useropt, parallel_reduce_cb);
+  pllmod_treeinfo_set_parallel_context(_pll_treeinfo, (void *) &ParallelContext::ctx(),
+                                       ParallelContext::parallel_reduce_cb);
 #endif
 
   // init partitions
@@ -23,11 +26,7 @@ TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA&
     const PartitionInfo& pinfo = parted_msa.part_info(p);
 
     /* create and init PLL partition structure */
-    pll_partition_t * partition = create_pll_partition(opts, pinfo, tree);
-
-#ifdef _USE_PTHREADS
-    parallel_thread_barrier(useropt);
-#endif
+    pll_partition_t * partition = create_pll_partition(opts, pinfo, tree, part_assign[p]);
 
     const int params_to_optimize = pinfo.model().params_to_optimize() | optimize_branches;
     int retval = pllmod_treeinfo_init_partition(_pll_treeinfo, p, partition,
@@ -201,16 +200,17 @@ void assign(PartitionedMSA& parted_msa, const TreeInfo& treeinfo)
 }
 
 
-void set_partition_tips(PartitionInfo const& pinfo, pll_partition_t* partition)
+void set_partition_tips(PartitionInfo const& pinfo, const PartitionRegion& part_region,
+                        pll_partition_t* partition)
 {
   for (size_t i = 0; i < pinfo.msa().size(); ++i)
   {
-    pll_set_tip_states(partition, i, partition->map, pinfo.msa().at(i).c_str());
+    pll_set_tip_states(partition, i, partition->map, pinfo.msa().at(i).c_str() + part_region.start);
   }
 }
 
 pll_partition_t* create_pll_partition(Options const& opts, PartitionInfo const& pinfo,
-                                      Tree const& tree)
+                                      Tree const& tree, const PartitionRegion& part_region)
 {
   const MSA& msa = pinfo.msa();
   const Model& model = pinfo.model();
@@ -241,7 +241,7 @@ pll_partition_t* create_pll_partition(Options const& opts, PartitionInfo const& 
       tree.num_tips(),         /* number of tip sequences */
       tree.num_inner(),        /* number of CLV buffers */
       model.num_states(),      /* number of states in the data */
-      msa.length(),            /* number of alignment sites/patterns */
+      part_region.length,      /* number of alignment sites/patterns */
       model.num_submodels(),   /* number of different substitution models (LG4 = 4) */
       tree.num_branches(),     /* number of probability matrices */
       model.num_ratecats(),    /* number of (GAMMA) rate categories */
@@ -257,9 +257,9 @@ pll_partition_t* create_pll_partition(Options const& opts, PartitionInfo const& 
 
   /* set pattern weights */
   if (!msa.weights().empty())
-    pll_set_pattern_weights(partition, msa.weights().data());
+    pll_set_pattern_weights(partition, msa.weights().data() + part_region.start);
 
-  set_partition_tips(pinfo, partition);
+  set_partition_tips(pinfo, part_region, partition);
 
   assign(partition, model);
 
