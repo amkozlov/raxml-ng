@@ -7,11 +7,13 @@
 class Tree
 {
 public:
-  Tree() : _pll_utree_start(nullptr), _num_tips(0) {};
+  Tree() : _num_tips(0), _pll_utree_start(nullptr) {};
+  Tree(size_t num_tips, pll_utree_t* pll_utree_start) :
+    _num_tips(num_tips), _pll_utree_start(pll_utree_clone(pll_utree_start)) {};
 
-  Tree (const Tree& other) = delete;
-  Tree& operator=(const Tree& other) = delete;
-  Tree (Tree&& other) = default;
+  Tree (const Tree& other) = default;
+  Tree& operator=(const Tree& other);
+  Tree (Tree&& other);
   Tree& operator=(Tree&& other);
 
   virtual ~Tree();
@@ -29,14 +31,15 @@ public:
   IdNameVector tip_labels() const;
 
   // TODO: use move semantics to transfer ownership?
-  pll_utree_t * pll_utree_start() const { return pll_utree_clone(_pll_utree_start); };
+  pll_utree_t * pll_utree_copy() const { return pll_utree_clone(_pll_utree_start); };
+  const pll_utree_t& pll_utree_start() const { return *_pll_utree_start; };
 
   void fix_missing_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
   void reset_tip_ids(const NameIdMap& label_id_map);
 
 private:
-  pll_utree_t* _pll_utree_start;
   size_t _num_tips;
+  pll_utree_t* _pll_utree_start;
 
   mutable std::vector<pll_utree_t*> _pll_utree_tips;
 

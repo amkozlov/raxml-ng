@@ -36,8 +36,24 @@
 #include "TreeInfo.hpp"
 #include "file_io.hpp"
 #include "ParallelContext.hpp"
+#include "LoadBalancer.hpp"
 
 using namespace std;
+
+typedef vector<Tree> TreeList;
+struct RaxmlInstance
+{
+  Options opts;
+  PartitionedMSA parted_msa;
+  TreeList start_trees;
+};
+
+struct TreeWithParams
+{
+  Tree tree;
+  double loglh;
+  std::vector<Model> models;
+};
 
 void print_banner()
 {
@@ -47,9 +63,10 @@ void print_banner()
       << endl << endl;
 }
 
-Tree get_start_tree(const Options &opts, const PartitionedMSA& part_msa)
+TreeList get_start_tree(const Options &opts, const PartitionedMSA& part_msa)
 {
   Tree tree;
+  TreeList tree_list;
 
   const MSA& msa = part_msa.full_msa();
 
@@ -104,10 +121,13 @@ Tree get_start_tree(const Options &opts, const PartitionedMSA& part_msa)
   /* make sure tip indices are consistent between MSA and pll_tree */
   tree.reset_tip_ids(msa.label_id_map());
 
-  return tree;
+  tree_list.emplace_back(move(tree));
+
+  return tree_list;
+//  return ParallelContext::master_broadcast(tree);
 }
 
-PartitionedMSA init_part_info(const Options &opts)
+PartitionedMSA init_part_info(Options &opts)
 {
   PartitionedMSA part_msa;
 
@@ -127,15 +147,15 @@ PartitionedMSA init_part_info(const Options &opts)
   }
 
   /* make sure that linked branch length mode is set for unpartitioned alignments */
-//  if (opts.part_count == 1)
-//    opts.brlen_linkage = PLLMOD_TREE_BRLEN_LINKED;
+  if (part_msa.part_count() == 1)
+    opts.brlen_linkage = PLLMOD_TREE_BRLEN_LINKED;
 
   int lg4x_count = 0;
 
   for (const auto& pinfo: part_msa.part_list())
   {
-    LOG_INFO << "|" << pinfo.name() << "|   |" << pinfo.model().to_string() << "|   |" <<
-        pinfo.range_string() << "|" << endl;
+//    LOG_INFO << "|" << pinfo.name() << "|   |" << pinfo.model().to_string() << "|   |" <<
+//        pinfo.range_string() << "|" << endl;
 
     if (pinfo.model().name() == "LG4X")
       lg4x_count++;
@@ -149,160 +169,229 @@ PartitionedMSA init_part_info(const Options &opts)
   return part_msa;
 }
 
-PartitionedAssignment get_part_assign(const PartitionedMSA& parted_msa,
+PartitionAssignment get_part_assign(const PartitionedMSA& parted_msa,
                                       size_t num_procs, size_t proc_id)
 {
-  PartitionedAssignment part_assign;
+  PartitionAssignment part_sizes;
 
-  // TODO: Kassian/Benoit load balancing algorithm
+  /* init list of partition sizes */
+  size_t i = 0;
   for (auto const& pinfo: parted_msa.part_list())
   {
-    PartitionRegion range;
-    const size_t total_sites = pinfo.msa().num_patterns();
-    const size_t proc_sites = total_sites / num_procs;
-    range.start = proc_id * proc_sites;
-    range.length = proc_id == num_procs-1 ? total_sites - range.start : proc_sites;
-    part_assign.push_back(range);
+    part_sizes.assign_sites(i, 0, pinfo.msa().num_patterns());
+    ++i;
   }
 
-  return part_assign;
-}
-
-TreeInfo load_msa_and_tree(const Options& opts, PartitionedMSA& part_msa)
-{
-  PartitionedMSA* p_parted_msa = nullptr;
-  Tree* p_tree = nullptr;
-  Tree tree;
-
-  if (ParallelContext::ctx().master())
-  {
-    LOG_INFO << "Loading alignment from file: " << opts.msa_file << endl;
-
-    /* load MSA */
-    auto msa = msa_load_from_file(opts.msa_file, opts.msa_format);
-
-    LOG_INFO << "Taxa: " << msa.size() << ", sites: " << msa.num_sites() << endl;
-
-    /* check alignment */
-  //  check_msa(useropt, msa);
-
-    part_msa.full_msa(std::move(msa));
-
-  //  LOG_INFO << "Splitting MSA... " << endl;
-
-    part_msa.split_msa();
-
-    if (opts.use_pattern_compression)
-      part_msa.compress_patterns();
-
-    part_msa.set_modeL_empirical_params();
-
-    LOG_INFO << endl;
-
-    print_partition_info(part_msa);
-
-    LOG_INFO << endl;
-
-    /* load/create starting tree */
-    tree = get_start_tree(opts, part_msa);
-
-    p_tree = &tree;
-    p_parted_msa = &part_msa;
-  }
-
-#ifdef _USE_PTHREADS
-  ParallelContext::ctx().thread_broadcast(0, &p_parted_msa, sizeof(PartitionedMSA*));
-  ParallelContext::ctx().thread_broadcast(0, &p_tree, sizeof(Tree *));
-#endif
-
-  assert(!p_tree->empty());
-
-  auto part_assign = get_part_assign(*p_parted_msa, ParallelContext::num_procs(),
-                                     ParallelContext::ctx().thread_id());
-
-  TreeInfo treeinfo(opts, *p_tree, *p_parted_msa, part_assign);
-
-  return treeinfo;
-}
-
-void search_evaluate(const Options& opts)
-{
-  const string tree_fname = opts.output_fname("raxml.bestTree");
-
-  printf("thread %u / %u\n", ParallelContext::ctx().thread_id(), ParallelContext::num_procs());
-
-  auto part_msa = init_part_info(opts);
-  auto treeinfo = load_msa_and_tree(opts, part_msa);
-  LOG_INFO << "\nInitial LogLikelihood: " << treeinfo.loglh() << endl;
-
-  Optimizer optimizer(opts);
-  if (opts.command == Command::search)
-    optimizer.optimize_topology(treeinfo);
-  else
-    optimizer.optimize(treeinfo);
-
-  const double final_loglh = treeinfo.loglh();
+//  SimpleLoadBalancer balancer;
+  KassianLoadBalancer balancer;
 
   if (ParallelContext::is_master())
   {
-    assign(part_msa, treeinfo);
-    for (auto const& pinfo: part_msa.part_list())
-      print_model_info(pinfo.model());
+    auto part_assign = balancer.get_all_assignments(part_sizes, num_procs);
 
-    LOG_INFO << "\nFinal LogLikelihood: " << setprecision(6) << final_loglh << endl;
+    LOG_INFO << part_assign;
 
-    NewickStream nw_result(tree_fname);
-    nw_result << *treeinfo.pll_treeinfo().root;
-
-    LOG_INFO << "\nElapsed time: " << setprecision(3) << sysutil_elapsed_seconds() << " seconds\n";
-
-    LOG_INFO << "\nFinal tree saved to: " << sysutil_realpath(tree_fname) << endl;
+    return part_assign[proc_id];
   }
+  else
+    return balancer.get_proc_assignments(part_sizes, num_procs, proc_id);
+}
+
+void load_msa(const Options& opts, PartitionedMSA& part_msa)
+{
+  LOG_INFO << "Loading alignment from file: " << opts.msa_file << endl;
+
+  /* load MSA */
+  auto msa = msa_load_from_file(opts.msa_file, opts.msa_format);
+
+  LOG_INFO << "Taxa: " << msa.size() << ", sites: " << msa.num_sites() << endl;
+
+  /* check alignment */
+//  check_msa(useropt, msa);
+
+  part_msa.full_msa(std::move(msa));
+
+//  LOG_INFO << "Splitting MSA... " << endl;
+
+  part_msa.split_msa();
+
+  if (opts.use_pattern_compression)
+    part_msa.compress_patterns();
+
+  part_msa.set_model_empirical_params();
+
+  LOG_INFO << endl;
+
+  print_partition_info(part_msa);
+
+  LOG_INFO << endl;
+}
+
+void search_evaluate_thread(const RaxmlInstance& instance, TreeWithParams& bestTree)
+{
+  unique_ptr<TreeInfo> treeinfo;
+
+  auto const& master_msa = instance.parted_msa;
+  auto const& opts = instance.opts;
+
+//  printf("thread %lu / %lu\n", ParallelContext::ctx().thread_id(), ParallelContext::num_procs());
+
+#ifdef _USE_PTHREADS
+  ParallelContext::ctx().barrier();
+#endif
+
+  /* run load balancing */
+  auto part_assign = get_part_assign(master_msa, ParallelContext::num_procs(),
+                                     ParallelContext::ctx().thread_id());
+
+#ifdef _USE_PTHREADS
+  ParallelContext::ctx().barrier();
+#endif
+
+//  size_t start_tree_num = 0;
+
+  for (auto const& tree: instance.start_trees)
+  {
+    assert(!tree.empty());
+
+    if (!treeinfo)
+      treeinfo.reset(new TreeInfo(opts, tree, master_msa, part_assign));
+    else
+      treeinfo->tree(tree);
+
+  //  LOG_INFO << "\nInitial LogLikelihood: " << treeinfo.loglh() << endl;
+
+    Optimizer optimizer(opts);
+    if (opts.command == Command::search)
+      optimizer.optimize_topology(*treeinfo);
+    else
+      optimizer.optimize(*treeinfo);
+  }
+
+#ifdef _USE_PTHREADS
+  ParallelContext::ctx().barrier();
+#endif
+
+  const double final_loglh = treeinfo->loglh();
+
+  if (ParallelContext::is_master())
+  {
+    bestTree.loglh = final_loglh;
+    bestTree.tree = treeinfo->tree();
+    for (size_t p = 0; p < master_msa.part_count(); ++p)
+      bestTree.models.push_back(master_msa.model(p));
+  }
+
+#ifdef _USE_PTHREADS
+  ParallelContext::ctx().barrier();
+#endif
+
+  // collect model params: quite dirty so far, and also pthreads-specific
+  // TODO: adapt for MPI
+  for (auto const& prange: part_assign)
+  {
+    if (prange.start == 0)
+    {
+      assign(bestTree.models.at(prange.part_id), *treeinfo, prange.part_id);
+    }
+  }
+
+#ifdef _USE_PTHREADS
+  ParallelContext::ctx().barrier();
+#endif
+}
+
+void search_evaluate(RaxmlInstance& instance, TreeWithParams& bestTree)
+{
+  auto const& opts = instance.opts;
+  const string tree_fname = opts.output_fname("raxml.bestTree");
+
+  instance.parted_msa = init_part_info(instance.opts);
+
+  load_msa(opts, instance.parted_msa);
+
+  /* load/create starting tree */
+  instance.start_trees = get_start_tree(opts, instance.parted_msa);
+
+  search_evaluate_thread(instance, bestTree);
+
+  assert(bestTree.models.size() == instance.parted_msa.part_count());
+
+  size_t p = 0;
+  for (auto const& model: bestTree.models)
+  {
+    LOG_INFO << "\n   Partition " << p << ": " << instance.parted_msa.part_info(p).name().c_str() << endl;
+    print_model_info(model);
+    p++;
+  }
+
+  LOG_INFO << "\nFinal LogLikelihood: " << setprecision(6) << bestTree.loglh << endl;
+
+  NewickStream nw_result(tree_fname);
+  nw_result << bestTree.tree;
+
+  LOG_INFO << "\nElapsed time: " << setprecision(3) << sysutil_elapsed_seconds() << " seconds\n";
+
+  LOG_INFO << "\nFinal tree saved to: " << sysutil_realpath(tree_fname) << endl;
 }
 
 int main(int argc, char** argv)
 {
+  int retval = EXIT_SUCCESS;
+
   print_banner();
 
-  Options opts;
+  RaxmlInstance instance;
+
   CommandLineParser cmdline;
 
   try
   {
-    cmdline.parse_options(argc, argv, opts);
+    cmdline.parse_options(argc, argv, instance.opts);
   }
   catch (OptionException &e)
   {
     LOG_INFO << "ERROR: " << e.what() << std::endl;
-    exit(EXIT_FAILURE);
+    return EXIT_FAILURE;
   }
 
-  switch (opts.command)
+  switch (instance.opts.command)
   {
     case Command::help:
       cmdline.print_help();
-      return EXIT_SUCCESS;
     case Command::version:
-      return EXIT_SUCCESS;
+      retval = EXIT_SUCCESS;
+      break;
     case Command::evaluate:
     case Command::search:
     {
       // parse model string & init partitions
-      print_options(opts);
+      print_options(instance.opts);
 
-      ParallelContext::init(opts, std::bind(search_evaluate, opts));
+      try
+      {
+        TreeWithParams bestTree;
+        ParallelContext::init(instance.opts, std::bind(search_evaluate_thread,
+                                                       std::cref(instance),
+                                                       std::ref(bestTree)));
 
-      search_evaluate(opts);
+        search_evaluate(instance, bestTree);
+      }
+      catch(exception& e)
+      {
+        LOG_INFO << e.what() << endl;
+        retval = EXIT_FAILURE;
+      }
 
       ParallelContext::finalize();
 
-      return EXIT_SUCCESS;
+      break;
     }
     case Command::none:
     default:
       LOG_INFO << "Unknown command!" << endl;
-      return EXIT_FAILURE;
+      retval = EXIT_FAILURE;
   }
 
-  return EXIT_SUCCESS;
+  return retval;
 }

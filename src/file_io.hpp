@@ -24,6 +24,12 @@ NewickStream& operator<<(NewickStream& stream, const pll_utree_t& tree)
   return stream;
 }
 
+NewickStream& operator<<(NewickStream& stream, const Tree& tree)
+{
+  stream << tree.pll_utree_start();
+  return stream;
+}
+
 NewickStream& operator>>(NewickStream& stream, Tree& tree)
 {
 //  stream.getline()

@@ -81,7 +81,7 @@ void PartitionedMSA::compress_patterns()
   }
 }
 
-void PartitionedMSA::set_modeL_empirical_params()
+void PartitionedMSA::set_model_empirical_params()
 {
   for (PartitionInfo& pinfo: _part_list)
   {

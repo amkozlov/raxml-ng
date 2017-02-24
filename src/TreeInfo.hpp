@@ -4,6 +4,7 @@
 #include "common.h"
 #include "Tree.hpp"
 #include "Options.hpp"
+#include "PartitionAssignment.hpp"
 
 struct spr_round_params
 {
@@ -22,23 +23,19 @@ struct spr_round_params
   }
 };
 
-struct PartitionRegion
-{
-  size_t start;
-  size_t length;
-};
-
-typedef std::vector<PartitionRegion> PartitionedAssignment;
-
 class TreeInfo
 {
 public:
   TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
-            const PartitionedAssignment& part_assign);
+            const PartitionAssignment& part_assign);
   virtual
   ~TreeInfo ();
 
   const pllmod_treeinfo_t& pll_treeinfo() const { return *_pll_treeinfo; }
+  const pll_utree& pll_utree_root() const { assert(_pll_treeinfo); return *_pll_treeinfo->root; }
+
+  Tree tree() const;
+  void tree(const Tree& tree) { _pll_treeinfo->root = tree.pll_utree_copy(); }
 
   double loglh(bool incremental = false);
   double optimize_params(int params_to_optimize, double lh_epsilon);
@@ -54,9 +51,11 @@ private:
 };
 
 void assign(PartitionedMSA& parted_msa, const TreeInfo& treeinfo);
+void assign(Model& model, const TreeInfo& treeinfo, size_t partition_id);
+
 
 pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& pinfo,
-                                      const Tree& tree, const PartitionRegion& part_region);
+                                      const Tree& tree, const PartitionRange& part_region);
 
 
 #endif /* RAXML_TREEINFO_HPP_ */

@@ -24,7 +24,10 @@ const unordered_map<DataType, const unsigned int *,EnumClassHash>  DATATYPE_MAPS
 Model::Model (DataType data_type, const std::string &model_string) :
     _data_type(data_type)
 {
-  init_from_string(model_string);
+  // RAxML compatibility hack, TODO: generic model name aliases
+  const string model_string_tmp = model_string == "DNA" ? "GTR+G+F" : model_string;
+
+  init_from_string(model_string_tmp);
 }
 
 const unsigned int * Model::charmap() const
@@ -501,7 +504,6 @@ void assign(pll_partition_t * partition, const Model& model)
 
 void print_model_info(const Model& m)
 {
-  LOG_INFO << endl;
   if (m.param_mode(PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER) != ParamValue::undefined)
     LOG_INFO << "   Speed ("  << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER))
              << "): " << m.brlen_scaler() << endl;
@@ -515,7 +517,7 @@ void print_model_info(const Model& m)
   {
     LOG_INFO << " (" << m.num_ratecats() << " cats)";
     if (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_GAMMA)
-      LOG_INFO << ",  alpha: " << m.alpha() << " ("  << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_ALPHA))
+      LOG_INFO << ",  alpha: " << setprecision(3) << m.alpha() << " ("  << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_ALPHA))
                  << ")";
     LOG_INFO << ",  weights&rates: ";
     for (size_t i = 0; i < m.num_ratecats(); ++i)
@@ -531,10 +533,10 @@ void print_model_info(const Model& m)
   for (size_t i = 0; i < m.num_submodels(); ++i)
   {
     if (m.num_submodels() > 1)
-      LOG_INFO << "\nM " << i << ": ";
+      LOG_INFO << "\nM" << i << ": ";
 
     for (size_t j = 0; j < m.base_freqs(i).size(); ++j)
-      LOG_INFO << m.base_freqs(i)[j] << " ";
+      LOG_INFO << setprecision(3) << m.base_freqs(i)[j] << " ";
   }
   LOG_INFO << endl;
 

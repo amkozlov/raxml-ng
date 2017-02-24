@@ -9,10 +9,10 @@ std::vector<std::thread> ParallelContext::_threads;
 std::vector<double> ParallelContext::_parallel_buf;
 std::unordered_map<std::thread::id, ParallelContext> ParallelContext::_thread_ctx_map;
 
-void ParallelContext::init(const Options& opts, std::function<void()> thread_main)
+void ParallelContext::init(const Options& opts, const std::function<void()>& thread_main)
 {
   _num_threads = opts.num_threads;
-  _parallel_buf.reserve(opts.num_threads * 16);
+  _parallel_buf.reserve(opts.num_threads * 4096);
 
   _thread_ctx_map.emplace(std::this_thread::get_id(), ParallelContext(0));
 
@@ -52,7 +52,7 @@ void ParallelContext::parallel_thread_barrier() const
     }
 }
 
-void ParallelContext::parallel_thread_reduce(double * data, size_t size) const
+void ParallelContext::parallel_thread_reduce(double * data, size_t size, int op) const
 {
   /* synchronize */
   parallel_thread_barrier();
@@ -68,9 +68,30 @@ void ParallelContext::parallel_thread_reduce(double * data, size_t size) const
   /* reduce */
   for (i = 0; i < size; ++i)
   {
-    data[i] = 0.;
-    for (j = 0; j < ParallelContext::_num_threads; ++j)
-      data[i] += _parallel_buf[j * size + i];
+    switch(op)
+    {
+      case PLLMOD_TREE_REDUCE_SUM:
+      {
+        data[i] = 0.;
+        for (j = 0; j < ParallelContext::_num_threads; ++j)
+          data[i] += _parallel_buf[j * size + i];
+      }
+      break;
+      case PLLMOD_TREE_REDUCE_MAX:
+      {
+        data[i] = _parallel_buf[i];
+        for (j = 1; j < ParallelContext::_num_threads; ++j)
+          data[i] = max(data[i], _parallel_buf[j * size + i]);
+      }
+      break;
+      case PLLMOD_TREE_REDUCE_MIN:
+      {
+        data[i] = _parallel_buf[i];
+        for (j = 1; j < ParallelContext::_num_threads; ++j)
+          data[i] = min(data[i], _parallel_buf[j * size + i]);
+      }
+      break;
+    }
   }
 
   //needed?
@@ -78,22 +99,31 @@ void ParallelContext::parallel_thread_reduce(double * data, size_t size) const
 }
 
 
-void ParallelContext::parallel_reduce(double * data, size_t size) const
+void ParallelContext::parallel_reduce(double * data, size_t size, int op) const
 {
 //  printf("P%u T%u: %lf\n", useropt->process_id, useropt->thread_id, data[0]);
 
+
 #ifdef _USE_PTHREADS
-  parallel_thread_reduce(data, size);
+  parallel_thread_reduce(data, size, op);
 #endif
 
 #ifdef _USE_MPI
-  MPI_Allreduce(MPI_IN_PLACE, data, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  int reduce_op = MPI_SUM;
+  if (op == PLLMOD_TREE_REDUCE_MAX)
+    reduce_op = MPI_MAX;
+  else if (op == PLLMOD_TREE_REDUCE_MIN)
+    reduce_op = MPI_MIN;
+  else
+    assert(0);
+
+  MPI_Allreduce(MPI_IN_PLACE, data, size, MPI_DOUBLE, reduce_op, MPI_COMM_WORLD);
 #endif
 }
 
-void ParallelContext::parallel_reduce_cb(void * context, double * data, size_t size)
+void ParallelContext::parallel_reduce_cb(void * context, double * data, size_t size, int op)
 {
-  (static_cast<const ParallelContext *>(context))->parallel_reduce(data, size);
+  (static_cast<const ParallelContext *>(context))->parallel_reduce(data, size, op);
 }
 
 void ParallelContext::thread_broadcast(size_t source_id, void * data, size_t size) const
@@ -118,3 +148,27 @@ void ParallelContext::thread_broadcast(size_t source_id, void * data, size_t siz
 
   barrier();
 }
+
+void ParallelContext::thread_send_master(size_t source_id, void * data, size_t size) const
+{
+  /* write to buf */
+  if (_thread_id == source_id && data && size)
+  {
+    memcpy((void *) _parallel_buf.data(), data, size);
+  }
+
+  /* synchronize */
+  barrier();
+
+//  pthread_barrier_wait(&barrier);
+  __sync_synchronize();
+
+  /* read from buf*/
+  if (_thread_id == 0)
+  {
+    memcpy(data, (void *) _parallel_buf.data(), size);
+  }
+
+  barrier();
+}
+

@@ -9,6 +9,27 @@
 
 using namespace std;
 
+Tree::Tree (Tree&& other) : _num_tips(other._num_tips), _pll_utree_start(other._pll_utree_start)
+{
+  other._num_tips = 0;
+  other._pll_utree_start = nullptr;
+  swap(_pll_utree_tips, other._pll_utree_tips);
+}
+
+Tree& Tree::operator=(const Tree& other)
+{
+  if (this != &other)
+  {
+    if (_pll_utree_start)
+      pll_utree_destroy(_pll_utree_start, nullptr);
+
+    _pll_utree_start = other.pll_utree_copy();
+    _num_tips = other._num_tips;
+  }
+
+  return *this;
+}
+
 Tree& Tree::operator=(Tree&& other)
 {
   if (this != &other)

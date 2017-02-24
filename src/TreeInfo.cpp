@@ -4,9 +4,9 @@
 using namespace std;
 
 TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
-                    const PartitionedAssignment& part_assign)
+                    const PartitionAssignment& part_assign)
 {
-  _pll_treeinfo = pllmod_treeinfo_create(tree.pll_utree_start(), tree.num_tips(),
+  _pll_treeinfo = pllmod_treeinfo_create(tree.pll_utree_copy(), tree.num_tips(),
                                          parted_msa.part_count(), opts.brlen_linkage);
 
   if (!_pll_treeinfo)
@@ -19,31 +19,54 @@ TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA&
 
   // init partitions
   int optimize_branches = opts.optimize_brlen ? PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE : 0;
-  if (opts.brlen_linkage == PLLMOD_TREE_BRLEN_SCALED && parted_msa.part_count() > 1)
+  if (opts.optimize_model && opts.brlen_linkage == PLLMOD_TREE_BRLEN_SCALED &&
+      parted_msa.part_count() > 1)
+  {
     optimize_branches |= PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER;
+  }
+
   for (size_t p = 0; p < parted_msa.part_count(); ++p)
   {
     const PartitionInfo& pinfo = parted_msa.part_info(p);
+    int params_to_optimize = opts.optimize_model ? pinfo.model().params_to_optimize() : 0;
+    params_to_optimize |= optimize_branches;
 
-    /* create and init PLL partition structure */
-    pll_partition_t * partition = create_pll_partition(opts, pinfo, tree, part_assign[p]);
+    PartitionAssignment::const_iterator part_range = part_assign.find(p);
+    if (part_range != part_assign.end())
+    {
+      /* create and init PLL partition structure */
+      pll_partition_t * partition = create_pll_partition(opts, pinfo, tree, *part_range);
 
-    const int params_to_optimize = pinfo.model().params_to_optimize() | optimize_branches;
-    int retval = pllmod_treeinfo_init_partition(_pll_treeinfo, p, partition,
-                                                params_to_optimize,
-                                                pinfo.model().alpha(),
-                                                pinfo.model().ratecat_submodels().data(),
-                                                pinfo.model().submodel(0).rate_sym().data());
+      int retval = pllmod_treeinfo_init_partition(_pll_treeinfo, p, partition,
+                                                  params_to_optimize,
+                                                  pinfo.model().alpha(),
+                                                  pinfo.model().ratecat_submodels().data(),
+                                                  pinfo.model().submodel(0).rate_sym().data());
 
-    if (!retval)
-      throw runtime_error("ERROR adding treeinfo partition: " + string(pll_errmsg));
+      if (!retval)
+        throw runtime_error("ERROR adding treeinfo partition: " + string(pll_errmsg));
+    }
+    else
+    {
+      // this partition will be processed by other threads, but we still need to know
+      // which parameters to optimize
+      _pll_treeinfo->params_to_optimize[p] = params_to_optimize;
+    }
   }
 }
 
 TreeInfo::~TreeInfo ()
 {
   if (_pll_treeinfo)
+  {
+    pll_utree_destroy(_pll_treeinfo->root, NULL);
     pllmod_treeinfo_destroy(_pll_treeinfo);
+  }
+}
+
+Tree TreeInfo::tree() const
+{
+  return _pll_treeinfo ? Tree(_pll_treeinfo->tip_count, _pll_treeinfo->root) : Tree();
 }
 
 double TreeInfo::loglh(bool incremental)
@@ -160,14 +183,19 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                           RAXML_FREERATE_MAX,
                                                           RAXML_BFGS_FACTOR,
                                                           RAXML_PARAM_EPSILON);
-  }
 
-  DBG("\t - after freeR: logLH = %f\n", new_loglh);
-  DBG("\t - after freeR/crosscheck: logLH = %f\n", loglh());
+    /* normalize scalers and scale the branches accordingly */
+    if (_pll_treeinfo->brlen_linkage == PLLMOD_TREE_BRLEN_SCALED &&
+        _pll_treeinfo->partition_count > 1)
+      pllmod_treeinfo_normalize_brlen_scalers(_pll_treeinfo);
+
+    DBG("\t - after freeR: logLH = %f\n", new_loglh);
+    DBG("\t - after freeR/crosscheck: logLH = %f\n", loglh());
+  }
 
   if (params_to_optimize & PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE)
   {
-    new_loglh = optimize_branches(1.0, lh_epsilon);
+    new_loglh = optimize_branches(lh_epsilon, 0.25);
   }
 
   return new_loglh;
@@ -186,21 +214,39 @@ double TreeInfo::spr_round(spr_round_params& params)
 
 void assign(PartitionedMSA& parted_msa, const TreeInfo& treeinfo)
 {
-  if (parted_msa.part_count() != treeinfo.pll_treeinfo().partition_count)
+  const pllmod_treeinfo_t& pll_treeinfo = treeinfo.pll_treeinfo();
+
+  if (parted_msa.part_count() != pll_treeinfo.partition_count)
     throw runtime_error("Incompatible arguments");
 
   for (size_t p = 0; p < parted_msa.part_count(); ++p)
   {
+    if (!pll_treeinfo.partitions[p])
+      continue;
+
     Model model(parted_msa.model(p));
-    assign(model, treeinfo.pll_treeinfo().partitions[p]);
-    model.alpha(treeinfo.pll_treeinfo().alphas[p]);
-    model.brlen_scaler(treeinfo.pll_treeinfo().brlen_scalers[p]);
+    assign(model, treeinfo, p);
     parted_msa.model(p, move(model));
   }
 }
 
+void assign(Model& model, const TreeInfo& treeinfo, size_t partition_id)
+{
+  const pllmod_treeinfo_t& pll_treeinfo = treeinfo.pll_treeinfo();
 
-void set_partition_tips(PartitionInfo const& pinfo, const PartitionRegion& part_region,
+  if (partition_id >= pll_treeinfo.partition_count)
+    throw out_of_range("Partition ID out of range");
+
+  if (!pll_treeinfo.partitions[partition_id])
+    return;
+
+  assign(model, pll_treeinfo.partitions[partition_id]);
+  model.alpha(pll_treeinfo.alphas[partition_id]);
+  if (pll_treeinfo.brlen_scalers)
+    model.brlen_scaler(pll_treeinfo.brlen_scalers[partition_id]);
+}
+
+void set_partition_tips(PartitionInfo const& pinfo, const PartitionRange& part_region,
                         pll_partition_t* partition)
 {
   for (size_t i = 0; i < pinfo.msa().size(); ++i)
@@ -210,7 +256,7 @@ void set_partition_tips(PartitionInfo const& pinfo, const PartitionRegion& part_
 }
 
 pll_partition_t* create_pll_partition(Options const& opts, PartitionInfo const& pinfo,
-                                      Tree const& tree, const PartitionRegion& part_region)
+                                      Tree const& tree, const PartitionRange& part_region)
 {
   const MSA& msa = pinfo.msa();
   const Model& model = pinfo.model();
@@ -249,11 +295,10 @@ pll_partition_t* create_pll_partition(Options const& opts, PartitionInfo const& 
       attrs                    /* list of flags (SSE3/AVX, TIP-INNER special cases etc.) */
   );
 
-  partition->map = model.charmap();
-
-  // TODO: exception
   if (!partition)
     throw runtime_error("ERROR creating pll_partition: " + string(pll_errmsg));
+
+  partition->map = model.charmap();
 
   /* set pattern weights */
   if (!msa.weights().empty())
