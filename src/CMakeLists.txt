@@ -2,6 +2,13 @@ file (GLOB_RECURSE raxml_sources ${PROJECT_SOURCE_DIR}/src/*.cpp)
 
 set (EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 
+# enable static linking
+if (STATIC_BUILD)
+  SET(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+  SET(BUILD_SHARED_LIBRARIES OFF)
+  SET(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
+endif()
+
 add_executable        (raxml_module ${raxml_sources})
 
 target_link_libraries (raxml_module ${RAXML_LOCALDEPS_DIR}/lib/libpll_algorithm.a)

@@ -7,7 +7,12 @@ set (ENABLE_PTHREADS ON)
 set (ENABLE_MPI OFF)
 set (ENABLE_VCF OFF)
 
+# leave this disabled to build a portable binary 
+# (don't worry, libpll will still have full SIMD support!)
+set (ENABLE_RAXML_SIMD OFF)
 
+# build a portable static binary
+set(STATIC_BUILD ON)
 
 project (raxml-ng CXX)
 
@@ -41,13 +46,15 @@ set (CMAKE_CXX_FLAGS          "-std=c++11 ${WARN_FLAGS}")
 set (CMAKE_CXX_FLAGS_DEBUG    "-g")
 set (CMAKE_CXX_FLAGS_RELEASE  "-O3 -DNDEBUG")
 
-include(CheckCXXCompilerFlag)
-CHECK_CXX_COMPILER_FLAG(-mavx HAS_AVX)
-CHECK_CXX_COMPILER_FLAG(-msse3 HAS_SSE3)
-if(HAS_AVX)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx -D__AVX")
-elseif(HAS_SSE3)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse3 -D__SSE3")
+if (ENABLE_RAXML_SIMD)
+  include(CheckCXXCompilerFlag)
+  CHECK_CXX_COMPILER_FLAG(-mavx HAS_AVX)
+  CHECK_CXX_COMPILER_FLAG(-msse3 HAS_SSE3)
+  if(HAS_AVX)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx -D__AVX")
+  elseif(HAS_SSE3)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse3 -D__SSE3")
+  endif()
 endif()
 
 if(ENABLE_PTHREADS)
