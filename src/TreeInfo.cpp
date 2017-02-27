@@ -263,16 +263,16 @@ pll_partition_t* create_pll_partition(Options const& opts, PartitionInfo const& 
 
   unsigned int attrs = opts.simd_arch;
 
-//  if (opts.use && pinfo.model().num_ratecats() > 1)
-//  {
-//    attrs |= PLL_ATTRIB_RATE_SCALERS;
-//
-//    if (pinfo.model().num_states() != 4 ||
-//        (opts.simd_arch != PLL_ATTRIB_ARCH_AVX && opts.simd_arch != PLL_ATTRIB_ARCH_AVX2))
-//    {
-//      throw runtime_error("ERROR: Per-rate scalers are implemented for DNA with AVX/AVX2 vectorization only!\n");
-//    }
-//  }
+  if (opts.use_rate_scalers && pinfo.model().num_ratecats() > 1)
+  {
+    attrs |= PLL_ATTRIB_RATE_SCALERS;
+
+    if (pinfo.model().num_states() != 4 ||
+        (opts.simd_arch != PLL_ATTRIB_ARCH_AVX && opts.simd_arch != PLL_ATTRIB_ARCH_AVX2))
+    {
+      throw runtime_error("Per-rate scalers are implemented for DNA with AVX/AVX2 vectorization only!\n");
+    }
+  }
 
   if (opts.use_tip_inner)
   {

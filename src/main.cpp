@@ -304,7 +304,7 @@ void search_evaluate_thread(const RaxmlInstance& instance, TreeWithParams& bestT
 void search_evaluate(RaxmlInstance& instance, TreeWithParams& bestTree)
 {
   auto const& opts = instance.opts;
-  const string tree_fname = opts.output_fname("raxml.bestTree");
+  const string tree_fname = opts.output_fname("bestTree");
 
   instance.parted_msa = init_part_info(instance.opts);
 
@@ -333,11 +333,15 @@ void search_evaluate(RaxmlInstance& instance, TreeWithParams& bestTree)
   LOG_INFO << "\nElapsed time: " << setprecision(3) << sysutil_elapsed_seconds() << " seconds\n";
 
   LOG_INFO << "\nFinal tree saved to: " << sysutil_realpath(tree_fname) << endl;
+  LOG_INFO << "\nExecution log saved to: " << sysutil_realpath(opts.log_file) << endl << endl;
 }
 
 int main(int argc, char** argv)
 {
   int retval = EXIT_SUCCESS;
+
+  logger().add_log_stream(&cout);
+  logger().set_log_level(LogLevel::progress);
 
   print_banner();
 
@@ -365,8 +369,9 @@ int main(int argc, char** argv)
     case Command::evaluate:
     case Command::search:
     {
-      // parse model string & init partitions
-      print_options(instance.opts);
+      logger().set_log_filename(instance.opts.log_file);
+
+      LOG_INFO << instance.opts;
 
       try
       {

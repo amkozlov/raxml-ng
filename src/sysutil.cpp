@@ -238,26 +238,6 @@ double sysutil_elapsed_seconds()
   return elapsed_seconds.count();
 }
 
-void print_progress(double loglh, const char* format, ... )
-{
-  if (!ParallelContext::is_master())
-    return;
-
-  const size_t BUF_SIZE = 1024;
-  char buf[BUF_SIZE];
-
-  va_list args;
-  va_start(args, format);
-  vsnprintf(buf, BUF_SIZE, format, args);
-  va_end(args);
-
-  const double secs = sysutil_elapsed_seconds();
-  const unsigned int hh = secs / 3600;
-  const unsigned int mm = (secs - hh * 3600) / 60;
-  const unsigned int ss = (secs - hh * 3600 - mm * 60);
-  printf("[%u:%02u:%02u %f] %s", hh, mm, ss, loglh, buf);
-}
-
 std::string sysutil_realpath(const std::string& path)
 {
   char * real_path = realpath(path.c_str(), NULL);

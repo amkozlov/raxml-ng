@@ -5,7 +5,7 @@ using namespace std;
 
 string Options::output_fname(const string& suffix) const
 {
-  return (outfile_prefix.empty() ? msa_file : outfile_prefix) + "." + suffix;
+  return (outfile_prefix.empty() ? msa_file : outfile_prefix) + ".raxml." + suffix;
 }
 
 static string get_simd_arch_name(unsigned int simd_arch)
@@ -32,73 +32,78 @@ static string get_simd_arch_name(unsigned int simd_arch)
   }
 }
 
-void print_options(const Options &opts)
+LogStream& operator<<(LogStream& stream, const Options& opts)
 {
-  LOG_INFO << "Analysis options:" << endl;
+  stream << "RAxML-NG was called as follows:" << endl << endl << opts.cmdline << endl << endl;
 
-  LOG_INFO << "  run mode: ";
+  stream << "Analysis options:" << endl;
+
+  stream << "  run mode: ";
   switch(opts.command)
   {
     case Command::search:
-      LOG_INFO << "Tree search";
+      stream << "Tree search";
       break;
     case Command::evaluate:
-      LOG_INFO << "Evaluate tree likelihood";
+      stream << "Evaluate tree likelihood";
       break;
     default:
       break;
   }
-  LOG_INFO << endl;
+  stream << endl;
 
-  LOG_INFO << "  start tree: ";
+  stream << "  start tree: ";
   switch(opts.start_tree)
   {
     case StartingTree::random:
-      LOG_INFO << "random";
+      stream << "random";
       break;
     case StartingTree::parsimony:
-      LOG_INFO << "parsimony";
+      stream << "parsimony";
       break;
     case StartingTree::user:
-      LOG_INFO << "user";
+      stream << "user";
       break;
   }
-  LOG_INFO << endl;
+  stream << endl;
 
-  LOG_INFO << "  random seed: " << opts.random_seed << endl;
-  LOG_INFO << "  tip-inner: " << (opts.use_tip_inner ? "ON" : "OFF") << endl;
-  LOG_INFO << "  pattern compression: " << (opts.use_pattern_compression ? "ON" : "OFF") << endl;
+  stream << "  random seed: " << opts.random_seed << endl;
+  stream << "  tip-inner: " << (opts.use_tip_inner ? "ON" : "OFF") << endl;
+  stream << "  pattern compression: " << (opts.use_pattern_compression ? "ON" : "OFF") << endl;
 
   if (opts.command == Command::search)
   {
     if (opts.spr_radius > 0)
-      LOG_INFO << "  fast spr radius: " << opts.spr_radius << endl;
+      stream << "  fast spr radius: " << opts.spr_radius << endl;
     else
-      LOG_INFO << "  fast spr radius: AUTO" << endl;
+      stream << "  fast spr radius: AUTO" << endl;
 
     if (opts.spr_cutoff > 0.)
-      LOG_INFO << "  spr subtree cutoff: " << opts.spr_cutoff << endl;
+      stream << "  spr subtree cutoff: " << opts.spr_cutoff << endl;
     else
-      LOG_INFO << "  spr subtree cutoff: OFF" << endl;
+      stream << "  spr subtree cutoff: OFF" << endl;
   }
 
-  LOG_INFO << "  SIMD kernels: " << get_simd_arch_name(opts.simd_arch) << endl;
+  stream << "  SIMD kernels: " << get_simd_arch_name(opts.simd_arch) << endl;
 
-  LOG_INFO << "  parallelization: ";
+  stream << "  parallelization: ";
 //  if (opts.num_processes > 1 && opts.num_threads > 1)
 //  {
-//    LOG_INFO << "hybrid MPI+PTHREADS (" << opts.num_processes <<  "ranks x " <<
+//    stream << "hybrid MPI+PTHREADS (" << opts.num_processes <<  "ranks x " <<
 //        opts.num_threads <<  " threads)" << endl;
 //  }
 //  else if (opts.num_processes > 1)
-//    LOG_INFO <<  "MPI (" << opts.num_processes << " ranks)" << endl;
+//    stream <<  "MPI (" << opts.num_processes << " ranks)" << endl;
   if (opts.num_threads > 1)
-    LOG_INFO << "PTHREADS (" << opts.num_threads << " threads)" << endl;
+    stream << "PTHREADS (" << opts.num_threads << " threads)" << endl;
   else
-    LOG_INFO << "NONE/sequential" << endl;
+    stream << "NONE/sequential" << endl;
 
-  LOG_INFO << endl;
+  stream << endl;
+
+  return stream;
 }
+
 
 
 

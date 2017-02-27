@@ -32,12 +32,23 @@ static struct option long_options[] =
   {"simd",               required_argument, 0, 0 },  /*  20 */
 
   {"msa-format",         required_argument, 0, 0 },  /*  21 */
+  {"rate-scalers",       required_argument, 0, 0 },  /*  22 */
 
   { 0, 0, 0, 0 }
 };
 
+static std::string get_cmdline(int argc, char** argv)
+{
+  ostringstream s;
+  for (int i = 0; i < argc; ++i)
+    s << argv[i] << (i < argc-1 ? " " : "");
+  return s.str();
+}
+
 void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 {
+  opts.cmdline = get_cmdline(argc, argv);
+
   /* if no command specified, default to --search (or --help if no args were given) */
   opts.command = (argc > 1) ? Command::search : Command::help;
   opts.start_tree = StartingTree::random;
@@ -47,6 +58,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.use_pattern_compression = true;
   /* use tip-inner case optimization by default */
   opts.use_tip_inner = true;
+
+  /* do not use per-rate-category CLV scalers */
+  opts.use_rate_scalers = false;
 
   /* optimize model and branch lengths */
   opts.optimize_model = true;
@@ -272,6 +286,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           throw InvalidOptionValueException("Unknown MSA file format: %s!", optarg);
         }
         break;
+      case 22: /* enable per-rate scalers */
+        opts.use_rate_scalers = !optarg || (strcasecmp(optarg, "off") != 0);
+        break;
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -296,13 +313,16 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
     if (opts.tree_file.empty())
       throw OptionException("Mandatory switch --tree");
   }
+
+  /* set logfile name */
+  opts.log_file = opts.output_fname("log");
 }
 
 void CommandLineParser::print_help()
 {
-  LOG_INFO << "Usage: raxml-ng [OPTIONS]\n";
+  cout << "Usage: raxml-ng [OPTIONS]\n";
 
-  LOG_INFO << "\n"
+  cout << "\n"
             "Commands (mutually exclusive):\n"
             "  --help                                     display help information.\n"
             "  --version                                  display version information.\n"
@@ -320,6 +340,7 @@ void CommandLineParser::print_help()
             "  --tip-inner    on | off                    tip-inner case optimization (default: ON)\n"
             "  --threads      VALUE                       number of parallel threads to use (default: 2).\n"
             "  --simd         none | sse3 | avx | avx2    vector instruction set to use (default: auto-detect).\n"
+            "  --rate-scalers on | off                    use individual CLV scalers for each rate category (default: OFF).\n\n"
             "Model options:\n"
             "  --model        <name>+G[n]+<Freqs> | FILE  model specification OR partition file (default: GTR+G4)\n"
             "  --brlen        linked | scaled | unlinked  branch length linkage between partitions (default: scaled)\n"

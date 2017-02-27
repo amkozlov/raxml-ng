@@ -50,11 +50,11 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo)
   /* Compute initial LH of the starting tree */
   loglh = treeinfo.loglh();
 
-  print_progress(loglh, "Initial branch length optimization\n");
+  LOG_PROGRESS(loglh) << "Initial branch length optimization" << endl;
   loglh = treeinfo.optimize_branches(fast_modopt_eps, 1);
 
   /* Initial fast model optimization */
-  print_progress(loglh, "Model parameter optimization (eps = %.1f)\n", fast_modopt_eps);
+  LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << fast_modopt_eps << ")" << endl;
   loglh = optimize(treeinfo, fast_modopt_eps);
 //  print_model_params(treeinfo, useropt);
 
@@ -84,8 +84,8 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo)
     while (params.radius_min < radius_limit)
     {
       ++iter;
-      print_progress(best_loglh, "AUTODETECT spr round %d (radius: %d)\n",
-                     iter, params.radius_max);
+      LOG_PROGRESS(best_loglh) << "AUTODETECT spr round " << iter << " (radius: " <<
+                     params.radius_max << ")" << endl;
       loglh = treeinfo.spr_round(params);
 
       if (!loglh)
@@ -105,14 +105,16 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo)
 
   }
 
-  print_progress(loglh, "SPR radius for FAST iterations: %d (%s)\n", best_fast_radius,
-                 _spr_radius > 0 ? "user-specified" : "autodetect");
+  LOG_PROGRESS(loglh) << "SPR radius for FAST iterations: " << best_fast_radius << " (" <<
+                 (_spr_radius > 0 ? "user-specified" : "autodetect") << ")" << endl;
 
   /* optimize model parameters a bit more thoroughly */
-  print_progress(loglh, "Model parameter optimization (eps = %.1f)\n", interim_modopt_eps);
+  LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " <<
+                                                          interim_modopt_eps << ")" << endl;
   loglh = optimize(treeinfo, interim_modopt_eps);
 
-  DBG("\nLogLikelihood after intermediate model optimization (eps = %.1f): %f\n", interim_modopt_eps, loglh);
+  DBG("\nLogLikelihood after intermediate model optimization (eps = %.1f): %f\n",
+      interim_modopt_eps, loglh);
 //  print_model_params(treeinfo, useropt);
 
   /* initialize search params */
@@ -130,8 +132,8 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo)
     {
       ++iter;
       old_loglh = new_loglh;
-      print_progress(old_loglh, "%s spr round %d (radius: %d)\n",
-                 spr_params.thorough ? "SLOW" : "FAST", iter, spr_params.radius_max);
+      LOG_PROGRESS(old_loglh) << (spr_params.thorough ? "SLOW" : "FAST") <<
+          " spr round " << iter << " (radius: " << spr_params.radius_max << ")" << endl;
       loglh = treeinfo.spr_round(spr_params);
 
       /* optimize ALL branches */
@@ -159,7 +161,7 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo)
           spr_params.radius_max = radius_step;
           iter = 0;
 
-          print_progress(new_loglh, "Model parameter optimization (eps = %.1f)\n", 1.0);
+          LOG_PROGRESS(new_loglh) << "Model parameter optimization (eps = " << 1.0 << ")" << endl;
           new_loglh = optimize(treeinfo, 1.0);
 //          print_model_params(treeinfo, useropt);
           DBG("LogLikelihood after FAST iterations: %f\n", new_loglh);
@@ -178,7 +180,7 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo)
   loglh = new_loglh;
 
   /* Final thorough model optimization */
-  print_progress(loglh, "Model parameter optimization (eps = %f)\n", _lh_epsilon);
+  LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << _lh_epsilon << ")" << endl;
   loglh = optimize(treeinfo, _lh_epsilon);
 
   return loglh;

@@ -1,17 +1,87 @@
 #ifndef RAXML_LOG_HPP_
 #define RAXML_LOG_HPP_
 
-class ParallelContext;
+#include <fstream>
+#include <vector>
+#include <memory>
 
-class Logger
+enum class LogLevel
 {
-public:
-  static std::ostream& info() { return std::cout; }
+  none = 0,
+  error,
+  warning,
+  info,
+  progress,
+  debug
 };
 
-//#define LOG_INFO if (!ParallelContext::is_master()) {} else Logger::info()
-#define LOG_INFO std::cout
+struct ProgressInfo
+{
+  ProgressInfo(double loglh) : loglh(loglh) {};
 
-void print_progress(double loglh, const char* format, ... );
+  double loglh;
+};
+
+typedef std::vector<std::ostream*> StreamList;
+
+class LogStream
+{
+public:
+  LogStream() {};
+  LogStream(const StreamList& streams) { _streams = streams; };
+
+  StreamList& streams() { return _streams;};
+
+  void add_stream(std::ostream* stream);
+
+private:
+  StreamList _streams;
+};
+
+class Logging
+{
+public:
+  static Logging& instance();
+
+  LogStream& logstream(LogLevel level);
+  LogLevel log_level() const;
+
+  void set_log_filename(const std::string& fname);
+  void add_log_stream(std::ostream* stream);
+  void set_log_level(LogLevel level);
+
+private:
+  Logging();
+
+  LogLevel _log_level;
+  std::ofstream _logfile;
+  LogStream _empty_stream;
+  LogStream _full_stream;
+};
+
+Logging& logger();
+
+#define RAXML_LOG(level) logger().logstream(level)
+
+#define LOG_ERROR RAXML_LOG(LogLevel::error)
+#define LOG_WARN RAXML_LOG(LogLevel::warn)
+#define LOG_INFO RAXML_LOG(LogLevel::info)
+#define LOG_DEBUG RAXML_LOG(LogLevel::debug)
+
+#define LOG_PROGRESS(loglh) RAXML_LOG(LogLevel::progress) << ProgressInfo(loglh)
+
+
+template <class T>
+LogStream& operator<<(LogStream& logstream, T object)
+{
+  for (auto s: logstream.streams())
+    *s << object;
+
+  return logstream;
+}
+
+LogStream& operator<<(LogStream& logstream, std::ostream& (*pf)(std::ostream&));
+
+LogStream& operator<<(LogStream& logstream, const ProgressInfo& prog);
 
 #endif /* RAXML_LOG_HPP_ */
