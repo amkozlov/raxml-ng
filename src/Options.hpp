@@ -13,7 +13,7 @@ public:
   random_seed(0), start_tree(StartingTree::random), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
   spr_cutoff(1.0), brlen_linkage(PLLMOD_TREE_BRLEN_SCALED), simd_arch(PLL_ATTRIB_ARCH_CPU),
   tree_file(""), msa_file(""), model_file(""), outfile_prefix(""), log_level(LogLevel::progress),
-  msa_format(FileFormat::autodetect), num_threads(1)
+  msa_format(FileFormat::autodetect), num_threads(1), num_ranks(1)
   {};
 
   ~Options() = default;
@@ -52,6 +52,7 @@ public:
 
   /* parallelization stuff */
   unsigned int num_threads;     /* number of threads */
+  unsigned int num_ranks;       /* number of MPI ranks */
 };
 
 std::ostream& operator<<(std::ostream& stream, const Options& opts);

@@ -4,7 +4,7 @@ set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES  ON)
 
 set (ENABLE_PTHREADS ON)
-set (ENABLE_MPI OFF)
+set (ENABLE_MPI ON)
 set (ENABLE_VCF OFF)
 
 # leave this disabled to build a portable binary 
@@ -58,7 +58,7 @@ if (ENABLE_RAXML_SIMD)
 endif()
 
 if(ENABLE_PTHREADS)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -D_USE_PTHREADS")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -D_RAXML_PTHREADS")
 endif()
 
 if(ENABLE_MPI)
@@ -67,7 +67,7 @@ if(ENABLE_MPI)
     # set( ENV{OMPI_CXX}            "clang++" PARENT_SCOPE )
     set( CMAKE_CXX_COMPILER       "mpicxx")
     include_directories(${MPI_CXX_INCLUDE_PATH})
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_COMPILER_FLAGS} -D__MPI")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_COMPILER_FLAGS} -D_RAXML_MPI")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_CXX_LINK_FLAGS}")
   endif()
 endif()

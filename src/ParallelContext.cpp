@@ -4,16 +4,41 @@
 
 using namespace std;
 
-size_t ParallelContext::_num_threads;
-std::vector<std::thread> ParallelContext::_threads;
+size_t ParallelContext::_num_threads = 1;
+size_t ParallelContext::_num_ranks = 1;
+size_t ParallelContext::_rank_id = 0;
+std::vector<ThreadType> ParallelContext::_threads;
 std::vector<double> ParallelContext::_parallel_buf;
-std::unordered_map<std::thread::id, ParallelContext> ParallelContext::_thread_ctx_map;
+std::unordered_map<ThreadIDType, ParallelContext> ParallelContext::_thread_ctx_map;
 
-void ParallelContext::init(const Options& opts, const std::function<void()>& thread_main)
+void ParallelContext::init_mpi(int argc, char * argv[])
+{
+#ifdef _RAXML_MPI
+  {
+    int tmp;
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &tmp);
+    _rank_id = (size_t) tmp;
+    MPI_Comm_size(MPI_COMM_WORLD, &tmp);
+    _num_ranks = (size_t) tmp;
+    printf("size: %lu, rank: %lu\n", _num_ranks, _rank_id);
+  }
+#endif
+
+  /* add master thread to the map */
+#ifdef _RAXML_PTHREADS
+  _thread_ctx_map.emplace(std::this_thread::get_id(), ParallelContext(0));
+#else
+  _thread_ctx_map.emplace(0, ParallelContext(0));
+#endif
+}
+
+void ParallelContext::init_pthreads(const Options& opts, const std::function<void()>& thread_main)
 {
   _num_threads = opts.num_threads;
   _parallel_buf.reserve(opts.num_threads * 4096);
 
+#ifdef _RAXML_PTHREADS
   _thread_ctx_map.emplace(std::this_thread::get_id(), ParallelContext(0));
 
   /* Launch threads */
@@ -22,6 +47,7 @@ void ParallelContext::init(const Options& opts, const std::function<void()>& thr
     _threads.emplace_back(thread_main);
     _thread_ctx_map.emplace(_threads.back().get_id(), ParallelContext(i));
   }
+#endif
 }
 
 void ParallelContext::finalize()
@@ -29,9 +55,46 @@ void ParallelContext::finalize()
   for (thread& t: _threads)
     t.join();
   _threads.clear();
+
+#ifdef _RAXML_MPI
+  MPI_Barrier(MPI_COMM_WORLD);
+  MPI_Finalize();
+#endif
 }
 
-void ParallelContext::parallel_thread_barrier() const
+const ParallelContext& ParallelContext::ctx()
+{
+  ThreadIDType id;
+
+#ifdef _RAXML_PTHREADS
+  id = std::this_thread::get_id();
+#else
+  id = 0;
+#endif
+
+  return ParallelContext::_thread_ctx_map.at(id);
+}
+
+void ParallelContext::barrier() const
+{
+#ifdef _RAXML_MPI
+  mpi_barrier();
+#endif
+
+#ifdef _RAXML_PTHREADS
+  thread_barrier();
+#endif
+}
+
+void ParallelContext::mpi_barrier() const
+{
+#ifdef _RAXML_MPI
+  if (_thread_id == 0 && _num_ranks > 1)
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif
+}
+
+void ParallelContext::thread_barrier() const
 {
   static volatile unsigned int barrier_counter = 0;
   static __thread volatile int myCycle = 0;
@@ -40,22 +103,22 @@ void ParallelContext::parallel_thread_barrier() const
   __sync_fetch_and_add( &barrier_counter, 1);
 
   if(_thread_id == 0)
-    {
-      while(barrier_counter != ParallelContext::_num_threads);
-      barrier_counter = 0;
-      proceed = !proceed;
-    }
+  {
+    while(barrier_counter != ParallelContext::_num_threads);
+    barrier_counter = 0;
+    proceed = !proceed;
+  }
   else
-    {
-      while(myCycle == proceed);
-      myCycle = !myCycle;
-    }
+  {
+    while(myCycle == proceed);
+    myCycle = !myCycle;
+  }
 }
 
 void ParallelContext::parallel_thread_reduce(double * data, size_t size, int op) const
 {
   /* synchronize */
-  parallel_thread_barrier();
+  thread_barrier();
 
   /* collect data from threads */
   size_t i, j;
@@ -63,7 +126,7 @@ void ParallelContext::parallel_thread_reduce(double * data, size_t size, int op)
     _parallel_buf[_thread_id * size + i] = data[i];
 
   /* synchronize */
-  parallel_thread_barrier();
+  thread_barrier();
 
   /* reduce */
   for (i = 0; i < size; ++i)
@@ -101,23 +164,34 @@ void ParallelContext::parallel_thread_reduce(double * data, size_t size, int op)
 
 void ParallelContext::parallel_reduce(double * data, size_t size, int op) const
 {
-//  printf("P%u T%u: %lf\n", useropt->process_id, useropt->thread_id, data[0]);
-
-
-#ifdef _USE_PTHREADS
-  parallel_thread_reduce(data, size, op);
+#ifdef _RAXML_PTHREADS
+  if (_num_threads > 1)
+    parallel_thread_reduce(data, size, op);
 #endif
 
-#ifdef _USE_MPI
-  int reduce_op = MPI_SUM;
-  if (op == PLLMOD_TREE_REDUCE_MAX)
-    reduce_op = MPI_MAX;
-  else if (op == PLLMOD_TREE_REDUCE_MIN)
-    reduce_op = MPI_MIN;
-  else
-    assert(0);
+#ifdef _RAXML_MPI
+  if (_num_ranks > 1)
+  {
+    thread_barrier();
 
-  MPI_Allreduce(MPI_IN_PLACE, data, size, MPI_DOUBLE, reduce_op, MPI_COMM_WORLD);
+    if (_thread_id == 0)
+    {
+      MPI_Op reduce_op;
+      if (op == PLLMOD_TREE_REDUCE_SUM)
+        reduce_op = MPI_SUM;
+      else if (op == PLLMOD_TREE_REDUCE_MAX)
+        reduce_op = MPI_MAX;
+      else if (op == PLLMOD_TREE_REDUCE_MIN)
+        reduce_op = MPI_MIN;
+      else
+        assert(0);
+
+      MPI_Allreduce(MPI_IN_PLACE, data, size, MPI_DOUBLE, reduce_op, MPI_COMM_WORLD);
+    }
+
+    if (_num_threads > 1)
+      thread_broadcast(0, data, size * sizeof(double));
+  }
 #endif
 }
 
@@ -135,7 +209,7 @@ void ParallelContext::thread_broadcast(size_t source_id, void * data, size_t siz
   }
 
   /* synchronize */
-  barrier();
+  thread_barrier();
 
 //  pthread_barrier_wait(&barrier);
   __sync_synchronize();
@@ -146,7 +220,7 @@ void ParallelContext::thread_broadcast(size_t source_id, void * data, size_t siz
     memcpy(data, (void *) _parallel_buf.data(), size);
   }
 
-  barrier();
+  thread_barrier();
 }
 
 void ParallelContext::thread_send_master(size_t source_id, void * data, size_t size) const

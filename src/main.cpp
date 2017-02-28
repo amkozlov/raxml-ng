@@ -21,10 +21,6 @@
 #include <algorithm>
 #include <chrono>
 
-//#include <cxxopts.hpp>
-//
-//#include "mpihead.hpp"
-
 #include <memory>
 
 #include "common.h"
@@ -171,8 +167,7 @@ PartitionedMSA init_part_info(Options &opts)
   return part_msa;
 }
 
-PartitionAssignment get_part_assign(const PartitionedMSA& parted_msa,
-                                      size_t num_procs, size_t proc_id)
+PartitionAssignment get_part_assign(const PartitionedMSA& parted_msa, const ParallelContext& ctx)
 {
   PartitionAssignment part_sizes;
 
@@ -187,16 +182,16 @@ PartitionAssignment get_part_assign(const PartitionedMSA& parted_msa,
 //  SimpleLoadBalancer balancer;
   KassianLoadBalancer balancer;
 
-  if (ParallelContext::is_master())
+  if (ctx.master())
   {
-    auto part_assign = balancer.get_all_assignments(part_sizes, num_procs);
+    auto part_assign = balancer.get_all_assignments(part_sizes, ctx.num_procs());
 
     LOG_INFO << "Data distribution:\n" << part_assign;
 
-    return part_assign[proc_id];
+    return part_assign[ctx.proc_id()];
   }
   else
-    return balancer.get_proc_assignments(part_sizes, num_procs, proc_id);
+    return balancer.get_proc_assignments(part_sizes, ctx.num_procs(), ctx.proc_id());
 }
 
 void load_msa(const Options& opts, PartitionedMSA& part_msa)
@@ -239,20 +234,16 @@ void search_evaluate_thread(const RaxmlInstance& instance, TreeWithParams& bestT
 
   auto const& master_msa = instance.parted_msa;
   auto const& opts = instance.opts;
+  auto const& ctx = ParallelContext::ctx();
 
 //  printf("thread %lu / %lu\n", ParallelContext::ctx().thread_id(), ParallelContext::num_procs());
 
-#ifdef _USE_PTHREADS
-  ParallelContext::ctx().barrier();
-#endif
+  ctx.thread_barrier();
 
   /* run load balancing */
-  auto part_assign = get_part_assign(master_msa, ParallelContext::num_procs(),
-                                     ParallelContext::ctx().thread_id());
+  auto part_assign = get_part_assign(master_msa, ctx);
 
-#ifdef _USE_PTHREADS
-  ParallelContext::ctx().barrier();
-#endif
+  ctx.thread_barrier();
 
 //  size_t start_tree_num = 0;
 
@@ -274,13 +265,11 @@ void search_evaluate_thread(const RaxmlInstance& instance, TreeWithParams& bestT
       optimizer.optimize(*treeinfo);
   }
 
-#ifdef _USE_PTHREADS
-  ParallelContext::ctx().barrier();
-#endif
+  ctx.thread_barrier();
 
   const double final_loglh = treeinfo->loglh();
 
-  if (ParallelContext::is_master())
+  if (ctx.master())
   {
     bestTree.loglh = final_loglh;
     bestTree.tree = treeinfo->tree();
@@ -288,9 +277,7 @@ void search_evaluate_thread(const RaxmlInstance& instance, TreeWithParams& bestT
       bestTree.models.push_back(master_msa.model(p));
   }
 
-#ifdef _USE_PTHREADS
-  ParallelContext::ctx().barrier();
-#endif
+  ctx.thread_barrier();
 
   // collect model params: quite dirty so far, and also pthreads-specific
   // TODO: adapt for MPI
@@ -302,9 +289,7 @@ void search_evaluate_thread(const RaxmlInstance& instance, TreeWithParams& bestT
     }
   }
 
-#ifdef _USE_PTHREADS
-  ParallelContext::ctx().barrier();
-#endif
+  ctx.thread_barrier();
 }
 
 void search_evaluate(RaxmlInstance& instance, TreeWithParams& bestTree)
@@ -344,13 +329,23 @@ void search_evaluate(RaxmlInstance& instance, TreeWithParams& bestTree)
   LOG_INFO << "\nExecution log saved to: " << sysutil_realpath(opts.log_file) << endl << endl;
 }
 
+void clean_exit(int retval)
+{
+  ParallelContext::finalize();
+  exit(retval);
+}
+
 int main(int argc, char** argv)
 {
   int retval = EXIT_SUCCESS;
 
-  logger().add_log_stream(&cout);
-
   RaxmlInstance instance;
+
+  ParallelContext::init_mpi(argc, argv);
+
+  instance.opts.num_ranks = ParallelContext::num_ranks();
+
+  logger().add_log_stream(&cout);
 
   CommandLineParser cmdline;
   try
@@ -360,7 +355,7 @@ int main(int argc, char** argv)
   catch (OptionException &e)
   {
     LOG_INFO << "ERROR: " << e.what() << std::endl;
-    return EXIT_FAILURE;
+    clean_exit(EXIT_FAILURE);
   }
 
   /* handle trivial commands first */
@@ -369,10 +364,12 @@ int main(int argc, char** argv)
     case Command::help:
       print_banner();
       cmdline.print_help();
-      return EXIT_SUCCESS;
+      clean_exit(EXIT_SUCCESS);
+      break;
     case Command::version:
       print_banner();
-      return EXIT_SUCCESS;
+      clean_exit(EXIT_SUCCESS);
+      break;
     default:
       break;
   }
@@ -392,9 +389,9 @@ int main(int argc, char** argv)
       try
       {
         TreeWithParams bestTree;
-        ParallelContext::init(instance.opts, std::bind(search_evaluate_thread,
-                                                       std::cref(instance),
-                                                       std::ref(bestTree)));
+        ParallelContext::init_pthreads(instance.opts, std::bind(search_evaluate_thread,
+                                                                std::cref(instance),
+                                                                std::ref(bestTree)));
 
         search_evaluate(instance, bestTree);
       }
@@ -403,9 +400,6 @@ int main(int argc, char** argv)
         LOG_INFO << e.what() << endl;
         retval = EXIT_FAILURE;
       }
-
-      ParallelContext::finalize();
-
       break;
     }
     case Command::none:
@@ -414,5 +408,6 @@ int main(int argc, char** argv)
       retval = EXIT_FAILURE;
   }
 
+  clean_exit(retval);
   return retval;
 }

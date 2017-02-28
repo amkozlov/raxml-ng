@@ -12,10 +12,11 @@ TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA&
   if (!_pll_treeinfo)
     throw runtime_error("ERROR creating treeinfo structure: " + string(pll_errmsg));
 
-#if (defined(_USE_PTHREADS) || defined(_USE_MPI))
-  pllmod_treeinfo_set_parallel_context(_pll_treeinfo, (void *) &ParallelContext::ctx(),
-                                       ParallelContext::parallel_reduce_cb);
-#endif
+  if (ParallelContext::num_procs() > 1)
+  {
+    pllmod_treeinfo_set_parallel_context(_pll_treeinfo, (void *) &ParallelContext::ctx(),
+                                         ParallelContext::parallel_reduce_cb);
+  }
 
   // init partitions
   int optimize_branches = opts.optimize_brlen ? PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE : 0;

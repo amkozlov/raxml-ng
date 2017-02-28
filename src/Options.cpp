@@ -99,14 +99,14 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   stream << "  SIMD kernels: " << get_simd_arch_name(opts.simd_arch) << endl;
 
   stream << "  parallelization: ";
-//  if (opts.num_processes > 1 && opts.num_threads > 1)
-//  {
-//    stream << "hybrid MPI+PTHREADS (" << opts.num_processes <<  "ranks x " <<
-//        opts.num_threads <<  " threads)" << endl;
-//  }
-//  else if (opts.num_processes > 1)
-//    stream <<  "MPI (" << opts.num_processes << " ranks)" << endl;
-  if (opts.num_threads > 1)
+  if (opts.num_ranks > 1 && opts.num_threads > 1)
+  {
+    stream << "hybrid MPI+PTHREADS (" << opts.num_ranks <<  " ranks x " <<
+        opts.num_threads <<  " threads)" << endl;
+  }
+  else if (opts.num_ranks > 1)
+    stream <<  "MPI (" << opts.num_ranks << " ranks)" << endl;
+  else if (opts.num_threads > 1)
     stream << "PTHREADS (" << opts.num_threads << " threads)" << endl;
   else
     stream << "NONE/sequential" << endl;
