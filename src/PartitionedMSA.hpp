@@ -20,6 +20,7 @@ public:
   const PartitionInfo& part_info(size_t index) const { return _part_list.at(index); };
   const Model& model(size_t index) const { return _part_list.at(index).model(); };
   const std::vector<PartitionInfo>& part_list() const { return _part_list; };
+  size_t total_length() const;
 
   // setters
   void full_msa(MSA&& msa) { _full_msa = std::move(msa); };
@@ -50,6 +51,6 @@ private:
   std::vector<unsigned int> get_site_part_assignment();
 };
 
-void print_partition_info(const PartitionedMSA& part_msa);
+std::ostream& operator<<(std::ostream& stream, const PartitionedMSA& part_msa);
 
 #endif /* RAXML_PARTITIONEDMSA_HPP_ */

@@ -33,6 +33,7 @@ static struct option long_options[] =
 
   {"msa-format",         required_argument, 0, 0 },  /*  21 */
   {"rate-scalers",       required_argument, 0, 0 },  /*  22 */
+  {"log",                required_argument, 0, 0 },  /*  23 */
 
   { 0, 0, 0, 0 }
 };
@@ -289,6 +290,20 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 22: /* enable per-rate scalers */
         opts.use_rate_scalers = !optarg || (strcasecmp(optarg, "off") != 0);
         break;
+      case 23: /* log level */
+        if (strcasecmp(optarg, "error") == 0 )
+          opts.log_level = LogLevel::error;
+        else if (strcasecmp(optarg, "warning") == 0)
+          opts.log_level = LogLevel::warning;
+        else if (strcasecmp(optarg, "info") == 0)
+          opts.log_level = LogLevel::info;
+        else if (strcasecmp(optarg, "progress") == 0)
+          opts.log_level = LogLevel::progress;
+        else if (strcasecmp(optarg, "debug") == 0)
+          opts.log_level = LogLevel::debug;
+        else
+          throw InvalidOptionValueException("Unknown log level: %s!", optarg);
+        break;
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -333,9 +348,10 @@ void CommandLineParser::print_help()
             "  --msa          FILENAME                    alignment file\n"
             "  --msa-format   VALUE                       alignment file type: FASTA, PHYLIP, VCF, CATG or AUTO-detect (default)\n"
             "  --data-type    VALUE                       data type: DNA, AA, MULTI-state or AUTO-detect (default)\n"
-            "  --prefix       STRING                      prefix for output files (default: MSA file name)\n\n"
+            "  --prefix       STRING                      prefix for output files (default: MSA file name)\n"
+            "  --log          VALUE                       log verbosity: ERROR,WARNING,INFO,PROGRESS,DEBUG (default: PROGRESS)\n\n"
             "General options:\n"
-            "  --seed VALUE                               seed for pseudo-random number generator (default: current time)\n"
+            "  --seed         VALUE                       seed for pseudo-random number generator (default: current time)\n"
             "  --pat-comp     on | off                    alignment pattern compression (default: ON)\n"
             "  --tip-inner    on | off                    tip-inner case optimization (default: ON)\n"
             "  --threads      VALUE                       number of parallel threads to use (default: 2).\n"
@@ -349,7 +365,7 @@ void CommandLineParser::print_help()
             "  --prob-msa     on | off                    use probabilistic alignment (works with CATG and VCF)\n"
             "  --lh-epsilon   VALUE                       log-likelihood epsilon for optimization/tree search (default: 0.1)\n\n"
             "Topology search options:\n"
-            "  --spr-radius  VALUE                        SPR re-insertion radius for fast iterations (default: AUTO)\n"
-            "  --spr-cutoff  VALUE | off                  Relative LH cutoff for descending into subtrees (default: 1.0)\n";
+            "  --spr-radius   VALUE                       SPR re-insertion radius for fast iterations (default: AUTO)\n"
+            "  --spr-cutoff   VALUE | off                 Relative LH cutoff for descending into subtrees (default: 1.0)\n";
 }
 

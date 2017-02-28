@@ -12,6 +12,7 @@ enum class LogLevel
   warning,
   info,
   progress,
+  verbose,
   debug
 };
 
@@ -50,6 +51,12 @@ public:
   void add_log_stream(std::ostream* stream);
   void set_log_level(LogLevel level);
 
+  /* singleton: remove copy/move constructors and assignment ops */
+  Logging(const Logging& other) = delete;
+  Logging(Logging&& other) = delete;
+  Logging& operator=(const Logging& other) = delete;
+  Logging& operator=(Logging&& other) = delete;
+
 private:
   Logging();
 
@@ -72,7 +79,7 @@ Logging& logger();
 
 
 template <class T>
-LogStream& operator<<(LogStream& logstream, T object)
+LogStream& operator<<(LogStream& logstream, const T& object)
 {
   for (auto s: logstream.streams())
     *s << object;

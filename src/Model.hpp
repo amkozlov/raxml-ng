@@ -126,10 +126,10 @@ private:
   void init_model_opts(const std::string& model_opts, const pllmod_mixture_model_t& mix_model);
 };
 
-void print_model_info(const Model& m);
-
 void assign(Model& model, const pllmod_msa_stats_t * stats);
 void assign(Model& model, const pll_partition_t * partition);
 void assign(pll_partition_t * partition, const Model& model);
+
+LogStream& operator<<(LogStream& stream, const Model& m);
 
 #endif /* RAXML_MODEL_H_ */

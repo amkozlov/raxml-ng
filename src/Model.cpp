@@ -366,20 +366,6 @@ int Model::params_to_optimize() const
   return params_to_optimize;
 }
 
-static string get_param_mode_str(ParamValue mode)
-{
-  return ParamValueNames[(size_t) mode];
-}
-
-static string get_ratehet_mode_str(const Model& m)
-{
-  if (m.num_ratecats() == 1)
-    return "NONE";
-  else
-    return (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_GAMMA) ? "GAMMA" :
-            (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_FREE) ? "FREE" : "FIXED";
-}
-
 void assign(Model& model, const pllmod_msa_stats_t * stats)
 {
   /* either compute empirical P-inv, or set the fixed user-specified value */
@@ -502,53 +488,65 @@ void assign(pll_partition_t * partition, const Model& model)
     throw runtime_error("incompatible partition!");
 }
 
-void print_model_info(const Model& m)
+static string get_param_mode_str(ParamValue mode)
+{
+  return ParamValueNames[(size_t) mode];
+}
+
+static string get_ratehet_mode_str(const Model& m)
+{
+  if (m.num_ratecats() == 1)
+    return "NONE";
+  else
+    return (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_GAMMA) ? "GAMMA" :
+            (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_FREE) ? "FREE" : "FIXED";
+}
+
+LogStream& operator<<(LogStream& stream, const Model& m)
 {
   if (m.param_mode(PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER) != ParamValue::undefined)
-    LOG_INFO << "   Speed ("  << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER))
+    stream << "   Speed ("  << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER))
              << "): " << m.brlen_scaler() << endl;
 
-//  print_info("   Branch lengths (%s): %s\n", get_param_mode_str(part_info->paramval_brlen),
-//             treeinfo->brlen_linkage == PLLMOD_TREE_BRLEN_SCALED ? "proportional" :
-//                 (treeinfo->brlen_linkage == PLLMOD_TREE_BRLEN_UNLINKED ? "unlinked" : "linked"));
-
-  LOG_INFO << "   Rate heterogeneity: " << get_ratehet_mode_str(m);
+  stream << "   Rate heterogeneity: " << get_ratehet_mode_str(m);
   if (m.num_ratecats() > 1)
   {
-    LOG_INFO << " (" << m.num_ratecats() << " cats)";
+    stream << " (" << m.num_ratecats() << " cats)";
     if (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_GAMMA)
-      LOG_INFO << ",  alpha: " << setprecision(3) << m.alpha() << " ("  << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_ALPHA))
+      stream << ",  alpha: " << setprecision(3) << m.alpha() << " ("  << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_ALPHA))
                  << ")";
-    LOG_INFO << ",  weights&rates: ";
+    stream << ",  weights&rates: ";
     for (size_t i = 0; i < m.num_ratecats(); ++i)
-      LOG_INFO << "(" << m.ratecat_weights()[i] << "," << m.ratecat_rates()[i] << ") ";
+      stream << "(" << m.ratecat_weights()[i] << "," << m.ratecat_rates()[i] << ") ";
   }
-  LOG_INFO << endl;
+  stream << endl;
 
   if (m.param_mode(PLLMOD_OPT_PARAM_PINV) != ParamValue::undefined)
-    LOG_INFO << "   P-inv (" << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_PINV)) << "): " <<
+    stream << "   P-inv (" << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_PINV)) << "): " <<
                m.pinv() << endl;
 
-  LOG_INFO << "   Base frequencies (" << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES)) << "): ";
+  stream << "   Base frequencies (" << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES)) << "): ";
   for (size_t i = 0; i < m.num_submodels(); ++i)
   {
     if (m.num_submodels() > 1)
-      LOG_INFO << "\nM" << i << ": ";
+      stream << "\nM" << i << ": ";
 
     for (size_t j = 0; j < m.base_freqs(i).size(); ++j)
-      LOG_INFO << setprecision(3) << m.base_freqs(i)[j] << " ";
+      stream << setprecision(3) << m.base_freqs(i)[j] << " ";
   }
-  LOG_INFO << endl;
+  stream << endl;
 
-  LOG_INFO << "   Substitution rates (" << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES)) << "): ";
+  stream << "   Substitution rates (" << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES)) << "): ";
   for (size_t i = 0; i < m.num_submodels(); ++i)
   {
     if (m.num_submodels() > 1)
-      LOG_INFO << "\nM " << i << ": ";
+      stream << "\nM " << i << ": ";
 
     for (size_t j = 0; j < m.subst_rates(i).size(); ++j)
-      LOG_INFO << m.subst_rates(i)[j] << " ";
+      stream << m.subst_rates(i)[j] << " ";
   }
-  LOG_INFO << endl;
+  stream << endl;
+
+  return stream;
 }
 

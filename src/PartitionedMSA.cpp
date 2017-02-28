@@ -81,6 +81,18 @@ void PartitionedMSA::compress_patterns()
   }
 }
 
+size_t PartitionedMSA::total_length() const
+{
+  size_t sum = 0;
+
+  for (const auto& pinfo: _part_list)
+  {
+    sum += pinfo.msa().length();
+  }
+
+  return sum;
+}
+
 void PartitionedMSA::set_model_empirical_params()
 {
   for (PartitionInfo& pinfo: _part_list)
@@ -89,26 +101,28 @@ void PartitionedMSA::set_model_empirical_params()
   }
 }
 
-void print_partition_info(const PartitionedMSA& part_msa)
+std::ostream& operator<<(std::ostream& stream, const PartitionedMSA& part_msa)
 {
   for (size_t p = 0; p < part_msa.part_count(); ++p)
   {
     const PartitionInfo& pinfo = part_msa.part_info(p);
-    LOG_INFO << "Partition " << p << ": " << pinfo.name() << endl;
-    LOG_INFO << "Model: " << pinfo.model().to_string() << endl;
+    stream << "Partition " << p << ": " << pinfo.name() << endl;
+    stream << "Model: " << pinfo.model().to_string() << endl;
     if (pinfo.msa().num_patterns())
     {
-      LOG_INFO << "Alignment sites / patterns: " << pinfo.msa().num_sites() <<
+      stream << "Alignment sites / patterns: " << pinfo.msa().num_sites() <<
           " / " << pinfo.msa().num_patterns() << endl;
     }
     else
-      LOG_INFO << "Alignment sites: " << pinfo.msa().num_sites() << endl;
+      stream << "Alignment sites: " << pinfo.msa().num_sites() << endl;
 
-    LOG_INFO << fixed;
-    LOG_INFO << "Gaps: " << setprecision(2) << (pinfo.stats()->gap_prop * 100) << " %" << endl;
-    LOG_INFO << "Invariant sites: " << setprecision(2) << (pinfo.stats()->inv_prop * 100) << " %" << endl;
-    LOG_INFO << endl;
+//    stream << fixed;
+    stream << "Gaps: " << setprecision(2) << (pinfo.stats()->gap_prop * 100) << " %" << endl;
+    stream << "Invariant sites: " << setprecision(2) << (pinfo.stats()->inv_prop * 100) << " %" << endl;
+    stream << endl;
   }
+
+  return stream;
 }
 
 

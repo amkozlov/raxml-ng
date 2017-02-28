@@ -113,6 +113,8 @@ TreeList get_start_tree(const Options &opts, const PartitionedMSA& part_msa)
       sysutil_fatal("Unknown starting tree type: %d\n", opts.start_tree);
   }
 
+  LOG_INFO << endl;
+
   assert(!tree.empty());
 
   /* fix missing branch lengths */
@@ -189,7 +191,7 @@ PartitionAssignment get_part_assign(const PartitionedMSA& parted_msa,
   {
     auto part_assign = balancer.get_all_assignments(part_sizes, num_procs);
 
-    LOG_INFO << part_assign;
+    LOG_INFO << "Data distribution:\n" << part_assign;
 
     return part_assign[proc_id];
   }
@@ -199,12 +201,13 @@ PartitionAssignment get_part_assign(const PartitionedMSA& parted_msa,
 
 void load_msa(const Options& opts, PartitionedMSA& part_msa)
 {
-  LOG_INFO << "Loading alignment from file: " << opts.msa_file << endl;
+  LOG_INFO << "Reading alignment from file: " << opts.msa_file << endl;
 
   /* load MSA */
   auto msa = msa_load_from_file(opts.msa_file, opts.msa_format);
 
-  LOG_INFO << "Taxa: " << msa.size() << ", sites: " << msa.num_sites() << endl;
+  LOG_INFO << "Loaded alignment with " << msa.size() << " taxa and " <<
+      msa.num_sites() << " sites" << endl;
 
   /* check alignment */
 //  check_msa(useropt, msa);
@@ -222,7 +225,10 @@ void load_msa(const Options& opts, PartitionedMSA& part_msa)
 
   LOG_INFO << endl;
 
-  print_partition_info(part_msa);
+  LOG_INFO << "Alignment comprises " << part_msa.part_count() << " partitions and " <<
+      part_msa.total_length() << " patterns\n" << endl;
+
+  LOG_INFO << part_msa;
 
   LOG_INFO << endl;
 }
@@ -317,11 +323,13 @@ void search_evaluate(RaxmlInstance& instance, TreeWithParams& bestTree)
 
   assert(bestTree.models.size() == instance.parted_msa.part_count());
 
+  LOG_INFO << "\nOptimized model parameters:" << endl;
+
   size_t p = 0;
   for (auto const& model: bestTree.models)
   {
     LOG_INFO << "\n   Partition " << p << ": " << instance.parted_msa.part_info(p).name().c_str() << endl;
-    print_model_info(model);
+    LOG_INFO << model;
     p++;
   }
 
@@ -341,14 +349,10 @@ int main(int argc, char** argv)
   int retval = EXIT_SUCCESS;
 
   logger().add_log_stream(&cout);
-  logger().set_log_level(LogLevel::progress);
-
-  print_banner();
 
   RaxmlInstance instance;
 
   CommandLineParser cmdline;
-
   try
   {
     cmdline.parse_options(argc, argv, instance.opts);
@@ -359,20 +363,32 @@ int main(int argc, char** argv)
     return EXIT_FAILURE;
   }
 
+  /* handle trivial commands first */
   switch (instance.opts.command)
   {
     case Command::help:
+      print_banner();
       cmdline.print_help();
+      return EXIT_SUCCESS;
     case Command::version:
-      retval = EXIT_SUCCESS;
+      print_banner();
+      return EXIT_SUCCESS;
+    default:
       break;
+  }
+
+  /* now get to the real stuff */
+  logger().set_log_level(instance.opts.log_level);
+  logger().set_log_filename(instance.opts.log_file);
+
+  print_banner();
+  LOG_INFO << instance.opts;
+
+  switch (instance.opts.command)
+  {
     case Command::evaluate:
     case Command::search:
     {
-      logger().set_log_filename(instance.opts.log_file);
-
-      LOG_INFO << instance.opts;
-
       try
       {
         TreeWithParams bestTree;

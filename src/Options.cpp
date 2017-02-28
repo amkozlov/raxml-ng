@@ -32,7 +32,7 @@ static string get_simd_arch_name(unsigned int simd_arch)
   }
 }
 
-LogStream& operator<<(LogStream& stream, const Options& opts)
+std::ostream& operator<<(std::ostream& stream, const Options& opts)
 {
   stream << "RAxML-NG was called as follows:" << endl << endl << opts.cmdline << endl << endl;
 
@@ -83,6 +83,18 @@ LogStream& operator<<(LogStream& stream, const Options& opts)
     else
       stream << "  spr subtree cutoff: OFF" << endl;
   }
+
+  stream << "  branch lengths: ";
+  stream << (opts.optimize_brlen ? "ML estimate" : "user-specified") << " (";
+  if (opts.brlen_linkage == PLLMOD_TREE_BRLEN_SCALED)
+    stream << "proportional";
+  else if (opts.brlen_linkage == PLLMOD_TREE_BRLEN_UNLINKED)
+    stream << "unlinked";
+  else
+    stream << "linked";
+
+  stream << ")" << endl;
+
 
   stream << "  SIMD kernels: " << get_simd_arch_name(opts.simd_arch) << endl;
 

@@ -6,7 +6,10 @@ using namespace std;
 void LogStream::add_stream(std::ostream* stream)
 {
   if (stream)
+  {
+    *stream << fixed;
     _streams.push_back(stream);
+  }
 }
 
 Logging::Logging() : _log_level(LogLevel::info), _logfile()

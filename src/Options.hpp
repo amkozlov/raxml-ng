@@ -12,7 +12,7 @@ public:
   optimize_model(true), optimize_brlen(true), data_type(DataType::autodetect),
   random_seed(0), start_tree(StartingTree::random), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
   spr_cutoff(1.0), brlen_linkage(PLLMOD_TREE_BRLEN_SCALED), simd_arch(PLL_ATTRIB_ARCH_CPU),
-  tree_file(""), msa_file(""), model_file(""), outfile_prefix(""),
+  tree_file(""), msa_file(""), model_file(""), outfile_prefix(""), log_level(LogLevel::progress),
   msa_format(FileFormat::autodetect), num_threads(1)
   {};
 
@@ -47,12 +47,14 @@ public:
   std::string model_file;     /* could be also model string */
   std::string outfile_prefix;
   std::string log_file;
+  LogLevel log_level;
   FileFormat msa_format;
 
   /* parallelization stuff */
   unsigned int num_threads;     /* number of threads */
 };
 
-LogStream& operator<<(LogStream& stream, const Options& opts);
+std::ostream& operator<<(std::ostream& stream, const Options& opts);
+
 
 #endif /* RAXML_OPTIONS_HPP_ */
