@@ -3,8 +3,8 @@ cmake_minimum_required (VERSION 2.8.10 FATAL_ERROR)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES  ON)
 
-set (ENABLE_PTHREADS ON)
-set (ENABLE_MPI ON)
+set (ENABLE_PTHREADS ON CACHE BOOL "Enable multi-threading support (PTHREADS)")
+set (ENABLE_MPI ON CACHE BOOL "Enable MPI support")
 set (ENABLE_VCF OFF)
 
 # leave this disabled to build a portable binary 

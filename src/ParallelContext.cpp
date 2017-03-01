@@ -10,6 +10,7 @@ size_t ParallelContext::_rank_id = 0;
 std::vector<ThreadType> ParallelContext::_threads;
 std::vector<double> ParallelContext::_parallel_buf;
 std::unordered_map<ThreadIDType, ParallelContext> ParallelContext::_thread_ctx_map;
+MutexType ParallelContext::mtx;
 
 void ParallelContext::init_mpi(int argc, char * argv[])
 {
@@ -21,7 +22,7 @@ void ParallelContext::init_mpi(int argc, char * argv[])
     _rank_id = (size_t) tmp;
     MPI_Comm_size(MPI_COMM_WORLD, &tmp);
     _num_ranks = (size_t) tmp;
-    printf("size: %lu, rank: %lu\n", _num_ranks, _rank_id);
+//    printf("size: %lu, rank: %lu\n", _num_ranks, _rank_id);
   }
 #endif
 
@@ -115,7 +116,7 @@ void ParallelContext::thread_barrier() const
   }
 }
 
-void ParallelContext::parallel_thread_reduce(double * data, size_t size, int op) const
+void ParallelContext::thread_reduce(double * data, size_t size, int op) const
 {
   /* synchronize */
   thread_barrier();
@@ -166,7 +167,7 @@ void ParallelContext::parallel_reduce(double * data, size_t size, int op) const
 {
 #ifdef _RAXML_PTHREADS
   if (_num_threads > 1)
-    parallel_thread_reduce(data, size, op);
+    thread_reduce(data, size, op);
 #endif
 
 #ifdef _RAXML_MPI

@@ -6,7 +6,7 @@ using namespace std;
 
 #define MAX_ARGS 256
 
-::testing::internal::Mutex mutex;
+::testing::internal::Mutex mutx;
 
 void cmdline_to_argv(char * cmd, int &argc, char** argv)
 {
@@ -28,7 +28,7 @@ void parse_options(string &cmd, CommandLineParser &parser, Options &opts,
   char * argv[MAX_ARGS];
 
   cmdline_to_argv(&cmd[0], argc, argv);
-  mutex.Lock();
+  mutx.Lock();
   try
   {
     parser.parse_options(argc, argv, opts);
@@ -38,7 +38,7 @@ void parse_options(string &cmd, CommandLineParser &parser, Options &opts,
   {
     EXPECT_TRUE(except_throw) << "Exception: " << e.what() << std::endl;
   }
-  mutex.Unlock();
+  mutx.Unlock();
 }
 
 TEST(CommandLineParserTest, help)

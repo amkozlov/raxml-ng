@@ -31,6 +31,7 @@
 #include "PartitionInfo.hpp"
 #include "TreeInfo.hpp"
 #include "file_io.hpp"
+#include "binary_io.hpp"
 #include "ParallelContext.hpp"
 #include "LoadBalancer.hpp"
 
@@ -48,7 +49,8 @@ struct TreeWithParams
 {
   Tree tree;
   double loglh;
-  std::vector<Model> models;
+//  std::vector<Model> models;
+  std::unordered_map<size_t, Model> models;
 };
 
 void print_banner()
@@ -228,6 +230,74 @@ void load_msa(const Options& opts, PartitionedMSA& part_msa)
   LOG_INFO << endl;
 }
 
+void gather_model_params(const RaxmlInstance& instance, TreeWithParams& bestTree)
+{
+  char buf[16384];
+  BinaryStream bs(buf, 16384);
+  if (ParallelContext::master_rank())
+  {
+    for (size_t r = 1; r < ParallelContext::num_ranks(); ++r)
+    {
+      MPI_Status status;
+      MPI_Recv(buf, bs.size(), MPI_BYTE, r, 0, MPI_COMM_WORLD, &status);
+
+//        printf("got: %lu\n", bs.pos());
+
+      auto model_count = bs.get<size_t>();
+      for (size_t m = 0; m < model_count; ++m)
+      {
+        size_t part_id;
+        bs >> part_id;
+
+        // initialize basic info
+        bestTree.models[part_id] = instance.parted_msa.model(part_id);
+
+        // read parameter estimates from binary stream
+        bs >> bestTree.models[part_id];
+      }
+      bs.reset();
+    }
+  }
+  else
+  {
+    bs << bestTree.models.size();
+    for (auto const& entry: bestTree.models)
+    {
+      bs << entry.first << entry.second;
+    }
+
+//      printf("sent: %lu\n", bs.pos());
+
+    MPI_Send(bs.reset(), bs.pos(), MPI_BYTE, 0, 0, MPI_COMM_WORLD);
+  }
+}
+
+void print_final_output(const RaxmlInstance& instance, const TreeWithParams& bestTree)
+{
+  auto const& opts = instance.opts;
+  auto const& tree_fname = opts.output_fname("bestTree");
+
+  LOG_INFO << "\nOptimized model parameters:" << endl;
+
+  assert(bestTree.models.size() == instance.parted_msa.part_count());
+
+  for (size_t p = 0; p < instance.parted_msa.part_count(); ++p)
+  {
+    LOG_INFO << "\n   Partition " << p << ": " << instance.parted_msa.part_info(p).name().c_str() << endl;
+    LOG_INFO << bestTree.models.at(p);
+  }
+
+  LOG_INFO << "\nFinal LogLikelihood: " << setprecision(6) << bestTree.loglh << endl;
+
+  NewickStream nw_result(tree_fname);
+  nw_result << bestTree.tree;
+
+  LOG_INFO << "\nElapsed time: " << setprecision(3) << sysutil_elapsed_seconds() << " seconds\n";
+
+  LOG_INFO << "\nFinal tree saved to: " << sysutil_realpath(tree_fname) << endl;
+  LOG_INFO << "\nExecution log saved to: " << sysutil_realpath(opts.log_file) << endl << endl;
+}
+
 void search_evaluate_thread(const RaxmlInstance& instance, TreeWithParams& bestTree)
 {
   unique_ptr<TreeInfo> treeinfo;
@@ -273,18 +343,21 @@ void search_evaluate_thread(const RaxmlInstance& instance, TreeWithParams& bestT
   {
     bestTree.loglh = final_loglh;
     bestTree.tree = treeinfo->tree();
-    for (size_t p = 0; p < master_msa.part_count(); ++p)
-      bestTree.models.push_back(master_msa.model(p));
   }
 
   ctx.thread_barrier();
 
-  // collect model params: quite dirty so far, and also pthreads-specific
-  // TODO: adapt for MPI
   for (auto const& prange: part_assign)
   {
     if (prange.start == 0)
     {
+      /* we will modify a global map -> define critical section */
+      ParallelContext::UniqueLock lock;
+
+      /* thread processing the first chunk of a partition stores its model parameters -> there is
+       * always *exactly* one such thread per partition (or load balancing is broken) */
+      assert(bestTree.models.count(prange.part_id) == 0);
+      bestTree.models[prange.part_id] = master_msa.model(prange.part_id);
       assign(bestTree.models.at(prange.part_id), *treeinfo, prange.part_id);
     }
   }
@@ -295,7 +368,6 @@ void search_evaluate_thread(const RaxmlInstance& instance, TreeWithParams& bestT
 void search_evaluate(RaxmlInstance& instance, TreeWithParams& bestTree)
 {
   auto const& opts = instance.opts;
-  const string tree_fname = opts.output_fname("bestTree");
 
   instance.parted_msa = init_part_info(instance.opts);
 
@@ -306,27 +378,11 @@ void search_evaluate(RaxmlInstance& instance, TreeWithParams& bestTree)
 
   search_evaluate_thread(instance, bestTree);
 
-  assert(bestTree.models.size() == instance.parted_msa.part_count());
+  if (ParallelContext::num_ranks() > 1)
+    gather_model_params(instance, bestTree);
 
-  LOG_INFO << "\nOptimized model parameters:" << endl;
-
-  size_t p = 0;
-  for (auto const& model: bestTree.models)
-  {
-    LOG_INFO << "\n   Partition " << p << ": " << instance.parted_msa.part_info(p).name().c_str() << endl;
-    LOG_INFO << model;
-    p++;
-  }
-
-  LOG_INFO << "\nFinal LogLikelihood: " << setprecision(6) << bestTree.loglh << endl;
-
-  NewickStream nw_result(tree_fname);
-  nw_result << bestTree.tree;
-
-  LOG_INFO << "\nElapsed time: " << setprecision(3) << sysutil_elapsed_seconds() << " seconds\n";
-
-  LOG_INFO << "\nFinal tree saved to: " << sysutil_realpath(tree_fname) << endl;
-  LOG_INFO << "\nExecution log saved to: " << sysutil_realpath(opts.log_file) << endl << endl;
+  if (ParallelContext::master_rank())
+    print_final_output(instance, bestTree);
 }
 
 void clean_exit(int retval)

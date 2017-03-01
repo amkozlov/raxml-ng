@@ -11,11 +11,16 @@
 
 #ifdef _RAXML_PTHREADS
 #include <thread>
+#include <mutex>
 typedef std::thread ThreadType;
 typedef std::thread::id ThreadIDType;
+typedef std::mutex MutexType;
+typedef std::unique_lock<std::mutex> LockType;
 #else
 typedef std::thread ThreadType;
 typedef size_t ThreadIDType;
+typedef size_t MutexType;
+typedef size_t LockType;
 #endif
 
 class Options;
@@ -29,17 +34,20 @@ public:
   static void finalize();
 
   static const ParallelContext& ctx();
-  static size_t num_procs() { return _num_ranks * _num_threads; };
-  static size_t num_threads() { return _num_threads; };
-  static size_t num_ranks() { return _num_ranks; };
+  static size_t num_procs() { return _num_ranks * _num_threads; }
+  static size_t num_threads() { return _num_threads; }
+  static size_t num_ranks() { return _num_ranks; }
 
   static void parallel_reduce_cb(void * context, double * data, size_t size, int op);
-  void parallel_thread_reduce(double * data, size_t size, int op) const;
+  void thread_reduce(double * data, size_t size, int op) const;
   void thread_broadcast(size_t source_id, void * data, size_t size) const;
   void thread_send_master(size_t source_id, void * data, size_t size) const;
 
+//  static void mpi_send();
+
+  static bool master_rank() { return _rank_id == 0; }
   static bool is_master() { return num_procs() == 1 || ctx().master(); }
-  static void ctx_barrier() { ctx().barrier(); };
+  static void ctx_barrier() { ctx().barrier(); }
 
   template<class T>
   static std::unique_ptr<T> master_broadcast(T const& object)
@@ -74,12 +82,20 @@ public:
 //  ParallelContext& operator=(const ParallelContext& other) = delete;
 //  ParallelContext& operator=(ParallelContext&& other) = delete;
 
+  class UniqueLock
+  {
+  public:
+    UniqueLock() : _lock(mtx) {}
+  private:
+    LockType _lock;
+  };
 private:
   static std::vector<std::thread> _threads;
   static size_t _num_threads;
   static size_t _num_ranks;
   static std::vector<double> _parallel_buf;
   static std::unordered_map<ThreadIDType, ParallelContext> _thread_ctx_map;
+  static MutexType mtx;
 
   static size_t _rank_id;
   size_t _thread_id;

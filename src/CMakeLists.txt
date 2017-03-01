@@ -34,5 +34,10 @@ if(MPI_LINK_FLAGS)
     LINK_FLAGS "${MPI_LINK_FLAGS}")
 endif()
 
-set_target_properties (raxml_module PROPERTIES OUTPUT_NAME raxml-ng)
+if(MPI_FOUND)
+  set_target_properties (raxml_module PROPERTIES OUTPUT_NAME raxml-ng-mpi)
+else()
+  set_target_properties (raxml_module PROPERTIES OUTPUT_NAME raxml-ng)
+endif()
+
 set_target_properties (raxml_module PROPERTIES PREFIX "")
