@@ -9,6 +9,7 @@
 #include <sstream>
 #include <vector>
 #include <unordered_map>
+#include <stdexcept>
 
 extern "C" {
 //#include <libpll/pll.h>
@@ -44,6 +45,8 @@ extern "C" {
 #define RAXML_BRLEN_SCALER_MIN    0.01
 #define RAXML_BRLEN_SCALER_MAX    100.
 
+/* used to supress compiler warnings about unused args */
+#define UNUSED(expr) while (0) { (void)(expr); }
 
 // cpu features
 #define RAXML_CPU_SSE3  (1<<0)

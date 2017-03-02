@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stack>
 #include <algorithm>
+#include <stdexcept>
 
 #include "LoadBalancer.hpp"
 

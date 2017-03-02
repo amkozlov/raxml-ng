@@ -17,10 +17,10 @@ typedef std::thread::id ThreadIDType;
 typedef std::mutex MutexType;
 typedef std::unique_lock<std::mutex> LockType;
 #else
-typedef std::thread ThreadType;
+typedef int ThreadType;
 typedef size_t ThreadIDType;
-typedef size_t MutexType;
-typedef size_t LockType;
+typedef int MutexType;
+typedef int LockType;
 #endif
 
 class Options;
@@ -43,29 +43,12 @@ public:
   void thread_broadcast(size_t source_id, void * data, size_t size) const;
   void thread_send_master(size_t source_id, void * data, size_t size) const;
 
-//  static void mpi_send();
+  static void mpi_gather_custom(std::function<int(void*,int)> prepare_send_cb,
+                                std::function<void(void*,int)> process_recv_cb);
 
   static bool master_rank() { return _rank_id == 0; }
   static bool is_master() { return num_procs() == 1 || ctx().master(); }
   static void ctx_barrier() { ctx().barrier(); }
-
-  template<class T>
-  static std::unique_ptr<T> master_broadcast(T const& object)
-  {
-    T const* p_object = &object;
-
-#ifdef _RAXML_PTHREADS
-    ParallelContext::ctx().thread_broadcast(0, &p_object, sizeof(T *));
-#endif
-
-    std::unique_ptr<T> result(new T(*p_object));
-
-#ifdef _RAXML_PTHREADS
-    ParallelContext::ctx().barrier();
-#endif
-
-    return result;
-  }
 
   size_t thread_id() const { return _thread_id; }
   size_t proc_id() const { return _rank_id * _num_threads + _thread_id; }
@@ -90,10 +73,10 @@ public:
     LockType _lock;
   };
 private:
-  static std::vector<std::thread> _threads;
+  static std::vector<ThreadType> _threads;
   static size_t _num_threads;
   static size_t _num_ranks;
-  static std::vector<double> _parallel_buf;
+  static std::vector<char> _parallel_buf;
   static std::unordered_map<ThreadIDType, ParallelContext> _thread_ctx_map;
   static MutexType mtx;
 

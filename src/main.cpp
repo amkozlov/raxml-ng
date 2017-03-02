@@ -232,44 +232,36 @@ void load_msa(const Options& opts, PartitionedMSA& part_msa)
 
 void gather_model_params(const RaxmlInstance& instance, TreeWithParams& bestTree)
 {
-  char buf[16384];
-  BinaryStream bs(buf, 16384);
-  if (ParallelContext::master_rank())
-  {
-    for (size_t r = 1; r < ParallelContext::num_ranks(); ++r)
-    {
-      MPI_Status status;
-      MPI_Recv(buf, bs.size(), MPI_BYTE, r, 0, MPI_COMM_WORLD, &status);
+  ParallelContext::mpi_gather_custom(
+       /* send callback -> worker ranks */
+       [&bestTree](void * buf, size_t buf_size) -> int
+       {
+         BinaryStream bs((char*) buf, buf_size);
+         bs << bestTree.models.size();
+         for (auto const& entry: bestTree.models)
+         {
+           bs << entry.first << entry.second;
+         }
+         return (int) bs.pos();
+       },
+       /* receive callback -> master rank */
+       [&bestTree,&instance](void * buf, size_t buf_size)
+       {
+         BinaryStream bs((char*) buf, buf_size);
+         auto model_count = bs.get<size_t>();
+         for (size_t m = 0; m < model_count; ++m)
+         {
+           size_t part_id;
+           bs >> part_id;
 
-//        printf("got: %lu\n", bs.pos());
+           // initialize basic info
+           bestTree.models[part_id] = instance.parted_msa.model(part_id);
 
-      auto model_count = bs.get<size_t>();
-      for (size_t m = 0; m < model_count; ++m)
-      {
-        size_t part_id;
-        bs >> part_id;
-
-        // initialize basic info
-        bestTree.models[part_id] = instance.parted_msa.model(part_id);
-
-        // read parameter estimates from binary stream
-        bs >> bestTree.models[part_id];
-      }
-      bs.reset();
-    }
-  }
-  else
-  {
-    bs << bestTree.models.size();
-    for (auto const& entry: bestTree.models)
-    {
-      bs << entry.first << entry.second;
-    }
-
-//      printf("sent: %lu\n", bs.pos());
-
-    MPI_Send(bs.reset(), bs.pos(), MPI_BYTE, 0, 0, MPI_COMM_WORLD);
-  }
+           // read parameter estimates from binary stream
+           bs >> bestTree.models[part_id];
+         }
+       }
+   );
 }
 
 void print_final_output(const RaxmlInstance& instance, const TreeWithParams& bestTree)

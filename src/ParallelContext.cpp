@@ -4,11 +4,14 @@
 
 using namespace std;
 
+// TODO: estimate based on #threads and #partitions?
+#define PARALLEL_BUF_SIZE (128 * 1024)
+
 size_t ParallelContext::_num_threads = 1;
 size_t ParallelContext::_num_ranks = 1;
 size_t ParallelContext::_rank_id = 0;
 std::vector<ThreadType> ParallelContext::_threads;
-std::vector<double> ParallelContext::_parallel_buf;
+std::vector<char> ParallelContext::_parallel_buf;
 std::unordered_map<ThreadIDType, ParallelContext> ParallelContext::_thread_ctx_map;
 MutexType ParallelContext::mtx;
 
@@ -24,6 +27,9 @@ void ParallelContext::init_mpi(int argc, char * argv[])
     _num_ranks = (size_t) tmp;
 //    printf("size: %lu, rank: %lu\n", _num_ranks, _rank_id);
   }
+#else
+  UNUSED(argc);
+  UNUSED(argv);
 #endif
 
   /* add master thread to the map */
@@ -37,7 +43,7 @@ void ParallelContext::init_mpi(int argc, char * argv[])
 void ParallelContext::init_pthreads(const Options& opts, const std::function<void()>& thread_main)
 {
   _num_threads = opts.num_threads;
-  _parallel_buf.reserve(opts.num_threads * 4096);
+  _parallel_buf.reserve(PARALLEL_BUF_SIZE);
 
 #ifdef _RAXML_PTHREADS
   _thread_ctx_map.emplace(std::this_thread::get_id(), ParallelContext(0));
@@ -121,10 +127,12 @@ void ParallelContext::thread_reduce(double * data, size_t size, int op) const
   /* synchronize */
   thread_barrier();
 
+  double *double_buf = (double*) _parallel_buf.data();
+
   /* collect data from threads */
   size_t i, j;
   for (i = 0; i < size; ++i)
-    _parallel_buf[_thread_id * size + i] = data[i];
+    double_buf[_thread_id * size + i] = data[i];
 
   /* synchronize */
   thread_barrier();
@@ -138,21 +146,21 @@ void ParallelContext::thread_reduce(double * data, size_t size, int op) const
       {
         data[i] = 0.;
         for (j = 0; j < ParallelContext::_num_threads; ++j)
-          data[i] += _parallel_buf[j * size + i];
+          data[i] += double_buf[j * size + i];
       }
       break;
       case PLLMOD_TREE_REDUCE_MAX:
       {
         data[i] = _parallel_buf[i];
         for (j = 1; j < ParallelContext::_num_threads; ++j)
-          data[i] = max(data[i], _parallel_buf[j * size + i]);
+          data[i] = max(data[i], double_buf[j * size + i]);
       }
       break;
       case PLLMOD_TREE_REDUCE_MIN:
       {
         data[i] = _parallel_buf[i];
         for (j = 1; j < ParallelContext::_num_threads; ++j)
-          data[i] = min(data[i], _parallel_buf[j * size + i]);
+          data[i] = min(data[i], double_buf[j * size + i]);
       }
       break;
     }
@@ -245,5 +253,44 @@ void ParallelContext::thread_send_master(size_t source_id, void * data, size_t s
   }
 
   barrier();
+}
+
+void ParallelContext::mpi_gather_custom(std::function<int(void*,int)> prepare_send_cb,
+                                        std::function<void(void*,int)> process_recv_cb)
+{
+#ifdef _RAXML_MPI
+  /* we're gonna use _parallel_buf, so make sure other threads don't interfere... */
+  UniqueLock lock;
+
+  if (_rank_id == 0)
+  {
+    for (size_t r = 1; r < _num_ranks; ++r)
+    {
+      int recv_size;
+      MPI_Status status;
+      MPI_Probe(r, 0, MPI_COMM_WORLD, &status);
+      MPI_Get_count(&status, MPI_BYTE, &recv_size);
+
+//      printf("recv: %lu\n", recv_size);
+
+      _parallel_buf.reserve(recv_size);
+
+      MPI_Recv((void*) _parallel_buf.data(), recv_size, MPI_BYTE,
+               r, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+      process_recv_cb(_parallel_buf.data(), recv_size);
+    }
+  }
+  else
+  {
+    auto send_size = prepare_send_cb(_parallel_buf.data(), _parallel_buf.capacity());
+//    printf("sent: %lu\n", send_size);
+
+    MPI_Send(_parallel_buf.data(), send_size, MPI_BYTE, 0, 0, MPI_COMM_WORLD);
+  }
+#else
+  UNUSED(prepare_send_cb);
+  UNUSED(process_recv_cb);
+#endif
 }
 
