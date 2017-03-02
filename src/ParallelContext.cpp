@@ -57,14 +57,23 @@ void ParallelContext::init_pthreads(const Options& opts, const std::function<voi
 #endif
 }
 
-void ParallelContext::finalize()
+void ParallelContext::finalize(bool force)
 {
   for (thread& t: _threads)
-    t.join();
+  {
+    if (force)
+      t.detach();
+    else
+      t.join();
+  }
   _threads.clear();
 
 #ifdef _RAXML_MPI
-  MPI_Barrier(MPI_COMM_WORLD);
+  if (force)
+    MPI_Abort(MPI_COMM_WORLD, -1);
+  else
+    MPI_Barrier(MPI_COMM_WORLD);
+
   MPI_Finalize();
 #endif
 }
@@ -195,7 +204,11 @@ void ParallelContext::parallel_reduce(double * data, size_t size, int op) const
       else
         assert(0);
 
-      MPI_Allreduce(MPI_IN_PLACE, data, size, MPI_DOUBLE, reduce_op, MPI_COMM_WORLD);
+      // TODO: can we use MPI_IN_PLACE and avoid memcpy?
+//      MPI_Allreduce(MPI_IN_PLACE, data, size, MPI_DOUBLE, reduce_op, MPI_COMM_WORLD);
+
+      MPI_Allreduce(data, _parallel_buf.data(), size, MPI_DOUBLE, reduce_op, MPI_COMM_WORLD);
+      memcpy(data, _parallel_buf.data(), size * sizeof(double));
     }
 
     if (_num_threads > 1)

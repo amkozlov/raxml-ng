@@ -102,11 +102,15 @@ BinaryStream& operator<<(BinaryStream& stream, const Model& m)
     stream << m.ratecat_rates();
   }
 
-  stream << m.num_submodels();
-
-  for (size_t i = 0; i < m.num_submodels(); ++i)
+  /* store subst model parameters only if they were estimated */
+  if (m.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::ML ||
+      m.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::ML)
   {
-    stream << m.submodel(i);
+    stream << m.num_submodels();
+    for (size_t i = 0; i < m.num_submodels(); ++i)
+    {
+      stream << m.submodel(i);
+    }
   }
 
   return stream;
@@ -172,12 +176,16 @@ BinaryStream& operator>>(BinaryStream& stream, Model& m)
     m.ratecat_rates(stream.get<doubleVector>());
   }
 
-  auto num_submodels = stream.get<unsigned int>();
-  assert(num_submodels == m.num_submodels());
-  for (size_t i = 0; i < m.num_submodels(); ++i)
+  if (m.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::ML ||
+      m.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::ML)
   {
-    m.base_freqs(i, stream.get<doubleVector>());
-    m.subst_rates(i, stream.get<doubleVector>());
+    auto num_submodels = stream.get<unsigned int>();
+    assert(num_submodels == m.num_submodels());
+    for (size_t i = 0; i < m.num_submodels(); ++i)
+    {
+      m.base_freqs(i, stream.get<doubleVector>());
+      m.subst_rates(i, stream.get<doubleVector>());
+    }
   }
 
   return stream;

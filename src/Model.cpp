@@ -100,9 +100,10 @@ pllmod_mixture_model_t * Model::init_mix_model(const std::string &model_name)
       modinfo =  pllmod_util_model_info_genotype(model_cstr);
     }
 
-    /* pre-defined model not found; assume model string encodes rate symmetries */
-    if (!modinfo)
-      modinfo =  pllmod_util_model_create_custom("USER", _num_states, NULL, NULL, model_cstr, NULL);
+    // TODO: user models must be defined explicitly
+//    /* pre-defined model not found; assume model string encodes rate symmetries */
+//    if (!modinfo)
+//      modinfo =  pllmod_util_model_create_custom("USER", _num_states, NULL, NULL, model_cstr, NULL);
 
     if (!modinfo)
       throw runtime_error("Invalid model name: " + model_name);

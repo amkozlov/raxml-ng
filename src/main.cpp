@@ -220,6 +220,8 @@ void load_msa(const Options& opts, PartitionedMSA& part_msa)
 
   part_msa.set_model_empirical_params();
 
+  // TODO: check empirical params (e.g. zero state freqs)
+
   LOG_INFO << endl;
 
   LOG_INFO << "Alignment comprises " << part_msa.part_count() << " partitions and " <<
@@ -228,6 +230,13 @@ void load_msa(const Options& opts, PartitionedMSA& part_msa)
   LOG_INFO << part_msa;
 
   LOG_INFO << endl;
+
+  LOG_DEBUG << "Initial model parameters:" << endl;
+  for (size_t p = 0; p < part_msa.part_count(); ++p)
+  {
+    LOG_DEBUG << "   Partition: " << part_msa.part_info(p).name() << endl <<
+                 part_msa.model(p) << endl;
+  }
 }
 
 void gather_model_params(const RaxmlInstance& instance, TreeWithParams& bestTree)
@@ -368,6 +377,14 @@ void search_evaluate(RaxmlInstance& instance, TreeWithParams& bestTree)
   /* load/create starting tree */
   instance.start_trees = get_start_tree(opts, instance.parted_msa);
 
+  if (::ParallelContext::master_rank())
+  {
+    const std::string start_fname = opts.output_fname("startTree");
+    NewickStream nw_start(start_fname);
+    for (auto const& tree: instance.start_trees)
+      nw_start << tree;
+  }
+
   search_evaluate_thread(instance, bestTree);
 
   if (ParallelContext::num_ranks() > 1)
@@ -379,7 +396,7 @@ void search_evaluate(RaxmlInstance& instance, TreeWithParams& bestTree)
 
 void clean_exit(int retval)
 {
-  ParallelContext::finalize();
+  ParallelContext::finalize(retval != EXIT_SUCCESS);
   exit(retval);
 }
 
@@ -445,14 +462,14 @@ int main(int argc, char** argv)
       }
       catch(exception& e)
       {
-        LOG_INFO << e.what() << endl;
+        LOG_ERROR << "ERROR:" << e.what() << endl << endl;
         retval = EXIT_FAILURE;
       }
       break;
     }
     case Command::none:
     default:
-      LOG_INFO << "Unknown command!" << endl;
+      LOG_ERROR << "Unknown command!" << endl;
       retval = EXIT_FAILURE;
   }
 

@@ -31,7 +31,7 @@ public:
   static void init_mpi(int argc, char * argv[]);
   static void init_pthreads(const Options& opts, const std::function<void()>& thread_main);
 
-  static void finalize();
+  static void finalize(bool force = false);
 
   static const ParallelContext& ctx();
   static size_t num_procs() { return _num_ranks * _num_threads; }
