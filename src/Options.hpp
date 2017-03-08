@@ -12,8 +12,8 @@ public:
   optimize_model(true), optimize_brlen(true), data_type(DataType::autodetect),
   random_seed(0), start_tree(StartingTree::random), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
   spr_cutoff(1.0), brlen_linkage(PLLMOD_TREE_BRLEN_SCALED), simd_arch(PLL_ATTRIB_ARCH_CPU),
-  tree_file(""), msa_file(""), model_file(""), outfile_prefix(""), log_level(LogLevel::progress),
-  msa_format(FileFormat::autodetect), num_threads(1), num_ranks(1)
+  tree_file(""), msa_file(""), model_file(""), outfile_prefix(""), checkp_file(""), log_file(""),
+  log_level(LogLevel::progress), msa_format(FileFormat::autodetect), num_threads(1), num_ranks(1)
   {};
 
   ~Options() = default;
@@ -46,6 +46,7 @@ public:
   std::string msa_file;
   std::string model_file;     /* could be also model string */
   std::string outfile_prefix;
+  std::string checkp_file;       /* checkpoint file */
   std::string log_file;
   LogLevel log_level;
   FileFormat msa_format;

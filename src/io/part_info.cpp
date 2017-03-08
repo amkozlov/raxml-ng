@@ -1,46 +1,4 @@
-#ifndef RAXML_FILE_IO_HPP_
-#define RAXML_FILE_IO_HPP_
-
-#include "Tree.hpp"
-#include <fstream>
-
-class NewickStream : public std::fstream
-{
-public:
-  NewickStream(std::string fname) : std::fstream(fname, std::ios::out) {};
-};
-
-class RaxmlPartitionFileStream : public std::fstream
-{
-public:
-  RaxmlPartitionFileStream(std::string fname) : std::fstream(fname, std::ios::in) {};
-};
-
-NewickStream& operator<<(NewickStream& stream, const pll_utree_t& tree)
-{
-  char * newick_str = pll_utree_export_newick(&tree);
-  stream << newick_str << std::endl;
-  free(newick_str);
-  return stream;
-}
-
-NewickStream& operator<<(NewickStream& stream, const Tree& tree)
-{
-  stream << tree.pll_utree_start();
-  return stream;
-}
-
-NewickStream& operator>>(NewickStream& stream, Tree& tree)
-{
-//  stream.getline()
-//  char * newick_str = pll_utree_export_newick((pll_utree_t *) &tree);
-//  stream << newick_str << std::endl;
-//  free(newick_str);
-
-  tree.fix_missing_brlens();
-  assert(0);
-  return stream;
-}
+#include "file_io.hpp"
 
 std::fstream& operator>>(std::fstream& stream, PartitionInfo& part_info)
 {
@@ -99,4 +57,5 @@ std::fstream& operator>>(std::fstream& stream, PartitionedMSA& parted_msa)
   return stream;
 }
 
-#endif /* RAXML_FILE_IO_HPP_ */
+
+

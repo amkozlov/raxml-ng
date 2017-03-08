@@ -4,6 +4,26 @@
 #include "common.h"
 #include "PartitionedMSA.hpp"
 
+struct TreeBranch
+{
+  TreeBranch() : left_node_id(0), right_node_id(0), length(0.) {};
+  TreeBranch(size_t left_node_id, size_t right_node_id, double length) :
+    left_node_id(left_node_id), right_node_id(right_node_id), length(length) {};
+
+  size_t left_node_id;
+  size_t right_node_id;
+  double length;
+};
+
+typedef std::vector<TreeBranch> TreeTopology;
+
+//struct Topology
+//{
+//  std::vector
+//};
+
+typedef std::vector<pll_utree_t*> PllTreeVector;
+
 class Tree
 {
 public:
@@ -27,8 +47,12 @@ public:
   size_t num_tips() const { return _num_tips; };
   size_t num_inner() const { return _num_tips - 2; };
   size_t num_nodes() const { return _num_tips + _num_tips - 2; };
+  size_t num_subnodes() const { return _num_tips + num_inner() * 3; };
   size_t num_branches() const { return _num_tips + _num_tips - 3; };
   IdNameVector tip_labels() const;
+
+  TreeTopology topology() const;
+  void topology(const TreeTopology& topol);
 
   // TODO: use move semantics to transfer ownership?
   pll_utree_t * pll_utree_copy() const { return pll_utree_clone(_pll_utree_start); };
@@ -41,9 +65,10 @@ private:
   size_t _num_tips;
   pll_utree_t* _pll_utree_start;
 
-  mutable std::vector<pll_utree_t*> _pll_utree_tips;
+  mutable PllTreeVector _pll_utree_tips;
 
-  std::vector<pll_utree_t*> const& tip_nodes() const;
+  PllTreeVector const& tip_nodes() const;
+  PllTreeVector subnodes() const;
 };
 
 #endif /* RAXML_TREE_HPP_ */

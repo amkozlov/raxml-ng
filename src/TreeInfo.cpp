@@ -46,6 +46,9 @@ TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA&
 
       if (!retval)
         throw runtime_error("ERROR adding treeinfo partition: " + string(pll_errmsg));
+
+      if (part_range->master())
+        _parts_master.insert(p);
     }
     else
     {
@@ -73,6 +76,20 @@ Tree TreeInfo::tree() const
 double TreeInfo::loglh(bool incremental)
 {
   return pllmod_treeinfo_compute_loglh(_pll_treeinfo, incremental ? 1 : 0);
+}
+
+void TreeInfo::model(size_t partition_id, const Model& model)
+{
+  if (partition_id >= _pll_treeinfo->partition_count)
+    throw out_of_range("Partition ID out of range");
+
+  if (!_pll_treeinfo->partitions[partition_id])
+    return;
+
+  assign(_pll_treeinfo->partitions[partition_id], model);
+  _pll_treeinfo->alphas[partition_id] = model.alpha();
+  if (_pll_treeinfo->brlen_scalers)
+    _pll_treeinfo->brlen_scalers[partition_id] = model.brlen_scaler();
 }
 
 //#define DBG printf

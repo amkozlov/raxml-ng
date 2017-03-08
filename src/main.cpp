@@ -30,8 +30,8 @@
 #include "Optimizer.hpp"
 #include "PartitionInfo.hpp"
 #include "TreeInfo.hpp"
-#include "file_io.hpp"
-#include "binary_io.hpp"
+#include "io/file_io.hpp"
+#include "io/binary_io.hpp"
 #include "ParallelContext.hpp"
 #include "LoadBalancer.hpp"
 
@@ -43,15 +43,15 @@ struct RaxmlInstance
   Options opts;
   PartitionedMSA parted_msa;
   TreeList start_trees;
+  PartitionAssignmentList proc_part_assign;
 };
 
-struct TreeWithParams
-{
-  Tree tree;
-  double loglh;
-//  std::vector<Model> models;
-  std::unordered_map<size_t, Model> models;
-};
+//struct TreeWithParams
+//{
+//  Tree tree;
+//  double loglh;
+//  std::unordered_map<size_t, Model> models;
+//};
 
 void print_banner()
 {
@@ -111,8 +111,6 @@ TreeList get_start_tree(const Options &opts, const PartitionedMSA& part_msa)
       sysutil_fatal("Unknown starting tree type: %d\n", opts.start_tree);
   }
 
-  LOG_INFO << endl;
-
   assert(!tree.empty());
 
   /* fix missing branch lengths */
@@ -124,7 +122,6 @@ TreeList get_start_tree(const Options &opts, const PartitionedMSA& part_msa)
   tree_list.emplace_back(move(tree));
 
   return tree_list;
-//  return ParallelContext::master_broadcast(tree);
 }
 
 PartitionedMSA init_part_info(Options &opts)
@@ -132,7 +129,7 @@ PartitionedMSA init_part_info(Options &opts)
   PartitionedMSA part_msa;
 
   /* check if model is a file */
-  if (access(opts.model_file.c_str(), F_OK) != -1)
+  if (sysutil_file_exists(opts.model_file))
   {
     // read partition definitions from file
     RaxmlPartitionFileStream partfile(opts.model_file);
@@ -169,13 +166,13 @@ PartitionedMSA init_part_info(Options &opts)
   return part_msa;
 }
 
-PartitionAssignment get_part_assign(const PartitionedMSA& parted_msa, const ParallelContext& ctx)
+void balance_load(RaxmlInstance& instance)
 {
   PartitionAssignment part_sizes;
 
   /* init list of partition sizes */
   size_t i = 0;
-  for (auto const& pinfo: parted_msa.part_list())
+  for (auto const& pinfo: instance.parted_msa.part_list())
   {
     part_sizes.assign_sites(i, 0, pinfo.msa().num_patterns());
     ++i;
@@ -184,16 +181,9 @@ PartitionAssignment get_part_assign(const PartitionedMSA& parted_msa, const Para
 //  SimpleLoadBalancer balancer;
   KassianLoadBalancer balancer;
 
-  if (ctx.master())
-  {
-    auto part_assign = balancer.get_all_assignments(part_sizes, ctx.num_procs());
+  instance.proc_part_assign = balancer.get_all_assignments(part_sizes, ParallelContext::num_procs());
 
-    LOG_INFO << "Data distribution:\n" << part_assign;
-
-    return part_assign[ctx.proc_id()];
-  }
-  else
-    return balancer.get_proc_assignments(part_sizes, ctx.num_procs(), ctx.proc_id());
+  LOG_INFO << "\nData distribution:\n" << instance.proc_part_assign;
 }
 
 void load_msa(const Options& opts, PartitionedMSA& part_msa)
@@ -230,50 +220,34 @@ void load_msa(const Options& opts, PartitionedMSA& part_msa)
   LOG_INFO << part_msa;
 
   LOG_INFO << endl;
+}
 
-  LOG_DEBUG << "Initial model parameters:" << endl;
-  for (size_t p = 0; p < part_msa.part_count(); ++p)
+void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
+{
+  /* init checkpoint and set to th manager */
   {
-    LOG_DEBUG << "   Partition: " << part_msa.part_info(p).name() << endl <<
-                 part_msa.model(p) << endl;
+    Checkpoint ckp;
+    for (size_t p = 0; p < instance.parted_msa.part_count(); ++p)
+      ckp.models[p] = instance.parted_msa.part_info(p).model();
+    ckp.tree = instance.start_trees.at(0);
+
+    cm.checkpoint(move(ckp));
+  }
+
+  if (cm.read())
+  {
+    const auto& ckp = cm.checkpoint();
+    for (const auto& m: ckp.models)
+      instance.parted_msa.model(m.first, m.second);
+
+    instance.start_trees.at(0) = ckp.tree;
+
+    LOG_INFO << "\nCheckpoint file found, execution will be resumed " <<
+        "(logLH: " << ckp.loglh() << ")" << endl;
   }
 }
 
-void gather_model_params(const RaxmlInstance& instance, TreeWithParams& bestTree)
-{
-  ParallelContext::mpi_gather_custom(
-       /* send callback -> worker ranks */
-       [&bestTree](void * buf, size_t buf_size) -> int
-       {
-         BinaryStream bs((char*) buf, buf_size);
-         bs << bestTree.models.size();
-         for (auto const& entry: bestTree.models)
-         {
-           bs << entry.first << entry.second;
-         }
-         return (int) bs.pos();
-       },
-       /* receive callback -> master rank */
-       [&bestTree,&instance](void * buf, size_t buf_size)
-       {
-         BinaryStream bs((char*) buf, buf_size);
-         auto model_count = bs.get<size_t>();
-         for (size_t m = 0; m < model_count; ++m)
-         {
-           size_t part_id;
-           bs >> part_id;
-
-           // initialize basic info
-           bestTree.models[part_id] = instance.parted_msa.model(part_id);
-
-           // read parameter estimates from binary stream
-           bs >> bestTree.models[part_id];
-         }
-       }
-   );
-}
-
-void print_final_output(const RaxmlInstance& instance, const TreeWithParams& bestTree)
+void print_final_output(const RaxmlInstance& instance, const Checkpoint& bestTree)
 {
   auto const& opts = instance.opts;
   auto const& tree_fname = opts.output_fname("bestTree");
@@ -288,7 +262,7 @@ void print_final_output(const RaxmlInstance& instance, const TreeWithParams& bes
     LOG_INFO << bestTree.models.at(p);
   }
 
-  LOG_INFO << "\nFinal LogLikelihood: " << setprecision(6) << bestTree.loglh << endl;
+  LOG_INFO << "\nFinal LogLikelihood: " << setprecision(6) << bestTree.loglh() << endl;
 
   NewickStream nw_result(tree_fname);
   nw_result << bestTree.tree;
@@ -299,22 +273,21 @@ void print_final_output(const RaxmlInstance& instance, const TreeWithParams& bes
   LOG_INFO << "\nExecution log saved to: " << sysutil_realpath(opts.log_file) << endl << endl;
 }
 
-void search_evaluate_thread(const RaxmlInstance& instance, TreeWithParams& bestTree)
+void search_evaluate_thread(const RaxmlInstance& instance, CheckpointManager& checkp)
 {
   unique_ptr<TreeInfo> treeinfo;
+  auto const& ctx = ParallelContext::ctx();
+
+  //  printf("thread %lu / %lu\n", ParallelContext::ctx().thread_id(), ParallelContext::num_procs());
+
+  /* wait until master thread prepares all global data */
+  ctx.thread_barrier();
 
   auto const& master_msa = instance.parted_msa;
   auto const& opts = instance.opts;
-  auto const& ctx = ParallelContext::ctx();
 
-//  printf("thread %lu / %lu\n", ParallelContext::ctx().thread_id(), ParallelContext::num_procs());
-
-  ctx.thread_barrier();
-
-  /* run load balancing */
-  auto part_assign = get_part_assign(master_msa, ctx);
-
-  ctx.thread_barrier();
+  /* get partitions assigned to the current thread */
+  auto const& part_assign = instance.proc_part_assign.at(ctx.proc_id());
 
 //  size_t start_tree_num = 0;
 
@@ -327,55 +300,29 @@ void search_evaluate_thread(const RaxmlInstance& instance, TreeWithParams& bestT
     else
       treeinfo->tree(tree);
 
-  //  LOG_INFO << "\nInitial LogLikelihood: " << treeinfo.loglh() << endl;
+    LOG_INFO << "\nInitial LogLikelihood: " << treeinfo->loglh() << endl;
 
     Optimizer optimizer(opts);
     if (opts.command == Command::search)
-      optimizer.optimize_topology(*treeinfo);
+      optimizer.optimize_topology(*treeinfo, checkp);
     else
       optimizer.optimize(*treeinfo);
   }
 
   ctx.thread_barrier();
-
-  const double final_loglh = treeinfo->loglh();
-
-  if (ctx.master())
-  {
-    bestTree.loglh = final_loglh;
-    bestTree.tree = treeinfo->tree();
-  }
-
-  ctx.thread_barrier();
-
-  for (auto const& prange: part_assign)
-  {
-    if (prange.start == 0)
-    {
-      /* we will modify a global map -> define critical section */
-      ParallelContext::UniqueLock lock;
-
-      /* thread processing the first chunk of a partition stores its model parameters -> there is
-       * always *exactly* one such thread per partition (or load balancing is broken) */
-      assert(bestTree.models.count(prange.part_id) == 0);
-      bestTree.models[prange.part_id] = master_msa.model(prange.part_id);
-      assign(bestTree.models.at(prange.part_id), *treeinfo, prange.part_id);
-    }
-  }
-
-  ctx.thread_barrier();
 }
 
-void search_evaluate(RaxmlInstance& instance, TreeWithParams& bestTree)
+void search_evaluate(RaxmlInstance& instance, CheckpointManager& checkp)
 {
   auto const& opts = instance.opts;
+  auto& parted_msa = instance.parted_msa;
 
   instance.parted_msa = init_part_info(instance.opts);
 
   load_msa(opts, instance.parted_msa);
 
   /* load/create starting tree */
-  instance.start_trees = get_start_tree(opts, instance.parted_msa);
+  instance.start_trees = get_start_tree(opts, parted_msa);
 
   if (::ParallelContext::master_rank())
   {
@@ -385,13 +332,23 @@ void search_evaluate(RaxmlInstance& instance, TreeWithParams& bestTree)
       nw_start << tree;
   }
 
-  search_evaluate_thread(instance, bestTree);
+  /* load checkpoint */
+  load_checkpoint(instance, checkp);
 
-  if (ParallelContext::num_ranks() > 1)
-    gather_model_params(instance, bestTree);
+  LOG_DEBUG << "Initial model parameters:" << endl;
+  for (size_t p = 0; p < parted_msa.part_count(); ++p)
+  {
+    LOG_DEBUG << "   Partition: " << parted_msa.part_info(p).name() << endl <<
+        parted_msa.model(p) << endl;
+  }
+
+  /* run load balancing algorithm */
+  balance_load(instance);
+
+  search_evaluate_thread(instance, checkp);
 
   if (ParallelContext::master_rank())
-    print_final_output(instance, bestTree);
+    print_final_output(instance, checkp.checkpoint());
 }
 
 void clean_exit(int retval)
@@ -453,12 +410,12 @@ int main(int argc, char** argv)
     {
       try
       {
-        TreeWithParams bestTree;
+        CheckpointManager checkp(instance.opts.checkp_file);
         ParallelContext::init_pthreads(instance.opts, std::bind(search_evaluate_thread,
                                                                 std::cref(instance),
-                                                                std::ref(bestTree)));
+                                                                std::ref(checkp)));
 
-        search_evaluate(instance, bestTree);
+        search_evaluate(instance, checkp);
       }
       catch(exception& e)
       {

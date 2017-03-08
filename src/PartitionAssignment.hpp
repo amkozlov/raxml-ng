@@ -11,6 +11,8 @@ struct PartitionRange
   PartitionRange(size_t part_id, size_t start, size_t length):
     part_id(part_id), start(start), length(length) {};
 
+  bool master() const { return start == 0; };
+
   size_t part_id;
   size_t start;
   size_t length;

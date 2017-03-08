@@ -40,6 +40,7 @@ public:
   // setters
   void msa(MSA&& msa) { _msa = std::move(msa); };
   void model(Model&& model) { _model = std::move(model); };
+  void model(const Model& model) { _model = model; };
   void name(const std::string& value) { _name = value; };
   void range_string(const std::string& value) { _range_string = value; };
 

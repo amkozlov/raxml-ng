@@ -48,6 +48,7 @@ public:
 
   static bool master_rank() { return _rank_id == 0; }
   static bool is_master() { return num_procs() == 1 || ctx().master(); }
+  static bool ctx_master_thread() { return num_threads() == 1 || ctx().master_thread(); }
   static void ctx_barrier() { ctx().barrier(); }
 
   size_t thread_id() const { return _thread_id; }

@@ -130,7 +130,7 @@ Tree Tree::loadFromFile(const std::string& file_name)
   return tree;
 }
 
-std::vector<pll_utree_t*> const& Tree::tip_nodes() const
+PllTreeVector const& Tree::tip_nodes() const
 {
  if (_pll_utree_tips.empty() && _num_tips > 0)
  {
@@ -170,5 +170,70 @@ void Tree::reset_tip_ids(const NameIdMap& label_id_map)
 void Tree::fix_missing_brlens(double new_brlen)
 {
   pllmod_utree_set_length_recursive(_pll_utree_start, new_brlen, 1);
+}
+
+PllTreeVector Tree::subnodes() const
+{
+  std::vector<pll_utree_t*> subnodes;
+
+  if (_num_tips > 0)
+  {
+    subnodes.resize(num_subnodes());
+
+    pllmod_utree_traverse_apply(_pll_utree_start, nullptr,
+                                [](pll_utree * node, void * data) -> int
+                                { auto list = (pll_utree_t**) data;
+                                  list[node->node_index] = node;
+                                  if (node->next)
+                                  {
+                                    list[node->next->node_index] = node->next;
+                                    list[node->next->next->node_index] = node->next->next;
+                                  }
+//                                  printf("node: %u\n", node->node_index);
+                                  return 1;
+                                },
+                                nullptr,
+                                (void*) subnodes.data());
+  }
+
+  return subnodes;
+}
+
+TreeTopology Tree::topology() const
+{
+  TreeTopology topol;
+
+  for (auto n: subnodes())
+  {
+    if (n->node_index < n->back->node_index)
+      topol.emplace_back(n->node_index, n->back->node_index, n->length);
+  }
+
+//  for (auto& branch: topol)
+//    printf("%u %u %lf\n", branch.left_node_id, branch.right_node_id, branch.length);
+
+  assert(topol.size() == num_branches());
+
+  return topol;
+}
+
+void Tree::topology(const TreeTopology& topol)
+{
+  assert(topol.size() == num_branches());
+
+  auto allnodes = subnodes();
+  unsigned int pmatrix_index = 0;
+  for (const auto& branch: topol)
+  {
+    pll_utree_t * left_node = allnodes.at(branch.left_node_id);
+    pll_utree_t * right_node = allnodes.at(branch.right_node_id);
+    pllmod_utree_connect_nodes(left_node, right_node, branch.length);
+
+    // important: make sure all branches have distinct pmatrix indices!
+    left_node->pmatrix_index = right_node->pmatrix_index = pmatrix_index++;
+//    printf("%u %u %lf %d\n", branch.left_node_id, branch.right_node_id, branch.length, left_node->pmatrix_index);
+  }
+
+  assert(pmatrix_index == num_branches());
 }
 

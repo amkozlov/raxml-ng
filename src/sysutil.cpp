@@ -266,3 +266,9 @@ std::string sysutil_realpath(const std::string& path)
     }
   }
 }
+
+bool sysutil_file_exists(const std::string& fname, int access_mode)
+{
+  return access(fname.c_str(), access_mode) == 0;
+}
+

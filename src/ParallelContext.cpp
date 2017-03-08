@@ -113,7 +113,7 @@ void ParallelContext::mpi_barrier() const
 void ParallelContext::thread_barrier() const
 {
   static volatile unsigned int barrier_counter = 0;
-  static __thread volatile int myCycle = 0;
+  static thread_local volatile int myCycle = 0;
   static volatile int proceed = 0;
 
   __sync_fetch_and_add( &barrier_counter, 1);

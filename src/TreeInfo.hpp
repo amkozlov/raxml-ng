@@ -37,6 +37,13 @@ public:
   Tree tree() const;
   void tree(const Tree& tree) { _pll_treeinfo->root = tree.pll_utree_copy(); }
 
+  /* in parallel mode, partition can be share among multiple threads and TreeInfo objects;
+   * this method returns list of partition IDs for which this thread is designated as "master"
+   * and thus responsible for e.g. sending model parameters to the main thread. */
+  const IDSet& parts_master() const { return _parts_master; }
+
+  void model(size_t partition_id, const Model& model);
+
   double loglh(bool incremental = false);
   double optimize_params(int params_to_optimize, double lh_epsilon);
   double optimize_params_all(double lh_epsilon)
@@ -48,6 +55,7 @@ public:
 
 private:
   pllmod_treeinfo_t * _pll_treeinfo;
+  IDSet _parts_master;
 };
 
 void assign(PartitionedMSA& parted_msa, const TreeInfo& treeinfo);

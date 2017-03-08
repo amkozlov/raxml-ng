@@ -78,7 +78,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.spr_cutoff = 1.0;
 
   /* default: scaled branch lengths */
-  opts.brlen_linkage = PLLMOD_TREE_BRLEN_SCALED;
+  opts.brlen_linkage = PLLMOD_TREE_BRLEN_LINKED;
 
   /* use 2 threads per default */
   opts.num_threads = 2;
@@ -331,6 +331,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   /* set logfile name */
   opts.log_file = opts.output_fname("log");
+
+  /* set default checkpoint file name, if not overwritten by the user */
+  if (opts.checkp_file.empty())
+    opts.checkp_file = opts.output_fname("ckp");
 }
 
 void CommandLineParser::print_help()
