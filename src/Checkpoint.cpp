@@ -27,10 +27,10 @@ bool CheckpointManager::read(const std::string& ckp_fname)
 
 void CheckpointManager::update_and_write(const TreeInfo& treeinfo)
 {
-  if (ParallelContext::ctx_master_thread())
+  if (ParallelContext::master_thread())
     _updated_models.clear();
 
-  ParallelContext::ctx_barrier();
+  ParallelContext::barrier();
 
   for (auto p: treeinfo.parts_master())
   {
@@ -44,12 +44,12 @@ void CheckpointManager::update_and_write(const TreeInfo& treeinfo)
     _updated_models.insert(p);
   }
 
-  ParallelContext::ctx_barrier();
+  ParallelContext::barrier();
 
   if (ParallelContext::num_ranks() > 1)
     gather_model_params();
 
-  if (ParallelContext::is_master())
+  if (ParallelContext::master())
   {
     assign_tree(_checkp, treeinfo);
     write();

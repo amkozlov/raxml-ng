@@ -14,7 +14,7 @@ TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA&
 
   if (ParallelContext::num_procs() > 1)
   {
-    pllmod_treeinfo_set_parallel_context(_pll_treeinfo, (void *) &ParallelContext::ctx(),
+    pllmod_treeinfo_set_parallel_context(_pll_treeinfo, (void *) nullptr,
                                          ParallelContext::parallel_reduce_cb);
   }
 

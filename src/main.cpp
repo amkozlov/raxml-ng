@@ -276,18 +276,17 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& bestTre
 void search_evaluate_thread(const RaxmlInstance& instance, CheckpointManager& checkp)
 {
   unique_ptr<TreeInfo> treeinfo;
-  auto const& ctx = ParallelContext::ctx();
 
-  //  printf("thread %lu / %lu\n", ParallelContext::ctx().thread_id(), ParallelContext::num_procs());
+//  printf("thread %lu / %lu\n", ParallelContext::thread_id(), ParallelContext::num_procs());
 
   /* wait until master thread prepares all global data */
-  ctx.thread_barrier();
+  ParallelContext::thread_barrier();
 
   auto const& master_msa = instance.parted_msa;
   auto const& opts = instance.opts;
 
   /* get partitions assigned to the current thread */
-  auto const& part_assign = instance.proc_part_assign.at(ctx.proc_id());
+  auto const& part_assign = instance.proc_part_assign.at(ParallelContext::proc_id());
 
 //  size_t start_tree_num = 0;
 
@@ -309,7 +308,7 @@ void search_evaluate_thread(const RaxmlInstance& instance, CheckpointManager& ch
       optimizer.optimize(*treeinfo);
   }
 
-  ctx.thread_barrier();
+  ParallelContext::thread_barrier();
 }
 
 void search_evaluate(RaxmlInstance& instance, CheckpointManager& checkp)

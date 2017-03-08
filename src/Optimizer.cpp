@@ -46,8 +46,8 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
   const double interim_modopt_eps = 3.;
 
   SearchState local_search_state = cm.search_state();
-  auto& search_state = ParallelContext::ctx_master_thread() ? cm.search_state() : local_search_state;
-  ParallelContext::ctx_barrier();
+  auto& search_state = ParallelContext::master_thread() ? cm.search_state() : local_search_state;
+  ParallelContext::barrier();
 
   /* set references such that we can work directly with checkpoint values */
   double &loglh = search_state.loglh;

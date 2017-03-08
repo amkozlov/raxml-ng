@@ -27,7 +27,7 @@ Logging& Logging::instance()
 
 LogStream& Logging::logstream(LogLevel level)
 {
-  if (ParallelContext::is_master() && level <= _log_level)
+  if (ParallelContext::master() && level <= _log_level)
     return _full_stream;
   else
     return _empty_stream;

@@ -33,38 +33,34 @@ public:
 
   static void finalize(bool force = false);
 
-  static const ParallelContext& ctx();
   static size_t num_procs() { return _num_ranks * _num_threads; }
   static size_t num_threads() { return _num_threads; }
   static size_t num_ranks() { return _num_ranks; }
 
   static void parallel_reduce_cb(void * context, double * data, size_t size, int op);
-  void thread_reduce(double * data, size_t size, int op) const;
-  void thread_broadcast(size_t source_id, void * data, size_t size) const;
+  static void thread_reduce(double * data, size_t size, int op);
+  static void thread_broadcast(size_t source_id, void * data, size_t size);
   void thread_send_master(size_t source_id, void * data, size_t size) const;
 
   static void mpi_gather_custom(std::function<int(void*,int)> prepare_send_cb,
                                 std::function<void(void*,int)> process_recv_cb);
 
+  static bool master() { return proc_id() == 0; }
   static bool master_rank() { return _rank_id == 0; }
-  static bool is_master() { return num_procs() == 1 || ctx().master(); }
-  static bool ctx_master_thread() { return num_threads() == 1 || ctx().master_thread(); }
-  static void ctx_barrier() { ctx().barrier(); }
+  static bool master_thread() { return _thread_id == 0; }
+  static size_t thread_id() { return _thread_id; }
+  static size_t proc_id() { return _rank_id * _num_threads + _thread_id; }
 
-  size_t thread_id() const { return _thread_id; }
-  size_t proc_id() const { return _rank_id * _num_threads + _thread_id; }
-  bool master() const { return proc_id() == 0; }
-  bool master_thread() const { return _thread_id == 0; }
+  static void barrier();
+  static void thread_barrier();
+  static void mpi_barrier();
 
-  void barrier() const;
-  void thread_barrier() const;
-  void mpi_barrier() const;
-
-  /* non-copyable ! */
-//  ParallelContext(const ParallelContext& other) = delete;
-//  ParallelContext(ParallelContext&& other) = delete;
-//  ParallelContext& operator=(const ParallelContext& other) = delete;
-//  ParallelContext& operator=(ParallelContext&& other) = delete;
+  /* static singleton, no instantiation/copying/moving */
+  ParallelContext() = delete;
+  ParallelContext(const ParallelContext& other) = delete;
+  ParallelContext(ParallelContext&& other) = delete;
+  ParallelContext& operator=(const ParallelContext& other) = delete;
+  ParallelContext& operator=(ParallelContext&& other) = delete;
 
   class UniqueLock
   {
@@ -82,11 +78,10 @@ private:
   static MutexType mtx;
 
   static size_t _rank_id;
-  size_t _thread_id;
+  static thread_local size_t _thread_id;
 
-  ParallelContext (size_t thread_id) : _thread_id(thread_id) {};
-
-  void parallel_reduce(double * data, size_t size, int op) const;
+  static void start_thread(size_t thread_id, const std::function<void()>& thread_main);
+  static void parallel_reduce(double * data, size_t size, int op);
 };
 
 #endif /* RAXML_PARALLELCONTEXT_HPP_ */
