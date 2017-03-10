@@ -190,11 +190,13 @@ void ParallelContext::parallel_reduce(double * data, size_t size, int op)
       else
         assert(0);
 
-      // TODO: can we use MPI_IN_PLACE and avoid memcpy?
-//      MPI_Allreduce(MPI_IN_PLACE, data, size, MPI_DOUBLE, reduce_op, MPI_COMM_WORLD);
-
+#if 1
+      MPI_Allreduce(MPI_IN_PLACE, data, size, MPI_DOUBLE, reduce_op, MPI_COMM_WORLD);
+#else
+      // not sure if MPI_IN_PLACE will work in all cases...
       MPI_Allreduce(data, _parallel_buf.data(), size, MPI_DOUBLE, reduce_op, MPI_COMM_WORLD);
       memcpy(data, _parallel_buf.data(), size * sizeof(double));
+#endif
     }
 
     if (_num_threads > 1)
