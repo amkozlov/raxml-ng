@@ -63,7 +63,7 @@ void assign(Model& model, const TreeInfo& treeinfo, size_t partition_id);
 
 
 pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& pinfo,
-                                      const Tree& tree, const PartitionRange& part_region);
+                                      const PartitionRange& part_region, const uintVector& weights);
 
 
 #endif /* RAXML_TREEINFO_HPP_ */

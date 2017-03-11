@@ -17,19 +17,30 @@ struct TreeBranch
 
 typedef std::vector<TreeBranch> TreeTopology;
 
-//struct Topology
-//{
-//  std::vector
-//};
-
 typedef std::vector<pll_utree_t*> PllTreeVector;
 
-class Tree
+class BasicTree
 {
 public:
-  Tree() : _num_tips(0), _pll_utree_start(nullptr) {};
+  BasicTree(size_t num_tips) : _num_tips(num_tips) {}
+
+  bool empty() const { return _num_tips == 0; };
+  size_t num_tips() const { return _num_tips; };
+  size_t num_inner() const { return _num_tips - 2; };
+  size_t num_nodes() const { return _num_tips + _num_tips - 2; };
+  size_t num_subnodes() const { return _num_tips + num_inner() * 3; };
+  size_t num_branches() const { return _num_tips + _num_tips - 3; };
+
+protected:
+  size_t _num_tips;
+};
+
+class Tree : public BasicTree
+{
+public:
+  Tree() : BasicTree(0), _pll_utree_start(nullptr) {};
   Tree(size_t num_tips, pll_utree_t* pll_utree_start) :
-    _num_tips(num_tips), _pll_utree_start(pll_utree_clone(pll_utree_start)) {};
+    BasicTree(num_tips), _pll_utree_start(pll_utree_clone(pll_utree_start)) {};
 
   Tree (const Tree& other) = default;
   Tree& operator=(const Tree& other);
@@ -43,12 +54,6 @@ public:
                              unsigned int attributes, unsigned int * score = nullptr);
   static Tree loadFromFile(const std::string& file_name);
 
-  bool empty() const { return _num_tips == 0; };
-  size_t num_tips() const { return _num_tips; };
-  size_t num_inner() const { return _num_tips - 2; };
-  size_t num_nodes() const { return _num_tips + _num_tips - 2; };
-  size_t num_subnodes() const { return _num_tips + num_inner() * 3; };
-  size_t num_branches() const { return _num_tips + _num_tips - 3; };
   IdNameVector tip_labels() const;
 
   TreeTopology topology() const;
@@ -62,7 +67,6 @@ public:
   void reset_tip_ids(const NameIdMap& label_id_map);
 
 private:
-  size_t _num_tips;
   pll_utree_t* _pll_utree_start;
 
   mutable PllTreeVector _pll_utree_tips;

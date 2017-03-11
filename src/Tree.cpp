@@ -9,7 +9,7 @@
 
 using namespace std;
 
-Tree::Tree (Tree&& other) : _num_tips(other._num_tips), _pll_utree_start(other._pll_utree_start)
+Tree::Tree (Tree&& other) : BasicTree(other._num_tips), _pll_utree_start(other._pll_utree_start)
 {
   other._num_tips = 0;
   other._pll_utree_start = nullptr;

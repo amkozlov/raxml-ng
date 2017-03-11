@@ -174,7 +174,7 @@ void balance_load(RaxmlInstance& instance)
   size_t i = 0;
   for (auto const& pinfo: instance.parted_msa.part_list())
   {
-    part_sizes.assign_sites(i, 0, pinfo.msa().num_patterns());
+    part_sizes.assign_sites(i, 0, pinfo.msa().length());
     ++i;
   }
 

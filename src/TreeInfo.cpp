@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "TreeInfo.hpp"
 #include "ParallelContext.hpp"
 
@@ -36,7 +38,8 @@ TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA&
     if (part_range != part_assign.end())
     {
       /* create and init PLL partition structure */
-      pll_partition_t * partition = create_pll_partition(opts, pinfo, tree, *part_range);
+      const auto& weights = pinfo.msa().weights();
+      pll_partition_t * partition = create_pll_partition(opts, pinfo, *part_range, weights);
 
       int retval = pllmod_treeinfo_init_partition(_pll_treeinfo, p, partition,
                                                   params_to_optimize,
@@ -264,28 +267,67 @@ void assign(Model& model, const TreeInfo& treeinfo, size_t partition_id)
     model.brlen_scaler(pll_treeinfo.brlen_scalers[partition_id]);
 }
 
-void set_partition_tips(PartitionInfo const& pinfo, const PartitionRange& part_region,
+void set_partition_tips(const MSA& msa, const PartitionRange& part_region,
                         pll_partition_t* partition)
 {
-  for (size_t i = 0; i < pinfo.msa().size(); ++i)
+  /* set pattern weights */
+  if (!msa.weights().empty())
+    pll_set_pattern_weights(partition, msa.weights().data() + part_region.start);
+
+  for (size_t i = 0; i < msa.size(); ++i)
   {
-    pll_set_tip_states(partition, i, partition->map, pinfo.msa().at(i).c_str() + part_region.start);
+    pll_set_tip_states(partition, i, partition->map, msa.at(i).c_str() + part_region.start);
   }
 }
 
+void set_partition_tips(const MSA& msa, const PartitionRange& part_region,
+                        pll_partition_t* partition, const uintVector& weights)
+{
+  assert(!weights.empty());
+
+  const auto pstart = part_region.start;
+  const auto pend = part_region.start + part_region.length;
+
+  /* compress weights array by removing all zero entries */
+  uintVector comp_weights;
+  for (size_t j = pstart; j < pend; ++j)
+  {
+    if (weights[j] > 0)
+      comp_weights.push_back(weights[j]);
+  }
+
+  /* now set tip sequences, ignoring all columns with zero weights */
+  std::vector<char> bs_seq(part_region.length);
+  for (size_t i = 0; i < msa.size(); ++i)
+  {
+    const char * full_seq = msa.at(i).c_str();
+    size_t pos = 0;
+    for (size_t j = pstart; j < pend; ++j)
+    {
+      if (weights[j] > 0)
+        bs_seq[pos++] = full_seq[j];
+    }
+    assert(pos == comp_weights.size());
+
+    pll_set_tip_states(partition, i, partition->map, bs_seq.data());
+  }
+
+  pll_set_pattern_weights(partition, comp_weights.data());
+}
+
 pll_partition_t* create_pll_partition(Options const& opts, PartitionInfo const& pinfo,
-                                      Tree const& tree, const PartitionRange& part_region)
+                                      const PartitionRange& part_region, const uintVector& weights)
 {
   const MSA& msa = pinfo.msa();
   const Model& model = pinfo.model();
 
   unsigned int attrs = opts.simd_arch;
 
-  if (opts.use_rate_scalers && pinfo.model().num_ratecats() > 1)
+  if (opts.use_rate_scalers && model.num_ratecats() > 1)
   {
     attrs |= PLL_ATTRIB_RATE_SCALERS;
 
-    if (pinfo.model().num_states() != 4 ||
+    if (model.num_states() != 4 ||
         (opts.simd_arch != PLL_ATTRIB_ARCH_AVX && opts.simd_arch != PLL_ATTRIB_ARCH_AVX2))
     {
       throw runtime_error("Per-rate scalers are implemented for DNA with AVX/AVX2 vectorization only!\n");
@@ -301,11 +343,20 @@ pll_partition_t* create_pll_partition(Options const& opts, PartitionInfo const& 
       attrs |= PLL_ATTRIB_PATTERN_TIP;
   }
 
+  /* part_length doesn't include columns with zero weight */
+  const size_t part_length = weights.empty() ? part_region.length :
+                             std::count_if(weights.begin() + part_region.start,
+                                           weights.begin() + part_region.start + part_region.length,
+                                           [](uintVector::value_type w) -> bool
+                                             { return w > 0; }
+                                           );
+
+  BasicTree tree(msa.size());
   pll_partition_t * partition = pll_partition_create(
       tree.num_tips(),         /* number of tip sequences */
       tree.num_inner(),        /* number of CLV buffers */
       model.num_states(),      /* number of states in the data */
-      part_region.length,      /* number of alignment sites/patterns */
+      part_length,             /* number of alignment sites/patterns */
       model.num_submodels(),   /* number of different substitution models (LG4 = 4) */
       tree.num_branches(),     /* number of probability matrices */
       model.num_ratecats(),    /* number of (GAMMA) rate categories */
@@ -318,11 +369,10 @@ pll_partition_t* create_pll_partition(Options const& opts, PartitionInfo const& 
 
   partition->map = model.charmap();
 
-  /* set pattern weights */
-  if (!msa.weights().empty())
-    pll_set_pattern_weights(partition, msa.weights().data() + part_region.start);
-
-  set_partition_tips(pinfo, part_region, partition);
+  if (part_length == part_region.length)
+    set_partition_tips(msa, part_region, partition);
+  else
+    set_partition_tips(msa, part_region, partition, weights);
 
   assign(partition, model);
 
