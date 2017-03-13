@@ -56,24 +56,32 @@ struct Checkpoint
 class CheckpointManager
 {
 public:
-  CheckpointManager(const std::string& ckp_fname) : _ckp_fname(ckp_fname) {}
+  CheckpointManager(const std::string& ckp_fname) : _active(true), _ckp_fname(ckp_fname) {}
 
   const Checkpoint& checkpoint() { return _checkp; }
   void checkpoint(Checkpoint&& ckp) { _checkp = std::move(ckp); }
 
   //TODO: this is not very elegant, but should do the job for now
-  SearchState& search_state() { return _checkp.search_state; };
+  SearchState& search_state();
+  void reset_search_state();
+
+  void enable() { _active = true; };
+  void disable() { _active = false; };
+
   void update_and_write(const TreeInfo& treeinfo);
 
-  void write() const { write(_ckp_fname); };
-  void write(const std::string& ckp_fname) const;
   bool read() { return read(_ckp_fname); };
   bool read(const std::string& ckp_fname);
+  void write() const { write(_ckp_fname); };
+  void write(const std::string& ckp_fname) const;
 
+  void remove();
 private:
+  bool _active;
   std::string _ckp_fname;
   Checkpoint _checkp;
   IDSet _updated_models;
+  SearchState _empty_search_state;
 
   void gather_model_params();
 };

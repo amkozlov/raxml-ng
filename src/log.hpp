@@ -74,8 +74,9 @@ Logging& logger();
 #define LOG_WARN RAXML_LOG(LogLevel::warn)
 #define LOG_INFO RAXML_LOG(LogLevel::info)
 #define LOG_DEBUG RAXML_LOG(LogLevel::debug)
+#define LOG_PROGR RAXML_LOG(LogLevel::progress)
 
-#define LOG_PROGRESS(loglh) RAXML_LOG(LogLevel::progress) << ProgressInfo(loglh)
+#define LOG_PROGRESS(loglh) LOG_PROGR << ProgressInfo(loglh)
 
 
 template <class T>

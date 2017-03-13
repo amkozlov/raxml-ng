@@ -8,6 +8,8 @@ class NewickStream : public std::fstream
 {
 public:
   NewickStream(std::string fname) : std::fstream(fname, std::ios::out) {};
+  NewickStream(std::string fname, std::ios_base::openmode mode) :
+    std::fstream(fname, mode) {};
 };
 
 class RaxmlPartitionFileStream : public std::fstream

@@ -8,6 +8,20 @@ using namespace std;
 TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
                     const PartitionAssignment& part_assign)
 {
+  init(opts, tree, parted_msa, part_assign, std::vector<uintVector>());
+}
+
+TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
+                    const PartitionAssignment& part_assign,
+                    const std::vector<uintVector>& site_weights)
+{
+  init(opts, tree, parted_msa, part_assign, site_weights);
+}
+
+void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
+                    const PartitionAssignment& part_assign,
+                    const std::vector<uintVector>& site_weights)
+{
   _pll_treeinfo = pllmod_treeinfo_create(tree.pll_utree_copy(), tree.num_tips(),
                                          parted_msa.part_count(), opts.brlen_linkage);
 
@@ -38,7 +52,7 @@ TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA&
     if (part_range != part_assign.end())
     {
       /* create and init PLL partition structure */
-      const auto& weights = pinfo.msa().weights();
+      const auto& weights = site_weights.empty() ? pinfo.msa().weights() : site_weights.at(p);
       pll_partition_t * partition = create_pll_partition(opts, pinfo, *part_range, weights);
 
       int retval = pllmod_treeinfo_init_partition(_pll_treeinfo, p, partition,

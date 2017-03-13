@@ -34,6 +34,7 @@
 #include "io/binary_io.hpp"
 #include "ParallelContext.hpp"
 #include "LoadBalancer.hpp"
+#include "bootstrap/BootstrapGenerator.hpp"
 
 using namespace std;
 
@@ -43,6 +44,7 @@ struct RaxmlInstance
   Options opts;
   PartitionedMSA parted_msa;
   TreeList start_trees;
+  BootstrapReplicateList bs_reps;
   PartitionAssignmentList proc_part_assign;
 };
 
@@ -61,12 +63,13 @@ void print_banner()
       << endl << endl;
 }
 
-TreeList get_start_tree(const Options &opts, const PartitionedMSA& part_msa)
+void build_start_trees(RaxmlInstance& instance)
 {
   Tree tree;
-  TreeList tree_list;
 
-  const MSA& msa = part_msa.full_msa();
+  const auto& opts = instance.opts;
+  const auto& parted_msa = instance.parted_msa;
+  const auto& msa = parted_msa.full_msa();
 
   switch (opts.start_tree)
   {
@@ -93,7 +96,7 @@ TreeList get_start_tree(const Options &opts, const PartitionedMSA& part_msa)
 
       LOG_INFO << "Generating a random starting tree with " << msa.size() << " taxa" << endl;
 
-      tree = Tree::buildRandom(msa.size(), (const char * const*) msa.pll_msa()->label);
+      tree = Tree::buildRandom(msa);
 
       break;
     case StartingTree::parsimony:
@@ -101,7 +104,7 @@ TreeList get_start_tree(const Options &opts, const PartitionedMSA& part_msa)
       LOG_INFO << "Generating a parsimony starting tree with " << msa.size() << " taxa" << endl;
 
       unsigned int score;
-      tree = Tree::buildParsimony(part_msa, opts.random_seed, opts.simd_arch, &score);
+      tree = Tree::buildParsimony(parted_msa, opts.random_seed, opts.simd_arch, &score);
 
       LOG_INFO << "Parsimony score of the starting tree: " << score << endl;
 
@@ -119,37 +122,36 @@ TreeList get_start_tree(const Options &opts, const PartitionedMSA& part_msa)
   /* make sure tip indices are consistent between MSA and pll_tree */
   tree.reset_tip_ids(msa.label_id_map());
 
-  tree_list.emplace_back(move(tree));
-
-  return tree_list;
+  instance.start_trees.emplace_back(move(tree));
 }
 
-PartitionedMSA init_part_info(Options &opts)
+void init_part_info(RaxmlInstance& instance)
 {
-  PartitionedMSA part_msa;
+  auto& opts = instance.opts;
+  auto& parted_msa = instance.parted_msa;
 
   /* check if model is a file */
   if (sysutil_file_exists(opts.model_file))
   {
     // read partition definitions from file
     RaxmlPartitionFileStream partfile(opts.model_file);
-    partfile >> part_msa;
+    partfile >> parted_msa;
 
 //    DBG("partitions found: %d\n", useropt->part_count);
   }
   else
   {
     // create and init single pseudo-partition
-    part_msa.emplace_part_info("noname", opts.data_type, opts.model_file);
+    parted_msa.emplace_part_info("noname", opts.data_type, opts.model_file);
   }
 
   /* make sure that linked branch length mode is set for unpartitioned alignments */
-  if (part_msa.part_count() == 1)
+  if (parted_msa.part_count() == 1)
     opts.brlen_linkage = PLLMOD_TREE_BRLEN_LINKED;
 
   int lg4x_count = 0;
 
-  for (const auto& pinfo: part_msa.part_list())
+  for (const auto& pinfo: parted_msa.part_list())
   {
 //    LOG_INFO << "|" << pinfo.name() << "|   |" << pinfo.model().to_string() << "|   |" <<
 //        pinfo.range_string() << "|" << endl;
@@ -158,12 +160,10 @@ PartitionedMSA init_part_info(Options &opts)
       lg4x_count++;
   }
 
-  if (part_msa.part_count() > 1 && lg4x_count > 0 && opts.brlen_linkage == PLLMOD_TREE_BRLEN_LINKED)
+  if (parted_msa.part_count() > 1 && lg4x_count > 0 && opts.brlen_linkage == PLLMOD_TREE_BRLEN_LINKED)
   {
     throw runtime_error("LG4X model is not supported in linked branch length mode, sorry :(");
   }
-
-  return part_msa;
 }
 
 void balance_load(RaxmlInstance& instance)
@@ -186,8 +186,11 @@ void balance_load(RaxmlInstance& instance)
   LOG_INFO << "\nData distribution:\n" << instance.proc_part_assign;
 }
 
-void load_msa(const Options& opts, PartitionedMSA& part_msa)
+void load_msa(RaxmlInstance& instance)
 {
+  const auto& opts = instance.opts;
+  auto& parted_msa = instance.parted_msa;
+
   LOG_INFO << "Reading alignment from file: " << opts.msa_file << endl;
 
   /* load MSA */
@@ -199,25 +202,25 @@ void load_msa(const Options& opts, PartitionedMSA& part_msa)
   /* check alignment */
 //  check_msa(useropt, msa);
 
-  part_msa.full_msa(std::move(msa));
+  parted_msa.full_msa(std::move(msa));
 
 //  LOG_INFO << "Splitting MSA... " << endl;
 
-  part_msa.split_msa();
+  parted_msa.split_msa();
 
   if (opts.use_pattern_compression)
-    part_msa.compress_patterns();
+    parted_msa.compress_patterns();
 
-  part_msa.set_model_empirical_params();
+  parted_msa.set_model_empirical_params();
 
   // TODO: check empirical params (e.g. zero state freqs)
 
   LOG_INFO << endl;
 
-  LOG_INFO << "Alignment comprises " << part_msa.part_count() << " partitions and " <<
-      part_msa.total_length() << " patterns\n" << endl;
+  LOG_INFO << "Alignment comprises " << parted_msa.part_count() << " partitions and " <<
+      parted_msa.total_length() << " patterns\n" << endl;
 
-  LOG_INFO << part_msa;
+  LOG_INFO << parted_msa;
 
   LOG_INFO << endl;
 }
@@ -247,10 +250,22 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
   }
 }
 
+void generate_bootstraps(RaxmlInstance& instance)
+{
+  if (instance.opts.command == Command::bootstrap || instance.opts.command == Command::all)
+  {
+    BootstrapGenerator bg;
+    for (size_t b = 0; b < instance.opts.num_bootstraps; ++b)
+    {
+      auto seed = rand();
+      instance.bs_reps.emplace_back(bg.generate(instance.parted_msa, seed));
+    }
+  }
+}
+
 void print_final_output(const RaxmlInstance& instance, const Checkpoint& bestTree)
 {
   auto const& opts = instance.opts;
-  auto const& tree_fname = opts.output_fname("bestTree");
 
   LOG_INFO << "\nOptimized model parameters:" << endl;
 
@@ -264,16 +279,27 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& bestTre
 
   LOG_INFO << "\nFinal LogLikelihood: " << setprecision(6) << bestTree.loglh() << endl;
 
-  NewickStream nw_result(tree_fname);
+  NewickStream nw_result(opts.best_tree_file());
   nw_result << bestTree.tree;
 
-  LOG_INFO << "\nElapsed time: " << setprecision(3) << sysutil_elapsed_seconds() << " seconds\n";
+  LOG_INFO << "\nElapsed time: " << setprecision(3) << sysutil_elapsed_seconds() << " seconds\n\n";
 
-  LOG_INFO << "\nFinal tree saved to: " << sysutil_realpath(tree_fname) << endl;
-  LOG_INFO << "\nExecution log saved to: " << sysutil_realpath(opts.log_file) << endl << endl;
+  if (opts.command == Command::search || opts.command == Command::all)
+  {
+    if (instance.start_trees.size() > 1)
+      LOG_INFO << "All ML trees saved to: " << sysutil_realpath(opts.ml_trees_file()) << endl;
+    LOG_INFO << "Best ML tree saved to: " << sysutil_realpath(opts.best_tree_file()) << endl;
+  }
+
+  if (opts.command == Command::bootstrap || opts.command == Command::all)
+  {
+    LOG_INFO << "Bootstrap trees saved to: " << sysutil_realpath(opts.bootstrap_trees_file()) << endl;
+  }
+
+  LOG_INFO << "\nExecution log saved to: " << sysutil_realpath(opts.log_file()) << endl << endl;
 }
 
-void search_evaluate_thread(const RaxmlInstance& instance, CheckpointManager& checkp)
+void search_evaluate_thread(const RaxmlInstance& instance, CheckpointManager& cm)
 {
   unique_ptr<TreeInfo> treeinfo;
 
@@ -288,8 +314,7 @@ void search_evaluate_thread(const RaxmlInstance& instance, CheckpointManager& ch
   /* get partitions assigned to the current thread */
   auto const& part_assign = instance.proc_part_assign.at(ParallelContext::proc_id());
 
-//  size_t start_tree_num = 0;
-
+  size_t start_tree_num = 0;
   for (auto const& tree: instance.start_trees)
   {
     assert(!tree.empty());
@@ -299,29 +324,78 @@ void search_evaluate_thread(const RaxmlInstance& instance, CheckpointManager& ch
     else
       treeinfo->tree(tree);
 
-    LOG_INFO << "\nInitial LogLikelihood: " << treeinfo->loglh() << endl;
+    Optimizer optimizer(opts);
+    if (opts.command == Command::search || opts.command == Command::all)
+    {
+      LOG_INFO << "\nRunning ML search from starting tree #" << start_tree_num+1 << endl << endl;
+      optimizer.optimize_topology(*treeinfo, cm);
+    }
+    else
+    {
+      LOG_INFO << "\nInitial LogLikelihood: " << treeinfo->loglh() << endl << endl;
+      optimizer.optimize(*treeinfo);
+    }
+
+    start_tree_num++;
+  }
+
+  ParallelContext::thread_barrier();
+
+  if (!instance.bs_reps.empty())
+  {
+    if (opts.command == Command::all)
+    {
+      LOG_INFO << "ML tree search completed, best tree logLH: " << cm.checkpoint().loglh()
+               << endl << endl;
+    }
+
+    LOG_INFO << "Starting bootstrapping analysis with " << instance.bs_reps.size()
+             << " replicates." << endl << endl;
+  }
+
+  // TODO: implement checkpointing for bootstraps
+  cm.disable();
+
+  /* infer bootstrap trees if needed */
+  size_t bs_num = 0;
+  for (const auto bs: instance.bs_reps)
+  {
+    /* for now, use the same starting tree as for the tree search */
+//    Tree tree = Tree::buildRandom(master_msa.full_msa());
+    const Tree& tree = instance.start_trees.at(0);
+    treeinfo.reset(new TreeInfo(opts, tree, master_msa, part_assign, bs.site_weights));
+
+//    checkp.reset_search_state();
 
     Optimizer optimizer(opts);
-    if (opts.command == Command::search)
-      optimizer.optimize_topology(*treeinfo, checkp);
-    else
-      optimizer.optimize(*treeinfo);
+    optimizer.optimize_topology(*treeinfo, cm);
+
+    if (ParallelContext::master())
+    {
+      NewickStream nw(opts.bootstrap_trees_file(), std::ios::out | std::ios::app);
+      nw << treeinfo->pll_utree_root();
+    }
+
+    LOG_PROGR << endl;
+    LOG_INFO << "Bootstrap tree #" << ++bs_num <<
+                ", logLikelihood: " << treeinfo->loglh(true) << endl;
+    LOG_PROGR << endl;
   }
 
   ParallelContext::thread_barrier();
 }
 
-void search_evaluate(RaxmlInstance& instance, CheckpointManager& checkp)
+void search_evaluate(RaxmlInstance& instance, CheckpointManager& cm)
 {
   auto const& opts = instance.opts;
   auto& parted_msa = instance.parted_msa;
 
-  instance.parted_msa = init_part_info(instance.opts);
+  init_part_info(instance);
 
-  load_msa(opts, instance.parted_msa);
+  load_msa(instance);
 
   /* load/create starting tree */
-  instance.start_trees = get_start_tree(opts, parted_msa);
+  build_start_trees(instance);
 
   if (::ParallelContext::master_rank())
   {
@@ -332,7 +406,7 @@ void search_evaluate(RaxmlInstance& instance, CheckpointManager& checkp)
   }
 
   /* load checkpoint */
-  load_checkpoint(instance, checkp);
+  load_checkpoint(instance, cm);
 
   LOG_DEBUG << "Initial model parameters:" << endl;
   for (size_t p = 0; p < parted_msa.part_count(); ++p)
@@ -344,10 +418,18 @@ void search_evaluate(RaxmlInstance& instance, CheckpointManager& checkp)
   /* run load balancing algorithm */
   balance_load(instance);
 
-  search_evaluate_thread(instance, checkp);
+  /* generate bootstrap replicates */
+  generate_bootstraps(instance);
+
+  search_evaluate_thread(instance, cm);
 
   if (ParallelContext::master_rank())
-    print_final_output(instance, checkp.checkpoint());
+  {
+    print_final_output(instance, cm.checkpoint());
+
+    /* analysis finished successfully, remove checkpoint */
+    cm.remove();
+  }
 }
 
 void clean_exit(int retval)
@@ -398,7 +480,7 @@ int main(int argc, char** argv)
   /* now get to the real stuff */
   srand(instance.opts.random_seed);
   logger().set_log_level(instance.opts.log_level);
-  logger().set_log_filename(instance.opts.log_file);
+  logger().set_log_filename(instance.opts.log_file());
 
   print_banner();
   LOG_INFO << instance.opts;
@@ -407,15 +489,17 @@ int main(int argc, char** argv)
   {
     case Command::evaluate:
     case Command::search:
+    case Command::bootstrap:
+    case Command::all:
     {
       try
       {
-        CheckpointManager checkp(instance.opts.checkp_file);
+        CheckpointManager cm(instance.opts.checkp_file());
         ParallelContext::init_pthreads(instance.opts, std::bind(search_evaluate_thread,
                                                                 std::cref(instance),
-                                                                std::ref(checkp)));
+                                                                std::ref(cm)));
 
-        search_evaluate(instance, checkp);
+        search_evaluate(instance, cm);
       }
       catch(exception& e)
       {

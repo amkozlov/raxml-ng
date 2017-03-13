@@ -3,6 +3,11 @@
 
 #include "common.h"
 
+typedef unsigned int WeightType;
+typedef std::vector<WeightType> WeightVector;
+typedef std::vector<WeightVector> WeightVectorList;
+typedef std::unordered_map<size_t, WeightVector> WeightVectorMap;
+
 class MSA
 {
 public:
@@ -32,7 +37,7 @@ public:
   unsigned int length() const { return _length; };
   unsigned int num_sites() const { return _num_sites; };
   unsigned int num_patterns() const { return _weights.size(); };
-  const std::vector<unsigned int>& weights() const {return _weights; };
+  const WeightVector& weights() const {return _weights; };
   const NameIdMap& label_id_map() const { return _label_id_map; };
   const pll_msa_t * pll_msa() const;
   const std::string& at(const std::string& label) const { return _sequences.at(_label_id_map.at(label)); };
@@ -57,7 +62,7 @@ private:
   container _sequences;
   container _labels;
   NameIdMap _label_id_map;
-  std::vector<unsigned int> _weights;
+  WeightVector _weights;
   mutable pll_msa_t * _pll_msa;
   mutable bool _dirty;
 

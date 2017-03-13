@@ -4,16 +4,27 @@
 #include "common.h"
 #include "PartitionedMSA.hpp"
 
+struct OutputFileNames
+{
+  std::string log;
+  std::string checkpoint;       /* checkpoint file */
+  std::string best_tree;
+  std::string ml_trees;
+  std::string bootstrap_trees;
+};
+
 class Options
 {
 public:
   Options() : cmdline(""), command(Command::none), use_tip_inner(true),
   use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false),
-  optimize_model(true), optimize_brlen(true), data_type(DataType::autodetect),
+  optimize_model(true), optimize_brlen(true), log_level(LogLevel::progress),
+  msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
   random_seed(0), start_tree(StartingTree::random), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
   spr_cutoff(1.0), brlen_linkage(PLLMOD_TREE_BRLEN_SCALED), simd_arch(PLL_ATTRIB_ARCH_CPU),
-  tree_file(""), msa_file(""), model_file(""), outfile_prefix(""), checkp_file(""), log_file(""),
-  log_level(LogLevel::progress), msa_format(FileFormat::autodetect), num_threads(1), num_ranks(1)
+  num_bootstraps(100),
+  tree_file(""), msa_file(""), model_file(""), outfile_prefix(""),
+  num_threads(1), num_ranks(1)
   {};
 
   ~Options() = default;
@@ -32,6 +43,8 @@ public:
   bool optimize_model;
   bool optimize_brlen;
 
+  LogLevel log_level;
+  FileFormat msa_format;
   DataType data_type;
   long random_seed;
   StartingTree start_tree;
@@ -41,19 +54,29 @@ public:
   int brlen_linkage;
   unsigned int simd_arch;
 
+  unsigned int num_bootstraps;
+
   /* I/O */
   std::string tree_file;
   std::string msa_file;
   std::string model_file;     /* could be also model string */
   std::string outfile_prefix;
-  std::string checkp_file;       /* checkpoint file */
-  std::string log_file;
-  LogLevel log_level;
-  FileFormat msa_format;
+  OutputFileNames outfile_names;
 
   /* parallelization stuff */
   unsigned int num_threads;     /* number of threads */
   unsigned int num_ranks;       /* number of MPI ranks */
+
+  const std::string& log_file() const { return outfile_names.log; }
+  const std::string& checkp_file() const { return outfile_names.checkpoint; }
+  const std::string& best_tree_file() const { return outfile_names.best_tree; }
+  const std::string& ml_trees_file() const { return outfile_names.ml_trees; }
+  const std::string& bootstrap_trees_file() const { return outfile_names.bootstrap_trees; }
+
+  void set_default_outfiles();
+
+private:
+  void set_default_outfile(std::string& fname, const std::string& suffix);
 };
 
 std::ostream& operator<<(std::ostream& stream, const Options& opts);

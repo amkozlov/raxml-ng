@@ -8,6 +8,21 @@ string Options::output_fname(const string& suffix) const
   return (outfile_prefix.empty() ? msa_file : outfile_prefix) + ".raxml." + suffix;
 }
 
+void Options::set_default_outfile(std::string& fname, const std::string& suffix)
+{
+  if (fname.empty())
+    fname = output_fname(suffix);
+}
+
+void Options::set_default_outfiles()
+{
+  set_default_outfile(outfile_names.log, "log");
+  set_default_outfile(outfile_names.checkpoint, "ckp");
+  set_default_outfile(outfile_names.best_tree, "bestTree");
+  set_default_outfile(outfile_names.ml_trees, "mlTrees");
+  set_default_outfile(outfile_names.bootstrap_trees, "bootstraps");
+}
+
 static string get_simd_arch_name(unsigned int simd_arch)
 {
   switch(simd_arch)
@@ -42,10 +57,16 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   switch(opts.command)
   {
     case Command::search:
-      stream << "Tree search";
+      stream << "ML tree search";
       break;
     case Command::evaluate:
       stream << "Evaluate tree likelihood";
+      break;
+    case Command::bootstrap:
+      stream << "Bootstrapping";
+      break;
+    case Command::all:
+      stream << "ML tree search + bootstrapping";
       break;
     default:
       break;

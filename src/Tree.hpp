@@ -50,6 +50,7 @@ public:
   virtual ~Tree();
 
   static Tree buildRandom(size_t num_tips, const char * const* tip_labels);
+  static Tree buildRandom(const MSA& msa);
   static Tree buildParsimony(const PartitionedMSA& parted_msa, unsigned int random_seed,
                              unsigned int attributes, unsigned int * score = nullptr);
   static Tree loadFromFile(const std::string& file_name);

@@ -66,6 +66,11 @@ Tree Tree::buildRandom(size_t num_tips, const char * const* tip_labels)
   return tree;
 }
 
+Tree Tree::buildRandom(const MSA& msa)
+{
+  return Tree::buildRandom(msa.size(), (const char * const*) msa.pll_msa()->label);
+}
+
 Tree Tree::buildParsimony(const PartitionedMSA& parted_msa, unsigned int random_seed,
                            unsigned int attributes, unsigned int * score)
 {

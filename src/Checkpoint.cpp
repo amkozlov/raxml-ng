@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 #include "Checkpoint.hpp"
 #include "io/binary_io.hpp"
 #include "io/file_io.hpp"
@@ -25,8 +27,39 @@ bool CheckpointManager::read(const std::string& ckp_fname)
     return false;
 }
 
+void CheckpointManager::remove()
+{
+  if (sysutil_file_exists(_ckp_fname))
+    std::remove(_ckp_fname.c_str());
+}
+
+SearchState& CheckpointManager::search_state()
+{
+  if (_active)
+    return _checkp.search_state;
+  else
+  {
+    _empty_search_state = SearchState();
+    return _empty_search_state;
+  }
+};
+
+void CheckpointManager::reset_search_state()
+{
+  ParallelContext::thread_barrier();
+
+  if (ParallelContext::master_thread())
+    _checkp.search_state = SearchState();
+
+  ParallelContext::thread_barrier();
+};
+
+
 void CheckpointManager::update_and_write(const TreeInfo& treeinfo)
 {
+  if (!_active)
+    return;
+
   if (ParallelContext::master_thread())
     _updated_models.clear();
 

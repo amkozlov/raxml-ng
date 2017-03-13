@@ -28,6 +28,8 @@ class TreeInfo
 public:
   TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
             const PartitionAssignment& part_assign);
+  TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
+            const PartitionAssignment& part_assign, const std::vector<uintVector>& site_weights);
   virtual
   ~TreeInfo ();
 
@@ -56,6 +58,9 @@ public:
 private:
   pllmod_treeinfo_t * _pll_treeinfo;
   IDSet _parts_master;
+
+  void init(const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
+            const PartitionAssignment& part_assign, const std::vector<uintVector>& site_weights);
 };
 
 void assign(PartitionedMSA& parted_msa, const TreeInfo& treeinfo);

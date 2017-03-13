@@ -117,7 +117,7 @@ void MSA::compress_patterns(const unsigned int * charmap)
     throw runtime_error("Pattern compression failed!");
 
   _length = _pll_msa->length;
-  _weights = std::vector<unsigned int>(w, w + _pll_msa->length);
+  _weights = WeightVector(w, w + _pll_msa->length);
 
   _dirty = false;
 }

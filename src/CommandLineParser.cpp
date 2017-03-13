@@ -35,6 +35,10 @@ static struct option long_options[] =
   {"rate-scalers",       required_argument, 0, 0 },  /*  22 */
   {"log",                required_argument, 0, 0 },  /*  23 */
 
+  {"bootstrap",          no_argument,       0, 0 },  /*  24 */
+  {"all",                no_argument,       0, 0 },  /*  25 */
+  {"bs-trees",           required_argument, 0, 0 },  /*  26 */
+
   { 0, 0, 0, 0 }
 };
 
@@ -87,6 +91,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   // autodetect CPU instruction set and use respective SIMD kernels
   opts.simd_arch = sysutil_simd_autodetect();
+
+  bool log_level_set = false;
 
   int option_index = 0;
   int c;
@@ -291,6 +297,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.use_rate_scalers = !optarg || (strcasecmp(optarg, "off") != 0);
         break;
       case 23: /* log level */
+        log_level_set = true;
         if (strcasecmp(optarg, "error") == 0 )
           opts.log_level = LogLevel::error;
         else if (strcasecmp(optarg, "warning") == 0)
@@ -303,6 +310,21 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.log_level = LogLevel::debug;
         else
           throw InvalidOptionValueException("Unknown log level: %s!", optarg);
+        break;
+      case 24:
+        opts.command = Command::bootstrap;
+        num_commands++;
+        break;
+      case 25:
+        opts.command = Command::all;
+        num_commands++;
+        break;
+      case 26:  /* number of bootstrap replicates */
+        if (sscanf(optarg, "%u", &opts.num_bootstraps) != 1 || opts.num_bootstraps == 0)
+        {
+          throw InvalidOptionValueException("Invalid number of num_bootstraps: %s, "
+              "please provide a positive integer number!", optarg);
+        }
         break;
       default:
         throw  OptionException("Internal error in option parsing");
@@ -329,12 +351,15 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       throw OptionException("Mandatory switch --tree");
   }
 
-  /* set logfile name */
-  opts.log_file = opts.output_fname("log");
+  /* set default log output level  */
+  if (!log_level_set)
+  {
+    opts.log_level = (opts.command == Command::bootstrap || opts.command == Command::all) ?
+        LogLevel::info : LogLevel::progress;
+  }
 
-  /* set default checkpoint file name, if not overwritten by the user */
-  if (opts.checkp_file.empty())
-    opts.checkp_file = opts.output_fname("ckp");
+  /* set default  names for output files */
+  opts. set_default_outfiles();
 }
 
 void CommandLineParser::print_help()
@@ -346,30 +371,39 @@ void CommandLineParser::print_help()
             "  --help                                     display help information.\n"
             "  --version                                  display version information.\n"
             "  --evaluate                                 evaluate the likelihood of a tree.\n"
-            "  --search                                   ML tree search.\n\n"
+            "  --search                                   ML tree search.\n"
+            "  --bootstrap                                bootstrapping.\n"
+            "  --all                                      All-in-one (ML search + bootstrapping).\n"
+            "\n"
             "Input and output options:\n"
             "  --tree         FILENAME | rand | pars      starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
             "  --msa          FILENAME                    alignment file\n"
             "  --msa-format   VALUE                       alignment file type: FASTA, PHYLIP, VCF, CATG or AUTO-detect (default)\n"
             "  --data-type    VALUE                       data type: DNA, AA, MULTI-state or AUTO-detect (default)\n"
             "  --prefix       STRING                      prefix for output files (default: MSA file name)\n"
-            "  --log          VALUE                       log verbosity: ERROR,WARNING,INFO,PROGRESS,DEBUG (default: PROGRESS)\n\n"
+            "  --log          VALUE                       log verbosity: ERROR,WARNING,INFO,PROGRESS,DEBUG (default: PROGRESS)\n"
+            "\n"
             "General options:\n"
             "  --seed         VALUE                       seed for pseudo-random number generator (default: current time)\n"
             "  --pat-comp     on | off                    alignment pattern compression (default: ON)\n"
             "  --tip-inner    on | off                    tip-inner case optimization (default: ON)\n"
             "  --threads      VALUE                       number of parallel threads to use (default: 2).\n"
             "  --simd         none | sse3 | avx | avx2    vector instruction set to use (default: auto-detect).\n"
-            "  --rate-scalers on | off                    use individual CLV scalers for each rate category (default: OFF).\n\n"
+            "  --rate-scalers on | off                    use individual CLV scalers for each rate category (default: OFF).\n"
+            "\n"
             "Model options:\n"
             "  --model        <name>+G[n]+<Freqs> | FILE  model specification OR partition file (default: GTR+G4)\n"
             "  --brlen        linked | scaled | unlinked  branch length linkage between partitions (default: scaled)\n"
             "  --opt-model    on | off                    ML optimization of all model parameters (default: ON)\n"
             "  --opt-branches on | off                    ML optimization of all branch lengths (default: ON)\n"
             "  --prob-msa     on | off                    use probabilistic alignment (works with CATG and VCF)\n"
-            "  --lh-epsilon   VALUE                       log-likelihood epsilon for optimization/tree search (default: 0.1)\n\n"
+            "  --lh-epsilon   VALUE                       log-likelihood epsilon for optimization/tree search (default: 0.1)\n"
+            "\n"
             "Topology search options:\n"
             "  --spr-radius   VALUE                       SPR re-insertion radius for fast iterations (default: AUTO)\n"
-            "  --spr-cutoff   VALUE | off                 Relative LH cutoff for descending into subtrees (default: 1.0)\n";
+            "  --spr-cutoff   VALUE | off                 Relative LH cutoff for descending into subtrees (default: 1.0)\n"
+            "\n"
+            "Bootstrapping options:\n"
+            "  --bs-trees     VALUE                       Number of bootstraps replicates (default: 100)\n";
 }
 
