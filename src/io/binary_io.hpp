@@ -2,6 +2,7 @@
 #define RAXML_BINARY_IO_HPP_
 
 #include "../Model.hpp"
+#include "../Tree.hpp"
 
 class BasicBinaryStream
 {
@@ -107,9 +108,6 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const std::vector<T>& v
   return stream;
 }
 
-BasicBinaryStream& operator<<(BasicBinaryStream& stream, const SubstitutionModel& sm);
-BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Model& m);
-
 /**
  *  Reading
  */
@@ -145,7 +143,19 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::vector<T>& vec)
 //  return stream;
 //}
 
+/**
+ * Model I/O
+ */
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const SubstitutionModel& sm);
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Model& m);
+
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, Model& m);
+
+/**
+ * TreeCollection I/O
+ */
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const TreeCollection& c);
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, TreeCollection& c);
 
 #endif
 

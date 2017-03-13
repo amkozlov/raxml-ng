@@ -42,7 +42,7 @@ public:
   Tree(size_t num_tips, pll_utree_t* pll_utree_start) :
     BasicTree(num_tips), _pll_utree_start(pll_utree_clone(pll_utree_start)) {};
 
-  Tree (const Tree& other) = default;
+  Tree (const Tree& other);
   Tree& operator=(const Tree& other);
   Tree (Tree&& other);
   Tree& operator=(Tree&& other);
@@ -74,6 +74,30 @@ private:
 
   PllTreeVector const& tip_nodes() const;
   PllTreeVector subnodes() const;
+};
+
+typedef std::pair<double, TreeTopology> ScoredTopology;
+
+class TreeCollection
+{
+public:
+  typedef std::vector<ScoredTopology> container_type;
+  typedef container_type::const_iterator const_iterator;
+  typedef container_type::value_type value_type;
+
+  size_t size() const { return  _trees.size(); }
+  const_iterator best() const;
+  value_type::first_type best_score() const { return best()->first; };
+
+  const_iterator begin() const { return _trees.cbegin(); }
+  const_iterator end() const { return _trees.cend(); }
+
+  void clear() { _trees.clear(); };
+  void push_back(double score, const Tree& tree);
+  void push_back(double score, TreeTopology&& topol);
+
+private:
+  container_type _trees;
 };
 
 #endif /* RAXML_TREE_HPP_ */

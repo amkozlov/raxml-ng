@@ -82,4 +82,21 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, Model& m)
   return stream;
 }
 
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const TreeCollection& c)
+{
+  stream << c.size();
+  for (const auto tree: c)
+    stream << tree.first << tree.second;
+  return stream;
+}
 
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, TreeCollection& c)
+{
+  auto size = stream.get<size_t>();
+  for (size_t i = 0; i < size; ++i)
+  {
+    auto score = stream.get<double>();
+    c.push_back(score, stream.get<TreeTopology>());
+  }
+  return stream;
+}

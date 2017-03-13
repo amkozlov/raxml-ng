@@ -54,6 +54,25 @@ void CheckpointManager::reset_search_state()
   ParallelContext::thread_barrier();
 };
 
+void CheckpointManager::save_ml_tree()
+{
+  if (ParallelContext::master_thread())
+  {
+    _checkp.save_ml_tree();
+    if (!_active)
+      write();
+  }
+}
+
+void CheckpointManager::save_bs_tree()
+{
+  if (ParallelContext::master_thread())
+  {
+    _checkp.save_bs_tree();
+    if (!_active)
+      write();
+  }
+}
 
 void CheckpointManager::update_and_write(const TreeInfo& treeinfo)
 {
@@ -133,6 +152,10 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Checkpoint& ckp)
   for (const auto& m: ckp.models)
     stream << m.first << m.second;
 
+  stream << ckp.ml_trees;
+
+  stream << ckp.bs_trees;
+
   return stream;
 }
 
@@ -161,6 +184,10 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, Checkpoint& ckp)
     stream >> part_id;
     stream >> ckp.models[part_id];
   }
+
+  stream >> ckp.ml_trees;
+
+  stream >> ckp.bs_trees;
 
   return stream;
 }

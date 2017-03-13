@@ -18,6 +18,7 @@ void Options::set_default_outfiles()
 {
   set_default_outfile(outfile_names.log, "log");
   set_default_outfile(outfile_names.checkpoint, "ckp");
+  set_default_outfile(outfile_names.start_tree, "startTree");
   set_default_outfile(outfile_names.best_tree, "bestTree");
   set_default_outfile(outfile_names.ml_trees, "mlTrees");
   set_default_outfile(outfile_names.bootstrap_trees, "bootstraps");

@@ -1,13 +1,13 @@
-/*
- * Tree.cpp
- *
- *  Created on: Feb 10, 2017
- *      Author: alex
- */
+#include <algorithm>
 
 #include "Tree.hpp"
 
 using namespace std;
+
+Tree::Tree (const Tree& other) : BasicTree(other._num_tips),
+    _pll_utree_start(other.pll_utree_copy())
+{
+}
 
 Tree::Tree (Tree&& other) : BasicTree(other._num_tips), _pll_utree_start(other._pll_utree_start)
 {
@@ -241,4 +241,24 @@ void Tree::topology(const TreeTopology& topol)
 
   assert(pmatrix_index == num_branches());
 }
+
+TreeCollection::const_iterator TreeCollection::best() const
+{
+  return std::max_element(_trees.cbegin(), _trees.cend(),
+                          [](const value_type& a, const value_type& b) -> bool
+                          { return a.first < b.first; }
+                         );
+}
+
+void TreeCollection::push_back(double score, const Tree& tree)
+{
+  _trees.emplace_back(score, tree.topology());
+}
+
+void TreeCollection::push_back(double score, TreeTopology&& topol)
+{
+  _trees.emplace_back(score, topol);
+}
+
+
 

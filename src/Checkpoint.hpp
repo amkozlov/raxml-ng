@@ -50,7 +50,13 @@ struct Checkpoint
   Tree tree;
   std::unordered_map<size_t, Model> models;
 
+  TreeCollection ml_trees;
+  TreeCollection bs_trees;
+
   double loglh() const { return search_state.loglh; }
+
+  void save_ml_tree() { ml_trees.push_back(loglh(), tree); }
+  void save_bs_tree() { bs_trees.push_back(loglh(), tree); }
 };
 
 class CheckpointManager
@@ -65,17 +71,21 @@ public:
   SearchState& search_state();
   void reset_search_state();
 
-  void enable() { _active = true; };
-  void disable() { _active = false; };
+  void enable() { _active = true; }
+  void disable() { _active = false; }
 
   void update_and_write(const TreeInfo& treeinfo);
 
-  bool read() { return read(_ckp_fname); };
+  void save_ml_tree();
+  void save_bs_tree();
+
+  bool read() { return read(_ckp_fname); }
   bool read(const std::string& ckp_fname);
-  void write() const { write(_ckp_fname); };
+  void write() const { write(_ckp_fname); }
   void write(const std::string& ckp_fname) const;
 
   void remove();
+
 private:
   bool _active;
   std::string _ckp_fname;
