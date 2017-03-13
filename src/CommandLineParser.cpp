@@ -92,6 +92,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   // autodetect CPU instruction set and use respective SIMD kernels
   opts.simd_arch = sysutil_simd_autodetect();
 
+  opts.num_searches = 0;
+
   bool log_level_set = false;
 
   int option_index = 0;
@@ -131,10 +133,18 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
 
       case 5: /* starting tree */
-        if (strcasecmp(optarg, "rand") == 0 || strcasecmp(optarg, "random") == 0)
+        if (strcasecmp(optarg, "rand") == 0 || strcasecmp(optarg, "random") == 0 ||
+            sscanf(optarg, "rand{%u}", &opts.num_searches) == 1 ||
+            sscanf(optarg, "random{%u}", &opts.num_searches) == 1)
+        {
           opts.start_tree = StartingTree::random;
-        else if (strcasecmp(optarg, "pars") == 0 || strcasecmp(optarg, "parsimony") == 0)
+        }
+        else if (strcasecmp(optarg, "pars") == 0 || strcasecmp(optarg, "parsimony") == 0 ||
+            sscanf(optarg, "pars{%u}", &opts.num_searches) == 1 ||
+            sscanf(optarg, "parsimony{%u}", &opts.num_searches) == 1)
+        {
           opts.start_tree = StartingTree::parsimony;
+        }
         else
         {
           opts.start_tree = StartingTree::user;
@@ -351,10 +361,17 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       throw OptionException("Mandatory switch --tree");
   }
 
+  if (opts.num_searches == 0)
+  {
+    opts.num_searches = (opts.command == Command::all) ? 20 : 1;
+    if (opts.start_tree == StartingTree::user)
+      opts.num_searches = 1;
+  }
+
   /* set default log output level  */
   if (!log_level_set)
   {
-    opts.log_level = (opts.command == Command::bootstrap || opts.command == Command::all) ?
+    opts.log_level = (opts.num_searches > 1 || opts.num_bootstraps > 1) ?
         LogLevel::info : LogLevel::progress;
   }
 
@@ -376,8 +393,9 @@ void CommandLineParser::print_help()
             "  --all                                      All-in-one (ML search + bootstrapping).\n"
             "\n"
             "Input and output options:\n"
-            "  --tree         FILENAME | rand | pars      starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
-            "  --msa          FILENAME                    alignment file\n"
+            "  --tree         FILE | rand{N} | pars{N}    starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
+            "                                             N = number of trees (default: 20 in 'all-in-one' mode, 1 otherwise)\n"
+            "  --msa          FILE                        alignment file\n"
             "  --msa-format   VALUE                       alignment file type: FASTA, PHYLIP, VCF, CATG or AUTO-detect (default)\n"
             "  --data-type    VALUE                       data type: DNA, AA, MULTI-state or AUTO-detect (default)\n"
             "  --prefix       STRING                      prefix for output files (default: MSA file name)\n"

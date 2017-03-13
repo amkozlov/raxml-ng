@@ -74,7 +74,7 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   }
   stream << endl;
 
-  stream << "  start tree: ";
+  stream << "  start tree(s): ";
   switch(opts.start_tree)
   {
     case StartingTree::random:
@@ -87,6 +87,8 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       stream << "user";
       break;
   }
+  if (opts.num_searches > 1)
+    stream << " (" << opts.num_searches << ")";
   stream << endl;
 
   stream << "  random seed: " << opts.random_seed << endl;

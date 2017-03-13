@@ -23,7 +23,7 @@ public:
   msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
   random_seed(0), start_tree(StartingTree::random), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
   spr_cutoff(1.0), brlen_linkage(PLLMOD_TREE_BRLEN_SCALED), simd_arch(PLL_ATTRIB_ARCH_CPU),
-  num_bootstraps(100),
+  num_searches(1), num_bootstraps(100),
   tree_file(""), msa_file(""), model_file(""), outfile_prefix(""),
   num_threads(1), num_ranks(1)
   {};
@@ -55,6 +55,7 @@ public:
   int brlen_linkage;
   unsigned int simd_arch;
 
+  unsigned int num_searches;
   unsigned int num_bootstraps;
 
   /* I/O */

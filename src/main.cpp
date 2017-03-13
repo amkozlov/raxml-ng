@@ -247,8 +247,7 @@ void build_start_trees(RaxmlInstance& instance, CheckpointManager& cm)
       assert(0);
   }
 
-  size_t num_trees = (opts.command == Command::all) ? 10 : 1;
-  for (size_t i = 0; i < num_trees; ++i)
+  for (size_t i = 0; i < opts.num_searches; ++i)
   {
     auto tree = generate_tree(instance, opts.start_tree);
 
@@ -371,7 +370,7 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
     LOG_INFO << "Bootstrap trees saved to: " << sysutil_realpath(opts.bootstrap_trees_file()) << endl;
   }
 
-  LOG_INFO << "\nExecution log saved to: " << sysutil_realpath(opts.log_file()) << endl << endl;
+  LOG_INFO << "\nExecution log saved to: " << sysutil_realpath(opts.log_file()) << endl;
 
   LOG_INFO << "\nElapsed time: " << setprecision(3) << sysutil_elapsed_seconds() << " seconds\n\n";
 }
@@ -395,7 +394,7 @@ void search_evaluate_thread(const RaxmlInstance& instance, CheckpointManager& cm
       !instance.start_trees.empty())
   {
 
-    LOG_INFO << "\nStarting ML tree search with " << instance.start_trees.size() <<
+    LOG_INFO << "\nStarting ML tree search with " << opts.num_searches <<
         " distinct starting trees" << endl << endl;
 
     size_t start_tree_num = cm.checkpoint().ml_trees.size();
@@ -446,7 +445,7 @@ void search_evaluate_thread(const RaxmlInstance& instance, CheckpointManager& cm
   {
     if (opts.command == Command::all)
     {
-      LOG_INFO << "ML tree search completed, best tree logLH: " <<
+      LOG_INFO << endl << "ML tree search completed, best tree logLH: " <<
           FMT_LH(cm.checkpoint().ml_trees.best_score()) << endl << endl;
     }
 
