@@ -85,6 +85,8 @@ public:
   void write(const std::string& ckp_fname) const;
 
   void remove();
+  void backup() const;
+  void remove_backup() const;
 
 private:
   bool _active;
@@ -94,6 +96,7 @@ private:
   SearchState _empty_search_state;
 
   void gather_model_params();
+  std::string backup_fname() const { return _ckp_fname + ".bk"; }
 };
 
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Checkpoint& ckp);

@@ -224,7 +224,8 @@ TreeTopology Tree::topology() const
 
 void Tree::topology(const TreeTopology& topol)
 {
-  assert(topol.size() == num_branches());
+  if (topol.size() != num_branches())
+    throw runtime_error("Incompatible topology!");
 
   auto allnodes = subnodes();
   unsigned int pmatrix_index = 0;

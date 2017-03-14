@@ -8,20 +8,33 @@ using namespace std;
 
 void CheckpointManager::write(const std::string& ckp_fname) const
 {
+  backup();
+
   BinaryFileStream fs(ckp_fname, std::ios::out);
 
   fs << _checkp;
+
+  remove_backup();
 }
 
 bool CheckpointManager::read(const std::string& ckp_fname)
 {
   if (sysutil_file_exists(ckp_fname))
   {
-    BinaryFileStream fs(ckp_fname, std::ios::in);
+    try
+    {
+      BinaryFileStream fs(ckp_fname, std::ios::in);
 
-    fs >> _checkp;
+      fs >> _checkp;
 
-    return true;
+      return true;
+    }
+    catch (runtime_error& e)
+    {
+      _checkp.search_state = SearchState();
+      LOG_DEBUG << "Error reading checkpoint: " << e.what() << endl;
+      return false;
+    }
   }
   else
     return false;
@@ -31,6 +44,18 @@ void CheckpointManager::remove()
 {
   if (sysutil_file_exists(_ckp_fname))
     std::remove(_ckp_fname.c_str());
+}
+
+void CheckpointManager::backup() const
+{
+  if (sysutil_file_exists(_ckp_fname))
+    std::rename(_ckp_fname.c_str(), backup_fname().c_str());
+}
+
+void CheckpointManager::remove_backup() const
+{
+  if (sysutil_file_exists(backup_fname()))
+    std::remove(backup_fname().c_str());
 }
 
 SearchState& CheckpointManager::search_state()
