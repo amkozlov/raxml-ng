@@ -46,6 +46,7 @@ struct RaxmlInstance
   TreeList start_trees;
   BootstrapReplicateList bs_reps;
   PartitionAssignmentList proc_part_assign;
+  unique_ptr<BootstrapTree> bs_tree;
 
   /* this is just a dummy random tree used for convenience, e,g, if we need tip labels or
    * just 'any' valid tree for the alignment at hand */
@@ -310,6 +311,21 @@ void generate_bootstraps(RaxmlInstance& instance, const Checkpoint& checkp)
   }
 }
 
+void draw_bootstrap_support(RaxmlInstance& instance, const Checkpoint& checkp)
+{
+  Tree tree = checkp.tree;
+  tree.topology(checkp.ml_trees.best_topology());
+
+  instance.bs_tree.reset(new BootstrapTree(tree));
+
+  for (auto bs: checkp.bs_trees)
+  {
+    tree.topology(bs.second);
+    instance.bs_tree->add_bootstrap_tree(tree);
+  }
+  instance.bs_tree->calc_support();
+}
+
 void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
 {
   auto const& opts = instance.opts;
@@ -351,6 +367,17 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
     }
 
     LOG_INFO << "Best ML tree saved to: " << sysutil_realpath(opts.best_tree_file()) << endl;
+
+    if (opts.command == Command::all)
+    {
+      assert(instance.bs_tree);
+
+      NewickStream nw(opts.support_tree_file(), std::ios::out);
+      nw << *instance.bs_tree;
+
+      LOG_INFO << "Best ML tree with bootstrap support values saved to: " <<
+          sysutil_realpath(opts.support_tree_file()) << endl;
+    }
   }
 
   if (opts.command == Command::bootstrap || opts.command == Command::all)
@@ -375,7 +402,7 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
   LOG_INFO << "\nElapsed time: " << setprecision(3) << sysutil_elapsed_seconds() << " seconds\n\n";
 }
 
-void search_evaluate_thread(const RaxmlInstance& instance, CheckpointManager& cm)
+void thread_main(const RaxmlInstance& instance, CheckpointManager& cm)
 {
   unique_ptr<TreeInfo> treeinfo;
 
@@ -479,7 +506,7 @@ void search_evaluate_thread(const RaxmlInstance& instance, CheckpointManager& cm
   ParallelContext::thread_barrier();
 }
 
-void search_evaluate(RaxmlInstance& instance, CheckpointManager& cm)
+void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 {
   auto const& opts = instance.opts;
   auto& parted_msa = instance.parted_msa;
@@ -510,19 +537,16 @@ void search_evaluate(RaxmlInstance& instance, CheckpointManager& cm)
   /* generate bootstrap replicates */
   generate_bootstraps(instance, cm.checkpoint());
 
-  search_evaluate_thread(instance, cm);
+  thread_main(instance, cm);
 
   if (ParallelContext::master_rank())
   {
     if (opts.command == Command::all)
-    {
-      // TODO: draw BS support on the best ML tree
-
-    }
+      draw_bootstrap_support(instance, cm.checkpoint());
 
     print_final_output(instance, cm.checkpoint());
 
-    /* analysis finished successfully, remove checkpoint */
+    /* analysis finished successfully, remove checkpoint file */
     cm.remove();
   }
 }
@@ -590,11 +614,11 @@ int main(int argc, char** argv)
       try
       {
         CheckpointManager cm(instance.opts.checkp_file());
-        ParallelContext::init_pthreads(instance.opts, std::bind(search_evaluate_thread,
+        ParallelContext::init_pthreads(instance.opts, std::bind(thread_main,
                                                                 std::cref(instance),
                                                                 std::ref(cm)));
 
-        search_evaluate(instance, cm);
+        master_main(instance, cm);
       }
       catch(exception& e)
       {

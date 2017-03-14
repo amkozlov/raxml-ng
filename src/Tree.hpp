@@ -67,7 +67,7 @@ public:
   void fix_missing_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
   void reset_tip_ids(const NameIdMap& label_id_map);
 
-private:
+protected:
   pll_utree_t* _pll_utree_start;
 
   mutable PllTreeVector _pll_utree_tips;
@@ -88,6 +88,7 @@ public:
   size_t size() const { return  _trees.size(); }
   const_iterator best() const;
   value_type::first_type best_score() const { return best()->first; };
+  const value_type::second_type& best_topology() const { return best()->second; };
 
   const_iterator begin() const { return _trees.cbegin(); }
   const_iterator end() const { return _trees.cend(); }

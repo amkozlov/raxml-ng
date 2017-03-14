@@ -22,6 +22,7 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.best_tree, "bestTree");
   set_default_outfile(outfile_names.ml_trees, "mlTrees");
   set_default_outfile(outfile_names.bootstrap_trees, "bootstraps");
+  set_default_outfile(outfile_names.support_tree, "support");
 }
 
 static string get_simd_arch_name(unsigned int simd_arch)

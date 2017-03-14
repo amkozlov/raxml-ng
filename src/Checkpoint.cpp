@@ -59,7 +59,7 @@ void CheckpointManager::save_ml_tree()
   if (ParallelContext::master_thread())
   {
     _checkp.save_ml_tree();
-    if (!_active)
+    if (_active)
       write();
   }
 }
@@ -69,7 +69,7 @@ void CheckpointManager::save_bs_tree()
   if (ParallelContext::master_thread())
   {
     _checkp.save_bs_tree();
-    if (!_active)
+    if (_active)
       write();
   }
 }

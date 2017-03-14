@@ -26,5 +26,10 @@ NewickStream& operator>>(NewickStream& stream, Tree& tree)
   return stream;
 }
 
+NewickStream& operator<<(NewickStream& stream, const BootstrapTree& tree)
+{
+  stream << tree.pll_utree_start();
+  return stream;
+}
 
 

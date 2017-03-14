@@ -12,6 +12,7 @@ struct OutputFileNames
   std::string best_tree;
   std::string ml_trees;
   std::string bootstrap_trees;
+  std::string support_tree;
 };
 
 class Options
@@ -75,6 +76,7 @@ public:
   const std::string& best_tree_file() const { return outfile_names.best_tree; }
   const std::string& ml_trees_file() const { return outfile_names.ml_trees; }
   const std::string& bootstrap_trees_file() const { return outfile_names.bootstrap_trees; }
+  const std::string& support_tree_file() const { return outfile_names.support_tree; }
 
   void set_default_outfiles();
 
