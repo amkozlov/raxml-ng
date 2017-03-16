@@ -14,7 +14,7 @@ set (ENABLE_RAXML_SIMD OFF)
 # build a portable static binary
 set(STATIC_BUILD ON)
 
-project (raxml-ng CXX)
+project (raxml-ng C CXX)
 
 #check for minimum compiler versions
 message(STATUS "Compier: ${CMAKE_CXX_COMPILER_ID}")
@@ -58,17 +58,22 @@ if (ENABLE_RAXML_SIMD)
 endif()
 
 if(ENABLE_PTHREADS)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -D_RAXML_PTHREADS")
+  find_package(Threads REQUIRED)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_RAXML_PTHREADS -pthread")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_RAXML_PTHREADS -pthread")
 endif()
 
 if(ENABLE_MPI)
   find_package(MPI)
   if(MPI_CXX_FOUND)
     # set( ENV{OMPI_CXX}            "clang++" PARENT_SCOPE )
-    set( CMAKE_CXX_COMPILER       "mpicxx")
+    set(CMAKE_CXX_COMPILER       "mpicxx")
     include_directories(${MPI_CXX_INCLUDE_PATH})
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_COMPILER_FLAGS} -D_RAXML_MPI")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_CXX_LINK_FLAGS}")
+
+    # disable static build for MPI
+    set(STATIC_BUILD OFF)
   endif()
 endif()
 
