@@ -2,6 +2,10 @@
 
 #include <getopt.h>
 
+#ifdef _RAXML_PTHREADS
+#include <thread>
+#endif
+
 using namespace std;
 
 static struct option long_options[] =
@@ -84,8 +88,12 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* default: scaled branch lengths */
   opts.brlen_linkage = PLLMOD_TREE_BRLEN_LINKED;
 
-  /* use 2 threads per default */
-  opts.num_threads = 2;
+  /* use all available cores per default */
+#if defined(_RAXML_PTHREADS) && !defined(_RAXML_MPI)
+  opts.num_threads = std::thread::hardware_concurrency();
+#else
+  opts.num_threads = 1;
+#endif
 
   opts.model_file = "GTR+G";
 
@@ -351,6 +359,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* check for mandatory options for each command */
   if (opts.command == Command::evaluate || opts.command == Command::search)
   {
+    opts.num_bootstraps = 0;
     if (opts.msa_file.empty())
       throw OptionException("Mandatory switch --msa");
   }
