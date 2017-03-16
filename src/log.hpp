@@ -16,6 +16,13 @@ enum class LogLevel
   debug
 };
 
+struct TimeStamp
+{
+  TimeStamp();
+
+  double secs;
+};
+
 struct ProgressInfo
 {
   ProgressInfo(double loglh) : loglh(loglh) {};
@@ -76,6 +83,7 @@ Logging& logger();
 #define LOG_DEBUG RAXML_LOG(LogLevel::debug)
 #define LOG_PROGR RAXML_LOG(LogLevel::progress)
 
+#define LOG_INFO_TS LOG_INFO << "[" << TimeStamp() << "] "
 #define LOG_PROGRESS(loglh) LOG_PROGR << ProgressInfo(loglh)
 
 #define FMT_LH(loglh) setprecision(6) << loglh
@@ -92,5 +100,7 @@ LogStream& operator<<(LogStream& logstream, const T& object)
 LogStream& operator<<(LogStream& logstream, std::ostream& (*pf)(std::ostream&));
 
 LogStream& operator<<(LogStream& logstream, const ProgressInfo& prog);
+
+LogStream& operator<<(LogStream& logstream, const TimeStamp& ts);
 
 #endif /* RAXML_LOG_HPP_ */

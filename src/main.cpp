@@ -107,12 +107,12 @@ void load_msa(RaxmlInstance& instance)
   const auto& opts = instance.opts;
   auto& parted_msa = instance.parted_msa;
 
-  LOG_INFO << "Reading alignment from file: " << opts.msa_file << endl;
+  LOG_INFO_TS << "Reading alignment from file: " << opts.msa_file << endl;
 
   /* load MSA */
   auto msa = msa_load_from_file(opts.msa_file, opts.msa_format);
 
-  LOG_INFO << "Loaded alignment with " << msa.size() << " taxa and " <<
+  LOG_INFO_TS << "Loaded alignment with " << msa.size() << " taxa and " <<
       msa.num_sites() << " sites" << endl;
 
   /* check alignment */
@@ -218,7 +218,7 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
     for (const auto& m: ckp.models)
       instance.parted_msa.model(m.first, m.second);
 
-    LOG_INFO << "\nCheckpoint file found, execution will be resumed " <<
+    LOG_INFO_TS << "Checkpoint file found, execution will be resumed " <<
         "(logLH: " << ckp.loglh() <<
         ", ML trees: " << ckp.ml_trees.size() <<
         ", bootstraps: " << ckp.bs_trees.size() <<
@@ -236,13 +236,13 @@ void build_start_trees(RaxmlInstance& instance, CheckpointManager& cm)
   switch (opts.start_tree)
   {
     case StartingTree::user:
-      LOG_INFO << "Loading user starting tree(s) from: " << opts.tree_file << endl;
+      LOG_INFO_TS << "Loading user starting tree(s) from: " << opts.tree_file << endl;
       break;
     case StartingTree::random:
-      LOG_INFO << "Generating random starting tree(s) with " << msa.size() << " taxa" << endl;
+      LOG_INFO_TS << "Generating random starting tree(s) with " << msa.size() << " taxa" << endl;
       break;
     case StartingTree::parsimony:
-      LOG_INFO << "Generating parsimony starting tree(s) with " << msa.size() << " taxa" << endl;
+      LOG_INFO_TS << "Generating parsimony starting tree(s) with " << msa.size() << " taxa" << endl;
       break;
     default:
       assert(0);
@@ -457,7 +457,7 @@ void thread_main(const RaxmlInstance& instance, CheckpointManager& cm)
       }
 
       LOG_PROGR << endl;
-      LOG_INFO << "ML tree search #" << start_tree_num <<
+      LOG_INFO_TS << "ML tree search #" << start_tree_num <<
           ", logLikelihood: " << FMT_LH(cm.checkpoint().loglh()) << endl;
       LOG_PROGR << endl;
 
@@ -472,11 +472,12 @@ void thread_main(const RaxmlInstance& instance, CheckpointManager& cm)
   {
     if (opts.command == Command::all)
     {
-      LOG_INFO << endl << "ML tree search completed, best tree logLH: " <<
+      LOG_INFO << endl;
+      LOG_INFO_TS << "ML tree search completed, best tree logLH: " <<
           FMT_LH(cm.checkpoint().ml_trees.best_score()) << endl << endl;
     }
 
-    LOG_INFO << "Starting bootstrapping analysis with " << opts.num_bootstraps
+    LOG_INFO_TS << "Starting bootstrapping analysis with " << opts.num_bootstraps
              << " replicates." << endl << endl;
   }
 
@@ -495,7 +496,7 @@ void thread_main(const RaxmlInstance& instance, CheckpointManager& cm)
     optimizer.optimize_topology(*treeinfo, cm);
 
     LOG_PROGR << endl;
-    LOG_INFO << "Bootstrap tree #" << bs_num <<
+    LOG_INFO_TS << "Bootstrap tree #" << bs_num <<
                 ", logLikelihood: " << FMT_LH(cm.checkpoint().loglh()) << endl;
     LOG_PROGR << endl;
 

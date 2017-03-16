@@ -54,6 +54,10 @@ Logging& logger()
   return Logging::instance();
 }
 
+TimeStamp::TimeStamp() : secs(sysutil_elapsed_seconds())
+{
+};
+
 LogStream& operator<<(LogStream& logstream, std::ostream& (*pf)(std::ostream&))
 {
   for (auto s: logstream.streams())
@@ -62,17 +66,23 @@ LogStream& operator<<(LogStream& logstream, std::ostream& (*pf)(std::ostream&))
   return logstream;
 }
 
+LogStream& operator<<(LogStream& logstream, const TimeStamp& ts)
+{
+  const unsigned int hh = ts.secs / 3600;
+  const unsigned int mm = (ts.secs - hh * 3600) / 60;
+  const unsigned int ss = (ts.secs - hh * 3600 - mm * 60);
+
+  logstream << setfill('0') << setw(2) << hh << ":" <<
+                      setw(2) << mm << ":" <<
+                      setw(2) << ss;
+
+  return logstream;
+}
+
 LogStream& operator<<(LogStream& logstream, const ProgressInfo& prog)
 {
-  const double secs = sysutil_elapsed_seconds();
-  const unsigned int hh = secs / 3600;
-  const unsigned int mm = (secs - hh * 3600) / 60;
-  const unsigned int ss = (secs - hh * 3600 - mm * 60);
 
-  logstream << "[" << setfill('0') << setw(2) << hh << ":" <<
-                      setw(2) << mm << ":" <<
-                      setw(2) << ss << " " <<
-                      setprecision(6) << prog.loglh << "] ";
+  logstream << "[" << TimeStamp() << " " << FMT_LH(prog.loglh) << "] ";
 
   return logstream;
 }
