@@ -15,7 +15,7 @@ public:
   PartitionedMSA& operator=(PartitionedMSA&& other);
 
   // getters
-  const MSA& full_msa() const { return _full_msa; };
+  const MSA& full_msa() const { return (part_count() == 1) ? _part_list.at(0).msa() : _full_msa; };
   size_t part_count() const { return _part_list.size(); };
   const PartitionInfo& part_info(size_t index) const { return _part_list.at(index); };
   const Model& model(size_t index) const { return _part_list.at(index).model(); };

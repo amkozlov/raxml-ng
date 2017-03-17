@@ -5,7 +5,7 @@
 using namespace std;
 
 MSA::MSA(const pll_msa_t *pll_msa) :
-    _length(pll_msa->length), _num_sites(pll_msa->length), _states(0), _pll_msa(nullptr)
+    _length(0), _num_sites(pll_msa->length), _states(0), _pll_msa(nullptr)
 {
   for (auto i = 0; i < pll_msa->count; ++i)
   {
@@ -18,7 +18,8 @@ MSA::MSA(const pll_msa_t *pll_msa) :
 MSA::MSA(MSA&& other) : _length(other._length), _num_sites(other._num_sites),
     _sequences(move(other._sequences)), _labels(move(other._labels)),
     _label_id_map(move(other._label_id_map)), _weights(move(other._weights)),
-    _states(other._states), _pll_msa(other._pll_msa), _dirty(other._dirty)
+    _probs(move(other._probs)), _states(other._states), _pll_msa(other._pll_msa),
+    _dirty(other._dirty)
 {
   other._length = other._num_sites = 0;
   other._pll_msa = nullptr;
@@ -49,6 +50,7 @@ MSA& MSA::operator=(MSA&& other)
     _sequences = std::move(other._sequences);
     _labels = std::move(other._labels);
     _label_id_map = std::move(other._label_id_map);
+    _probs = std::move(other._probs);
     _states = other._states;
     _dirty = other._dirty;
 
@@ -90,6 +92,7 @@ void MSA::append(const string& sequence, const string& header)
     _length = sequence.length();
     if (!_num_sites)
       _num_sites = _length;
+    _weights.assign(_length, 1.);
   }
 
   _dirty = true;
@@ -183,5 +186,49 @@ ProbVector::const_iterator MSA::probs(size_t index, size_t site) const
 ProbVector::iterator MSA::probs(size_t index, size_t site)
 {
   return _probs.at(index).begin() + site * _states;
+}
+
+bool MSA::normalized() const
+{
+  if (!probabilistic())
+    return true;
+
+  for (const auto& pv: _probs)
+  {
+    for (auto p: pv)
+    {
+      if (p > 1.)
+        return false;
+    }
+  }
+
+  return true;
+}
+
+doubleVector MSA::state_freqs() const
+{
+  assert(_states > 0);
+
+  double sum = 0;
+  doubleVector freqs(_states, 0.);
+  for (const auto& pv: _probs)
+  {
+    for (auto p = pv.cbegin(); p != pv.cend();)
+    {
+      for (size_t i = 0; i < _states; ++i, ++p)
+      {
+        freqs[i] += *p;
+        sum += *p;
+      }
+    }
+  }
+
+  assert(sum > 0.);
+
+//  double total_bases = _length * size();
+  for (size_t i = 0; i < _states; ++i)
+    freqs[i] /= sum;
+
+  return freqs;
 }
 

@@ -118,6 +118,17 @@ void load_msa(RaxmlInstance& instance)
   /* check alignment */
 //  check_msa(useropt, msa);
 
+  if (msa.probabilistic() && opts.use_prob_msa)
+  {
+    instance.opts.use_pattern_compression = false;
+    instance.opts.use_tip_inner = false;
+
+    if (parted_msa.part_count() > 1)
+      throw runtime_error("Partitioned probabilistic alignments are not supported yet, sorry...");
+  }
+  else
+    instance.opts.use_prob_msa = false;
+
   parted_msa.full_msa(std::move(msa));
 
 //  LOG_INFO << "Splitting MSA... " << endl;
@@ -525,10 +536,10 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   /* load/create starting tree */
   build_start_trees(instance, cm);
 
-  LOG_DEBUG << "Initial model parameters:" << endl;
+  LOG_VERB << endl << "Initial model parameters:" << endl;
   for (size_t p = 0; p < parted_msa.part_count(); ++p)
   {
-    LOG_DEBUG << "   Partition: " << parted_msa.part_info(p).name() << endl <<
+    LOG_VERB << "   Partition: " << parted_msa.part_info(p).name() << endl <<
         parted_msa.model(p) << endl;
   }
 
@@ -623,7 +634,7 @@ int main(int argc, char** argv)
       }
       catch(exception& e)
       {
-        LOG_ERROR << "ERROR:" << e.what() << endl << endl;
+        LOG_ERROR << endl << "ERROR: " << e.what() << endl << endl;
         retval = EXIT_FAILURE;
       }
       break;

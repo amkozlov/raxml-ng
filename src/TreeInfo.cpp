@@ -281,21 +281,75 @@ void assign(Model& model, const TreeInfo& treeinfo, size_t partition_id)
     model.brlen_scaler(pll_treeinfo.brlen_scalers[partition_id]);
 }
 
-void set_partition_tips(const MSA& msa, const PartitionRange& part_region,
+void build_clv(ProbVector::const_iterator probs, size_t sites, WeightVector::const_iterator weights,
+               pll_partition_t* partition, bool normalize, std::vector<double>& clv)
+{
+  const auto states = partition->states;
+  const auto states_padded = partition->states_padded;
+  auto clvp = clv.begin();
+
+  for (size_t i = 0; i < sites; ++i)
+  {
+    if (weights[i] > 0)
+    {
+      double sum = 0.;
+      for (size_t j = 0; j < states; ++j)
+        sum += probs[j];
+
+      for (size_t j = 0; j < states; ++j)
+      {
+        if (sum > 0.)
+          clvp[j] =  normalize ? probs[j] / sum : probs[j];
+        else
+          clvp[j] = 1.0;
+      }
+
+      clvp += states_padded;
+    }
+
+    /* NB: clv has to be padded, but msa arrays are not! */
+    probs += states;
+  }
+
+  assert(clvp == clv.end());
+}
+
+void set_partition_tips(const Options& opts, const MSA& msa, const PartitionRange& part_region,
                         pll_partition_t* partition)
 {
   /* set pattern weights */
   if (!msa.weights().empty())
     pll_set_pattern_weights(partition, msa.weights().data() + part_region.start);
 
-  for (size_t i = 0; i < msa.size(); ++i)
+  if (opts.use_prob_msa && msa.probabilistic())
   {
-    pll_set_tip_states(partition, i, partition->map, msa.at(i).c_str() + part_region.start);
+    assert(!(partition->attributes & PLL_ATTRIB_PATTERN_TIP));
+    assert(partition->states == msa.states());
+
+    auto normalize = !msa.normalized();
+    auto weights_start = msa.weights().cbegin() + part_region.start;
+
+    // we need a libpll function for that!
+    auto clv_size = partition->sites * partition->states_padded;
+    std::vector<double> tmp_clv(clv_size);
+    for (size_t i = 0; i < msa.size(); ++i)
+    {
+      auto prob_start = msa.probs(i, part_region.start);
+      build_clv(prob_start, partition->sites, weights_start, partition, normalize, tmp_clv);
+      pll_set_tip_clv(partition, i, tmp_clv.data());
+    }
+  }
+  else
+  {
+    for (size_t i = 0; i < msa.size(); ++i)
+    {
+      pll_set_tip_states(partition, i, partition->map, msa.at(i).c_str() + part_region.start);
+    }
   }
 }
 
-void set_partition_tips(const MSA& msa, const PartitionRange& part_region,
-                        pll_partition_t* partition, const uintVector& weights)
+void set_partition_tips(const Options& opts, const MSA& msa, const PartitionRange& part_region,
+                        pll_partition_t* partition, const WeightVector& weights)
 {
   assert(!weights.empty());
 
@@ -311,25 +365,46 @@ void set_partition_tips(const MSA& msa, const PartitionRange& part_region,
   }
 
   /* now set tip sequences, ignoring all columns with zero weights */
-  std::vector<char> bs_seq(part_region.length);
-  for (size_t i = 0; i < msa.size(); ++i)
+  if (opts.use_prob_msa && msa.probabilistic())
   {
-    const char * full_seq = msa.at(i).c_str();
-    size_t pos = 0;
-    for (size_t j = pstart; j < pend; ++j)
-    {
-      if (weights[j] > 0)
-        bs_seq[pos++] = full_seq[j];
-    }
-    assert(pos == comp_weights.size());
+    assert(!(partition->attributes & PLL_ATTRIB_PATTERN_TIP));
+    assert(partition->states == msa.states());
 
-    pll_set_tip_states(partition, i, partition->map, bs_seq.data());
+    auto normalize = !msa.normalized();
+    auto weights_start = msa.weights().cbegin() + part_region.start;
+
+    // we need a libpll function for that!
+    auto clv_size = part_region.length * partition->states_padded;
+    std::vector<double> tmp_clv(clv_size);
+    for (size_t i = 0; i < msa.size(); ++i)
+    {
+      auto prob_start = msa.probs(i, part_region.start);
+      build_clv(prob_start, part_region.length, weights_start, partition, normalize, tmp_clv);
+      pll_set_tip_clv(partition, i, tmp_clv.data());
+    }
+  }
+  else
+  {
+    std::vector<char> bs_seq(part_region.length);
+    for (size_t i = 0; i < msa.size(); ++i)
+    {
+      const char * full_seq = msa.at(i).c_str();
+      size_t pos = 0;
+      for (size_t j = pstart; j < pend; ++j)
+      {
+        if (weights[j] > 0)
+          bs_seq[pos++] = full_seq[j];
+      }
+      assert(pos == comp_weights.size());
+
+      pll_set_tip_states(partition, i, partition->map, bs_seq.data());
+    }
   }
 
   pll_set_pattern_weights(partition, comp_weights.data());
 }
 
-pll_partition_t* create_pll_partition(Options const& opts, PartitionInfo const& pinfo,
+pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& pinfo,
                                       const PartitionRange& part_region, const uintVector& weights)
 {
   const MSA& msa = pinfo.msa();
@@ -384,9 +459,9 @@ pll_partition_t* create_pll_partition(Options const& opts, PartitionInfo const& 
   partition->map = model.charmap();
 
   if (part_length == part_region.length)
-    set_partition_tips(msa, part_region, partition);
+    set_partition_tips(opts, msa, part_region, partition);
   else
-    set_partition_tips(msa, part_region, partition, weights);
+    set_partition_tips(opts, msa, part_region, partition, weights);
 
   assign(partition, model);
 

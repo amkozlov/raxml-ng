@@ -82,6 +82,16 @@ pllmod_msa_stats_t * PartitionInfo::compute_stats() const
 
   assert(_stats);
 
+  if (_msa.probabilistic() &&
+      _model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::empirical)
+  {
+    assert(_stats->states == _msa.states());
+    assert(_stats->freqs);
+
+    auto freqs = _msa.state_freqs();
+    memcpy(_stats->freqs, freqs.data(), _msa.states() * sizeof(double));
+  }
+
   return _stats;
 }
 

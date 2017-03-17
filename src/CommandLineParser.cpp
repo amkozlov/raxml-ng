@@ -71,6 +71,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* do not use per-rate-category CLV scalers */
   opts.use_rate_scalers = false;
 
+  /* use probabilistic MSA _if available_ (e.g. CATG file was provided) */
+  opts.use_prob_msa = true;
+
   /* optimize model and branch lengths */
   opts.optimize_model = true;
   opts.optimize_brlen = true;
@@ -95,7 +98,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.num_threads = 1;
 #endif
 
-  opts.model_file = "GTR+G";
+  opts.model_file = "GTR+G+F";
 
   // autodetect CPU instruction set and use respective SIMD kernels
   opts.simd_arch = sysutil_simd_autodetect();
@@ -200,6 +203,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.use_pattern_compression = false;
           opts.use_tip_inner = false;
         }
+        else
+          opts.use_prob_msa = false;
         break;
 
       case 12: /* disable pattern compression */
@@ -324,6 +329,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.log_level = LogLevel::info;
         else if (strcasecmp(optarg, "progress") == 0)
           opts.log_level = LogLevel::progress;
+        else if (strcasecmp(optarg, "verbose") == 0)
+          opts.log_level = LogLevel::verbose;
         else if (strcasecmp(optarg, "debug") == 0)
           opts.log_level = LogLevel::debug;
         else
@@ -357,9 +364,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
     throw OptionException("More than one command specified");
 
   /* check for mandatory options for each command */
-  if (opts.command == Command::evaluate || opts.command == Command::search)
+  if (opts.command == Command::evaluate || opts.command == Command::search ||
+      opts.command == Command::bootstrap || opts.command == Command::all)
   {
-    opts.num_bootstraps = 0;
     if (opts.msa_file.empty())
       throw OptionException("Mandatory switch --msa");
   }
@@ -368,6 +375,11 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   {
     if (opts.tree_file.empty())
       throw OptionException("Mandatory switch --tree");
+  }
+
+  if (opts.command != Command::bootstrap && opts.command != Command::all)
+  {
+    opts.num_bootstraps = 0;
   }
 
   if (opts.num_searches == 0)

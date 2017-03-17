@@ -82,6 +82,7 @@ Logging& logger();
 #define LOG_INFO RAXML_LOG(LogLevel::info)
 #define LOG_DEBUG RAXML_LOG(LogLevel::debug)
 #define LOG_PROGR RAXML_LOG(LogLevel::progress)
+#define LOG_VERB RAXML_LOG(LogLevel::verbose)
 
 #define LOG_INFO_TS LOG_INFO << "[" << TimeStamp() << "] "
 #define LOG_PROGRESS(loglh) LOG_PROGR << ProgressInfo(loglh)

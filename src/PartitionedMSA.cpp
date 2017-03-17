@@ -70,7 +70,7 @@ void PartitionedMSA::split_msa()
     free(part_msa_list);
   }
   else
-    part_msa(0, _full_msa.pll_msa());
+    part_msa(0, std::move(_full_msa));
 }
 
 void PartitionedMSA::compress_patterns()

@@ -49,10 +49,15 @@ public:
   const std::string& operator[](size_t index) const { return at(index); }
   std::string& operator[](size_t index) { return _sequences.at(index); }
 
-  size_t states() { return _states; }
+  bool probabilistic() const { return _states > 0; }
+  bool normalized() const;
+  size_t states() const { return _states; }
   void states(size_t states);
+  const ProbVector& probs(size_t index) const { return _probs.at(index); }
   ProbVector::const_iterator probs(size_t index, size_t site) const;
   ProbVector::iterator probs(size_t index, size_t site);
+
+  doubleVector state_freqs() const;
 
   void num_sites(const unsigned int sites) { _num_sites = sites; }
 

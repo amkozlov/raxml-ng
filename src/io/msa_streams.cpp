@@ -123,6 +123,9 @@ CATGStream& operator>>(CATGStream& stream, MSA& msa)
 
   assert (msa.size() == taxa_count);
 
+  /* this is mapping for DNA: CATG -> ACGT, for other datatypes we assume 1:1 mapping */
+  std::vector<size_t> state_map({1, 0, 3, 2});
+
   string cons_str, prob_str;
 
   /* read alignment, remember that the matrix is transposed! */
@@ -149,6 +152,11 @@ CATGStream& operator>>(CATGStream& stream, MSA& msa)
         auto states = std::count_if(prob_str.cbegin(), prob_str.cend(),
                                     [](char c) -> bool { return c == ','; }) + 1;
         msa.states(states);
+
+        /* see above: for datatypes other than DNA we assume 1:1 mapping */
+        if (states != 4)
+          state_map.clear();
+
         LOG_DEBUG << "CATG: number of states: " << states << endl;
       }
 
@@ -158,7 +166,10 @@ CATGStream& operator>>(CATGStream& stream, MSA& msa)
       size_t k = 0;
       for (string token; getline(ss, token, ','); ++k)
       {
-        site_probs[k] = stod(token);
+        if (state_map.empty())
+          site_probs[k] = stod(token);
+        else
+          site_probs[state_map[k]] = stod(token);
       }
 
       if (k != msa.states())
