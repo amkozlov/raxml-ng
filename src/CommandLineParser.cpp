@@ -90,7 +90,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   /* use all available cores per default */
 #if defined(_RAXML_PTHREADS) && !defined(_RAXML_MPI)
-  opts.num_threads = std::thread::hardware_concurrency();
+  opts.num_threads = std::max(1u, std::thread::hardware_concurrency());
 #else
   opts.num_threads = 1;
 #endif
