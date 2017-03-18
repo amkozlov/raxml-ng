@@ -169,6 +169,9 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Checkpoint& ckp)
 {
   stream << ckp.version;
 
+  // NB: accumulated runtime from past runs + current elapsed time
+  stream << ckp.elapsed_seconds + sysutil_elapsed_seconds();
+
   stream << ckp.search_state;
 
   stream << ckp.tree.topology();
@@ -192,6 +195,8 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, Checkpoint& ckp)
   {
     throw runtime_error("Unsupported checkpoint file version!");
   }
+
+  stream >> ckp.elapsed_seconds;
 
   stream >> ckp.search_state;
 

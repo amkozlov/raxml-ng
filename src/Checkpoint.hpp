@@ -36,7 +36,7 @@ struct SearchState
 
 struct Checkpoint
 {
-  Checkpoint() : version(CKP_VERSION), search_state(), tree(), models() {}
+  Checkpoint() : version(CKP_VERSION), elapsed_seconds(0.), search_state(), tree(), models() {}
 
   Checkpoint(const Checkpoint& other) = delete;
   Checkpoint& operator=(const Checkpoint& other) = delete;
@@ -44,6 +44,8 @@ struct Checkpoint
   Checkpoint& operator=(Checkpoint&& other) = default;
 
   int version;
+
+  double elapsed_seconds;
 
   SearchState search_state;
 

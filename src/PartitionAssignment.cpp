@@ -23,4 +23,10 @@ std::ostream& operator<<(std::ostream& stream, const PartitionAssignmentList& pa
   return stream;
 }
 
+std::ostream& operator<<(std::ostream& stream, const PartitionAssignmentStats& stats)
+{
+  stream << "partitions/thread: " << stats.min_thread_parts << "-" << stats.max_thread_parts <<
+      ", patterns/thread: " << stats.min_thread_sites << "-" << stats.max_thread_sites;
+  return stream;
+}
 

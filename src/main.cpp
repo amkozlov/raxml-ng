@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2016 Alexey Kozlov, Alexandros Stamatakis, Diego Darriba, Tomas Flouri
+    Copyright (C) 2017 Alexey Kozlov, Alexandros Stamatakis, Diego Darriba, Tomas Flouri
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,7 @@
 
 #include <memory>
 
+#include "version.h"
 #include "common.h"
 #include "MSA.hpp"
 #include "Options.hpp"
@@ -55,10 +56,14 @@ struct RaxmlInstance
 
 void print_banner()
 {
-  LOG_INFO << "RAxML-NG v. 0.1.0 BETA (c) 2017 The Exelixis Lab" << endl;
-  LOG_INFO << endl <<
-      "WARNING: This is an EXPERIMENTAL version of RAxML which has not been released yet!"
-      << endl << endl;
+  LOG_INFO << endl << "RAxML-NG v. " << RAXML_VERSION << " released on " << RAXML_DATE <<
+      " by The Exelixis Lab." << endl;
+  LOG_INFO << "Authors: Alexey Kozlov, Alexandros Stamatakis, Diego Darriba, "
+              "Tomas Flouri, Benoit Morel." << endl;
+  LOG_INFO << "Latest version: https://github.com/amkozlov/raxml-ng" << endl;
+  LOG_INFO << "Questions/problems/suggestions? "
+              "Please visit: https://groups.google.com/forum/#!forum/raxml" << endl;
+  LOG_INFO << endl << "WARNING: This is a BETA release, please use at your own risk!" << endl << endl;
 }
 
 void init_part_info(RaxmlInstance& instance)
@@ -211,7 +216,7 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
 
 void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
 {
-  /* init checkpoint and set to th manager */
+  /* init checkpoint and set to the manager */
   {
     Checkpoint ckp;
     for (size_t p = 0; p < instance.parted_msa.part_count(); ++p)
@@ -301,7 +306,8 @@ void balance_load(RaxmlInstance& instance)
 
   instance.proc_part_assign = balancer.get_all_assignments(part_sizes, ParallelContext::num_procs());
 
-  LOG_INFO << "\nData distribution:\n" << instance.proc_part_assign;
+  LOG_INFO_TS << "Data distribution: " << PartitionAssignmentStats(instance.proc_part_assign) << endl;
+  LOG_VERB << endl << instance.proc_part_assign;
 }
 
 void generate_bootstraps(RaxmlInstance& instance, const Checkpoint& checkp)
@@ -410,7 +416,13 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
 
   LOG_INFO << "\nExecution log saved to: " << sysutil_realpath(opts.log_file()) << endl;
 
-  LOG_INFO << "\nElapsed time: " << setprecision(3) << sysutil_elapsed_seconds() << " seconds\n\n";
+  LOG_INFO << "\nElapsed time: " << FMT_PREC3(sysutil_elapsed_seconds()) << " seconds\n";
+  if (checkp.elapsed_seconds > 0.)
+  {
+    LOG_INFO << "Total analysis time: " <<
+                FMT_PREC3(checkp.elapsed_seconds + sysutil_elapsed_seconds()) << " seconds\n";
+  }
+  LOG_INFO << endl;
 }
 
 void thread_main(const RaxmlInstance& instance, CheckpointManager& cm)

@@ -88,6 +88,7 @@ Logging& logger();
 #define LOG_PROGRESS(loglh) LOG_PROGR << ProgressInfo(loglh)
 
 #define FMT_LH(loglh) setprecision(6) << loglh
+#define FMT_PREC3(val) setprecision(3) << val
 
 template <class T>
 LogStream& operator<<(LogStream& logstream, const T& object)
