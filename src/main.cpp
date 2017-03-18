@@ -75,7 +75,7 @@ void init_part_info(RaxmlInstance& instance)
   if (sysutil_file_exists(opts.model_file))
   {
     // read partition definitions from file
-    RaxmlPartitionFileStream partfile(opts.model_file);
+    RaxmlPartitionStream partfile(opts.model_file, ios::in);
     partfile >> parted_msa;
 
 //    DBG("partitions found: %d\n", useropt->part_count);
@@ -203,33 +203,29 @@ void check_msa(RaxmlInstance& instance)
   }
 
 
-//  if (stats->gap_seqs_count > 0 || stats->gap_cols_count > 0)
-//  {
-//    // TODO: partition file must be modified as well!
-//    char * fname = get_out_fname("reduced");
-//    int inplace = 1;
-//    pll_msa_t * red_msa = pllmod_msa_filter(&pll_msa,
-//                                            stats->gap_seqs, stats->gap_seqs_count,
-//                                            stats->gap_cols, stats->gap_cols_count,
-//                                            inplace);
-//    pllmod_msa_save_phylip(red_msa, fname);
-//
-//    char * reduced_fname = realpath(fname, NULL);
-//    print_info("\nReduced alignment (with gap-only sequences and columns removed) was printed to:\n");
-//    print_info("%s\n\n", reduced_fname);
-//    if (inplace)
-//    {
-//      msa->count = red_msa->count;
-//      msa->length = red_msa->length;
-//    }
-//    else
-//    {
-//      // TODO: destroy must be fixed!
-//      //    pll_msa_destroy(red_msa);
-//    }
-//    free(fname);
-//    free(reduced_fname);
-//  }
+  if (total_gap_cols > 0 || !gap_seqs.empty() > 0)
+  {
+    // save reduced MSA and partition files
+    auto reduced_msa_fname = instance.opts.output_fname("reduced.phy");
+    PhylipStream ps(reduced_msa_fname);
+
+    ps << instance.parted_msa;
+
+    LOG_INFO << "\nNOTE: Reduced alignment (with gap-only sequences and columns removed) was printed to:\n";
+    LOG_INFO << sysutil_realpath(reduced_msa_fname) << endl;
+
+    // save reduced partition file
+    if (sysutil_file_exists(instance.opts.model_file))
+    {
+      auto reduced_part_fname = instance.opts.output_fname("reduced.partition");
+      RaxmlPartitionStream ps(reduced_part_fname, ios::out);
+
+      ps << instance.parted_msa;
+
+      LOG_INFO << "\nNOTE: The corresponding reduced partition file was printed to:\n";
+      LOG_INFO << sysutil_realpath(reduced_part_fname) << endl;
+    }
+  }
 
 }
 

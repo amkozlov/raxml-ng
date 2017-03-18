@@ -82,6 +82,28 @@ PhylipStream& operator<<(PhylipStream& stream, MSA& msa)
   return stream;
 }
 
+PhylipStream& operator<<(PhylipStream& stream, PartitionedMSA& msa)
+{
+  ofstream fs(stream.fname());
+
+  auto taxa = msa.full_msa().size();
+  auto sites = msa.total_length();
+  fs << taxa << " " << sites << endl;
+
+  for (size_t i = 0; i < taxa; ++i)
+  {
+    fs << msa.full_msa().label(i) << " ";
+    for (const auto& p: msa.part_list())
+    {
+      fs << p.msa().at(i);
+    }
+    fs << endl;
+  }
+
+  return stream;
+}
+
+
 CATGStream& operator>>(CATGStream& stream, MSA& msa)
 {
   ifstream fs;

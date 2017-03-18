@@ -42,6 +42,7 @@ public:
   const NameIdMap& label_id_map() const { return _label_id_map; }
   const pll_msa_t * pll_msa() const;
 
+  const std::string& label(size_t index) const { return _labels.at(index); }
   const std::string& at(const std::string& label) const
   { return _sequences.at(_label_id_map.at(label)); }
   const std::string& at(size_t index) const { return _sequences.at(index); }
