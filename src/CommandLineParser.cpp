@@ -42,6 +42,7 @@ static struct option long_options[] =
   {"bootstrap",          no_argument,       0, 0 },  /*  24 */
   {"all",                no_argument,       0, 0 },  /*  25 */
   {"bs-trees",           required_argument, 0, 0 },  /*  26 */
+  {"redo",               no_argument,       0, 0 },  /*  27 */
 
   { 0, 0, 0, 0 }
 };
@@ -104,6 +105,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.simd_arch = sysutil_simd_autodetect();
 
   opts.num_searches = 0;
+
+  opts.redo_mode = false;
 
   bool log_level_set = false;
 
@@ -185,7 +188,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         else if (strcasecmp(optarg, "auto") == 0)
           opts.data_type = DataType::autodetect;
         else
-          throw InvalidOptionValueException("Unknown data type: %s", optarg);
+          throw InvalidOptionValueException("Unknown data type: " + string(optarg));
         break;
 
       case 9: /* optimize model */
@@ -226,14 +229,14 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           throw OptionException("Unlinked branch lengths not supported yet!");
         }
         else
-          throw InvalidOptionValueException("Unknown branch linkage mode: %s", optarg);
+          throw InvalidOptionValueException("Unknown branch linkage mode: " + string(optarg));
         break;
 
       case 15:  /* spr-radius = maximum radius for fast SPRs */
         if (sscanf(optarg, "%u", &opts.spr_radius) != 1)
         {
-          throw InvalidOptionValueException("Invalid SPR radius: %s, please provide a positive integer!",
-                        optarg);
+          throw InvalidOptionValueException("Invalid SPR radius: " + string(optarg) +
+                                            ", please provide a positive integer!");
         }
         break;
       case 16:  /* spr-cutoff = relative LH cutoff to discard subtrees */
@@ -243,14 +246,16 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         }
         else if (sscanf(optarg, "%lf", &opts.spr_cutoff) != 1)
         {
-          throw InvalidOptionValueException("Invalid SPR cutoff: %s, please provide a real number!",
-                        optarg);
+          throw InvalidOptionValueException("Invalid SPR cutoff: " + string(optarg) +
+                                            ", please provide a real number!");
         }
         break;
 
       case 17: /* LH epsilon */
         if(sscanf(optarg, "%lf", &opts.lh_epsilon) != 1 || opts.lh_epsilon < 0.)
-          throw InvalidOptionValueException("Invalid LH epsilon parameter value: %s, please provide a positive real number.", optarg);
+          throw InvalidOptionValueException("Invalid LH epsilon parameter value: " +
+                                            string(optarg) +
+                                            ", please provide a positive real number.");
         break;
 
       case 18: /* random seed */
@@ -260,8 +265,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 19:  /* number of threads */
         if (sscanf(optarg, "%u", &opts.num_threads) != 1 || opts.num_threads == 0)
         {
-          throw InvalidOptionValueException("Invalid number of threads: %s, please provide a positive integer number!",
-                        optarg);
+          throw InvalidOptionValueException("Invalid number of threads: %s " + string(optarg) +
+                                            ", please provide a positive integer number!");
         }
         break;
       case 20: /* SIMD instruction set */
@@ -283,7 +288,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         }
         else
         {
-          throw InvalidOptionValueException("Unknown SIMD instruction set: %s!", optarg);
+          throw InvalidOptionValueException("Unknown SIMD instruction set: " + string(optarg));
         }
         break;
       case 21: /* MSA file format */
@@ -313,7 +318,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         }
         else
         {
-          throw InvalidOptionValueException("Unknown MSA file format: %s!", optarg);
+          throw InvalidOptionValueException("Unknown MSA file format: " + string(optarg));
         }
         break;
       case 22: /* enable per-rate scalers */
@@ -334,7 +339,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         else if (strcasecmp(optarg, "debug") == 0)
           opts.log_level = LogLevel::debug;
         else
-          throw InvalidOptionValueException("Unknown log level: %s!", optarg);
+          throw InvalidOptionValueException("Unknown log level: " + string(optarg));
         break;
       case 24:
         opts.command = Command::bootstrap;
@@ -347,9 +352,12 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 26:  /* number of bootstrap replicates */
         if (sscanf(optarg, "%u", &opts.num_bootstraps) != 1 || opts.num_bootstraps == 0)
         {
-          throw InvalidOptionValueException("Invalid number of num_bootstraps: %s, "
-              "please provide a positive integer number!", optarg);
+          throw InvalidOptionValueException("Invalid number of num_bootstraps: " + string(optarg) +
+              ", please provide a positive integer number!");
         }
+        break;
+      case 27:
+        opts.redo_mode = true;
         break;
       default:
         throw  OptionException("Internal error in option parsing");
@@ -421,6 +429,7 @@ void CommandLineParser::print_help()
             "  --data-type    VALUE                       data type: DNA, AA, MULTI-state or AUTO-detect (default)\n"
             "  --prefix       STRING                      prefix for output files (default: MSA file name)\n"
             "  --log          VALUE                       log verbosity: ERROR,WARNING,INFO,PROGRESS,DEBUG (default: PROGRESS)\n"
+            "  --redo                                     overwrite existing result files and ignore checkpoints (default: OFF)\n"
             "\n"
             "General options:\n"
             "  --seed         VALUE                       seed for pseudo-random number generator (default: current time)\n"

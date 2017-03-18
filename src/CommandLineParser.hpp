@@ -16,6 +16,8 @@ public:
 class InvalidOptionValueException : public OptionException
 {
 public:
+  InvalidOptionValueException(const std::string& message) : OptionException(message) {}
+
   InvalidOptionValueException(const std::string& format, const std::string& value) :
     OptionException("")
   {

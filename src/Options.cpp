@@ -25,6 +25,12 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.support_tree, "support");
 }
 
+bool Options::result_files_exist()
+{
+  return sysutil_file_exists(best_tree_file()) || sysutil_file_exists(bootstrap_trees_file()) ||
+      sysutil_file_exists(support_tree_file());
+}
+
 static string get_simd_arch_name(unsigned int simd_arch)
 {
   switch(simd_arch)

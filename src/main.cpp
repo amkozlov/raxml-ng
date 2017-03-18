@@ -348,7 +348,7 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
     cm.checkpoint(move(ckp));
   }
 
-  if (cm.read())
+  if (!instance.opts.redo_mode && cm.read())
   {
     const auto& ckp = cm.checkpoint();
     for (const auto& m: ckp.models)
@@ -757,6 +757,20 @@ int main(int argc, char** argv)
     {
       try
       {
+        if (instance.opts.redo_mode)
+        {
+          LOG_WARN << "WARNING: Running in REDO mode: existing checkpoints are ignored, "
+              "and all result files will be overwritten!" << endl << endl;
+        }
+        else
+        {
+          if (instance.opts.result_files_exist())
+            throw runtime_error("Result files for the run with prefix `" +
+                                instance.opts.outfile_prefix + "` already exist!\n"
+                                "Please either choose a new prefix, remove old files, or add "
+                                "--redo command line switch to overwrite them.");
+        }
+
         CheckpointManager cm(instance.opts.checkp_file());
         ParallelContext::init_pthreads(instance.opts, std::bind(thread_main,
                                                                 std::cref(instance),

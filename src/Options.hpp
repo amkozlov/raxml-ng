@@ -20,7 +20,7 @@ class Options
 public:
   Options() : cmdline(""), command(Command::none), use_tip_inner(true),
   use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false),
-  optimize_model(true), optimize_brlen(true), log_level(LogLevel::progress),
+  optimize_model(true), optimize_brlen(true), redo_mode(false), log_level(LogLevel::progress),
   msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
   random_seed(0), start_tree(StartingTree::random), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
   spr_cutoff(1.0), brlen_linkage(PLLMOD_TREE_BRLEN_SCALED), simd_arch(PLL_ATTRIB_ARCH_CPU),
@@ -44,6 +44,8 @@ public:
 
   bool optimize_model;
   bool optimize_brlen;
+
+  bool redo_mode;
 
   LogLevel log_level;
   FileFormat msa_format;
@@ -79,6 +81,8 @@ public:
   const std::string& support_tree_file() const { return outfile_names.support_tree; }
 
   void set_default_outfiles();
+
+  bool result_files_exist();
 
 private:
   void set_default_outfile(std::string& fname, const std::string& suffix);
