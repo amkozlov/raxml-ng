@@ -20,6 +20,7 @@ public:
   const PartitionInfo& part_info(size_t index) const { return _part_list.at(index); };
   const Model& model(size_t index) const { return _part_list.at(index).model(); };
   const std::vector<PartitionInfo>& part_list() const { return _part_list; };
+  std::vector<PartitionInfo>& part_list() { return _part_list; };
   size_t total_length() const;
 
   // setters

@@ -60,6 +60,7 @@ public:
   doubleVector state_freqs() const;
 
   void num_sites(const unsigned int sites) { _num_sites = sites; }
+  void remove_sites(const std::vector<size_t>& site_indices);
 
   //Iterator Compatibility
   iterator begin() { return _sequences.begin(); }

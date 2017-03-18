@@ -1,4 +1,5 @@
 #include <stdexcept>
+#include <algorithm>
 
 #include "MSA.hpp"
 
@@ -230,5 +231,59 @@ doubleVector MSA::state_freqs() const
     freqs[i] /= sum;
 
   return freqs;
+}
+
+void MSA::remove_sites(const std::vector<size_t>& site_indices)
+{
+  if (site_indices.empty())
+    return;
+
+  assert(_length);
+
+  auto sorted_indicies = site_indices;
+
+  std::sort(sorted_indicies.begin(), sorted_indicies.end());
+
+  if (sorted_indicies.back() >= _length)
+    throw out_of_range("Invalid site index");
+
+  auto new_length = _length - sorted_indicies.size();
+  for (auto& s: _sequences)
+  {
+    size_t pos = 0;
+    auto ignore = sorted_indicies.cbegin();
+    for (size_t i = 0; i < s.size(); ++i)
+    {
+      if (i != *ignore)
+      {
+        s[pos++] = s[i];
+      }
+      else
+        ignore++;
+    }
+    assert(pos == new_length);
+    s.resize(new_length);
+  }
+
+  if (!_weights.empty())
+  {
+    assert(_weights.size() == _length);
+    size_t pos = 0;
+    auto ignore = sorted_indicies.cbegin();
+    for (size_t i = 0; i < _weights.size(); ++i)
+    {
+      if (i != *ignore)
+      {
+        _weights[pos++] = _weights[i];
+      }
+      else
+        ignore++;
+    }
+    assert(pos == new_length);
+    _weights.resize(new_length);
+  }
+
+  _length = new_length;
+  _dirty = true;
 }
 

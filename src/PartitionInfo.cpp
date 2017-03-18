@@ -67,35 +67,62 @@ void PartitionInfo::compress_patterns()
   _msa.compress_patterns(model().charmap());
 }
 
-pllmod_msa_stats_t * PartitionInfo::compute_stats() const
+pllmod_msa_stats_t * PartitionInfo::compute_stats(unsigned long stats_mask) const
 {
-  unsigned long stats_mask = PLLMOD_MSA_STATS_GAP_PROP;
-  stats_mask |= PLLMOD_MSA_STATS_FREQS;
-  stats_mask |= PLLMOD_MSA_STATS_INV_PROP;
-
-  if (_model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::empirical)
-    stats_mask |= PLLMOD_MSA_STATS_SUBST_RATES;
-
   const unsigned int * weights = _msa.weights().empty() ? nullptr : _msa.weights().data();
-  _stats = pllmod_msa_compute_stats(_msa.pll_msa(), _model.num_states(), _model.charmap(),
-                                    weights, stats_mask);
+  pllmod_msa_stats_t * stats = pllmod_msa_compute_stats(_msa.pll_msa(), _model.num_states(),
+                                                        _model.charmap(), weights, stats_mask);
 
-  assert(_stats);
+  if (!stats)
+    throw runtime_error(pll_errmsg);
 
-  if (_msa.probabilistic() &&
+  if ((stats_mask & PLLMOD_MSA_STATS_FREQS) &&_msa.probabilistic() &&
       _model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::empirical)
   {
-    assert(_stats->states == _msa.states());
-    assert(_stats->freqs);
+    assert(stats->states == _msa.states());
+    assert(stats->freqs);
 
     auto freqs = _msa.state_freqs();
-    memcpy(_stats->freqs, freqs.data(), _msa.states() * sizeof(double));
+    memcpy(stats->freqs, freqs.data(), _msa.states() * sizeof(double));
+  }
+
+  return stats;
+}
+
+const pllmod_msa_stats_t * PartitionInfo::stats() const
+{
+  if (!_stats)
+  {
+    unsigned long stats_mask = PLLMOD_MSA_STATS_GAP_PROP;
+    stats_mask |= PLLMOD_MSA_STATS_FREQS;
+    stats_mask |= PLLMOD_MSA_STATS_INV_PROP;
+
+    if (_model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::empirical)
+      stats_mask |= PLLMOD_MSA_STATS_SUBST_RATES;
+
+    _stats = compute_stats(stats_mask);
   }
 
   return _stats;
-}
+};
+
 
 void PartitionInfo::set_modeL_empirical_params()
 {
+  stats();
+
+  // check for zero state frequencies
+  if (_model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::empirical)
+  {
+    for (unsigned int i = 0; i < _stats->states; ++i)
+    {
+      if (!(_stats->freqs[i] > 0.))
+        throw runtime_error("Frequency of state " + to_string(i) +
+                            " in partition " + _name + " is 0!\n"
+                            "Please either change your partitioning scheme or "
+                            "use model state frequencies for this partition!");
+    }
+  }
+
   assign(_model, stats());
 }

@@ -107,6 +107,132 @@ void init_part_info(RaxmlInstance& instance)
   }
 }
 
+void check_msa(RaxmlInstance& instance)
+{
+  LOG_VERB_TS << "Checking the alignment...\n";
+
+  const auto& full_msa = instance.parted_msa.full_msa();
+  const auto pll_msa = full_msa.pll_msa();
+
+  unsigned long stats_mask = PLLMOD_MSA_STATS_DUP_TAXA | PLLMOD_MSA_STATS_DUP_SEQS;
+
+  pllmod_msa_stats_t * stats = pllmod_msa_compute_stats(pll_msa,
+                                                        4,
+                                                        pll_map_nt, // map is not used here
+                                                        NULL,
+                                                        stats_mask);
+
+  if (!stats)
+    throw runtime_error(pll_errmsg);
+
+  if (stats->dup_taxa_pairs_count > 0)
+  {
+    LOG_ERROR << "\nERROR: Duplicate sequence names found: " << stats->dup_taxa_pairs_count << endl;
+    for (unsigned long c = 0; c < stats->dup_taxa_pairs_count; ++c)
+    {
+      const unsigned long idx1 = stats->dup_taxa_pairs[c*2];
+      const unsigned long idx2 = stats->dup_taxa_pairs[c*2+1];
+      LOG_ERROR << "ERROR: Sequences " << idx1 << " and " << idx2 << " have identical name: " <<
+          pll_msa->label[idx1] << endl;
+    }
+    throw runtime_error("Please fix your alignment!");
+  }
+
+  if (stats->dup_seqs_pairs_count > 0)
+  {
+    LOG_WARN << "\nWARNING: Duplicate sequences found: " << stats->dup_seqs_pairs_count << endl;
+    for (unsigned long c = 0; c < stats->dup_seqs_pairs_count; ++c)
+    {
+      const unsigned long idx1 = stats->dup_seqs_pairs[c*2];
+      const unsigned long idx2 = stats->dup_seqs_pairs[c*2+1];
+      LOG_WARN << "WARNING: Sequences " << pll_msa->label[idx1] << " and " <<
+          pll_msa->label[idx2] << " are exactly identical!" << endl;
+    }
+  }
+
+  pllmod_msa_destroy_stats(stats);
+
+  std::set<size_t> gap_seqs;
+  size_t total_gap_cols = 0;
+  size_t part_num = 0;
+  for (auto& pinfo: instance.parted_msa.part_list())
+  {
+    stats_mask = PLLMOD_MSA_STATS_GAP_SEQS | PLLMOD_MSA_STATS_GAP_COLS;
+
+    pllmod_msa_stats_t * stats = pinfo.compute_stats(stats_mask);
+
+    if (stats->gap_cols_count > 0)
+    {
+      total_gap_cols += stats->gap_cols_count;
+      std::vector<size_t> gap_cols(stats->gap_cols, stats->gap_cols + stats->gap_cols_count);
+      pinfo.msa().remove_sites(gap_cols);
+    }
+
+    std::set<size_t> cur_gap_seq(stats->gap_seqs, stats->gap_seqs + stats->gap_seqs_count);
+
+    if (!part_num)
+    {
+      gap_seqs = cur_gap_seq;
+    }
+    else
+    {
+      for (auto e: gap_seqs)
+      {
+        if (cur_gap_seq.find(e) == cur_gap_seq.end())
+          gap_seqs.erase(e);
+      }
+    }
+
+    pllmod_msa_destroy_stats(stats);
+
+    part_num++;
+  }
+
+  if (total_gap_cols > 0)
+  {
+    LOG_WARN << "\nWARNING: Fully undetermined columns found: " << total_gap_cols << endl;
+//    for (unsigned long c = 0; c < stats->gap_cols_count; ++c)
+//      LOG_VERB << "WARNING: Column " << stats->gap_cols[c]+1 << " contains only gaps!" << endl;
+  }
+
+  if (!gap_seqs.empty())
+  {
+   LOG_WARN << "\nWARNING: Fully undetermined sequences found: " << stats->gap_seqs_count << endl;
+   for (auto c : gap_seqs)
+     LOG_VERB << "WARNING: Sequence " << pll_msa->label[c] << " contains only gaps!" << endl;
+  }
+
+
+//  if (stats->gap_seqs_count > 0 || stats->gap_cols_count > 0)
+//  {
+//    // TODO: partition file must be modified as well!
+//    char * fname = get_out_fname("reduced");
+//    int inplace = 1;
+//    pll_msa_t * red_msa = pllmod_msa_filter(&pll_msa,
+//                                            stats->gap_seqs, stats->gap_seqs_count,
+//                                            stats->gap_cols, stats->gap_cols_count,
+//                                            inplace);
+//    pllmod_msa_save_phylip(red_msa, fname);
+//
+//    char * reduced_fname = realpath(fname, NULL);
+//    print_info("\nReduced alignment (with gap-only sequences and columns removed) was printed to:\n");
+//    print_info("%s\n\n", reduced_fname);
+//    if (inplace)
+//    {
+//      msa->count = red_msa->count;
+//      msa->length = red_msa->length;
+//    }
+//    else
+//    {
+//      // TODO: destroy must be fixed!
+//      //    pll_msa_destroy(red_msa);
+//    }
+//    free(fname);
+//    free(reduced_fname);
+//  }
+
+}
+
 void load_msa(RaxmlInstance& instance)
 {
   const auto& opts = instance.opts;
@@ -119,9 +245,6 @@ void load_msa(RaxmlInstance& instance)
 
   LOG_INFO_TS << "Loaded alignment with " << msa.size() << " taxa and " <<
       msa.num_sites() << " sites" << endl;
-
-  /* check alignment */
-//  check_msa(useropt, msa);
 
   if (msa.probabilistic() && opts.use_prob_msa)
   {
@@ -136,16 +259,17 @@ void load_msa(RaxmlInstance& instance)
 
   parted_msa.full_msa(std::move(msa));
 
-//  LOG_INFO << "Splitting MSA... " << endl;
+  LOG_VERB_TS << "Extracting partitions... " << endl;
 
   parted_msa.split_msa();
+
+  /* check alignment */
+  check_msa(instance);
 
   if (opts.use_pattern_compression)
     parted_msa.compress_patterns();
 
   parted_msa.set_model_empirical_params();
-
-  // TODO: check empirical params (e.g. zero state freqs)
 
   LOG_INFO << endl;
 

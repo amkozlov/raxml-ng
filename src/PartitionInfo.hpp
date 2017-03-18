@@ -35,7 +35,9 @@ public:
   const Model& model() const { return _model; };
   const std::string& range_string() const { return _range_string; };
   const MSA& msa() const { return _msa; };
-  const pllmod_msa_stats_t * stats() const { return _stats ?_stats : compute_stats(); };
+  MSA& msa() { return _msa; };
+  const pllmod_msa_stats_t * stats() const;
+  pllmod_msa_stats_t * compute_stats(unsigned long stats_mask) const;
 
   // setters
   void msa(MSA&& msa) { _msa = std::move(msa); };
@@ -55,8 +57,6 @@ private:
   Model _model;
   MSA _msa;
   mutable pllmod_msa_stats_t * _stats;
-
-  pllmod_msa_stats_t * compute_stats() const;
 };
 
 
