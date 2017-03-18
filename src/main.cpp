@@ -229,7 +229,7 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
     for (const auto& m: ckp.models)
       instance.parted_msa.model(m.first, m.second);
 
-    LOG_INFO_TS << "Checkpoint file found, execution will be resumed " <<
+    LOG_INFO_TS << "NOTE: Resuming execution from checkpoint " <<
         "(logLH: " << ckp.loglh() <<
         ", ML trees: " << ckp.ml_trees.size() <<
         ", bootstraps: " << ckp.bs_trees.size() <<
@@ -436,7 +436,7 @@ void thread_main(const RaxmlInstance& instance, CheckpointManager& cm)
         " distinct starting trees" << endl << endl;
 
     size_t start_tree_num = cm.checkpoint().ml_trees.size();
-    bool use_ckp_tree = (start_tree_num > 0);
+    bool use_ckp_tree = cm.checkpoint().search_state.step != CheckpointStep::start;
     for (const auto& tree: instance.start_trees)
     {
       assert(!tree.empty());
