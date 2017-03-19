@@ -71,10 +71,11 @@ TEST(CommandLineParserTest, search_minimal)
   Options options;
 
   // minimal valid command line
-  string cmd = "raxml-ng --msa data.fa";
+  string cmd = "raxml-ng --msa data.fa --model GTR";
   parse_options(cmd, parser, options, false);
   EXPECT_EQ(Command::search, options.command);
   EXPECT_EQ("data.fa", options.msa_file);
+  EXPECT_EQ("GTR", options.model_file);
 }
 
 TEST(CommandLineParserTest, search_complex1)
@@ -133,9 +134,10 @@ TEST(CommandLineParserTest, eval_minimal)
   Options options;
 
   // valid evaluate command line
-  string cmd = "raxml-ng --evaluate --msa data.fa --tree start.tre";
+  string cmd = "raxml-ng --evaluate --msa data.fa --model GTR --tree start.tre";
   parse_options(cmd, parser, options, false);
   EXPECT_EQ(Command::evaluate, options.command);
+  EXPECT_EQ("GTR", options.model_file);
   EXPECT_TRUE(options.optimize_model);
   EXPECT_TRUE(options.optimize_brlen);
 }
@@ -148,9 +150,10 @@ TEST(CommandLineParserTest, eval_complex)
 
   // evaluate with more settings
   string cmd = "raxml-ng --evaluate --msa data.fa --tree start.tre --opt-model OFF "
-      "--opt-branches OFF --lh-epsilon 0.02";
+      "--opt-branches OFF --lh-epsilon 0.02 --model GTR";
   parse_options(cmd, parser, options, false);
   EXPECT_EQ(Command::evaluate, options.command);
+  EXPECT_EQ("GTR", options.model_file);
   EXPECT_FALSE(options.optimize_model);
   EXPECT_FALSE(options.optimize_brlen);
   EXPECT_DOUBLE_EQ(0.02, options.lh_epsilon);

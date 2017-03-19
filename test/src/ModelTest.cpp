@@ -10,21 +10,6 @@ TEST(ModelTest, defaults)
   auto model = Model();
 
   // tests
-  EXPECT_EQ(model.to_string(), "GTR+F+G4");
-  EXPECT_EQ(model.data_type(), DataType::dna);
-  EXPECT_EQ(model.name(), "GTR");
-  EXPECT_EQ(model.num_states(), 4);
-  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_GAMMA);
-  EXPECT_EQ(model.num_ratecats(), 4);
-  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_ALPHA);
-}
-
-TEST(ModelTest, GTR)
-{
-  // buildup
-  auto model = Model(DataType::autodetect, "GTR");
-
-  // tests
   EXPECT_EQ(model.to_string(), "GTR+FO");
   EXPECT_EQ(model.data_type(), DataType::dna);
   EXPECT_EQ(model.name(), "GTR");
@@ -32,6 +17,21 @@ TEST(ModelTest, GTR)
   EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_FIXED);
   EXPECT_EQ(model.num_ratecats(), 1);
   EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_FREQUENCIES);
+}
+
+TEST(ModelTest, GTR)
+{
+  // buildup
+  auto model = Model(DataType::autodetect, "GTR+F+G");
+
+  // tests
+  EXPECT_EQ(model.to_string(), "GTR+F+G4");
+  EXPECT_EQ(model.data_type(), DataType::dna);
+  EXPECT_EQ(model.name(), "GTR");
+  EXPECT_EQ(model.num_states(), 4);
+  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_GAMMA);
+  EXPECT_EQ(model.num_ratecats(), 4);
+  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_ALPHA);
 }
 
 TEST(ModelTest, JCI_user)
