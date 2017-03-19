@@ -766,7 +766,9 @@ int main(int argc, char** argv)
         {
           if (instance.opts.result_files_exist())
             throw runtime_error("Result files for the run with prefix `" +
-                                instance.opts.outfile_prefix + "` already exist!\n"
+                                (instance.opts.outfile_prefix.empty() ?
+                                    instance.opts.msa_file : instance.opts.outfile_prefix) +
+                                "` already exist!\n"
                                 "Please either choose a new prefix, remove old files, or add "
                                 "--redo command line switch to overwrite them.");
         }

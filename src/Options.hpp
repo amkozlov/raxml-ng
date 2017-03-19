@@ -31,8 +31,6 @@ public:
 
   ~Options() = default;
 
-  std::string output_fname(const std::string& suffix) const;
-
   std::string cmdline;
 
   Command command;
@@ -71,6 +69,8 @@ public:
   /* parallelization stuff */
   unsigned int num_threads;     /* number of threads */
   unsigned int num_ranks;       /* number of MPI ranks */
+
+  std::string output_fname(const std::string& suffix) const;
 
   const std::string& log_file() const { return outfile_names.log; }
   const std::string& checkp_file() const { return outfile_names.checkpoint; }

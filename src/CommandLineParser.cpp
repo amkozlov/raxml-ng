@@ -99,7 +99,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.num_threads = 1;
 #endif
 
-  opts.model_file = "GTR+G+F";
+//  opts.model_file = "GTR+G+F";
+  opts.model_file = "";
 
   // autodetect CPU instruction set and use respective SIMD kernels
   opts.simd_arch = sysutil_simd_autodetect();
@@ -376,7 +377,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       opts.command == Command::bootstrap || opts.command == Command::all)
   {
     if (opts.msa_file.empty())
-      throw OptionException("Mandatory switch --msa");
+      throw OptionException("You must specify a multiple alignment file with --msa switch");
+
+    if (opts.model_file.empty())
+      throw OptionException("You must specify an evolutionary model with --model switch");
   }
 
   if (opts.command == Command::evaluate)
@@ -453,5 +457,31 @@ void CommandLineParser::print_help()
             "\n"
             "Bootstrapping options:\n"
             "  --bs-trees     VALUE                       Number of bootstraps replicates (default: 100)\n";
+
+  cout << "\n"
+            "EXAMPLES:\n"
+            "  1. Perform single tree inference on DNA alignment \n"
+            "     (random starting tree, general time-reversible model, ML estimate of substitution rates and\n"
+            "      nucleotide frequencies, discrete GAMMA model of rate heterogeneity with 4 categories):\n"
+            "\n"
+            "     ./raxml-ng --msa testDNA.fa --model GTR+G\n"
+            "\n";
+
+  cout << "\n"
+            "  2. Perform an all-in-one analysis (ML tree search + non-parametric bootstrap) \n"
+            "     (10 randomized parsimony starting trees, fixed empirical substitution matrix (LG),\n"
+            "      empirical aminoacid frequencies from alignment, 8 discrete GAMMA categories,\n"
+            "      200 bootstrap replicates):\n"
+            "\n"
+            "     ./raxml-ng --all --msa testAA.fa --model LG+G8+F --tree pars{10} --bs-trees 200\n"
+            "\n";
+
+  cout << "\n"
+            "  3. Optimize branch lengths and free model parameters on a fixed topology\n"
+            "     (using multiple partitions with proportional branch lengths)\n"
+            "\n"
+            "     ./raxml-ng --evaluate --msa testAA.fa --model partitions.txt --tree test.tree --brlen scaled\n"
+            "\n";
+
 }
 
