@@ -176,10 +176,12 @@ void check_msa(RaxmlInstance& instance)
     }
     else
     {
-      for (auto e: gap_seqs)
+      for(auto it = gap_seqs.begin(); it != gap_seqs.end();)
       {
-        if (cur_gap_seq.find(e) == cur_gap_seq.end())
-          gap_seqs.erase(e);
+        if(cur_gap_seq.find(*it) == cur_gap_seq.end())
+          it = gap_seqs.erase(it);
+        else
+          ++it;
       }
     }
 
@@ -197,9 +199,9 @@ void check_msa(RaxmlInstance& instance)
 
   if (!gap_seqs.empty())
   {
-   LOG_WARN << "\nWARNING: Fully undetermined sequences found: " << stats->gap_seqs_count << endl;
+   LOG_WARN << "\nWARNING: Fully undetermined sequences found: " << gap_seqs.size() << endl;
    for (auto c : gap_seqs)
-     LOG_VERB << "WARNING: Sequence " << pll_msa->label[c] << " contains only gaps!" << endl;
+     LOG_VERB << "WARNING: Sequence " << c << " " << pll_msa->label[c] << " contains only gaps!" << endl;
   }
 
 
@@ -211,7 +213,7 @@ void check_msa(RaxmlInstance& instance)
 
     ps << instance.parted_msa;
 
-    LOG_INFO << "\nNOTE: Reduced alignment (with gap-only sequences and columns removed) was printed to:\n";
+    LOG_INFO << "\nNOTE: Reduced alignment (with gap-only columns removed) was printed to:\n";
     LOG_INFO << sysutil_realpath(reduced_msa_fname) << endl;
 
     // save reduced partition file
