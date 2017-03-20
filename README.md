@@ -25,6 +25,7 @@ You can see some of the planned features [here](https://github.com/amkozlov/raxm
 
 ```
 git clone --recursive https://github.com/amkozlov/raxml-ng
+cd raxml-ng
 mkdir build && cd build
 cmake ..
 make
