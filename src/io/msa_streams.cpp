@@ -223,6 +223,9 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format)
   auto fmt_begin = msa_formats.cbegin();
   auto fmt_end = msa_formats.cend();
 
+  if (!sysutil_file_exists(filename))
+    throw runtime_error("File not found: " + filename);
+
   if (format != FileFormat::autodetect)
   {
     fmt_begin = std::find_if(msa_formats.begin(), msa_formats.end(),
