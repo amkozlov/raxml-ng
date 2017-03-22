@@ -745,7 +745,10 @@ int main(int argc, char** argv)
   /* now get to the real stuff */
   srand(instance.opts.random_seed);
   logger().set_log_level(instance.opts.log_level);
-  logger().set_log_filename(instance.opts.log_file());
+
+  /* only master process writes the log file */
+  if (ParallelContext::master())
+    logger().set_log_filename(instance.opts.log_file());
 
   print_banner();
   LOG_INFO << instance.opts;
