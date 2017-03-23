@@ -25,7 +25,7 @@ public:
     _name = std::move(other._name);
     _range_string = std::move(other._range_string);
     _model = std::move(other._model);
-    _msa = std::move(_msa);
+    _msa = std::move(other._msa);
     _stats = other._stats;
     other._stats = nullptr;
   }
