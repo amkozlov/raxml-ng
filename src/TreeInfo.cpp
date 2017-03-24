@@ -133,7 +133,8 @@ double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor
                                                                     _pll_treeinfo->parallel_context,
                                                                     _pll_treeinfo->parallel_reduce_cb
                                                                     );
-    DBG("\t - after brlen: logLH = %f\n", new_loglh);
+
+    LOG_DEBUG << "\t - after brlen: logLH = " << new_loglh << endl;
 
     if (pll_errno)
       throw runtime_error("ERROR in branch lenght optimization: " + string(pll_errmsg));
@@ -152,7 +153,7 @@ double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor
     /* normalize scalers and scale the branches accordingly */
     pllmod_treeinfo_normalize_brlen_scalers(_pll_treeinfo);
 
-    DBG("\t - after brlen scalers: logLH = %f\n", new_loglh);
+    LOG_DEBUG << "\t - after brlen scalers: logLH = " << new_loglh << endl;
   }
 
 
@@ -172,7 +173,8 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                           PLLMOD_OPT_MAX_SUBST_RATE,
                                                           RAXML_BFGS_FACTOR,
                                                           RAXML_PARAM_EPSILON);
-    DBG("\t - after rates: logLH = %f\n", new_loglh);
+
+    LOG_DEBUG << "\t - after rates: logLH = " << new_loglh << endl;
   }
 
   /* optimize BASE FREQS */
@@ -185,7 +187,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                           RAXML_BFGS_FACTOR,
                                                           RAXML_PARAM_EPSILON);
 
-    DBG("\t - after freqs: logLH = %f\n", new_loglh);
+    LOG_DEBUG << "\t - after freqs: logLH = " << new_loglh << endl;
   }
 
   /* optimize ALPHA */
@@ -196,7 +198,8 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                       PLLMOD_OPT_MIN_ALPHA,
                                                       PLLMOD_OPT_MAX_ALPHA,
                                                       RAXML_PARAM_EPSILON);
-    DBG("\t - after alpha: logLH = %f\n", new_loglh);
+
+   LOG_DEBUG << "\t - after alpha: logLH = " << new_loglh << endl;
   }
 
   if (params_to_optimize & PLLMOD_OPT_PARAM_PINV)
@@ -207,7 +210,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                       PLLMOD_OPT_MAX_PINV,
                                                       RAXML_PARAM_EPSILON);
 
-    DBG("\t - after p-inv: logLH = %f\n", new_loglh);
+    LOG_DEBUG << "\t - after p-inv: logLH = " << new_loglh << endl;
   }
 
   /* optimize FREE RATES and WEIGHTS */
@@ -224,8 +227,8 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
         _pll_treeinfo->partition_count > 1)
       pllmod_treeinfo_normalize_brlen_scalers(_pll_treeinfo);
 
-    DBG("\t - after freeR: logLH = %f\n", new_loglh);
-    DBG("\t - after freeR/crosscheck: logLH = %f\n", loglh());
+    LOG_DEBUG << "\t - after freeR: logLH = " << new_loglh << endl;
+//    LOG_DEBUG << "\t - after freeR/crosscheck: logLH = " << loglh() << endl;
   }
 
   if (params_to_optimize & PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE)
