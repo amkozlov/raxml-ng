@@ -49,6 +49,8 @@ struct RaxmlInstance
   PartitionAssignmentList proc_part_assign;
   unique_ptr<BootstrapTree> bs_tree;
 
+  unique_ptr<NewickStream> start_tree_stream;
+
   /* this is just a dummy random tree used for convenience, e,g, if we need tip labels or
    * just 'any' valid tree for the alignment at hand */
   Tree random_tree;
@@ -291,11 +293,11 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
   {
     case StartingTree::user:
     {
-      assert(!opts.tree_file.empty());
+      assert(instance.start_tree_stream);
 
       /* parse the unrooted binary tree in newick format, and store the number
          of tip nodes in tip_nodes_count */
-      tree = Tree::loadFromFile(opts.tree_file);
+      *instance.start_tree_stream >> tree;
 
       LOG_DEBUG << "Loaded user starting tree with " << tree.num_tips() << " taxa from: "
                            << opts.tree_file << endl;
@@ -375,6 +377,9 @@ void build_start_trees(RaxmlInstance& instance, CheckpointManager& cm)
   {
     case StartingTree::user:
       LOG_INFO_TS << "Loading user starting tree(s) from: " << opts.tree_file << endl;
+      if (!sysutil_file_exists(opts.tree_file))
+        throw runtime_error("File not found: " + opts.tree_file);
+      instance.start_tree_stream.reset(new NewickStream(opts.tree_file, std::ios::in));
       break;
     case StartingTree::random:
       LOG_INFO_TS << "Generating random starting tree(s) with " << msa.size() << " taxa" << endl;
@@ -389,6 +394,13 @@ void build_start_trees(RaxmlInstance& instance, CheckpointManager& cm)
   for (size_t i = 0; i < opts.num_searches; ++i)
   {
     auto tree = generate_tree(instance, opts.start_tree);
+
+    // TODO use universal starting tree generator
+    if (opts.start_tree == StartingTree::user)
+    {
+      if (instance.start_tree_stream->peek() != EOF)
+        instance.opts.num_searches++;
+    }
 
     // TODO: skip generation
     if (i < cm.checkpoint().ml_trees.size())
