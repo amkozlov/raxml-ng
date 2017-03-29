@@ -21,6 +21,45 @@ const unordered_map<DataType, const unsigned int *,EnumClassHash>  DATATYPE_MAPS
   {DataType::diploid10, pll_map_diploid10}
 };
 
+
+// TODO move it out of here
+class parse_error {};
+static bool read_param(istringstream& s, double& val)
+{
+  if (s.peek() == '{')
+  {
+    s.get();
+    s >> val;
+    if (s.get() != '}')
+      throw parse_error();
+
+    return true;
+  }
+  else
+    return false;
+}
+
+static bool read_param(istringstream& s, doubleVector& vec)
+{
+  if (s.peek() == '{')
+  {
+    int c = s.get();
+    while (s && c != '}')
+    {
+      double val;
+      s >> val;
+      vec.push_back(val);
+      c = s.get();
+    }
+    if (c != '}')
+      throw parse_error();
+
+    return true;
+  }
+  else
+    return false;
+}
+
 Model::Model (DataType data_type, const std::string &model_string) :
     _data_type(data_type)
 {
@@ -143,72 +182,147 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
       mix_model.models[0]->rates ? ParamValue::model : ParamValue::ML;
 
   const char *s = model_opts.c_str();
-  const char *tmp;
+
+  istringstream ss(model_opts);
+
+  // skip "+"
+  ss.get();
 
   /* parse the rest and set additional model params */
-  int rate_cats;
   ParamValue param_mode;
-  while(*s != '\0')
+  while(ss.peek() != EOF)
   {
-    // skip "+"
-    s++;
+    // set current string position, for error reporting
+    s = model_opts.c_str() + ss.tellg();
 
-    switch(toupper(*s))
+    switch(toupper(ss.get()))
     {
+      case EOF:
       case '\0':
       case '+':
         break;
       case 'F':
-        switch (toupper(*(s+1)))
+        try
         {
-          case '\0':
-          case '+':
-          case 'C':
-            param_mode = ParamValue::empirical;
-            break;
-          case 'O':
-            param_mode = ParamValue::ML;
-            break;
-          case 'E':
-            param_mode = ParamValue::equal;
-            break;
-          default:
-            throw runtime_error(string("Invalid frequencies specification: ") + s);
-        }
-        _param_mode[PLLMOD_OPT_PARAM_FREQUENCIES] = param_mode;
-        break;
-      case 'I':
-        switch (toupper(*(s+1)))
-        {
-          case '\0':
-          case '+':
-          case 'O':
-            param_mode = ParamValue::ML;
-            break;
-          case 'C':
-            param_mode = ParamValue::empirical;
-            break;
-          case '{':
-            if (sscanf(s+1, "{%lf}", &_pinv) == 1 && ((tmp = strchr(s, '}')) != NULL))
+          switch (toupper(ss.get()))
+          {
+            case EOF:
+            case '\0':
+            case '+':
+            case 'C':
+              param_mode = ParamValue::empirical;
+              break;
+            case 'O':
+              param_mode = ParamValue::ML;
+              break;
+            case 'E':
+              param_mode = ParamValue::equal;
+              break;
+            case 'U':
             {
               param_mode = ParamValue::user;
-              s = tmp+1;
+
+              /* for now, read single set of frequencies */
+              doubleVector user_freqs;
+              if (read_param(ss, user_freqs))
+              {
+                if (user_freqs.size() != _num_states)
+                {
+                  throw runtime_error("Invalid number of user frequencies specified: " +
+                           std::to_string(user_freqs.size()) + "\n" +
+                           "Number of frequencies must be equal to the number of states: " +
+                           std::to_string(_num_states) + "\n");
+                }
+
+                double sum = 0.;
+                bool invalid = false;
+                for (auto v: user_freqs)
+                {
+                  invalid |= (v <= 0. || v >= 1.);
+                  sum += v;
+                }
+                invalid |= (fabs(sum - 1.) > 1e-6);
+
+                if (invalid)
+                {
+                  throw runtime_error("Invalid base frequencies specified! "
+                      "Frequencies must be positive numbers and must add up to 1.");
+                }
+
+                for (auto& m: _submodels)
+                  m.base_freqs(user_freqs);
+              }
+              else
+                throw parse_error();
             }
-            else
-              throw runtime_error(string("Invalid p-inv specification: ") + s);
             break;
-          default:
-            throw runtime_error(string("Invalid p-inv specification: ") + s);
+            default:
+              throw parse_error();
+          }
+          _param_mode[PLLMOD_OPT_PARAM_FREQUENCIES] = param_mode;
         }
-        _param_mode[PLLMOD_OPT_PARAM_PINV] = param_mode;
+        catch(parse_error& e)
+        {
+          throw runtime_error(string("Invalid frequencies specification: ") + s);
+        }
+        break;
+      case 'I':
+        try
+        {
+          switch (toupper(ss.get()))
+          {
+            case EOF:
+            case '\0':
+            case '+':
+            case 'O':
+              param_mode = ParamValue::ML;
+              break;
+            case 'C':
+              param_mode = ParamValue::empirical;
+              break;
+            case 'U':
+              if (read_param(ss, _pinv))
+                param_mode = ParamValue::user;
+              else
+                throw parse_error();
+              break;
+            default:
+              throw parse_error();
+          }
+          _param_mode[PLLMOD_OPT_PARAM_PINV] = param_mode;
+        }
+        catch(parse_error& e)
+        {
+          throw runtime_error(string("Invalid p-inv specification: ") + s);
+        }
+        break;
+      case 'G':
+        try
+        {
+          /* allow to override mixture ratehet mode for now */
+          _rate_het = PLLMOD_UTIL_MIXTYPE_GAMMA;
+          if (isdigit(ss.peek()))
+          {
+            ss >> _num_ratecats;
+          }
+          else if (_num_ratecats == 1)
+            _num_ratecats = 4;
+
+          if (read_param(ss, _alpha))
+          {
+            _param_mode[PLLMOD_OPT_PARAM_ALPHA] = ParamValue::user;
+          }
+        }
+        catch(parse_error& e)
+        {
+          throw runtime_error(string("Invalid GAMMA specification: ") + s);
+        }
         break;
       case 'R':
-      case 'G':
-        /* allow to override mixture ratehet mode for now */
-        _rate_het = toupper(*s) == 'R' ? PLLMOD_UTIL_MIXTYPE_FREE : PLLMOD_UTIL_MIXTYPE_GAMMA;
-        if (sscanf(s+1, "%d", &rate_cats) == 1)
+        _rate_het = PLLMOD_UTIL_MIXTYPE_FREE;
+        if (isdigit(ss.peek()))
         {
-          _num_ratecats = rate_cats;
+          ss >> _num_ratecats;
         }
         else if (_num_ratecats == 1)
           _num_ratecats = 4;
@@ -216,10 +330,6 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
       default:
         throw runtime_error("Wrong model specification: " + model_opts);
     }
-
-    // rewind to next term
-    while (*s != '+' && *s != '\0')
-      s++;
   }
 
   switch (_param_mode.at(PLLMOD_OPT_PARAM_FREQUENCIES))
@@ -310,7 +420,7 @@ std::string Model::to_string() const
   switch(_param_mode.at(PLLMOD_OPT_PARAM_FREQUENCIES))
   {
     case ParamValue::empirical:
-      model_string << "+F";
+      model_string << "+FC";
       break;
     case ParamValue::ML:
       model_string << "+FO";
@@ -318,6 +428,18 @@ std::string Model::to_string() const
     case ParamValue::equal:
       model_string << "+FE";
       break;
+    case ParamValue::user:
+    {
+      model_string << "+FU{";
+      size_t i = 0;
+      for (auto f: base_freqs(0))
+      {
+        model_string << ((i > 0) ? "/" : "") << f;
+        ++i;
+      }
+      model_string << "}";
+    }
+    break;
     default:
       break;
   }
@@ -331,7 +453,7 @@ std::string Model::to_string() const
       model_string << "+I";
       break;
     case ParamValue::user:
-      model_string << "+I{" << _pinv << "}";
+      model_string << "+IU{" << _pinv << "}";
       break;
     default:
       break;
