@@ -35,6 +35,7 @@ make
 ## Documentation and Support
 
 Documentation can be found in the [github wiki](https://github.com/amkozlov/raxml-ng/wiki) (work in progress).
+
 Also please check the online help with `raxml-ng -h`.
 
 If still in doubt, please feel free to post to the [RAxML google group](https://groups.google.com/forum/#!forum/raxml).

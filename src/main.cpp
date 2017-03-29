@@ -311,7 +311,6 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
     }
     case StartingTree::random:
       /* no starting tree provided, generate a random one */
-      assert(opts.command != Command::evaluate);
 
       LOG_DEBUG << "Generating a random starting tree with " << msa.size() << " taxa" << endl;
 
@@ -477,6 +476,17 @@ void draw_bootstrap_support(RaxmlInstance& instance, const Checkpoint& checkp)
   instance.bs_tree->calc_support();
 }
 
+void save_ml_trees(const Options& opts, const Checkpoint& checkp)
+{
+  NewickStream nw(opts.ml_trees_file(), std::ios::out);
+  Tree ml_tree = checkp.tree;
+  for (auto topol: checkp.ml_trees)
+  {
+    ml_tree.topology(topol.second);
+    nw << ml_tree;
+  }
+}
+
 void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
 {
   auto const& opts = instance.opts;
@@ -489,6 +499,13 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
   {
     LOG_INFO << "\n   Partition " << p << ": " << instance.parted_msa.part_info(p).name().c_str() << endl;
     LOG_INFO << checkp.models.at(p);
+  }
+
+  if (opts.command == Command::evaluate)
+  {
+    save_ml_trees(opts, checkp);
+
+    LOG_INFO << "\nAll optimized tree(s) saved to: " << sysutil_realpath(opts.ml_trees_file()) << endl;
   }
 
   if (opts.command == Command::search || opts.command == Command::all)
@@ -506,13 +523,7 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
 
     if (checkp.ml_trees.size() > 1)
     {
-      NewickStream nw(opts.ml_trees_file(), std::ios::out);
-      Tree ml_tree = checkp.tree;
-      for (auto topol: checkp.ml_trees)
-      {
-        ml_tree.topology(topol.second);
-        nw << ml_tree;
-      }
+      save_ml_trees(opts, checkp);
 
       LOG_INFO << "All ML trees saved to: " << sysutil_realpath(opts.ml_trees_file()) << endl;
     }
@@ -574,12 +585,20 @@ void thread_main(const RaxmlInstance& instance, CheckpointManager& cm)
   /* get partitions assigned to the current thread */
   auto const& part_assign = instance.proc_part_assign.at(ParallelContext::proc_id());
 
-  if ((opts.command == Command::search || opts.command == Command::all) &&
-      !instance.start_trees.empty())
+  if ((opts.command == Command::search || opts.command == Command::all ||
+      opts.command == Command::evaluate ) && !instance.start_trees.empty())
   {
 
-    LOG_INFO << "\nStarting ML tree search with " << opts.num_searches <<
-        " distinct starting trees" << endl << endl;
+    if (opts.command == Command::evaluate)
+    {
+      LOG_INFO << "\nEvaluating " << opts.num_searches <<
+          " trees" << endl << endl;
+    }
+    else
+    {
+      LOG_INFO << "\nStarting ML tree search with " << opts.num_searches <<
+          " distinct starting trees" << endl << endl;
+    }
 
     size_t start_tree_num = cm.checkpoint().ml_trees.size();
     bool use_ckp_tree = cm.checkpoint().search_state.step != CheckpointStep::start;
@@ -603,19 +622,29 @@ void thread_main(const RaxmlInstance& instance, CheckpointManager& cm)
   //      treeinfo->tree(tree);
 
       Optimizer optimizer(opts);
-      if (opts.command == Command::search || opts.command == Command::all)
+      if (opts.command == Command::evaluate)
       {
-        optimizer.optimize_topology(*treeinfo, cm);
+        LOG_INFO_TS << "Tree #" << start_tree_num <<
+            ", initial LogLikelihood: " << FMT_LH(treeinfo->loglh()) << endl;
+        cm.search_state().loglh = optimizer.optimize(*treeinfo);
+        cm.update_and_write(*treeinfo);
       }
       else
       {
-        LOG_INFO << "\nInitial LogLikelihood: " << FMT_LH(treeinfo->loglh()) << endl << endl;
-        optimizer.optimize(*treeinfo);
+        optimizer.optimize_topology(*treeinfo, cm);
       }
 
       LOG_PROGR << endl;
-      LOG_INFO_TS << "ML tree search #" << start_tree_num <<
-          ", logLikelihood: " << FMT_LH(cm.checkpoint().loglh()) << endl;
+      if (opts.command == Command::evaluate)
+      {
+        LOG_INFO_TS << "Tree #" << start_tree_num <<
+            ", final logLikelihood: " << FMT_LH(cm.checkpoint().loglh()) << endl;
+      }
+      else
+      {
+        LOG_INFO_TS << "ML tree search #" << start_tree_num <<
+            ", logLikelihood: " << FMT_LH(cm.checkpoint().loglh()) << endl;
+      }
       LOG_PROGR << endl;
 
       cm.save_ml_tree();
