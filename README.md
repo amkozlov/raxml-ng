@@ -8,17 +8,17 @@ RAxML-NG is a phylogenetic tree inference tool which uses maximum-likelihood (ML
 
 RAxML-NG offers improvements in speed, flexibility and user-friendliness over the previous RAxML versions. It also implements some of the features previously available in ExaML (Kozlov et al. 2015), including checkpointing and efficient load balancing for partitioned alignments (Kobert et al. 2014).
 
-RAxML-NG is currently under active development, and the mid-term plan is to have most functionality of RAxML 8.x covered.
+RAxML-NG is currently under active development, and the mid-term goal is to have most functionality of RAxML 8.x covered.
 You can see some of the planned features [here](https://github.com/amkozlov/raxml-ng/issues).
 
 ## Installation instructions
 
 * For most desktop Unix/Linux and macOS systems, the easiest way to install RAxML-NG is by using the pre-compiled binary:  
-[**Download 64-bit Linux binary**](https://github.com/amkozlov/raxml-ng/releases/download/0.1.0/raxml-ng_v0.1.0b_linux_x86_64.zip)  
-[**Download 64-bit OSX/macOS binary**](https://github.com/amkozlov/raxml-ng/releases/download/0.1.0/raxml-ng_v0.1.0b_macos_x86_64.zip)
+[**Download 64-bit Linux binary**](https://github.com/amkozlov/raxml-ng/releases/download/0.2.0/raxml-ng_v0.2.0b_linux_x86_64.zip)  
+[**Download 64-bit OSX/macOS binary**](https://github.com/amkozlov/raxml-ng/releases/download/0.2.0/raxml-ng_v0.2.0b_macos_x86_64.zip)
 
 * For clusters/supercomputers (i.e., if you want to use MPI), please use the following installation package which contains pre-built *libpll*. You will need `GCC 4.8+` and `CMake 2.8+` to compile RAxML-NG for your system.  
-[**Download RAxML-NG-MPI for Linux**](https://github.com/amkozlov/raxml-ng/releases/download/0.1.0/raxml-ng_v0.1.0b_linux_x86_64_MPI.zip)
+[**Download RAxML-NG-MPI for Linux**](https://github.com/amkozlov/raxml-ng/releases/download/0.2.0/raxml-ng_v0.2.0b_linux_x86_64_MPI.zip)
 
 * Binaries for Windows will become available later on
 
