@@ -1,6 +1,8 @@
 #ifndef RAXML_MODEL_H_
 #define RAXML_MODEL_H_
 
+#include <algorithm>
+
 #include "common.h"
 
 class SubstitutionModel
@@ -22,10 +24,33 @@ public:
   // getters
   unsigned int states() const;
   std::string name() const;
-  const doubleVector& base_freqs() const { return _base_freqs; };
-  const doubleVector& subst_rates() const { return _subst_rates; };
-  const intVector& rate_sym() const { return _rate_sym; };
-  const intVector& freq_sym() const { return _freq_sym; };
+  const doubleVector& base_freqs() const { return _base_freqs; }
+  const doubleVector& subst_rates() const { return _subst_rates; }
+  const intVector& rate_sym() const { return _rate_sym; }
+  const intVector& freq_sym() const { return _freq_sym; }
+
+  unsigned int num_rates() const  { return _states*(_states-1)/2; }
+  unsigned int num_uniq_rates() const
+  {
+    if (_rate_sym.empty())
+      return num_rates();
+    else
+      return *std::max_element(_rate_sym.cbegin(), _rate_sym.cend()) + 1;
+  }
+
+  doubleVector uniq_subst_rates() const
+  {
+    if (!_rate_sym.empty())
+    {
+      doubleVector uniq_rates(num_uniq_rates());
+      for (size_t i = 0; i < _subst_rates.size(); ++i)
+        uniq_rates[_rate_sym[i]] = _subst_rates[i];
+      return uniq_rates;
+    }
+    else
+      return _subst_rates;
+  };
+
 
   // setters
   void base_freqs(const doubleVector& v)
@@ -39,10 +64,25 @@ public:
 
   void subst_rates(const doubleVector& v)
   {
-    if (v.size() != _states * (_states - 1) / 2)
+    if (v.size() != num_rates())
       throw std::invalid_argument("Invalid size of subst_rates vector!");
 
     _subst_rates = v;
+  };
+
+  void uniq_subst_rates(const doubleVector& v)
+  {
+    if (!_rate_sym.empty())
+    {
+      if (v.size() != num_uniq_rates())
+        throw std::invalid_argument("Invalid size of subst_rates vector!");
+
+      _subst_rates.resize(num_rates());
+      for (size_t i = 0; i < _subst_rates.size(); ++i)
+        _subst_rates[i] = v[_rate_sym[i]];
+    }
+    else
+      subst_rates(v);
   };
 
 private:

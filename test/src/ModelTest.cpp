@@ -34,6 +34,23 @@ TEST(ModelTest, GTR)
   EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_ALPHA);
 }
 
+TEST(ModelTest, GTR_R_user)
+{
+  // buildup
+  auto model = Model(DataType::autodetect, "GTR{0.1/0.5/1/2/3.5/0.5}+R3+Fc");
+
+  // tests
+  EXPECT_EQ(model.to_string(), "GTR{0.2/1/2/4/7/1}+FC+R3");
+  EXPECT_EQ(model.data_type(), DataType::dna);
+  EXPECT_EQ(model.name(), "GTR");
+  EXPECT_EQ(model.num_states(), 4);
+  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_FREE);
+  EXPECT_EQ(model.num_ratecats(), 3);
+  EXPECT_EQ(model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES), ParamValue::user);
+  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_RATE_WEIGHTS | PLLMOD_OPT_PARAM_FREE_RATES);
+}
+
+
 TEST(ModelTest, JCI_user)
 {
   // buildup
@@ -68,7 +85,7 @@ TEST(ModelTest, JCFG_user)
   EXPECT_EQ(model.alpha(), 2.5);
 }
 
-TEST(ModelTest, HKY_user)
+TEST(ModelTest, HKY_user_freqs)
 {
   // buildup
   auto model = Model(DataType::autodetect, "HKY+FU{0.1/0.299/0.201/0.4}");
@@ -87,6 +104,30 @@ TEST(ModelTest, HKY_user)
   EXPECT_EQ(model.base_freqs(0)[1], 0.299);
   EXPECT_EQ(model.base_freqs(0)[2], 0.201);
   EXPECT_EQ(model.base_freqs(0)[3], 0.4);
+}
+
+TEST(ModelTest, HKY_user_rates)
+{
+  // buildup
+  auto model = Model(DataType::autodetect, "HKY{1/2.424}+FC");
+
+  // tests
+  EXPECT_EQ(model.to_string(), "HKY{1/2.424}+FC");
+  EXPECT_EQ(model.data_type(), DataType::dna);
+  EXPECT_EQ(model.name(), "HKY");
+  EXPECT_EQ(model.num_states(), 4);
+  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_FIXED);
+  EXPECT_EQ(model.num_ratecats(), 1);
+  EXPECT_EQ(model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES), ParamValue::empirical);
+  EXPECT_EQ(model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES), ParamValue::user);
+  EXPECT_EQ(model.params_to_optimize(), 0);
+  EXPECT_EQ(model.subst_rates(0).size(), 6);
+  EXPECT_EQ(model.subst_rates(0)[0], 1.0);
+  EXPECT_EQ(model.subst_rates(0)[1], 2.424);
+  EXPECT_EQ(model.subst_rates(0)[2], 1.0);
+  EXPECT_EQ(model.subst_rates(0)[3], 1.0);
+  EXPECT_EQ(model.subst_rates(0)[4], 2.424);
+  EXPECT_EQ(model.subst_rates(0)[5], 1.0);
 }
 
 TEST(ModelTest, LGFI)
@@ -118,3 +159,31 @@ TEST(ModelTest, LG4X)
   EXPECT_EQ(model.num_ratecats(), 4);
   EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_FREE_RATES | PLLMOD_OPT_PARAM_RATE_WEIGHTS);
 }
+
+TEST(ModelTest, LG_R4_user)
+{
+  // buildup
+  auto model = Model(DataType::autodetect, "LG+R4{1/2/3/4}");
+
+  // tests
+  EXPECT_EQ(model.to_string(), "LG+R4{0.4/0.8/1.2/1.6}{0.25/0.25/0.25/0.25}");
+  EXPECT_EQ(model.data_type(), DataType::protein);
+  EXPECT_EQ(model.name(), "LG");
+  EXPECT_EQ(model.num_states(), 20);
+  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_FREE);
+  EXPECT_EQ(model.num_ratecats(), 4);
+  EXPECT_EQ(model.params_to_optimize(), 0);
+  EXPECT_EQ(model.param_mode(PLLMOD_OPT_PARAM_FREE_RATES), ParamValue::user);
+  EXPECT_EQ(model.param_mode(PLLMOD_OPT_PARAM_RATE_WEIGHTS), ParamValue::user);
+  EXPECT_EQ(model.ratecat_weights().size(), 4);
+  EXPECT_EQ(model.ratecat_weights()[0], 1. / 4.);
+  EXPECT_EQ(model.ratecat_weights()[1], 1. / 4.);
+  EXPECT_EQ(model.ratecat_weights()[2], 1. / 4.);
+  EXPECT_EQ(model.ratecat_weights()[3], 1. / 4.);
+  EXPECT_EQ(model.ratecat_rates().size(), 4);
+  EXPECT_EQ(model.ratecat_rates()[0], 0.4);
+  EXPECT_EQ(model.ratecat_rates()[1], 0.8);
+  EXPECT_EQ(model.ratecat_rates()[2], 1.2);
+  EXPECT_EQ(model.ratecat_rates()[3], 1.6);
+}
+
