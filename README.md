@@ -1,6 +1,6 @@
 # RAxML New Generation
 
-[![License](https://img.shields.io/badge/license-AGPL-blue.svg)](http://www.gnu.org/licenses/agpl-3.0.en.html)
+[![DOI](https://zenodo.org/badge/75947982.svg)](https://zenodo.org/badge/latestdoi/75947982) [![License](https://img.shields.io/badge/license-AGPL-blue.svg)](http://www.gnu.org/licenses/agpl-3.0.en.html)
 
 ## Introduction
 
@@ -61,9 +61,11 @@ If still in doubt, please feel free to post to the [RAxML google group](https://
 
      `./raxml-ng --evaluate --msa testAA.fa --model partitions.txt --tree test.tree --brlen scaled`
 
-## License and third party licenses
+## License and citation
 
 The code is currently licensed under the GNU Affero General Public License version 3.
+
+Pending the publication, you can cite this code as [DOI:10.5281/zenodo.492245](https://doi.org/10.5281/zenodo.492245)
 
 ## The team
 
