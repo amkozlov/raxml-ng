@@ -5,14 +5,14 @@
 using namespace std;
 
 Tree::Tree (const Tree& other) : BasicTree(other._num_tips),
-    _pll_utree_start(other.pll_utree_copy())
+    _pll_utree(other.pll_utree_copy())
 {
 }
 
-Tree::Tree (Tree&& other) : BasicTree(other._num_tips), _pll_utree_start(other._pll_utree_start)
+Tree::Tree (Tree&& other) : BasicTree(other._num_tips), _pll_utree(other._pll_utree)
 {
   other._num_tips = 0;
-  other._pll_utree_start = nullptr;
+  other._pll_utree = nullptr;
   swap(_pll_utree_tips, other._pll_utree_tips);
 }
 
@@ -20,10 +20,10 @@ Tree& Tree::operator=(const Tree& other)
 {
   if (this != &other)
   {
-    if (_pll_utree_start)
-      pll_utree_destroy(_pll_utree_start, nullptr);
+    if (_pll_utree)
+      pll_utree_destroy(_pll_utree, nullptr);
 
-    _pll_utree_start = other.pll_utree_copy();
+    _pll_utree = other.pll_utree_copy();
     _num_tips = other._num_tips;
   }
 
@@ -36,14 +36,14 @@ Tree& Tree::operator=(Tree&& other)
   {
     _num_tips = 0;
     _pll_utree_tips.clear();
-    if (_pll_utree_start)
+    if (_pll_utree)
     {
-      pll_utree_destroy(_pll_utree_start, nullptr);
-     _pll_utree_start = nullptr;
+      pll_utree_destroy(_pll_utree, nullptr);
+     _pll_utree = nullptr;
     }
 
     swap(_num_tips, other._num_tips);
-    swap(_pll_utree_start, other._pll_utree_start);
+    swap(_pll_utree, other._pll_utree);
     swap(_pll_utree_tips, other._pll_utree_tips);
   }
 
@@ -52,8 +52,8 @@ Tree& Tree::operator=(Tree&& other)
 
 Tree::~Tree ()
 {
-  if (_pll_utree_start)
-    pll_utree_destroy(_pll_utree_start, nullptr);
+  if (_pll_utree)
+    pll_utree_destroy(_pll_utree, nullptr);
 }
 
 Tree Tree::buildRandom(size_t num_tips, const char * const* tip_labels)
@@ -61,7 +61,7 @@ Tree Tree::buildRandom(size_t num_tips, const char * const* tip_labels)
   Tree tree;
 
   tree._num_tips = num_tips;
-  tree._pll_utree_start = pllmod_utree_create_random(num_tips, tip_labels);
+  tree._pll_utree = pllmod_utree_create_random(num_tips, tip_labels);
 
   return tree;
 }
@@ -88,18 +88,18 @@ Tree Tree::buildParsimony(const PartitionedMSA& parted_msa, unsigned int random_
   tree._num_tips = msa.size();
 
 
-  tree._pll_utree_start = pllmod_utree_create_parsimony(msa.size(),
-                                                        msa.length(),
-                                                        msa.pll_msa()->label,
-                                                        msa.pll_msa()->sequence,
-                                                        weights,
-                                                        map,
-                                                        num_states,
-                                                        attributes,
-                                                        random_seed,
-                                                        pscore);
+  tree._pll_utree = pllmod_utree_create_parsimony(msa.size(),
+                                                  msa.length(),
+                                                  msa.pll_msa()->label,
+                                                  msa.pll_msa()->sequence,
+                                                  weights,
+                                                  map,
+                                                  num_states,
+                                                  attributes,
+                                                  random_seed,
+                                                  pscore);
 
-  if (!tree._pll_utree_start)
+  if (!tree._pll_utree)
     throw runtime_error("ERROR building parsimony tree: " + string(pll_errmsg));
 
   return tree;
@@ -112,10 +112,9 @@ Tree Tree::loadFromFile(const std::string& file_name)
   pll_utree_t * utree;
   pll_rtree_t * rtree;
 
-  unsigned int tip_count;
-  if (!(rtree = pll_rtree_parse_newick(file_name.c_str(), &tip_count)))
+  if (!(rtree = pll_rtree_parse_newick(file_name.c_str())))
   {
-    if (!(utree = pll_utree_parse_newick(file_name.c_str(), &tip_count)))
+    if (!(utree = pll_utree_parse_newick(file_name.c_str())))
     {
       throw runtime_error("ERROR reading tree file: " + string(pll_errmsg));
     }
@@ -126,22 +125,22 @@ Tree Tree::loadFromFile(const std::string& file_name)
     utree = pll_rtree_unroot(rtree);
 
     /* optional step if using default PLL clv/pmatrix index assignments */
-    pll_utree_reset_template_indices(utree, tip_count);
+    pll_utree_reset_template_indices(get_pll_utree_root(utree), utree->tip_count);
   }
 
-  tree._num_tips = tip_count;
-  tree._pll_utree_start = utree;
+  tree._num_tips = utree->tip_count;
+  tree._pll_utree = utree;
 
   return tree;
 }
 
-PllTreeVector const& Tree::tip_nodes() const
+PllNodeVector const& Tree::tip_nodes() const
 {
  if (_pll_utree_tips.empty() && _num_tips > 0)
  {
-   _pll_utree_tips.resize(_num_tips);
+   assert(_num_tips == _pll_utree->tip_count);
 
-   pll_utree_query_tipnodes(_pll_utree_start, _pll_utree_tips.data());
+   _pll_utree_tips.assign(_pll_utree->nodes, _pll_utree->nodes + _pll_utree->tip_count);
  }
 
  return _pll_utree_tips;
@@ -163,8 +162,7 @@ void Tree::reset_tip_ids(const NameIdMap& label_id_map)
   if (label_id_map.size() != _num_tips)
     throw invalid_argument("Invalid map size");
 
-  tip_nodes();
-  for (auto& node: _pll_utree_tips)
+  for (auto& node: tip_nodes())
   {
     const unsigned int tip_id = label_id_map.at(node->label);
     node->clv_index = node->node_index = tip_id;
@@ -174,31 +172,27 @@ void Tree::reset_tip_ids(const NameIdMap& label_id_map)
 
 void Tree::fix_missing_brlens(double new_brlen)
 {
-  pllmod_utree_set_length_recursive(_pll_utree_start, new_brlen, 1);
+  pllmod_utree_set_length_recursive(_pll_utree, new_brlen, 1);
 }
 
-PllTreeVector Tree::subnodes() const
+PllNodeVector Tree::subnodes() const
 {
-  std::vector<pll_utree_t*> subnodes;
+  PllNodeVector subnodes;
 
   if (_num_tips > 0)
   {
     subnodes.resize(num_subnodes());
 
-    pllmod_utree_traverse_apply(_pll_utree_start, nullptr,
-                                [](pll_utree * node, void * data) -> int
-                                { auto list = (pll_utree_t**) data;
-                                  list[node->node_index] = node;
-                                  if (node->next)
-                                  {
-                                    list[node->next->node_index] = node->next;
-                                    list[node->next->next->node_index] = node->next->next;
-                                  }
-//                                  printf("node: %u\n", node->node_index);
-                                  return 1;
-                                },
-                                nullptr,
-                                (void*) subnodes.data());
+    for (size_t i = 0; i < _pll_utree->tip_count + _pll_utree->inner_count; ++i)
+    {
+      auto node = _pll_utree->nodes[i];
+      subnodes[node->node_index] = node;
+      if (node->next)
+      {
+        subnodes[node->next->node_index] = node->next;
+        subnodes[node->next->next->node_index] = node->next->next;
+      }
+    }
   }
 
   return subnodes;
@@ -231,8 +225,8 @@ void Tree::topology(const TreeTopology& topol)
   unsigned int pmatrix_index = 0;
   for (const auto& branch: topol)
   {
-    pll_utree_t * left_node = allnodes.at(branch.left_node_id);
-    pll_utree_t * right_node = allnodes.at(branch.right_node_id);
+    pll_unode_t * left_node = allnodes.at(branch.left_node_id);
+    pll_unode_t * right_node = allnodes.at(branch.right_node_id);
     pllmod_utree_connect_nodes(left_node, right_node, branch.length);
 
     // important: make sure all branches have distinct pmatrix indices!
@@ -261,5 +255,7 @@ void TreeCollection::push_back(double score, TreeTopology&& topol)
   _trees.emplace_back(score, topol);
 }
 
-
-
+pll_unode_t* get_pll_utree_root(const pll_utree_t* tree)
+{
+  return tree->nodes[tree->tip_count + tree->inner_count - 1];
+}

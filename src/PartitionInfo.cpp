@@ -117,10 +117,17 @@ void PartitionInfo::set_modeL_empirical_params()
     for (unsigned int i = 0; i < _stats->states; ++i)
     {
       if (!(_stats->freqs[i] > 0.))
+      {
+        LOG_ERROR << "\nBase frequencies: ";
+        for (unsigned int j = 0; j < _stats->states; ++j)
+          LOG_ERROR << _stats->freqs[j] <<  " ";
+        LOG_ERROR << endl;
+
         throw runtime_error("Frequency of state " + to_string(i) +
                             " in partition " + _name + " is 0!\n"
                             "Please either change your partitioning scheme or "
                             "use model state frequencies for this partition!");
+      }
     }
   }
 

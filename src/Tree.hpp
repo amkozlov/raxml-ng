@@ -4,6 +4,8 @@
 #include "common.h"
 #include "PartitionedMSA.hpp"
 
+pll_unode_t* get_pll_utree_root(const pll_utree_t* tree);
+
 struct TreeBranch
 {
   TreeBranch() : left_node_id(0), right_node_id(0), length(0.) {};
@@ -17,7 +19,7 @@ struct TreeBranch
 
 typedef std::vector<TreeBranch> TreeTopology;
 
-typedef std::vector<pll_utree_t*> PllTreeVector;
+typedef std::vector<pll_unode_t*> PllNodeVector;
 
 class BasicTree
 {
@@ -38,9 +40,12 @@ protected:
 class Tree : public BasicTree
 {
 public:
-  Tree() : BasicTree(0), _pll_utree_start(nullptr) {};
-  Tree(size_t num_tips, pll_utree_t* pll_utree_start) :
-    BasicTree(num_tips), _pll_utree_start(pll_utree_clone(pll_utree_start)) {};
+  Tree() : BasicTree(0), _pll_utree(nullptr) {}
+  Tree(unsigned int tip_count, const pll_unode_t& root) :
+    BasicTree(tip_count),
+    _pll_utree(pll_utree_wraptree(pll_utree_graph_clone(&root), tip_count)) {}
+  Tree(const pll_utree_t& pll_utree) :
+    BasicTree(pll_utree.tip_count), _pll_utree(pll_utree_clone(&pll_utree)) {}
 
   Tree (const Tree& other);
   Tree& operator=(const Tree& other);
@@ -61,19 +66,22 @@ public:
   void topology(const TreeTopology& topol);
 
   // TODO: use move semantics to transfer ownership?
-  pll_utree_t * pll_utree_copy() const { return pll_utree_clone(_pll_utree_start); };
-  const pll_utree_t& pll_utree_start() const { return *_pll_utree_start; };
+  pll_utree_t * pll_utree_copy() const { return pll_utree_clone(_pll_utree); }
+  const pll_utree_t& pll_utree() const { return *_pll_utree; }
+
+  // TODO: store root explicitly
+  const pll_unode_t& pll_utree_root() const { return *get_pll_utree_root(_pll_utree); }
 
   void fix_missing_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
   void reset_tip_ids(const NameIdMap& label_id_map);
 
 protected:
-  pll_utree_t* _pll_utree_start;
+  pll_utree_t* _pll_utree;
 
-  mutable PllTreeVector _pll_utree_tips;
+  mutable PllNodeVector _pll_utree_tips;
 
-  PllTreeVector const& tip_nodes() const;
-  PllTreeVector subnodes() const;
+  PllNodeVector const& tip_nodes() const;
+  PllNodeVector subnodes() const;
 };
 
 typedef std::pair<double, TreeTopology> ScoredTopology;
@@ -87,8 +95,8 @@ public:
 
   size_t size() const { return  _trees.size(); }
   const_iterator best() const;
-  value_type::first_type best_score() const { return best()->first; };
-  const value_type::second_type& best_topology() const { return best()->second; };
+  value_type::first_type best_score() const { return best()->first; }
+  const value_type::second_type& best_topology() const { return best()->second; }
 
   const_iterator begin() const { return _trees.cbegin(); }
   const_iterator end() const { return _trees.cend(); }

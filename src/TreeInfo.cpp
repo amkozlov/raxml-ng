@@ -22,7 +22,8 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
                     const PartitionAssignment& part_assign,
                     const std::vector<uintVector>& site_weights)
 {
-  _pll_treeinfo = pllmod_treeinfo_create(tree.pll_utree_copy(), tree.num_tips(),
+  _pll_treeinfo = pllmod_treeinfo_create(pll_utree_graph_clone(&tree.pll_utree_root()),
+                                         tree.num_tips(),
                                          parted_msa.part_count(), opts.brlen_linkage);
 
   if (!_pll_treeinfo)
@@ -80,14 +81,14 @@ TreeInfo::~TreeInfo ()
 {
   if (_pll_treeinfo)
   {
-    pll_utree_destroy(_pll_treeinfo->root, NULL);
+    pll_utree_graph_destroy(_pll_treeinfo->root, NULL);
     pllmod_treeinfo_destroy(_pll_treeinfo);
   }
 }
 
 Tree TreeInfo::tree() const
 {
-  return _pll_treeinfo ? Tree(_pll_treeinfo->tip_count, _pll_treeinfo->root) : Tree();
+  return _pll_treeinfo ? Tree(_pll_treeinfo->tip_count, *_pll_treeinfo->root) : Tree();
 }
 
 double TreeInfo::loglh(bool incremental)

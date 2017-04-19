@@ -8,12 +8,12 @@ BootstrapTree::BootstrapTree (const Tree& tree) : Tree(tree), _num_bs_trees(0), 
 {
   _pll_splits_hash = nullptr;
 
-  add_splits_to_hashtable(_pll_utree_start, true);
+  add_splits_to_hashtable(pll_utree_root(), true);
 }
 
 BootstrapTree::~BootstrapTree ()
 {
-  pll_utree_destroy(_pll_utree_start, nullptr);
+  pll_utree_destroy(_pll_utree, nullptr);
   pllmod_utree_split_hashtable_destroy(_pll_splits_hash);
   free(_node_split_map);
 }
@@ -23,17 +23,17 @@ void BootstrapTree::add_bootstrap_tree(const Tree& tree)
   if (tree.num_tips() != _num_tips)
     throw runtime_error("Incompatible tree!");
 
-  add_splits_to_hashtable(&tree.pll_utree_start(), false);
+  add_splits_to_hashtable(tree.pll_utree_root(), false);
   _num_bs_trees++;
 }
 
-void BootstrapTree::add_splits_to_hashtable(const pll_utree_t* root, bool ref_tree)
+void BootstrapTree::add_splits_to_hashtable(const pll_unode_t& root, bool ref_tree)
 {
   unsigned int n_splits;
   int ** node_split_map = ref_tree ? &_node_split_map : nullptr;
   int update_only = ref_tree ? 0 : 1;
 
-  pll_split_t * ref_splits = pllmod_utree_split_create((pll_utree_t*) root,
+  pll_split_t * ref_splits = pllmod_utree_split_create((pll_unode_t*) &root,
                                                        _num_tips,
                                                        &n_splits,
                                                        node_split_map);
@@ -70,9 +70,8 @@ void BootstrapTree::calc_support()
 //    printf("node_id %d, split_id %d\n", i, _node_split_map[i]);
 //  printf("\n\n");
 
-  PllTreeVector inner(num_inner());
-
-  pll_utree_query_innernodes(_pll_utree_start, inner.data());
+  PllNodeVector inner(_pll_utree->nodes + _pll_utree->tip_count,
+                      _pll_utree->nodes + _pll_utree->tip_count + _pll_utree->inner_count - 1);
 
   vector<bool> split_plotted(_num_splits);
   for (auto node: inner)

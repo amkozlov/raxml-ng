@@ -63,6 +63,7 @@ private:
   size_t _offset;
 };
 
+NewickStream& operator<<(NewickStream& stream, const pll_unode_t& root);
 NewickStream& operator<<(NewickStream& stream, const pll_utree_t& tree);
 NewickStream& operator<<(NewickStream& stream, const Tree& tree);
 NewickStream& operator>>(NewickStream& stream, Tree& tree);

@@ -34,10 +34,11 @@ public:
   ~TreeInfo ();
 
   const pllmod_treeinfo_t& pll_treeinfo() const { return *_pll_treeinfo; }
-  const pll_utree& pll_utree_root() const { assert(_pll_treeinfo); return *_pll_treeinfo->root; }
+  const pll_unode_t& pll_utree_root() const { assert(_pll_treeinfo); return *_pll_treeinfo->root; }
 
   Tree tree() const;
-  void tree(const Tree& tree) { _pll_treeinfo->root = tree.pll_utree_copy(); }
+  void tree(const Tree& tree)
+  { _pll_treeinfo->root = pll_utree_graph_clone(&tree.pll_utree_root()); }
 
   /* in parallel mode, partition can be share among multiple threads and TreeInfo objects;
    * this method returns list of partition IDs for which this thread is designated as "master"

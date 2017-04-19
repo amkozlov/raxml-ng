@@ -21,7 +21,7 @@ private:
   bitv_hashtable_t* _pll_splits_hash;
   int * _node_split_map;
 
-  void add_splits_to_hashtable(const pll_utree_t* root, bool update_only);
+  void add_splits_to_hashtable(const pll_unode_t& root, bool update_only);
 };
 
 #endif /* RAXML_BOOTSTRAP_BOOTSTRAPTREE_HPP_ */
