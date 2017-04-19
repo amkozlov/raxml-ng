@@ -54,7 +54,7 @@ public:
   LogStream& logstream(LogLevel level);
   LogLevel log_level() const;
 
-  void set_log_filename(const std::string& fname);
+  void set_log_filename(const std::string& fname, std::ios_base::openmode mode = std::ios::out);
   void add_log_stream(std::ostream* stream);
   void set_log_level(LogLevel level);
 

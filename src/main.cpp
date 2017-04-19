@@ -779,6 +779,21 @@ int main(int argc, char** argv)
       print_banner();
       clean_exit(EXIT_SUCCESS);
       break;
+    case Command::evaluate:
+    case Command::search:
+    case Command::bootstrap:
+    case Command::all:
+      if (!instance.opts.redo_mode && instance.opts.result_files_exist())
+      {
+        LOG_ERROR << endl << "ERROR: Result files for the run with prefix `" <<
+                            (instance.opts.outfile_prefix.empty() ?
+                                instance.opts.msa_file : instance.opts.outfile_prefix) <<
+                            "` already exist!\n" <<
+                            "Please either choose a new prefix, remove old files, or add "
+                            "--redo command line switch to overwrite them." << endl << endl;
+        clean_exit(EXIT_FAILURE);
+      }
+      break;
     default:
       break;
   }
@@ -789,7 +804,11 @@ int main(int argc, char** argv)
 
   /* only master process writes the log file */
   if (ParallelContext::master())
-    logger().set_log_filename(instance.opts.log_file());
+  {
+    auto mode = !instance.opts.redo_mode && sysutil_file_exists(instance.opts.checkp_file()) ?
+        ios::app : ios::out;
+    logger().set_log_filename(instance.opts.log_file(), mode);
+  }
 
   print_banner();
   LOG_INFO << instance.opts;
@@ -807,16 +826,7 @@ int main(int argc, char** argv)
         {
           LOG_WARN << "WARNING: Running in REDO mode: existing checkpoints are ignored, "
               "and all result files will be overwritten!" << endl << endl;
-        }
-        else
-        {
-          if (instance.opts.result_files_exist())
-            throw runtime_error("Result files for the run with prefix `" +
-                                (instance.opts.outfile_prefix.empty() ?
-                                    instance.opts.msa_file : instance.opts.outfile_prefix) +
-                                "` already exist!\n"
-                                "Please either choose a new prefix, remove old files, or add "
-                                "--redo command line switch to overwrite them.");
+          instance.opts.remove_result_files();
         }
 
         CheckpointManager cm(instance.opts.checkp_file());

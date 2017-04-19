@@ -33,9 +33,9 @@ LogStream& Logging::logstream(LogLevel level)
     return _empty_stream;
 }
 
-void Logging::set_log_filename(const std::string& fname)
+void Logging::set_log_filename(const std::string& fname, ios_base::openmode mode)
 {
-  _logfile.open(fname, ofstream::out);
+  _logfile.open(fname, mode);
 }
 
 void Logging::add_log_stream(std::ostream* stream)

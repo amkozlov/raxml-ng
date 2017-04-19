@@ -82,7 +82,8 @@ public:
 
   void set_default_outfiles();
 
-  bool result_files_exist();
+  bool result_files_exist() const;
+  void remove_result_files() const;
 
 private:
   void set_default_outfile(std::string& fname, const std::string& suffix);

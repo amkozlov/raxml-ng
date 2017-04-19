@@ -25,10 +25,20 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.support_tree, "support");
 }
 
-bool Options::result_files_exist()
+bool Options::result_files_exist() const
 {
   return sysutil_file_exists(best_tree_file()) || sysutil_file_exists(bootstrap_trees_file()) ||
       sysutil_file_exists(support_tree_file());
+}
+
+void Options::remove_result_files() const
+{
+  if (sysutil_file_exists(best_tree_file()))
+    std::remove(best_tree_file().c_str());
+  if (sysutil_file_exists(bootstrap_trees_file()))
+    std::remove(bootstrap_trees_file().c_str());
+  if (sysutil_file_exists(support_tree_file()))
+    std::remove(support_tree_file().c_str());
 }
 
 static string get_simd_arch_name(unsigned int simd_arch)
