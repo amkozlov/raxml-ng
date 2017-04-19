@@ -22,13 +22,25 @@ You can see some of the planned features [here](https://github.com/amkozlov/raxm
 
 * Binaries for Windows will become available later on
 
-* If neither of the above options worked for you, please clone this repository and build RAxML-NG from scratch:
+* If neither of the above options worked for you, please clone this repository and build RAxML-NG from scratch.
+
+PTHREADS version:
 
 ```
 git clone --recursive https://github.com/amkozlov/raxml-ng
 cd raxml-ng
 mkdir build && cd build
 cmake ..
+make
+```
+
+MPI version:
+
+```
+git clone --recursive https://github.com/amkozlov/raxml-ng
+cd raxml-ng
+mkdir build && cd build
+cmake -DUSE_MPI=ON ..
 make
 ```
 

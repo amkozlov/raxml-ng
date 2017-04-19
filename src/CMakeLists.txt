@@ -3,7 +3,7 @@ file (GLOB_RECURSE raxml_sources ${PROJECT_SOURCE_DIR}/src/*.cpp)
 set (EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 
 # enable static linking
-if (STATIC_BUILD)
+if(STATIC_BUILD)
   SET(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
   SET(BUILD_SHARED_LIBRARIES OFF)
   SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
@@ -25,7 +25,7 @@ target_link_libraries (raxml_module ${RAXML_LOCALDEPS_DIR}/lib/libpll.a)
 target_link_libraries (raxml_module m)
 
 if(MPI_FOUND)
-target_link_libraries (raxml_module ${MPI_CXX_LIBRARIES})
+  target_link_libraries (raxml_module ${MPI_CXX_LIBRARIES})
 endif()
 
 if(MPI_COMPILE_FLAGS)
@@ -40,6 +40,8 @@ endif()
 
 if(MPI_FOUND)
   set_target_properties (raxml_module PROPERTIES OUTPUT_NAME raxml-ng-mpi)
+elseif(STATIC_BUILD)
+  set_target_properties (raxml_module PROPERTIES OUTPUT_NAME raxml-ng-static)
 else()
   set_target_properties (raxml_module PROPERTIES OUTPUT_NAME raxml-ng)
 endif()
