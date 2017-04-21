@@ -81,6 +81,12 @@ TreeInfo::~TreeInfo ()
 {
   if (_pll_treeinfo)
   {
+    for (unsigned int i = 0; i < _pll_treeinfo->partition_count; ++i)
+    {
+      if (_pll_treeinfo->partitions[i])
+        pll_partition_destroy(_pll_treeinfo->partitions[i]);
+    }
+
     pll_utree_graph_destroy(_pll_treeinfo->root, NULL);
     pllmod_treeinfo_destroy(_pll_treeinfo);
   }
