@@ -44,6 +44,8 @@ struct PartitionAssignment
 
   const_iterator begin() const { return _part_range_list.cbegin(); };
   const_iterator end() const { return _part_range_list.cend(); };
+  iterator begin() { return _part_range_list.begin(); };
+  iterator end() { return _part_range_list.end(); };
 
 private:
   container _part_range_list;

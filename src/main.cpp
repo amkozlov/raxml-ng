@@ -47,6 +47,7 @@ struct RaxmlInstance
   TreeList start_trees;
   BootstrapReplicateList bs_reps;
   PartitionAssignmentList proc_part_assign;
+  unique_ptr<LoadBalancer> load_balancer;
   unique_ptr<BootstrapTree> bs_tree;
 
   unique_ptr<NewickStream> start_tree_stream;
@@ -434,13 +435,66 @@ void balance_load(RaxmlInstance& instance)
     ++i;
   }
 
-//  SimpleLoadBalancer balancer;
-  KassianLoadBalancer balancer;
-
-  instance.proc_part_assign = balancer.get_all_assignments(part_sizes, ParallelContext::num_procs());
+  instance.proc_part_assign =
+      instance.load_balancer->get_all_assignments(part_sizes, ParallelContext::num_procs());
 
   LOG_INFO_TS << "Data distribution: " << PartitionAssignmentStats(instance.proc_part_assign) << endl;
   LOG_VERB << endl << instance.proc_part_assign;
+}
+
+void balance_load(RaxmlInstance& instance, WeightVectorList part_site_weights)
+{
+  /* This function is used to re-distribute sites across processes for each bootstrap replicate.
+   * Since during bootstrapping alignment sites are sampled with replacement, some sites will be
+   * absent from BS alignment. Therefore, site distribution computed for original alignment can
+   * be suboptimal for BS replicates. Here, we recompute the site distribution, ignoring all sites
+   * that are not present in BS replicate (i.e., have weight of 0 in part_site_weights).
+   * */
+
+  PartitionAssignment part_sizes;
+  WeightVectorList comp_pos_map(part_site_weights.size());
+
+  /* init list of partition sizes */
+  size_t i = 0;
+  for (auto const& weights: part_site_weights)
+  {
+    /* build mapping from compressed indices to the original/uncompressed ones */
+    comp_pos_map[i].reserve(weights.size());
+    for (size_t s = 0; s < weights.size(); ++s)
+    {
+      if (weights[s] > 0)
+      {
+        comp_pos_map[i].push_back(s);
+      }
+    }
+
+    LOG_DEBUG << "Partition #" << i << ": " << comp_pos_map[i].size() << endl;
+
+    /* add compressed partition length to the */
+    part_sizes.assign_sites(i, 0, comp_pos_map[i].size());
+    ++i;
+  }
+
+  instance.proc_part_assign =
+      instance.load_balancer->get_all_assignments(part_sizes, ParallelContext::num_procs());
+
+  LOG_VERB_TS << "Data distribution: " << PartitionAssignmentStats(instance.proc_part_assign) << endl;
+  LOG_DEBUG << endl << instance.proc_part_assign;
+
+  // translate partition range coordinates: compressed -> uncompressed
+  for (auto& part_assign: instance.proc_part_assign)
+  {
+    for (auto& part_range: part_assign)
+    {
+      const auto& pos_map = comp_pos_map[part_range.part_id];
+      const auto comp_start = part_range.start;
+      part_range.start = comp_start > 0 ? pos_map[comp_start] : 0;
+      part_range.length = pos_map[comp_start + part_range.length - 1] - part_range.start + 1;
+    }
+  }
+
+//  LOG_VERB_TS << "(uncompressed) Data distribution: " << PartitionAssignmentStats(instance.proc_part_assign) << endl;
+//  LOG_DEBUG << endl << instance.proc_part_assign;
 }
 
 void generate_bootstraps(RaxmlInstance& instance, const Checkpoint& checkp)
@@ -570,7 +624,7 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
   LOG_INFO << endl;
 }
 
-void thread_main(const RaxmlInstance& instance, CheckpointManager& cm)
+void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 {
   unique_ptr<TreeInfo> treeinfo;
 
@@ -615,11 +669,6 @@ void thread_main(const RaxmlInstance& instance, CheckpointManager& cm)
       }
       else
         treeinfo.reset(new TreeInfo(opts, tree, master_msa, part_assign));
-
-  //    if (!treeinfo)
-  //      treeinfo.reset(new TreeInfo(opts, tree, master_msa, part_assign));
-  //    else
-  //      treeinfo->tree(tree);
 
       Optimizer optimizer(opts);
       if (opts.command == Command::evaluate)
@@ -673,10 +722,19 @@ void thread_main(const RaxmlInstance& instance, CheckpointManager& cm)
   {
     ++bs_num;
 
+    // rebalance sites
+    if (ParallelContext::master_thread())
+    {
+      balance_load(instance, bs.site_weights);
+    }
+    ParallelContext::thread_barrier();
+
+    auto const& bs_part_assign = instance.proc_part_assign.at(ParallelContext::proc_id());
+
 //    Tree tree = Tree::buildRandom(master_msa.full_msa());
     /* for now, use the same random tree for all bootstraps */
     const Tree& tree = instance.random_tree;
-    treeinfo.reset(new TreeInfo(opts, tree, master_msa, part_assign, bs.site_weights));
+    treeinfo.reset(new TreeInfo(opts, tree, master_msa, bs_part_assign, bs.site_weights));
 
     Optimizer optimizer(opts);
     optimizer.optimize_topology(*treeinfo, cm);
@@ -829,9 +887,12 @@ int main(int argc, char** argv)
           instance.opts.remove_result_files();
         }
 
+        /* init load balancer */
+        instance.load_balancer.reset(new KassianLoadBalancer());
+
         CheckpointManager cm(instance.opts.checkp_file());
         ParallelContext::init_pthreads(instance.opts, std::bind(thread_main,
-                                                                std::cref(instance),
+                                                                std::ref(instance),
                                                                 std::ref(cm)));
 
         master_main(instance, cm);
