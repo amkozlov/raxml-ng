@@ -48,19 +48,32 @@ public:
 class RaxmlPartitionStream : public std::fstream
 {
 public:
-  RaxmlPartitionStream(std::string fname) : std::fstream(fname, std::ios::out), _offset(0) {}
+  RaxmlPartitionStream(std::string fname, bool use_range_string = false) :
+    std::fstream(fname, std::ios::out), _offset(0), _print_model_params(false),
+    _use_range_string(use_range_string) {}
   RaxmlPartitionStream(std::string fname, std::ios_base::openmode mode) :
-    std::fstream(fname, mode), _offset(0) {}
+    std::fstream(fname, mode), _offset(0), _print_model_params(false), _use_range_string(false) {}
+
+  bool print_model_params() const { return _print_model_params; }
+  void print_model_params(bool value) { _print_model_params = value; }
 
   void reset() { _offset = 0; }
-  void put_range(size_t part_len)
+  void put_range(const PartitionInfo& part_info)
   {
-    *this << (_offset+1) << "-" << (_offset+part_len);
-    _offset += part_len;
+    if (_use_range_string && !part_info.range_string().empty())
+      *this << part_info.range_string();
+    else
+    {
+      auto part_len = part_info.msa().length();
+      *this << (_offset+1) << "-" << (_offset+part_len);
+      _offset += part_len;
+    }
   }
 
 private:
   size_t _offset;
+  bool _print_model_params;
+  bool _use_range_string;
 };
 
 NewickStream& operator<<(NewickStream& stream, const pll_unode_t& root);

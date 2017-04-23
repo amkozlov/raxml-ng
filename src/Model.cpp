@@ -531,15 +531,22 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
   }
 }
 
-std::string Model::to_string() const
+std::string Model::to_string(bool print_params) const
 {
   ostringstream model_string;
   model_string << name();
 
-  if (_param_mode.at(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::user)
+  auto out_param_mode = _param_mode;
+  if (print_params)
+  {
+    for (auto& entry: out_param_mode)
+      entry.second = (entry.second == ParamValue::ML) ? ParamValue::user : entry.second;
+  }
+
+  if (out_param_mode.at(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::user)
     print_param(model_string, submodel(0).uniq_subst_rates());
 
-  switch(_param_mode.at(PLLMOD_OPT_PARAM_FREQUENCIES))
+  switch(out_param_mode.at(PLLMOD_OPT_PARAM_FREQUENCIES))
   {
     case ParamValue::empirical:
       model_string << "+FC";
@@ -560,7 +567,7 @@ std::string Model::to_string() const
       break;
   }
 
-  switch(_param_mode.at(PLLMOD_OPT_PARAM_PINV))
+  switch(out_param_mode.at(PLLMOD_OPT_PARAM_PINV))
   {
     case ParamValue::empirical:
       model_string << "+IC";
@@ -580,13 +587,13 @@ std::string Model::to_string() const
     if (_rate_het == PLLMOD_UTIL_MIXTYPE_GAMMA)
     {
       model_string << "+G" << _num_ratecats;
-      if (_param_mode.at(PLLMOD_OPT_PARAM_ALPHA) == ParamValue::user)
+      if (out_param_mode.at(PLLMOD_OPT_PARAM_ALPHA) == ParamValue::user)
         model_string << "{" << _alpha << "}";
     }
     else if (_rate_het == PLLMOD_UTIL_MIXTYPE_FREE)
     {
       model_string << "+R" << _num_ratecats;
-      if (_param_mode.at(PLLMOD_OPT_PARAM_FREE_RATES) == ParamValue::user)
+      if (out_param_mode.at(PLLMOD_OPT_PARAM_FREE_RATES) == ParamValue::user)
       {
         print_param(model_string, _ratecat_rates);
         print_param(model_string, _ratecat_weights);

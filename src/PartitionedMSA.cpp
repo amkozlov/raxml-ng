@@ -70,7 +70,11 @@ void PartitionedMSA::split_msa()
     free(part_msa_list);
   }
   else
+  {
+    if (_part_list[0].range_string().empty())
+      _part_list[0].range_string("1-" + to_string(_full_msa.num_sites()));
     part_msa(0, std::move(_full_msa));
+  }
 }
 
 void PartitionedMSA::compress_patterns()

@@ -545,14 +545,15 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
 {
   auto const& opts = instance.opts;
 
-  LOG_INFO << "\nOptimized model parameters:" << endl;
+  auto model_log_lvl = instance.parted_msa.part_count() > 1 ? LogLevel::verbose : LogLevel::info;
 
-  assert(checkp.models.size() == instance.parted_msa.part_count());
+  RAXML_LOG(model_log_lvl) << "\nOptimized model parameters:" << endl;
 
   for (size_t p = 0; p < instance.parted_msa.part_count(); ++p)
   {
-    LOG_INFO << "\n   Partition " << p << ": " << instance.parted_msa.part_info(p).name().c_str() << endl;
-    LOG_INFO << checkp.models.at(p);
+    RAXML_LOG(model_log_lvl) << "\n   Partition " << p << ": " <<
+        instance.parted_msa.part_info(p).name().c_str() << endl;
+    RAXML_LOG(model_log_lvl) << checkp.models.at(p);
   }
 
   if (opts.command == Command::evaluate)
@@ -583,6 +584,12 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
     }
 
     LOG_INFO << "Best ML tree saved to: " << sysutil_realpath(opts.best_tree_file()) << endl;
+
+    RaxmlPartitionStream model_stream(opts.best_model_file(), true);
+    model_stream.print_model_params(true);
+    model_stream << instance.parted_msa;
+
+    LOG_INFO << "Optimized model saved to: " << sysutil_realpath(opts.best_model_file()) << endl;
 
     if (opts.command == Command::all)
     {
@@ -782,12 +789,20 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   /* generate bootstrap replicates */
   generate_bootstraps(instance, cm.checkpoint());
 
+  instance.opts.remove_result_files();
+
   thread_main(instance, cm);
 
   if (ParallelContext::master_rank())
   {
     if (opts.command == Command::all)
       draw_bootstrap_support(instance, cm.checkpoint());
+
+    assert(cm.checkpoint().models.size() == instance.parted_msa.part_count());
+    for (size_t p = 0; p < instance.parted_msa.part_count(); ++p)
+    {
+      instance.parted_msa.model(p, cm.checkpoint().models.at(p));
+    }
 
     print_final_output(instance, cm.checkpoint());
 
@@ -884,7 +899,6 @@ int main(int argc, char** argv)
         {
           LOG_WARN << "WARNING: Running in REDO mode: existing checkpoints are ignored, "
               "and all result files will be overwritten!" << endl << endl;
-          instance.opts.remove_result_files();
         }
 
         /* init load balancer */

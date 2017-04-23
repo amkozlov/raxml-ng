@@ -123,7 +123,7 @@ public:
   const doubleVector& base_freqs(unsigned int i) const { return _submodels.at(i).base_freqs(); };
   const doubleVector& subst_rates(unsigned int i) const { return _submodels.at(i).subst_rates(); };
 
-  std::string to_string() const;
+  std::string to_string(bool print_params = false) const;
   int params_to_optimize() const;
   ParamValue param_mode(int param) const { return _param_mode.at(param); };
 

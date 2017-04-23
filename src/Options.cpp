@@ -20,6 +20,7 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.checkpoint, "ckp");
   set_default_outfile(outfile_names.start_tree, "startTree");
   set_default_outfile(outfile_names.best_tree, "bestTree");
+  set_default_outfile(outfile_names.best_model, "bestModel");
   set_default_outfile(outfile_names.ml_trees, "mlTrees");
   set_default_outfile(outfile_names.bootstrap_trees, "bootstraps");
   set_default_outfile(outfile_names.support_tree, "support");
@@ -28,13 +29,15 @@ void Options::set_default_outfiles()
 bool Options::result_files_exist() const
 {
   return sysutil_file_exists(best_tree_file()) || sysutil_file_exists(bootstrap_trees_file()) ||
-      sysutil_file_exists(support_tree_file());
+      sysutil_file_exists(support_tree_file()) || sysutil_file_exists(best_model_file());
 }
 
 void Options::remove_result_files() const
 {
   if (sysutil_file_exists(best_tree_file()))
     std::remove(best_tree_file().c_str());
+  if (sysutil_file_exists(best_model_file()))
+    std::remove(best_model_file().c_str());
   if (sysutil_file_exists(bootstrap_trees_file()))
     std::remove(bootstrap_trees_file().c_str());
   if (sysutil_file_exists(support_tree_file()))
