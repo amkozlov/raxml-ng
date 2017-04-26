@@ -426,10 +426,9 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
   {
     attrs |= PLL_ATTRIB_RATE_SCALERS;
 
-    if (model.num_states() != 4 ||
-        (opts.simd_arch != PLL_ATTRIB_ARCH_AVX && opts.simd_arch != PLL_ATTRIB_ARCH_AVX2))
+    if (model.num_states() != 4)
     {
-      throw runtime_error("Per-rate scalers are implemented for DNA with AVX/AVX2 vectorization only!\n");
+      throw runtime_error("Per-rate scalers are implemented for DNA data only!\n");
     }
   }
 
