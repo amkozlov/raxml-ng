@@ -133,3 +133,35 @@ void PartitionInfo::set_modeL_empirical_params()
 
   assign(_model, stats());
 }
+
+void PartitionInfo::fill_tip_clv(unsigned int tip_id, doubleVector& clv,
+                                 unsigned int states_padded) const
+{
+  auto clv_size = _msa.length() * states_padded;
+  clv.resize(clv_size);
+  auto clvp = clv.begin();
+  auto seq = _msa.at(tip_id);
+  auto charmap = _model.charmap();
+  auto errmodel = _model.error_model();
+
+  for (size_t j = 0; j < _msa.length(); ++j)
+  {
+    auto charstate = (unsigned int) seq[j];
+    unsigned int state = charmap ? charmap[(int) charstate] : charstate;
+
+    errmodel->state_probs(state, clvp);
+
+    if (j == 0 && 0)
+    {
+      printf("state: %u ", state);
+      for (size_t k = 0; k < _model.num_states(); ++k)
+        printf("%lf ", clvp[k]);
+      printf("\n");
+    }
+
+    clvp += states_padded;
+  }
+
+  assert(clvp == clv.end());
+}
+

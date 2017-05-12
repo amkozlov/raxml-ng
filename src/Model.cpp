@@ -6,7 +6,9 @@ const vector<int> ALL_MODEL_PARAMS = {PLLMOD_OPT_PARAM_FREQUENCIES, PLLMOD_OPT_P
                                       PLLMOD_OPT_PARAM_PINV, PLLMOD_OPT_PARAM_ALPHA,
                                       PLLMOD_OPT_PARAM_FREE_RATES, PLLMOD_OPT_PARAM_RATE_WEIGHTS,
                                       PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER,
-                                      PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE};
+                                      PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE,
+                                      RAXML_OPT_PARAM_SEQ_ERROR,
+                                      RAXML_OPT_PARAM_ADO_RATE};
 
 const unordered_map<DataType,unsigned int,EnumClassHash>  DATATYPE_STATES { {DataType::dna, 4},
                                                                             {DataType::protein, 20},
@@ -440,6 +442,31 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
           throw runtime_error(string("Invalid FreeRate specification: ") + s);
         }
         break;
+      case 'E':
+        if (_data_type == DataType::diploid10)
+          _error_model.reset(new GenotypeErrorModel());
+        else
+          _error_model.reset(new UniformErrorModel(_num_states));
+
+        for (auto p: _error_model->param_ids())
+         _param_mode[p] = ParamValue::ML;
+
+        try
+        {
+          doubleVector v;
+          if (read_param(ss, v))
+          {
+            _error_model->params(v);
+
+            for (auto p: _error_model->param_ids())
+             _param_mode[p] = ParamValue::user;
+          }
+        }
+        catch(parse_error& e)
+        {
+          throw runtime_error(string("Invalid error model specification: ") + s);
+        }
+        break;
       default:
         throw runtime_error("Wrong model specification: " + model_opts);
     }
@@ -452,8 +479,8 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
     case ParamValue::model:
       /* nothing to do here */
       break;
-    case ParamValue::equal:
     case ParamValue::ML:
+    case ParamValue::equal:
       /* use equal frequencies as s a starting value for ML optimization */
       for (auto& m: _submodels)
         m.base_freqs(doubleVector(_num_states, 1.0 / _num_states));
@@ -470,8 +497,12 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
     case ParamValue::model:
       /* nothing to do here */
       break;
-    case ParamValue::equal:
     case ParamValue::ML:
+      for (auto& m: _submodels)
+        m.subst_rates(doubleVector(m.num_rates(), 1.0));
+//        m.subst_rates(doubleVector({0.5, 0.5, 0.5, 0.5, 0.5, 1.0 }));
+      break;
+    case ParamValue::equal:
       /* use equal rates as s a starting value for ML optimization */
       for (auto& m: _submodels)
         m.subst_rates(doubleVector(m.num_rates(), 1.0));
@@ -599,6 +630,12 @@ std::string Model::to_string(bool print_params) const
         print_param(model_string, _ratecat_weights);
       }
     }
+  }
+
+  if (_error_model)
+  {
+    model_string << "+E";
+    print_param(model_string, _error_model->params());
   }
 
   return model_string.str();
@@ -758,6 +795,14 @@ LogStream& operator<<(LogStream& stream, const Model& m)
   if (m.param_mode(PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER) != ParamValue::undefined)
     stream << "   Speed ("  << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER))
              << "): " << m.brlen_scaler() << endl;
+
+  if (m.error_model())
+  {
+    stream << "   Error model: ";
+    for (auto p: m.error_model()->params())
+      stream << p << " ";
+    stream << endl;
+  }
 
   stream << "   Rate heterogeneity: " << get_ratehet_mode_str(m);
   if (m.num_ratecats() > 1)

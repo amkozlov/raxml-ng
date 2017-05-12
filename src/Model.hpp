@@ -4,6 +4,7 @@
 #include <algorithm>
 
 #include "common.h"
+#include "ErrorModel.hpp"
 
 class SubstitutionModel
 {
@@ -127,6 +128,8 @@ public:
   int params_to_optimize() const;
   ParamValue param_mode(int param) const { return _param_mode.at(param); };
 
+  const std::shared_ptr<ErrorModel>& error_model() const { return _error_model; };
+
   /* setters */
   void alpha(double value) { _alpha = value; };
   void pinv(double value) { _pinv = value; };
@@ -137,6 +140,8 @@ public:
   void subst_rates(const doubleVector& value) { for (SubstitutionModel& s: _submodels) s.subst_rates(value); };
   void ratecat_rates(doubleVector const& value) { _ratecat_rates = value; };
   void ratecat_weights(doubleVector const& value) { _ratecat_weights = value; };
+
+  void error_model_params(const doubleVector &param_vals) { _error_model->params(param_vals); };
 
   /* initialization */
   void init_from_string(const std::string& model_string);
@@ -160,6 +165,9 @@ private:
   std::vector<SubstitutionModel> _submodels;
 
   std::unordered_map<int,ParamValue> _param_mode;
+
+//  std::unique_ptr<ErrorModel> _error_model;
+  std::shared_ptr<ErrorModel> _error_model;
 
   void autodetect_data_type(const std::string& model_name);
   pllmod_mixture_model_t * init_mix_model(const std::string& model_name);

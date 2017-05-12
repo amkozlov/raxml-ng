@@ -5,6 +5,8 @@
 
 using namespace std;
 
+static PartitionInfo * global_pinfo;
+
 TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
                     const PartitionAssignment& part_assign)
 {
@@ -67,6 +69,8 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
 
       if (part_range->master())
         _parts_master.insert(p);
+
+      global_pinfo = (PartitionInfo *) &pinfo;
     }
     else
     {
@@ -117,6 +121,130 @@ void TreeInfo::model(size_t partition_id, const Model& model)
 }
 
 //#define DBG printf
+
+void recompute_tip_clvs(const PartitionInfo& pinfo, pll_partition_t * partition)
+{
+  assert(!(partition->attributes & PLL_ATTRIB_PATTERN_TIP));
+
+//  static auto rates = pinfo.model().submodel(0).subst_rates();
+//  static auto ratesym = pinfo.model().submodel(0).rate_sym();
+
+// doubleVector all_rates(partition->states * partition->states);
+//  size_t r = 0;
+//  for (size_t i = 0; i < partition->states; ++i)
+//  {
+//    all_rates[i * partition->states + i] = 1;
+//    for (size_t j = i+1; j < partition->states; ++j)
+//    {
+//      all_rates[i * partition->states + j] = all_rates[j * partition->states + i] =
+//          ratesym.empty() ? rates[r] : ratesym[r];
+//      ++r;
+//    }
+//  }
+//  assert(r == rates.size());
+//
+//  auto err2 = global_seq_error * global_seq_error;
+//
+//  auto freqs = partition->frequencies[0];
+//  double freqs[] = {0.385, 0.285, 0.186, 0.101, 0.009, 0.015, 0.006, 0.005, 0.006, 0.003};
+
+#if 0
+  printf("\n sub_rates: ");
+  for (size_t i = 0; i < rates.size(); ++i)
+    printf("%e ", rates[i]);
+
+  printf("\n all_rates: ");
+  for (size_t i = 0; i < partition->states; ++i)
+    printf("%e ", all_rates[i]);
+  printf("\n\n");
+#endif
+
+
+  std::vector<double> tmp_clv;
+  for (size_t i = 0; i < pinfo.msa().size(); ++i)
+  {
+    pinfo.fill_tip_clv(i, tmp_clv, partition->states_padded);
+    pll_set_tip_clv(partition, i, tmp_clv.data());
+  }
+}
+
+class ParamVisitor
+{
+public:
+  static thread_local int params_to_optimize;
+
+  static int get_errmodel_param(const pllmod_treeinfo_t * treeinfo,
+                                unsigned int  part_num,
+                                double * param_vals,
+                                unsigned int param_count);
+
+  static int set_errmodel_param(pllmod_treeinfo_t * treeinfo,
+                                unsigned int  part_num,
+                                const double * param_vals,
+                                unsigned int param_count);
+};
+
+thread_local int ParamVisitor::params_to_optimize = 0;
+
+int ParamVisitor::get_errmodel_param(const pllmod_treeinfo_t * treeinfo,
+                                     unsigned int  part_num,
+                                     double * param_vals,
+                                     unsigned int param_count)
+{
+  auto ids = global_pinfo->model().error_model()->param_ids();
+  auto params = global_pinfo->model().error_model()->params();
+
+  assert(param_count <= params.size());
+
+  size_t i = 0;
+  for (size_t j = 0; j < ids.size(); ++j)
+  {
+    if (params_to_optimize & ids[j])
+      param_vals[i++] = params[j];
+  }
+
+//  printf("get paramval: %.17lf\n", param_vals[0]);
+
+  assert(i == param_count);
+
+  return PLL_SUCCESS;
+}
+
+int ParamVisitor::set_errmodel_param(pllmod_treeinfo_t * treeinfo,
+                                     unsigned int  part_num,
+                                     const double * param_vals,
+                                     unsigned int param_count)
+{
+  if (part_num >= treeinfo->partition_count)
+  {
+    assert(0);
+    return PLL_FAILURE;
+  }
+
+  auto ids = global_pinfo->model().error_model()->param_ids();
+  auto params = global_pinfo->model().error_model()->params();
+
+  size_t i = 0;
+  for (size_t j = 0; j < ids.size(); ++j)
+  {
+    if (params_to_optimize & ids[j])
+      params[j] = param_vals[i++];
+  }
+
+  global_pinfo->model().error_model_params(params);
+
+//  printf("set paramval: %.17lf %.17lf\n", global_pinfo->model().error_model()->params()[0],
+//         global_pinfo->model().error_model()->params()[1]);
+
+//  printf("error rate: %lf\n", param_vals[0]);
+
+  pll_partition_t * partition = treeinfo->partitions[part_num];
+
+  recompute_tip_clvs(*global_pinfo, partition);
+
+  return PLL_SUCCESS;
+}
+
 
 double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor)
 {
@@ -223,7 +351,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
   /* optimize FREE RATES and WEIGHTS */
   if (params_to_optimize & PLLMOD_OPT_PARAM_FREE_RATES)
   {
-    new_loglh = -1 * pllmod_algo_opt_rates_weights_treeinfo (_pll_treeinfo,
+    new_loglh = -1 * pllmod_algo_opt_rates_weights_treeinfo(_pll_treeinfo,
                                                           RAXML_FREERATE_MIN,
                                                           RAXML_FREERATE_MAX,
                                                           RAXML_BFGS_FACTOR,
@@ -236,6 +364,61 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
 
     LOG_DEBUG << "\t - after freeR: logLH = " << new_loglh << endl;
 //    LOG_DEBUG << "\t - after freeR/crosscheck: logLH = " << loglh() << endl;
+  }
+
+  if (params_to_optimize & RAXML_OPT_PARAM_SEQ_ERROR)
+  {
+    auto old_loglh = new_loglh;
+    ParamVisitor::params_to_optimize = RAXML_OPT_PARAM_SEQ_ERROR;
+    new_loglh = -1 * pllmod_algo_opt_onedim_treeinfo_custom(_pll_treeinfo,
+                                                            RAXML_OPT_PARAM_SEQ_ERROR,
+                                                            ParamVisitor::get_errmodel_param,
+                                                            ParamVisitor::set_errmodel_param,
+                                                            RAXML_SEQ_ERROR_MIN,
+                                                            RAXML_SEQ_ERROR_MAX,
+                                                            1e-3);
+
+    LOG_DEBUG << "\t - after SEQ ERROR: logLH = " << new_loglh << endl;
+
+    if (std::isinf((double) new_loglh))
+    {
+      if (pll_errno == PLLMOD_OPT_ERROR_BRENT_INIT)
+      {
+        new_loglh = old_loglh;
+      }
+      else
+        throw runtime_error(pll_errmsg);
+    }
+
+    if (std::isinf((double) new_loglh))
+      throw runtime_error(pll_errmsg);
+  }
+
+  if (params_to_optimize & RAXML_OPT_PARAM_ADO_RATE)
+  {
+    auto old_loglh = new_loglh;
+    ParamVisitor::params_to_optimize = RAXML_OPT_PARAM_ADO_RATE;
+    new_loglh = -1 * pllmod_algo_opt_onedim_treeinfo_custom(_pll_treeinfo,
+                                                            RAXML_OPT_PARAM_ADO_RATE,
+                                                            ParamVisitor::get_errmodel_param,
+                                                            ParamVisitor::set_errmodel_param,
+                                                            RAXML_ADO_RATE_MIN,
+                                                            RAXML_ADO_RATE_MAX,
+                                                            1e-3);
+
+    LOG_DEBUG << "\t - after ADO RATE: logLH = " << new_loglh << endl;
+
+//    printf("\t - OPT error rate: %lf, logLH = %lf\n", global_seq_error, new_loglh);
+
+    if (std::isinf((double) new_loglh))
+    {
+      if (pll_errno == PLLMOD_OPT_ERROR_BRENT_INIT)
+      {
+        new_loglh = old_loglh;
+      }
+      else
+        throw runtime_error(pll_errmsg);
+    }
   }
 
   if (params_to_optimize & PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE)
@@ -471,6 +654,10 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
     set_partition_tips(opts, msa, part_region, partition);
   else
     set_partition_tips(opts, msa, part_region, partition, weights);
+
+  // TODO: temp workaround!
+  if (pinfo.model().error_model())
+    recompute_tip_clvs(pinfo, partition);
 
   assign(partition, model);
 

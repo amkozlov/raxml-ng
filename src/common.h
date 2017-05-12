@@ -46,6 +46,16 @@ extern "C" {
 #define RAXML_BRLEN_SCALER_MIN    0.01
 #define RAXML_BRLEN_SCALER_MAX    100.
 
+#define RAXML_SEQ_ERROR_MIN    1.e-9
+#define RAXML_SEQ_ERROR_MAX    0.5
+
+#define RAXML_ADO_RATE_MIN    1.e-9
+#define RAXML_ADO_RATE_MAX    0.7
+
+// RAxML-specific model params
+#define RAXML_OPT_PARAM_SEQ_ERROR    (PLLMOD_OPT_PARAM_USER<<0)
+#define RAXML_OPT_PARAM_ADO_RATE     (PLLMOD_OPT_PARAM_USER<<1)
+
 /* used to supress compiler warnings about unused args */
 #define UNUSED(expr) while (0) { (void)(expr); }
 
