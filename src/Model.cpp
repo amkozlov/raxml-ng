@@ -170,6 +170,7 @@ pllmod_mixture_model_t * Model::init_mix_model(const std::string &model_name)
 
 void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_model_t& mix_model)
 {
+  _gamma_mode = PLL_GAMMA_RATES_MEAN;
   _alpha = 1.0;
   _pinv = 0.0;
   _brlen_scaler = 1.0;
@@ -502,7 +503,7 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
       case PLLMOD_UTIL_MIXTYPE_GAMMA:
         /* compute the discretized category rates from a gamma distribution
            with given alpha shape and store them in rate_cats  */
-        pll_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data());
+        pll_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _gamma_mode);
         if (_param_mode[PLLMOD_OPT_PARAM_ALPHA] == ParamValue::undefined)
           _param_mode[PLLMOD_OPT_PARAM_ALPHA] = ParamValue::ML;
         break;
@@ -511,7 +512,7 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
         if (_param_mode[PLLMOD_OPT_PARAM_FREE_RATES] == ParamValue::undefined)
         {
           /* use GAMMA rates as initial values -> can be changed */
-          pll_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data());
+          pll_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _gamma_mode);
           _param_mode[PLLMOD_OPT_PARAM_FREE_RATES] = ParamValue::ML;
         }
         if (_param_mode[PLLMOD_OPT_PARAM_RATE_WEIGHTS] == ParamValue::undefined)

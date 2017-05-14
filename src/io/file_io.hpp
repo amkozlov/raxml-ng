@@ -29,7 +29,12 @@ private:
 class PhylipStream : public MSAFileStream
 {
 public:
-  PhylipStream(const std::string& fname) : MSAFileStream(fname) {}
+  PhylipStream(const std::string& fname, bool interleaved = true) :
+    MSAFileStream(fname), _interleaved(interleaved) {}
+
+  bool interleaved() const { return _interleaved; }
+private:
+  bool _interleaved;
 };
 
 class FastaStream : public MSAFileStream

@@ -59,8 +59,15 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
 
 PhylipStream& operator>>(PhylipStream& stream, MSA& msa)
 {
-  unsigned int sequence_count;
-  pll_msa_t * pll_msa = pll_phylip_parse_msa(stream.fname().c_str(), &sequence_count);
+  pll_phylip_t * fd = pll_phylip_open(stream.fname().c_str(), pll_map_phylip);
+  if (!fd)
+    throw runtime_error(pll_errmsg);
+
+  pll_msa_t * pll_msa = stream.interleaved() ?
+      pll_phylip_parse_interleaved(fd) : pll_phylip_parse_sequential(fd);
+
+  pll_phylip_close(fd);
+
   if (pll_msa)
   {
     msa = MSA(pll_msa);
@@ -214,11 +221,12 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format)
   MSA msa;
 
   typedef pair<FileFormat, string> FormatNamePair;
-  static vector<FormatNamePair> msa_formats = { {FileFormat::phylip, "PHYLIP"},
-                                                 {FileFormat::fasta, "FASTA"},
-                                                 {FileFormat::catg, "CATG"},
-                                                 {FileFormat::vcf, "VCF"},
-                                                 {FileFormat::binary, "RAxML-binary"} };
+  static vector<FormatNamePair> msa_formats = { {FileFormat::iphylip, "IPHYLIP"},
+                                                {FileFormat::phylip, "PHYLIP"},
+                                                {FileFormat::fasta, "FASTA"},
+                                                {FileFormat::catg, "CATG"},
+                                                {FileFormat::vcf, "VCF"},
+                                                {FileFormat::binary, "RAxML-binary"} };
 
   auto fmt_begin = msa_formats.cbegin();
   auto fmt_end = msa_formats.cend();
@@ -247,9 +255,16 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format)
           return msa;
           break;
         }
+        case FileFormat::iphylip:
+        {
+          PhylipStream s(filename, true);
+          s >> msa;
+          return msa;
+          break;
+        }
         case FileFormat::phylip:
         {
-          PhylipStream s(filename);
+          PhylipStream s(filename, false);
           s >> msa;
           return msa;
           break;

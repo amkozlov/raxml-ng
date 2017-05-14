@@ -58,6 +58,7 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
 
       int retval = pllmod_treeinfo_init_partition(_pll_treeinfo, p, partition,
                                                   params_to_optimize,
+                                                  pinfo.model().gamma_mode(),
                                                   pinfo.model().alpha(),
                                                   pinfo.model().ratecat_submodels().data(),
                                                   pinfo.model().submodel(0).rate_sym().data());
@@ -295,7 +296,6 @@ void build_clv(ProbVector::const_iterator probs, size_t sites, WeightVector::con
                pll_partition_t* partition, bool normalize, std::vector<double>& clv)
 {
   const auto states = partition->states;
-  const auto states_padded = partition->states_padded;
   auto clvp = clv.begin();
 
   for (size_t i = 0; i < sites; ++i)
@@ -314,7 +314,7 @@ void build_clv(ProbVector::const_iterator probs, size_t sites, WeightVector::con
           clvp[j] = 1.0;
       }
 
-      clvp += states_padded;
+      clvp += states;
     }
 
     /* NB: clv has to be padded, but msa arrays are not! */
@@ -340,13 +340,13 @@ void set_partition_tips(const Options& opts, const MSA& msa, const PartitionRang
     auto weights_start = msa.weights().cbegin() + part_region.start;
 
     // we need a libpll function for that!
-    auto clv_size = partition->sites * partition->states_padded;
+    auto clv_size = partition->sites * partition->states;
     std::vector<double> tmp_clv(clv_size);
     for (size_t i = 0; i < msa.size(); ++i)
     {
       auto prob_start = msa.probs(i, part_region.start);
       build_clv(prob_start, partition->sites, weights_start, partition, normalize, tmp_clv);
-      pll_set_tip_clv(partition, i, tmp_clv.data());
+      pll_set_tip_clv(partition, i, tmp_clv.data(), PLL_FALSE);
     }
   }
   else
@@ -384,13 +384,13 @@ void set_partition_tips(const Options& opts, const MSA& msa, const PartitionRang
     auto weights_start = msa.weights().cbegin() + part_region.start;
 
     // we need a libpll function for that!
-    auto clv_size = part_region.length * partition->states_padded;
+    auto clv_size = part_region.length * partition->states;
     std::vector<double> tmp_clv(clv_size);
     for (size_t i = 0; i < msa.size(); ++i)
     {
       auto prob_start = msa.probs(i, part_region.start);
       build_clv(prob_start, part_region.length, weights_start, partition, normalize, tmp_clv);
-      pll_set_tip_clv(partition, i, tmp_clv.data());
+      pll_set_tip_clv(partition, i, tmp_clv.data(), PLL_FALSE);
     }
   }
   else

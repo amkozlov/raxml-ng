@@ -116,6 +116,7 @@ public:
   const doubleVector& ratecat_rates() const { return _ratecat_rates; };
   const doubleVector& ratecat_weights() const { return _ratecat_weights; };
   const std::vector<unsigned int>& ratecat_submodels() const { return _ratecat_submodels; };
+  int gamma_mode() const { return _gamma_mode; };
 
   double alpha() const { return _alpha; };
   double pinv() const { return _pinv; };
@@ -152,6 +153,7 @@ private:
   doubleVector _ratecat_rates;
   doubleVector _ratecat_weights;
   std::vector<unsigned int> _ratecat_submodels;
+  int _gamma_mode;
 
   double _alpha;
   double _pinv;

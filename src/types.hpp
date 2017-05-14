@@ -24,6 +24,7 @@ enum class FileFormat
   autodetect = 0,
   fasta,
   phylip,
+  iphylip,
   vcf,
   catg,
   binary
