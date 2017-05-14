@@ -682,8 +682,8 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
       {
         LOG_INFO_TS << "Tree #" << start_tree_num <<
             ", initial LogLikelihood: " << FMT_LH(treeinfo->loglh()) << endl;
-        cm.search_state().loglh = optimizer.optimize(*treeinfo);
-        cm.update_and_write(*treeinfo);
+        LOG_PROGR << endl;
+        optimizer.evaluate(*treeinfo, cm);
       }
       else
       {

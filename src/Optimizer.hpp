@@ -11,9 +11,10 @@ public:
   virtual
   ~Optimizer ();
 
-  double optimize(TreeInfo& treeinfo, double lh_epsilon);
-  double optimize(TreeInfo& treeinfo) { return optimize(treeinfo, _lh_epsilon); };
+  double optimize_model(TreeInfo& treeinfo, double lh_epsilon);
+  double optimize_model(TreeInfo& treeinfo) { return optimize_model(treeinfo, _lh_epsilon); };
   double optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm);
+  double evaluate(TreeInfo& treeinfo, CheckpointManager& cm);
 private:
   double _lh_epsilon;
   int _spr_radius;
