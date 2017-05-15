@@ -585,12 +585,6 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
 
     LOG_INFO << "Best ML tree saved to: " << sysutil_realpath(opts.best_tree_file()) << endl;
 
-    RaxmlPartitionStream model_stream(opts.best_model_file(), true);
-    model_stream.print_model_params(true);
-    model_stream << instance.parted_msa;
-
-    LOG_INFO << "Optimized model saved to: " << sysutil_realpath(opts.best_model_file()) << endl;
-
     if (opts.command == Command::all)
     {
       assert(instance.bs_tree);
@@ -601,6 +595,16 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
       LOG_INFO << "Best ML tree with bootstrap support values saved to: " <<
           sysutil_realpath(opts.support_tree_file()) << endl;
     }
+  }
+
+  if (opts.command == Command::search || opts.command == Command::all ||
+      opts.command == Command::evaluate)
+  {
+    RaxmlPartitionStream model_stream(opts.best_model_file(), true);
+    model_stream.print_model_params(true);
+    model_stream << instance.parted_msa;
+
+    LOG_INFO << "Optimized model saved to: " << sysutil_realpath(opts.best_model_file()) << endl;
   }
 
   if (opts.command == Command::bootstrap || opts.command == Command::all)

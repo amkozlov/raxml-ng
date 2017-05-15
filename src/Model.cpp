@@ -366,6 +366,17 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
           else if (_num_ratecats == 1)
             _num_ratecats = 4;
 
+          if (ss.peek() == 'a' || ss.peek() == 'A')
+          {
+            ss.get();
+            _gamma_mode = PLL_GAMMA_RATES_MEDIAN;
+          }
+          else if (ss.peek() == 'm' || ss.peek() == 'M')
+          {
+            ss.get();
+            _gamma_mode = PLL_GAMMA_RATES_MEAN;
+          }
+
           if (read_param(ss, _alpha))
           {
             _param_mode[PLLMOD_OPT_PARAM_ALPHA] = ParamValue::user;
@@ -588,6 +599,7 @@ std::string Model::to_string(bool print_params) const
     if (_rate_het == PLLMOD_UTIL_MIXTYPE_GAMMA)
     {
       model_string << "+G" << _num_ratecats;
+      model_string << (_gamma_mode == PLL_GAMMA_RATES_MEDIAN ? "a" : "m");
       if (out_param_mode.at(PLLMOD_OPT_PARAM_ALPHA) == ParamValue::user)
         model_string << "{" << _alpha << "}";
     }
@@ -763,7 +775,8 @@ LogStream& operator<<(LogStream& stream, const Model& m)
   stream << "   Rate heterogeneity: " << get_ratehet_mode_str(m);
   if (m.num_ratecats() > 1)
   {
-    stream << " (" << m.num_ratecats() << " cats)";
+    stream << " (" << m.num_ratecats() << " cats, " <<
+        (m.gamma_mode() == PLL_GAMMA_RATES_MEDIAN ? "median" : "mean") << ")";
     if (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_GAMMA)
       stream << ",  alpha: " << setprecision(3) << m.alpha() << " ("  << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_ALPHA))
                  << ")";

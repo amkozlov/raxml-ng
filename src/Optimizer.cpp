@@ -280,7 +280,7 @@ double Optimizer::evaluate(TreeInfo& treeinfo, CheckpointManager& cm)
   if (do_step(CheckpointStep::modOpt1))
   {
     cm.update_and_write(treeinfo);
-    LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << fast_modopt_eps << ")" << endl;
+    LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << _lh_epsilon << ")" << endl;
     loglh = optimize_model(treeinfo);
   }
 
