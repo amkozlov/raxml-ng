@@ -25,6 +25,7 @@ extern "C" {
 #include "constants.hpp"
 #include "ParallelContext.hpp"
 #include "log.hpp"
+#include "SystemTimer.hpp"
 
 #define RAXML_DOUBLE_TOLERANCE    1e-14
 
@@ -67,7 +68,7 @@ unsigned long sysutil_get_memtotal();
 unsigned long sysutil_get_cpu_features();
 unsigned int sysutil_simd_autodetect();
 
-double sysutil_elapsed_seconds();
+const SystemTimer& global_timer();
 
 std::string sysutil_realpath(const std::string& path);
 bool sysutil_file_exists(const std::string& fname, int access_mode = F_OK);

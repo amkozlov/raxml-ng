@@ -10,7 +10,7 @@
 
 using namespace std;
 
-chrono::time_point<chrono::system_clock> start_time = chrono::system_clock::now();
+SystemTimer systimer;
 
 void sysutil_fatal(const char * format, ...)
 {
@@ -231,13 +231,6 @@ unsigned int sysutil_simd_autodetect()
     return PLL_ATTRIB_ARCH_CPU;
 }
 
-double sysutil_elapsed_seconds()
-{
-  chrono::time_point<chrono::system_clock> end_time = chrono::system_clock::now();
-  chrono::duration<double> elapsed_seconds = end_time - start_time;
-  return elapsed_seconds.count();
-}
-
 std::string sysutil_realpath(const std::string& path)
 {
   char * real_path = realpath(path.c_str(), NULL);
@@ -271,4 +264,10 @@ bool sysutil_file_exists(const std::string& fname, int access_mode)
 {
   return access(fname.c_str(), access_mode) == 0;
 }
+
+const SystemTimer& global_timer()
+{
+  return systimer;
+}
+
 

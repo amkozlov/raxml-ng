@@ -626,13 +626,17 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
 
   LOG_INFO << "\nExecution log saved to: " << sysutil_realpath(opts.log_file()) << endl;
 
-  LOG_INFO << "\nElapsed time: " << FMT_PREC3(sysutil_elapsed_seconds()) << " seconds\n";
+  LOG_INFO << "\nAnalysis started: " << global_timer().start_time();
+  LOG_INFO << " / finished: " << global_timer().current_time() << std::endl;
+  LOG_INFO << "\nElapsed time: " << FMT_PREC3(global_timer().elapsed_seconds()) << " seconds";
   if (checkp.elapsed_seconds > 0.)
   {
-    LOG_INFO << "Total analysis time: " <<
-                FMT_PREC3(checkp.elapsed_seconds + sysutil_elapsed_seconds()) << " seconds\n";
+    LOG_INFO << " (this run) / ";
+    LOG_INFO << FMT_PREC3(checkp.elapsed_seconds + global_timer().elapsed_seconds()) <<
+        " seconds (total with restarts)";
   }
-  LOG_INFO << endl;
+
+  LOG_INFO << endl << endl;
 }
 
 void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
