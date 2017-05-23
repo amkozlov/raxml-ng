@@ -44,6 +44,16 @@ cmake -DUSE_MPI=ON ..
 make
 ```
 
+Portable PTHREADS version (static linkage, compatible with old non-AVX CPUs):
+
+```
+git clone --recursive https://github.com/amkozlov/raxml-ng
+cd raxml-ng
+mkdir build && cd build
+cmake -DSTATIC_BUILD=ON -DENABLE_RAXML_SIMD=OFF -DENABLE_PLLMOD_SIMD=OFF ..
+make
+```
+
 ## Documentation and Support
 
 Documentation can be found in the [github wiki](https://github.com/amkozlov/raxml-ng/wiki) (work in progress).
