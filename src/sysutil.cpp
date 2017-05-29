@@ -220,12 +220,12 @@ unsigned long sysutil_get_cpu_features()
 
 unsigned int sysutil_simd_autodetect()
 {
-  unsigned long features = sysutil_get_cpu_features();
-  if ((features & RAXML_CPU_AVX2) && (features & RAXML_CPU_FMA3))
+//  unsigned long features = sysutil_get_cpu_features();
+  if (PLL_STAT(avx2_present))
     return PLL_ATTRIB_ARCH_AVX2;
-  else if (features & RAXML_CPU_AVX)
+  else if (PLL_STAT(avx_present))
     return PLL_ATTRIB_ARCH_AVX;
-  else if (features & RAXML_CPU_SSE3)
+  else if (PLL_STAT(sse3_present))
     return PLL_ATTRIB_ARCH_SSE;
   else
     return PLL_ATTRIB_ARCH_CPU;

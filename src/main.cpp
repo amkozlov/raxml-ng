@@ -265,7 +265,8 @@ void load_msa(RaxmlInstance& instance)
   parted_msa.split_msa();
 
   /* check alignment */
-  check_msa(instance);
+  if (!opts.force_mode)
+    check_msa(instance);
 
   if (opts.use_pattern_compression)
     parted_msa.compress_patterns();
@@ -907,6 +908,12 @@ int main(int argc, char** argv)
         {
           LOG_WARN << "WARNING: Running in REDO mode: existing checkpoints are ignored, "
               "and all result files will be overwritten!" << endl << endl;
+        }
+
+        if (instance.opts.force_mode)
+        {
+          LOG_WARN << "WARNING: Running in FORCE mode: all safety checks are disabled!"
+              << endl << endl;
         }
 
         /* init load balancer */

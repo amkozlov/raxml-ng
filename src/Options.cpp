@@ -44,7 +44,7 @@ void Options::remove_result_files() const
     std::remove(support_tree_file().c_str());
 }
 
-static string get_simd_arch_name(unsigned int simd_arch)
+string Options::simd_arch_name() const
 {
   switch(simd_arch)
   {
@@ -140,7 +140,7 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   stream << ")" << endl;
 
 
-  stream << "  SIMD kernels: " << get_simd_arch_name(opts.simd_arch) << endl;
+  stream << "  SIMD kernels: " << opts.simd_arch_name() << endl;
 
   stream << "  parallelization: ";
   if (opts.num_ranks > 1 && opts.num_threads > 1)

@@ -70,9 +70,9 @@ if (ENABLE_RAXML_SIMD)
 endif()
 
 if(ENABLE_PLLMOD_SIMD)
-  set(PLLMOD_AUTOCONF_ARGS "")
+  set(PLLMOD_AUTOCONF_ARGS "--enable-avx --enable-sse")
 else()
-  set(PLLMOD_AUTOCONF_ARGS "--disable-avx --disable-sse")
+  set(PLLMOD_AUTOCONF_ARGS "")
 endif()
 
 if(ENABLE_PTHREADS)

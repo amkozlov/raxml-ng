@@ -43,6 +43,7 @@ static struct option long_options[] =
   {"all",                no_argument,       0, 0 },  /*  25 */
   {"bs-trees",           required_argument, 0, 0 },  /*  26 */
   {"redo",               no_argument,       0, 0 },  /*  27 */
+  {"force",              no_argument,       0, 0 },  /*  28 */
 
   { 0, 0, 0, 0 }
 };
@@ -108,6 +109,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.num_searches = 0;
 
   opts.redo_mode = false;
+  opts.force_mode = false;
 
   bool log_level_set = false;
 
@@ -360,6 +362,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 27:
         opts.redo_mode = true;
         break;
+      case 28:
+        opts.force_mode = true;
+        break;
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -387,6 +392,18 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   {
     if (opts.tree_file.empty())
       throw OptionException("Mandatory switch --tree");
+  }
+
+  if (opts.simd_arch > sysutil_simd_autodetect())
+  {
+    if (opts.force_mode)
+      pll_hardware_ignore();
+    else
+    {
+      throw OptionException("Cannot detect " + opts.simd_arch_name() +
+                            " instruction set on your system. If you are absolutely sure "
+                            "it is supported, please use --force option to disable this check.");
+    }
   }
 
   if (opts.command != Command::bootstrap && opts.command != Command::all)
@@ -442,6 +459,7 @@ void CommandLineParser::print_help()
             "  --threads      VALUE                       number of parallel threads to use (default: 2).\n"
             "  --simd         none | sse3 | avx | avx2    vector instruction set to use (default: auto-detect).\n"
             "  --rate-scalers on | off                    use individual CLV scalers for each rate category (default: OFF).\n"
+            "  --force                                    disable all safety checks (please think twice!)\n"
             "\n"
             "Model options:\n"
             "  --model        <name>+G[n]+<Freqs> | FILE  model specification OR partition file (default: GTR+G4)\n"
