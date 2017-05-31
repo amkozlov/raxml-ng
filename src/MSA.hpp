@@ -3,11 +3,6 @@
 
 #include "common.h"
 
-typedef unsigned int WeightType;
-typedef std::vector<WeightType> WeightVector;
-typedef std::vector<WeightVector> WeightVectorList;
-typedef std::unordered_map<size_t, WeightVector> WeightVectorMap;
-
 typedef std::vector<double> ProbVector;
 typedef std::vector<ProbVector> ProbVectorList;
 

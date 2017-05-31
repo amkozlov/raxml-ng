@@ -234,6 +234,45 @@ void check_msa(RaxmlInstance& instance)
 
 }
 
+void check_models(const RaxmlInstance& instance)
+{
+  for (const auto& pinfo: instance.parted_msa.part_list())
+  {
+    auto stats = pinfo.stats();
+    auto model = pinfo.model();
+
+    // check for zero state frequencies
+    if (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::empirical)
+    {
+      for (unsigned int i = 0; i < stats->states; ++i)
+      {
+        if (!(stats->freqs[i] > 0.))
+        {
+          LOG_ERROR << "\nBase frequencies: ";
+          for (unsigned int j = 0; j < stats->states; ++j)
+            LOG_ERROR << stats->freqs[j] <<  " ";
+          LOG_ERROR << endl;
+
+          throw runtime_error("Frequency of state " + to_string(i) +
+                              " in partition " + pinfo.name() + " is 0!\n"
+                              "Please either change your partitioning scheme or "
+                              "use model state frequencies for this partition!");
+        }
+      }
+    }
+
+    // check partitions which contain invariant sites and have ascertainment bias enabled
+    if (model.ascbias_type() != AscBiasCorrection::none && stats->inv_cols_count > 0)
+    {
+      throw runtime_error("You enabled ascertainment bias correction for partition " +
+                           pinfo.name() + ", but it contains " +
+                           to_string(stats->inv_cols_count) + " invariant sites.\n"
+                          "This is not allowed! Please either remove invariant sites or "
+                          "disable ascertainment bias correction.");
+    }
+  }
+}
+
 void load_msa(RaxmlInstance& instance)
 {
   const auto& opts = instance.opts;
@@ -272,6 +311,9 @@ void load_msa(RaxmlInstance& instance)
     parted_msa.compress_patterns();
 
   parted_msa.set_model_empirical_params();
+
+  if (!opts.force_mode)
+    check_models(instance);
 
   LOG_INFO << endl;
 

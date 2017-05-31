@@ -49,7 +49,7 @@ public:
   // operations
   size_t mark_partition_sites(unsigned int part_num, std::vector<unsigned int>& site_part);
   void compress_patterns();
-  void set_modeL_empirical_params();
+  void set_model_empirical_params();
 
 private:
   std::string _name;

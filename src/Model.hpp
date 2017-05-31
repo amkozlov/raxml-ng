@@ -128,6 +128,9 @@ public:
   int params_to_optimize() const;
   ParamValue param_mode(int param) const { return _param_mode.at(param); };
 
+  AscBiasCorrection ascbias_type() const { return _ascbias_type; }
+  const WeightVector& ascbias_weights() const { return _ascbias_weights; }
+
   /* setters */
   void alpha(double value) { _alpha = value; };
   void pinv(double value) { _pinv = value; };
@@ -158,6 +161,9 @@ private:
   double _alpha;
   double _pinv;
   double _brlen_scaler;
+
+  AscBiasCorrection _ascbias_type;
+  WeightVector _ascbias_weights;
 
   std::vector<SubstitutionModel> _submodels;
 

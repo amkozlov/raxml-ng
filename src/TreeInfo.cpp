@@ -441,6 +441,14 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
       attrs |= PLL_ATTRIB_PATTERN_TIP;
   }
 
+  // NOTE: if partition is split among multiple threads, asc. bias correction must be applied only once!
+  if (model.ascbias_type() == AscBiasCorrection::lewis ||
+      (model.ascbias_type() != AscBiasCorrection::none && part_region.master()))
+  {
+    attrs |=  PLL_ATTRIB_AB_FLAG;
+    attrs |= (unsigned int) model.ascbias_type();
+  }
+
   /* part_length doesn't include columns with zero weight */
   const size_t part_length = weights.empty() ? part_region.length :
                              std::count_if(weights.begin() + part_region.start,
@@ -466,6 +474,9 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
     throw runtime_error("ERROR creating pll_partition: " + string(pll_errmsg));
 
   partition->map = model.charmap();
+
+  if (part_region.master() && !model.ascbias_weights().empty())
+    pll_set_asc_state_weights(partition, model.ascbias_weights().data());
 
   if (part_length == part_region.length)
     set_partition_tips(opts, msa, part_region, partition);

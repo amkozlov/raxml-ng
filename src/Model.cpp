@@ -24,7 +24,18 @@ const unordered_map<DataType, const unsigned int *,EnumClassHash>  DATATYPE_MAPS
 
 // TODO move it out of here
 class parse_error {};
-static bool read_param(istringstream& s, double& val)
+static string read_option(istringstream& s)
+{
+  ostringstream os;
+  while (s.peek() != '{' && s.peek() != '+' && s.peek() != EOF)
+  {
+    os.put(toupper(s.get()));
+  }
+  return os.str();
+}
+
+template<typename T>
+static bool read_param(istringstream& s, T& val)
 {
   if (s.peek() == '{' || s.peek() == '[')
   {
@@ -40,14 +51,15 @@ static bool read_param(istringstream& s, double& val)
     return false;
 }
 
-static bool read_param(istringstream& s, doubleVector& vec)
+template<typename T>
+static bool read_param(istringstream& s, std::vector<T>& vec)
 {
   if (s.peek() == '{' || s.peek() == '[')
   {
     int c = s.get();
     while (s && c != '}' && c != ']')
     {
-      double val;
+      T val;
       s >> val;
       vec.push_back(val);
       c = s.get();
@@ -61,7 +73,14 @@ static bool read_param(istringstream& s, doubleVector& vec)
     return false;
 }
 
-static void print_param(ostringstream& s, const doubleVector& vec)
+template<typename T>
+static void print_param(ostringstream& s, T val)
+{
+  s << "{" << val << "}";
+}
+
+template<typename T>
+static void print_param(ostringstream& s, const std::vector<T>& vec)
 {
   s << "{";
   size_t i = 0;
@@ -176,6 +195,9 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
   _brlen_scaler = 1.0;
   _name = string(mix_model.name);
 
+  _ascbias_type = AscBiasCorrection::none;
+  _ascbias_weights.clear();
+
   _ratecat_rates.clear();
   _ratecat_weights.clear();
 
@@ -256,6 +278,50 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
       case '+':
         // proceed to the next token
         continue;
+      case 'A':
+      {
+        try
+        {
+          const string asc_str = "A" + read_option(ss);
+          if (asc_str == "ASC_LEWIS")
+          {
+            _ascbias_type = AscBiasCorrection::lewis;
+          }
+          else if (asc_str == "ASC_FELS")
+          {
+            _ascbias_type = AscBiasCorrection::felsenstein;
+            WeightType w;
+            if (read_param(ss, w))
+            {
+              _ascbias_weights.resize(_num_states, 0);
+              _ascbias_weights[0] = w;
+            }
+            else
+              throw parse_error();
+          }
+          else if (asc_str == "ASC_STAM")
+          {
+            _ascbias_type = AscBiasCorrection::stamatakis;
+            WeightVector v;
+            if (read_param(ss, v))
+            {
+              if (v.size() == _num_states)
+                _ascbias_weights.assign(v.cbegin(), v.cend());
+              else
+                throw parse_error();
+            }
+            else
+              throw parse_error();
+          }
+          else
+            throw parse_error();
+        }
+        catch (parse_error& e)
+        {
+          throw runtime_error(string("Invalid ascertainment bias correction specification: ") + s);
+        }
+        break;
+      }
       case 'F':
         try
         {
@@ -612,6 +678,23 @@ std::string Model::to_string(bool print_params) const
         print_param(model_string, _ratecat_weights);
       }
     }
+  }
+
+  switch(_ascbias_type)
+  {
+    case AscBiasCorrection::lewis:
+      model_string << "+ASC_LEWIS";
+      break;
+    case AscBiasCorrection::felsenstein:
+      model_string << "+ASC_FELS";
+      print_param(model_string, _ascbias_weights.at(0));
+      break;
+    case AscBiasCorrection::stamatakis:
+      model_string << "+ASC_STAM";
+      print_param(model_string, _ascbias_weights);
+      break;
+    default:
+      break;
   }
 
   return model_string.str();
