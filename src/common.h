@@ -8,6 +8,7 @@
 #include <iomanip>
 #include <sstream>
 #include <vector>
+#include <array>
 #include <set>
 #include <unordered_map>
 #include <stdexcept>
