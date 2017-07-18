@@ -117,6 +117,11 @@ void check_msa(RaxmlInstance& instance)
   const auto& full_msa = instance.parted_msa.full_msa();
   const auto pll_msa = full_msa.pll_msa();
 
+  if (full_msa.size() < 4)
+  {
+    throw runtime_error("Your alignment contains less than 4 sequences!");
+  }
+
   unsigned long stats_mask = PLLMOD_MSA_STATS_DUP_TAXA | PLLMOD_MSA_STATS_DUP_SEQS;
 
   pllmod_msa_stats_t * stats = pllmod_msa_compute_stats(pll_msa,
@@ -273,6 +278,48 @@ void check_models(const RaxmlInstance& instance)
   }
 }
 
+void check_tree(const MSA& msa, const Tree& tree)
+{
+  auto missing_taxa = 0;
+  auto duplicate_taxa = 0;
+
+  if (msa.size() > tree.num_tips())
+    throw runtime_error("Alignment file contains more sequences than expected");
+  else if (msa.size() != tree.num_tips())
+    throw runtime_error("Some taxa are missing from the alignment file");
+
+  unordered_set<string> tree_labels;
+  unordered_set<string> msa_labels(msa.label_cbegin(), msa.label_cend());
+
+  for (const auto& tip: tree.tip_labels())
+  {
+    if (!tree_labels.insert(tip.second).second)
+    {
+      LOG_ERROR << "ERROR: Taxon name appears more than once in the tree: " << tip.second << endl;
+      duplicate_taxa++;
+    }
+
+    if (msa_labels.count(tip.second) == 0)
+    {
+      LOG_ERROR << "ERROR: Taxon name not found in the alignment: " << tip.second << endl;
+      missing_taxa++;
+    }
+  }
+
+  if (duplicate_taxa > 0)
+    throw runtime_error("Tree contains duplicate taxon names (see above)!");
+
+  if (missing_taxa > 0)
+    throw runtime_error("Please check that sequence labels in the alignment and in the tree file are identical!");
+
+  /* check for negative branch length */
+  for (const auto& branch: tree.topology())
+  {
+    if (branch.length < 0.)
+      throw runtime_error("Tree file contains negative branch lengths!");
+  }
+}
+
 void load_msa(RaxmlInstance& instance)
 {
   const auto& opts = instance.opts;
@@ -346,10 +393,7 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
       LOG_DEBUG << "Loaded user starting tree with " << tree.num_tips() << " taxa from: "
                            << opts.tree_file << endl;
 
-      if (msa.size() > tree.num_tips())
-        sysutil_fatal("Alignment file contains more sequences than expected");
-      else if (msa.size() != tree.num_tips())
-        sysutil_fatal("Some taxa are missing from the alignment file");
+      check_tree(msa, tree);
 
       break;
     }

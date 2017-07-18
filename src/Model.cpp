@@ -861,7 +861,7 @@ LogStream& operator<<(LogStream& stream, const Model& m)
     stream << " (" << m.num_ratecats() << " cats, " <<
         (m.gamma_mode() == PLL_GAMMA_RATES_MEDIAN ? "median" : "mean") << ")";
     if (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_GAMMA)
-      stream << ",  alpha: " << setprecision(3) << m.alpha() << " ("  << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_ALPHA))
+      stream << ",  alpha: " << setprecision(6) << m.alpha() << " ("  << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_ALPHA))
                  << ")";
     stream << ",  weights&rates: ";
     for (size_t i = 0; i < m.num_ratecats(); ++i)
@@ -880,7 +880,7 @@ LogStream& operator<<(LogStream& stream, const Model& m)
       stream << "\nM" << i << ": ";
 
     for (size_t j = 0; j < m.base_freqs(i).size(); ++j)
-      stream << setprecision(3) << m.base_freqs(i)[j] << " ";
+      stream << setprecision(6) << m.base_freqs(i)[j] << " ";
   }
   stream << endl;
 

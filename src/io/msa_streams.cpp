@@ -22,29 +22,30 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
   /* read sequences and make sure they are all of the same length */
   int sites = 0;
 
-  /* read the first sequence separately, so that the MSA object can be constructed */
-  pll_fasta_getnext(file, &header, &header_length, &sequence, &sequence_length, &sequence_number);
-  sites = sequence_length;
-
-  if (sites == -1 || sites == 0)
-    throw runtime_error{"Unable to read MSA file"};
-
-  msa = MSA(sites);
-
-  msa.append(sequence, header);
-
-  free(sequence);
-  free(header);
-
   /* read the rest */
   while (pll_fasta_getnext(file, &header, &header_length, &sequence, &sequence_length, &sequence_number))
   {
-    if (sites && sites != sequence_length)
-      throw runtime_error{"MSA file does not contain equal size sequences"};
+    if (!sites)
+    {
+      /* first sequence, init the MSA object */
+      if (sequence_length == -1 || sequence_length == 0)
+        throw runtime_error{"Unable to read MSA file"};
 
-    if (!sites) sites = sequence_length;
+      sites = sequence_length;
 
-    msa.append(sequence, header);
+      msa = MSA(sites);
+    }
+    else
+    {
+      if (sequence_length != sites)
+        throw runtime_error{"MSA file does not contain equal size sequences"};
+    }
+
+    /*trim trailing whitespace from the sequence label */
+    std::string label(header);
+    label.erase(label.find_last_not_of(" \n\r\t")+1);
+
+    msa.append(sequence, label);
     free(sequence);
     free(header);
   }

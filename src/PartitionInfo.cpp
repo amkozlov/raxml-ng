@@ -26,6 +26,8 @@ size_t PartitionInfo::mark_partition_sites(unsigned int part_num, std::vector<un
     /* try to parse strided format first */
     read = sscanf(range, "%lu-%lu\\%lu", &start, &end, &stride);
     if (read != 3)
+      read = sscanf(range, "%lu-%lu/%lu", &start, &end, &stride);
+    if (read != 3)
     {
       /* try to parse contiguous range format first */
       stride = 1;

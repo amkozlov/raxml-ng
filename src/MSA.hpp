@@ -66,6 +66,9 @@ public:
   const_iterator cbegin() { return _sequences.cbegin(); }
   const_iterator cend() { return _sequences.cend(); }
 
+  const_iterator label_cbegin() const { return _labels.cbegin(); }
+  const_iterator label_cend() const { return _labels.cend(); }
+
 private:
   // Data Members
   size_t _length;
