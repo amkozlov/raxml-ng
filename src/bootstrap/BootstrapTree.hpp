@@ -17,9 +17,8 @@ public:
 
 private:
   size_t _num_bs_trees;
-  size_t _num_splits;
   bitv_hashtable_t* _pll_splits_hash;
-  int * _node_split_map;
+  std::vector<pll_unode_t*> _node_split_map;
 
   void add_splits_to_hashtable(const pll_unode_t& root, bool update_only);
 };

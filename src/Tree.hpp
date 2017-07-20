@@ -32,6 +32,7 @@ public:
   size_t num_nodes() const { return _num_tips + _num_tips - 2; };
   size_t num_subnodes() const { return _num_tips + num_inner() * 3; };
   size_t num_branches() const { return _num_tips + _num_tips - 3; };
+  size_t num_splits() const { return _num_tips - 3; };
 
 protected:
   size_t _num_tips;
