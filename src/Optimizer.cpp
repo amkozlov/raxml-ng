@@ -124,9 +124,6 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
             spr_params.radius_max << ")" << endl;
         loglh = treeinfo.spr_round(spr_params);
 
-        if (!loglh)
-          throw runtime_error("ERROR in SPR round: " + string(pll_errmsg));
-
         if (loglh - best_loglh > 0.1)
         {
           /* LH improved, try to increase the radius */

@@ -249,12 +249,17 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
 
 double TreeInfo::spr_round(spr_round_params& params)
 {
-  return pllmod_algo_spr_round(_pll_treeinfo, params.radius_min, params.radius_max,
+  double loglh = pllmod_algo_spr_round(_pll_treeinfo, params.radius_min, params.radius_max,
                                params.ntopol_keep, params.thorough,
                                RAXML_BRLEN_MIN, RAXML_BRLEN_MAX, RAXML_BRLEN_SMOOTHINGS,
                                0.1,
                                params.subtree_cutoff > 0. ? &params.cutoff_info : nullptr,
                                params.subtree_cutoff);
+
+  if (loglh)
+    return loglh;
+  else
+    throw runtime_error("ERROR in SPR round: " + string(pll_errmsg));
 }
 
 
