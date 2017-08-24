@@ -246,6 +246,17 @@ void check_models(const RaxmlInstance& instance)
     auto stats = pinfo.stats();
     auto model = pinfo.model();
 
+    // check for non-recommended model combinations
+    if ((model.name() == "LG4X" || model.name() == "LG4M") &&
+        model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) != ParamValue::model)
+    {
+      throw runtime_error("Partition \"" + pinfo.name() +
+                          "\": You specified LG4M or LG4X model with shared stationary based frequencies (" +
+                          model.to_string(false) + ").\n"
+                          "Please be warned, that this is against the idea of LG4 models and hence it's not recommended!" + "\n"
+                          "If you know what you're doing, you can add --force command line switch to disable this safety check.");
+    }
+
     // check for zero state frequencies
     if (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::empirical)
     {
