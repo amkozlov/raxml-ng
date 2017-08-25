@@ -49,6 +49,8 @@ extern "C" {
 #define RAXML_BRLEN_SCALER_MIN    0.01
 #define RAXML_BRLEN_SCALER_MAX    100.
 
+#define RAXML_RATESCALERS_TAXA    2000
+
 /* used to supress compiler warnings about unused args */
 #define UNUSED(expr) while (0) { (void)(expr); }
 

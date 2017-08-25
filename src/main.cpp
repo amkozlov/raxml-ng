@@ -237,6 +237,14 @@ void check_msa(RaxmlInstance& instance)
     }
   }
 
+  if (full_msa.size() > RAXML_RATESCALERS_TAXA && !instance.opts.use_rate_scalers)
+  {
+    LOG_INFO << "\nNOTE: Per-rate scalers were automatically enabled to prevent numerical issues "
+        "on taxa-rich alignments.\n";
+    LOG_INFO << "NOTE: You can use --force switch to skip this check and fall back to per-site scalers.\n";
+    instance.opts.use_rate_scalers = true;
+  }
+
 }
 
 void check_models(const RaxmlInstance& instance)
