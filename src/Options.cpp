@@ -115,6 +115,7 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   stream << "  tip-inner: " << (opts.use_tip_inner ? "ON" : "OFF") << endl;
   stream << "  pattern compression: " << (opts.use_pattern_compression ? "ON" : "OFF") << endl;
   stream << "  per-rate scalers: " << (opts.use_rate_scalers ? "ON" : "OFF") << endl;
+  stream << "  site repeats: " << (opts.use_repeats ? "ON" : "OFF") << endl;
 
   if (opts.command == Command::search)
   {

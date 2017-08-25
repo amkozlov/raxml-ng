@@ -20,7 +20,7 @@ class Options
 {
 public:
   Options() : cmdline(""), command(Command::none), use_tip_inner(true),
-  use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false),
+  use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false), use_repeats(true),
   optimize_model(true), optimize_brlen(true), redo_mode(false), force_mode(false),
   log_level(LogLevel::progress),
   msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
@@ -41,6 +41,7 @@ public:
   bool use_pattern_compression;
   bool use_prob_msa;
   bool use_rate_scalers;
+  bool use_repeats;
 
   bool optimize_model;
   bool optimize_brlen;

@@ -45,6 +45,8 @@ static struct option long_options[] =
   {"redo",               no_argument,       0, 0 },  /*  27 */
   {"force",              no_argument,       0, 0 },  /*  28 */
 
+  {"site-repeats",       required_argument, 0, 0 },  /*  29 */
+
   { 0, 0, 0, 0 }
 };
 
@@ -75,6 +77,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   /* use probabilistic MSA _if available_ (e.g. CATG file was provided) */
   opts.use_prob_msa = true;
+
+  /* do not use site repeats */
+  opts.use_repeats = false;
 
   /* optimize model and branch lengths */
   opts.optimize_model = true;
@@ -364,6 +369,16 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       case 28:
         opts.force_mode = true;
+        break;
+
+      case 29:  /* site repeats */
+        if (!optarg || (strcasecmp(optarg, "off") != 0))
+        {
+          opts.use_repeats = true;
+          opts.use_tip_inner = false;
+        }
+        else
+          opts.use_repeats = false;
         break;
       default:
         throw  OptionException("Internal error in option parsing");
