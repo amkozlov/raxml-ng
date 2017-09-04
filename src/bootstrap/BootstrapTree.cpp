@@ -56,7 +56,7 @@ void BootstrapTree::calc_support()
     while (e != NULL)
     {
 //      printf("split %d, support %d\n", e->bip_number, e->support);
-      support[e->bip_number] = (unsigned char) (e->support - 1) * 100 / _num_bs_trees;
+      support[e->bip_number] = (unsigned char) ((e->support - 1) * 100 / _num_bs_trees);
       e = e->next;
     }
   }
