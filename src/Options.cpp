@@ -89,6 +89,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     case Command::all:
       stream << "ML tree search + bootstrapping";
       break;
+    case Command::support:
+      stream << "Compute bipartition support";
+      break;
     default:
       break;
   }

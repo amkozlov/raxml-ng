@@ -46,6 +46,7 @@ static struct option long_options[] =
   {"force",              no_argument,       0, 0 },  /*  28 */
 
   {"site-repeats",       required_argument, 0, 0 },  /*  29 */
+  {"support",            no_argument,       0, 0 },  /*  30 */
 
   { 0, 0, 0, 0 }
 };
@@ -358,7 +359,11 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         num_commands++;
         break;
       case 26:  /* number of bootstrap replicates */
-        if (sscanf(optarg, "%u", &opts.num_bootstraps) != 1 || opts.num_bootstraps == 0)
+        if (sysutil_file_exists(optarg))
+        {
+          opts.outfile_names.bootstrap_trees = optarg;
+        }
+        else if (sscanf(optarg, "%u", &opts.num_bootstraps) != 1 || opts.num_bootstraps == 0)
         {
           throw InvalidOptionValueException("Invalid number of num_bootstraps: " + string(optarg) +
               ", please provide a positive integer number!");
@@ -379,6 +384,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         }
         else
           opts.use_repeats = false;
+        break;
+      case 30: /* support */
+        opts.command = Command::support;
+        num_commands++;
         break;
       default:
         throw  OptionException("Internal error in option parsing");
@@ -403,10 +412,22 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       throw OptionException("You must specify an evolutionary model with --model switch");
   }
 
-  if (opts.command == Command::evaluate)
+  if (opts.command == Command::evaluate || opts.command == Command::support)
   {
     if (opts.tree_file.empty())
       throw OptionException("Mandatory switch --tree");
+  }
+
+  if (opts.command == Command::support)
+  {
+    if (opts.outfile_prefix.empty())
+      opts.outfile_prefix = opts.tree_file;
+
+    if (opts.outfile_names.bootstrap_trees.empty())
+    {
+      throw OptionException("You must specify Newick file with replicate trees, e.g., "
+          "--bs-trees bootstrap.nw");
+    }
   }
 
   if (opts.simd_arch > sysutil_simd_autodetect())
@@ -441,7 +462,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   }
 
   /* set default  names for output files */
-  opts. set_default_outfiles();
+  opts.set_default_outfiles();
 }
 
 void CommandLineParser::print_help()
@@ -456,6 +477,8 @@ void CommandLineParser::print_help()
             "  --search                                   ML tree search.\n"
             "  --bootstrap                                bootstrapping.\n"
             "  --all                                      All-in-one (ML search + bootstrapping).\n"
+            "  --support                                  Compute bipartition support for a given reference tree (e.g., best ML tree)\n"
+            "                                             and a set of replicate trees (e.g., from a bootstrap analysis) \n"
             "\n"
             "Input and output options:\n"
             "  --tree         FILE | rand{N} | pars{N}    starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
@@ -489,7 +512,8 @@ void CommandLineParser::print_help()
             "  --spr-cutoff   VALUE | off                 Relative LH cutoff for descending into subtrees (default: 1.0)\n"
             "\n"
             "Bootstrapping options:\n"
-            "  --bs-trees     VALUE                       Number of bootstraps replicates (default: 100)\n";
+            "  --bs-trees     VALUE                       Number of bootstraps replicates (default: 100)\n"
+            "  --bs-trees     FILE                        Newick file containing set of bootstrap replicate trees (with --support)\n";
 
   cout << "\n"
             "EXAMPLES:\n"

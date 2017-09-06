@@ -16,7 +16,8 @@ enum class Command
   evaluate,
   search,
   bootstrap,
-  all
+  all,
+  support
 };
 
 enum class FileFormat
