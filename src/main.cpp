@@ -621,6 +621,62 @@ void generate_bootstraps(RaxmlInstance& instance, const Checkpoint& checkp)
   }
 }
 
+void draw_bootstrap_support(const Options& opts)
+{
+  LOG_INFO << "Reading reference tree from file: " << opts.tree_file << endl;
+
+  Tree ref_tree;
+  NewickStream refs(opts.tree_file, std::ios::in);
+  refs >> ref_tree;
+
+  LOG_INFO << "Reference tree size: " << to_string(ref_tree.num_tips()) << endl << endl;
+
+  auto ref_tip_ids = ref_tree.tip_ids();
+
+  BootstrapTree sup_tree(ref_tree);
+
+  LOG_INFO << "Reading bootstrap trees from file: " << opts.bootstrap_trees_file() << endl;
+
+  NewickStream boots(opts.bootstrap_trees_file(), std::ios::in);
+  unsigned int bs_num = 0;
+  while (boots.peek() != EOF)
+  {
+    Tree bs_tree;
+    boots >> bs_tree;
+    try
+    {
+      bs_tree.reset_tip_ids(ref_tip_ids);
+    }
+    catch (out_of_range& e)
+    {
+      throw runtime_error("Bootstrap tree #" + to_string(bs_num+1) +
+                          " is not compatible with the reference tree!");
+    }
+    catch (invalid_argument& e)
+    {
+      throw runtime_error("Bootstrap tree #" + to_string(bs_num+1) +
+                          " has wrong number of tips: " + to_string(bs_tree.num_tips()));
+    }
+    sup_tree.add_bootstrap_tree(bs_tree);
+    bs_num++;
+  }
+
+  LOG_INFO << "Bootstrap trees found: " << bs_num << endl << endl;
+
+  if (bs_num < 2)
+  {
+    throw runtime_error("You must provide a file with multiple bootstrap trees!");
+  }
+
+  sup_tree.calc_support();
+
+  NewickStream sups(opts.support_tree_file(), std::ios::out);
+  sups << sup_tree;
+
+  LOG_INFO << "Best ML tree with bootstrap support values saved to: " <<
+      sysutil_realpath(opts.support_tree_file()) << endl << endl;
+}
+
 void draw_bootstrap_support(RaxmlInstance& instance, const Checkpoint& checkp)
 {
   Tree tree = checkp.tree;
@@ -950,7 +1006,7 @@ int main(int argc, char** argv)
   }
   catch (OptionException &e)
   {
-    LOG_INFO << "ERROR: " << e.what() << std::endl;
+    LOG_INFO << "ERROR: " << e.message() << std::endl;
     clean_exit(EXIT_FAILURE);
   }
 
@@ -970,6 +1026,7 @@ int main(int argc, char** argv)
     case Command::search:
     case Command::bootstrap:
     case Command::all:
+    case Command::support:
       if (!instance.opts.redo_mode && instance.opts.result_files_exist())
       {
         LOG_ERROR << endl << "ERROR: Result files for the run with prefix `" <<
@@ -1000,14 +1057,14 @@ int main(int argc, char** argv)
   print_banner();
   LOG_INFO << instance.opts;
 
-  switch (instance.opts.command)
+  try
   {
-    case Command::evaluate:
-    case Command::search:
-    case Command::bootstrap:
-    case Command::all:
+    switch (instance.opts.command)
     {
-      try
+      case Command::evaluate:
+      case Command::search:
+      case Command::bootstrap:
+      case Command::all:
       {
         if (instance.opts.redo_mode)
         {
@@ -1030,18 +1087,21 @@ int main(int argc, char** argv)
                                                                 std::ref(cm)));
 
         master_main(instance, cm);
+        break;
       }
-      catch(exception& e)
-      {
-        LOG_ERROR << endl << "ERROR: " << e.what() << endl << endl;
+      case Command::support:
+        draw_bootstrap_support(instance.opts);
+        break;
+      case Command::none:
+      default:
+        LOG_ERROR << "Unknown command!" << endl;
         retval = EXIT_FAILURE;
-      }
-      break;
     }
-    case Command::none:
-    default:
-      LOG_ERROR << "Unknown command!" << endl;
-      retval = EXIT_FAILURE;
+  }
+  catch(exception& e)
+  {
+    LOG_ERROR << endl << "ERROR: " << e.what() << endl << endl;
+    retval = EXIT_FAILURE;
   }
 
   clean_exit(retval);

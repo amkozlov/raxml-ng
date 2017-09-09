@@ -14,7 +14,6 @@ BootstrapTree::BootstrapTree (const Tree& tree) : Tree(tree), _num_bs_trees(0)
 
 BootstrapTree::~BootstrapTree ()
 {
-  pll_utree_destroy(_pll_utree, nullptr);
   pllmod_utree_split_hashtable_destroy(_pll_splits_hash);
 }
 
@@ -56,7 +55,7 @@ void BootstrapTree::calc_support()
     while (e != NULL)
     {
 //      printf("split %d, support %d\n", e->bip_number, e->support);
-      support[e->bip_number] = (unsigned char) ((e->support - 1) * 100 / _num_bs_trees);
+      support[e->bip_number] = (unsigned char) round((e->support - 1) * 100 / _num_bs_trees);
       e = e->next;
     }
   }

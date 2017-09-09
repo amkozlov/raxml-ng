@@ -62,6 +62,7 @@ public:
   static Tree loadFromFile(const std::string& file_name);
 
   IdNameVector tip_labels() const;
+  NameIdMap tip_ids() const;
 
   TreeTopology topology() const;
   void topology(const TreeTopology& topol);

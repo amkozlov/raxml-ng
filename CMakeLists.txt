@@ -44,10 +44,10 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 endif()
 
 set (raxml-ng_VERSION_MAJOR 0)
-set (raxml-ng_VERSION_MINOR 1)
+set (raxml-ng_VERSION_MINOR 5)
 
 set (CMAKE_BUILD_TYPE DEBUG)
-# set (CMAKE_BUILD_TYPE RELEASE)
+#set (CMAKE_BUILD_TYPE RELEASE)
 # set (CMAKE_VERBOSE_MAKEFILE ON)
 
 message (STATUS "Building ${CMAKE_BUILD_TYPE}")
