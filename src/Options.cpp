@@ -28,8 +28,21 @@ void Options::set_default_outfiles()
 
 bool Options::result_files_exist() const
 {
-  return sysutil_file_exists(best_tree_file()) || sysutil_file_exists(bootstrap_trees_file()) ||
-      sysutil_file_exists(support_tree_file()) || sysutil_file_exists(best_model_file());
+  switch (command)
+  {
+    case Command::evaluate:
+    case Command::search:
+      return sysutil_file_exists(best_tree_file()) || sysutil_file_exists(best_model_file());
+    case Command::bootstrap:
+      return sysutil_file_exists(bootstrap_trees_file());
+    case Command::all:
+      return sysutil_file_exists(best_tree_file()) || sysutil_file_exists(bootstrap_trees_file()) ||
+             sysutil_file_exists(support_tree_file()) || sysutil_file_exists(best_model_file());
+    case Command::support:
+      return sysutil_file_exists(support_tree_file());
+    default:
+      return false;
+  }
 }
 
 void Options::remove_result_files() const
@@ -38,10 +51,17 @@ void Options::remove_result_files() const
     std::remove(best_tree_file().c_str());
   if (sysutil_file_exists(best_model_file()))
     std::remove(best_model_file().c_str());
-  if (sysutil_file_exists(bootstrap_trees_file()))
-    std::remove(bootstrap_trees_file().c_str());
-  if (sysutil_file_exists(support_tree_file()))
-    std::remove(support_tree_file().c_str());
+
+  if (command == Command::bootstrap || command == Command::all)
+  {
+    if (sysutil_file_exists(bootstrap_trees_file()))
+      std::remove(bootstrap_trees_file().c_str());
+  }
+  if (command == Command::support || command == Command::all)
+  {
+    if (sysutil_file_exists(support_tree_file()))
+      std::remove(support_tree_file().c_str());
+  }
 }
 
 string Options::simd_arch_name() const
