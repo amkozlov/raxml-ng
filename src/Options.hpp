@@ -14,6 +14,7 @@ struct OutputFileNames
   std::string ml_trees;
   std::string bootstrap_trees;
   std::string support_tree;
+  std::string terrace;
 };
 
 class Options
@@ -26,7 +27,7 @@ public:
   msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
   random_seed(0), start_tree(StartingTree::random), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
   spr_cutoff(1.0), brlen_linkage(PLLMOD_TREE_BRLEN_SCALED), simd_arch(PLL_ATTRIB_ARCH_CPU),
-  num_searches(1), num_bootstraps(100),
+  num_searches(1), num_bootstraps(100), terrace_maxsize(100),
   tree_file(""), msa_file(""), model_file(""), outfile_prefix(""),
   num_threads(1), num_ranks(1)
   {};
@@ -62,6 +63,7 @@ public:
 
   unsigned int num_searches;
   unsigned int num_bootstraps;
+  unsigned long long terrace_maxsize;
 
   /* I/O */
   std::string tree_file;
@@ -86,6 +88,7 @@ public:
   const std::string& ml_trees_file() const { return outfile_names.ml_trees; }
   const std::string& bootstrap_trees_file() const { return outfile_names.bootstrap_trees; }
   const std::string& support_tree_file() const { return outfile_names.support_tree; }
+  const std::string& terrace_file() const { return outfile_names.terrace; }
 
   void set_default_outfiles();
 

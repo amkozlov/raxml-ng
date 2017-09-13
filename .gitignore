@@ -31,6 +31,9 @@
 # binaries
 build/
 bin/
+build-mpi/
+build-static/
+release/
 
 # Eclipse project files
 .cproject

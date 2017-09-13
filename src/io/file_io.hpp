@@ -103,5 +103,6 @@ RaxmlPartitionStream& operator>>(RaxmlPartitionStream& stream, PartitionedMSA& p
 RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const PartitionInfo& part_info);
 RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const PartitionedMSA& parted_msa);
 
+std::string to_newick_string_rooted(const Tree& tree, double root_brlen = 0.0);
 
 #endif /* RAXML_FILE_IO_HPP_ */

@@ -37,6 +37,8 @@
 #include "LoadBalancer.hpp"
 #include "bootstrap/BootstrapGenerator.hpp"
 
+#include "terraces/TerraceWrapper.hpp"
+
 using namespace std;
 
 typedef vector<Tree> TreeList;
@@ -49,6 +51,7 @@ struct RaxmlInstance
   PartitionAssignmentList proc_part_assign;
   unique_ptr<LoadBalancer> load_balancer;
   unique_ptr<BootstrapTree> bs_tree;
+  unique_ptr<TerraceWrapper> terrace_wrapper;
 
   unique_ptr<NewickStream> start_tree_stream;
 
@@ -376,6 +379,9 @@ void load_msa(RaxmlInstance& instance)
   if (opts.use_pattern_compression)
     parted_msa.compress_patterns();
 
+//  if (parted_msa.part_count() > 1)
+//    instance.terrace_wrapper.reset(new TerraceWrapper(parted_msa));
+
   parted_msa.set_model_empirical_params();
 
   if (!opts.force_mode)
@@ -692,6 +698,42 @@ void draw_bootstrap_support(RaxmlInstance& instance, const Checkpoint& checkp)
   instance.bs_tree->calc_support();
 }
 
+void check_terrace(const RaxmlInstance& instance, const Tree& tree)
+{
+  if (instance.parted_msa.part_count() > 1)
+  {
+    auto newick_str = to_newick_string_rooted(tree);
+    LOG_DEBUG << newick_str << endl << endl;
+//      auto terrace_size = instance.terrace_wrapper->get_terrace_size(newick_str);
+    TerraceWrapper terrace_wrapper(instance.parted_msa, newick_str);
+    try
+    {
+      auto terrace_size = terrace_wrapper.terrace_size();
+      if (terrace_size > 1)
+      {
+        LOG_WARN << "WARNING: Best-found ML tree lies on a terrace of size: "
+                 << terrace_size << endl << endl;
+
+        ofstream fs(instance.opts.terrace_file());
+        terrace_wrapper.print_terrace(fs);
+        LOG_INFO << "Tree terrace (in compressed Newick format) was saved to: "
+            << sysutil_realpath(instance.opts.terrace_file()) << endl << endl;
+
+        // TODO partial prints to multiline newick?
+        // if (terrace_size <= instance.opts.terrace_maxsize)
+      }
+      else
+      {
+        LOG_INFO << "NOTE: Tree does not lie on a phylogenetic terrace." << endl << endl;
+      }
+    }
+    catch (std::exception& e)
+    {
+      LOG_ERROR << "ERROR: Failed to compute terrace: " << e.what() << endl << endl;
+    }
+  }
+}
+
 void save_ml_trees(const Options& opts, const Checkpoint& checkp)
 {
   NewickStream nw(opts.ml_trees_file(), std::ios::out);
@@ -737,6 +779,8 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
 
     NewickStream nw_result(opts.best_tree_file());
     nw_result << best_tree;
+
+    check_terrace(instance, best_tree);
 
     if (checkp.ml_trees.size() > 1)
     {
@@ -1092,6 +1136,19 @@ int main(int argc, char** argv)
       case Command::support:
         draw_bootstrap_support(instance.opts);
         break;
+      case Command::terrace:
+      {
+        init_part_info(instance);
+        load_msa(instance);
+        assert(instance.opts.start_tree == StartingTree::user);
+        LOG_INFO << "Loading tree from: " << instance.opts.tree_file << endl << endl;
+        if (!sysutil_file_exists(instance.opts.tree_file))
+          throw runtime_error("File not found: " + instance.opts.tree_file);
+        instance.start_tree_stream.reset(new NewickStream(instance.opts.tree_file, std::ios::in));
+        Tree tree = generate_tree(instance, instance.opts.start_tree);
+        check_terrace(instance, tree);
+        break;
+      }
       case Command::none:
       default:
         LOG_ERROR << "Unknown command!" << endl;

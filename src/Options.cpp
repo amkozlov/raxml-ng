@@ -24,6 +24,7 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.ml_trees, "mlTrees");
   set_default_outfile(outfile_names.bootstrap_trees, "bootstraps");
   set_default_outfile(outfile_names.support_tree, "support");
+  set_default_outfile(outfile_names.terrace, "terrace");
 }
 
 bool Options::result_files_exist() const
@@ -40,6 +41,8 @@ bool Options::result_files_exist() const
              sysutil_file_exists(support_tree_file()) || sysutil_file_exists(best_model_file());
     case Command::support:
       return sysutil_file_exists(support_tree_file());
+    case Command::terrace:
+      return sysutil_file_exists(terrace_file());
     default:
       return false;
   }
@@ -47,10 +50,14 @@ bool Options::result_files_exist() const
 
 void Options::remove_result_files() const
 {
-  if (sysutil_file_exists(best_tree_file()))
-    std::remove(best_tree_file().c_str());
-  if (sysutil_file_exists(best_model_file()))
-    std::remove(best_model_file().c_str());
+  if (command == Command::search || command == Command::all ||
+      command == Command::evaluate)
+  {
+    if (sysutil_file_exists(best_tree_file()))
+      std::remove(best_tree_file().c_str());
+    if (sysutil_file_exists(best_model_file()))
+      std::remove(best_model_file().c_str());
+  }
 
   if (command == Command::bootstrap || command == Command::all)
   {
@@ -61,6 +68,12 @@ void Options::remove_result_files() const
   {
     if (sysutil_file_exists(support_tree_file()))
       std::remove(support_tree_file().c_str());
+  }
+
+  if (command == Command::terrace)
+  {
+    if (sysutil_file_exists(terrace_file()))
+      std::remove(terrace_file().c_str());
   }
 }
 

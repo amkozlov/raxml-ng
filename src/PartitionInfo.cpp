@@ -98,6 +98,7 @@ const pllmod_msa_stats_t * PartitionInfo::stats() const
     unsigned long stats_mask = PLLMOD_MSA_STATS_GAP_PROP;
     stats_mask |= PLLMOD_MSA_STATS_FREQS;
     stats_mask |= PLLMOD_MSA_STATS_INV_PROP;
+    stats_mask |= PLLMOD_MSA_STATS_GAP_SEQS;
 
     if (_model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::empirical)
       stats_mask |= PLLMOD_MSA_STATS_SUBST_RATES;

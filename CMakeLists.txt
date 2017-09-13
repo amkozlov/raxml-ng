@@ -15,7 +15,12 @@ set (ENABLE_PLLMOD_SIMD OFF CACHE BOOL "Enable SIMD instructions in pll-modules 
 # build a static binary
 set(STATIC_BUILD OFF CACHE BOOL "Build static binary")
 
+set(USE_GMP ON CACHE BOOL "Use Gnu Muliple precision (GMP) library ")
+
 set(ENABLE_PTHREADS ${USE_PTHREADS})
+
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 project (raxml-ng C CXX)
 
@@ -57,6 +62,12 @@ set (CMAKE_CXX_FLAGS          "-std=c++11 ${WARN_FLAGS}")
 
 set (CMAKE_CXX_FLAGS_DEBUG    "-g")
 set (CMAKE_CXX_FLAGS_RELEASE  "-O3 -DNDEBUG")
+
+if (USE_GMP)
+#find_package(GMP REQUIRED)
+  set(GMP_FOUND ON)
+  set(GMP_LIBRARIES gmpxx gmp)
+endif()
 
 if (ENABLE_RAXML_SIMD)
   include(CheckCXXCompilerFlag)
@@ -111,7 +122,7 @@ set(pll_msa_dir ${PROJECT_SOURCE_DIR}/libs/pll-modules/src/msa)
 set(RAXML_LOCALDEPS_DIR ${PROJECT_BINARY_DIR}/localdeps)
 add_subdirectory(${PROJECT_SOURCE_DIR}/libs)
 
-include_directories(${RAXML_LOCALDEPS_DIR}/include)
+include_directories(${RAXML_LOCALDEPS_DIR}/include ${TERRACES_INCLUDE_DIR})
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/src)
 

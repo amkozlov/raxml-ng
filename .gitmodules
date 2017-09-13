@@ -1,3 +1,6 @@
 [submodule "libs/pll-modules"]
 	path = libs/pll-modules
 	url = https://github.com/ddarriba/pll-modules.git
+[submodule "libs/terraphast"]
+	path = libs/terraphast
+	url = https://github.com/terraphast/terraphast

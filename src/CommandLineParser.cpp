@@ -47,6 +47,8 @@ static struct option long_options[] =
 
   {"site-repeats",       required_argument, 0, 0 },  /*  29 */
   {"support",            no_argument,       0, 0 },  /*  30 */
+  {"terrace",            no_argument,       0, 0 },  /*  31 */
+  {"terrace-maxsize",    required_argument, 0, 0 },  /*  32 */
 
   { 0, 0, 0, 0 }
 };
@@ -389,6 +391,17 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.command = Command::support;
         num_commands++;
         break;
+      case 31: /* terrace */
+        opts.command = Command::terrace;
+        num_commands++;
+        break;
+      case 32:  /* maximum number of terrace trees to output */
+        if (sscanf(optarg, "%llu", &opts.terrace_maxsize) != 1 || opts.terrace_maxsize == 0)
+        {
+          throw InvalidOptionValueException("Invalid number of terrace trees to output: "
+              + string(optarg) + ", please provide a positive integer number!");
+        }
+        break;
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -403,7 +416,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   /* check for mandatory options for each command */
   if (opts.command == Command::evaluate || opts.command == Command::search ||
-      opts.command == Command::bootstrap || opts.command == Command::all)
+      opts.command == Command::bootstrap || opts.command == Command::all ||
+      opts.command == Command::terrace)
   {
     if (opts.msa_file.empty())
       throw OptionException("You must specify a multiple alignment file with --msa switch");
@@ -412,7 +426,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       throw OptionException("You must specify an evolutionary model with --model switch");
   }
 
-  if (opts.command == Command::evaluate || opts.command == Command::support)
+  if (opts.command == Command::evaluate || opts.command == Command::support ||
+      opts.command == Command::terrace)
   {
     if (opts.tree_file.empty())
       throw OptionException("Mandatory switch --tree");
@@ -425,8 +440,17 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
     if (opts.outfile_names.bootstrap_trees.empty())
     {
-      throw OptionException("You must specify Newick file with replicate trees, e.g., "
+      throw OptionException("You must specify a Newick file with replicate trees, e.g., "
           "--bs-trees bootstrap.nw");
+    }
+  }
+
+  if (opts.command == Command::terrace)
+  {
+    if (opts.start_tree != StartingTree::user)
+    {
+      throw OptionException("You must specify a tree file in the Newick format, e.g., "
+          "--tree bestTree.nw");
     }
   }
 
@@ -476,9 +500,10 @@ void CommandLineParser::print_help()
             "  --evaluate                                 evaluate the likelihood of a tree.\n"
             "  --search                                   ML tree search.\n"
             "  --bootstrap                                bootstrapping.\n"
-            "  --all                                      All-in-one (ML search + bootstrapping).\n"
-            "  --support                                  Compute bipartition support for a given reference tree (e.g., best ML tree)\n"
+            "  --all                                      all-in-one (ML search + bootstrapping).\n"
+            "  --support                                  compute bipartition support for a given reference tree (e.g., best ML tree)\n"
             "                                             and a set of replicate trees (e.g., from a bootstrap analysis) \n"
+            "  --terrace                                  check whether tree lies on a phylogenetic terrace \n"
             "\n"
             "Input and output options:\n"
             "  --tree         FILE | rand{N} | pars{N}    starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
@@ -510,10 +535,10 @@ void CommandLineParser::print_help()
             "\n"
             "Topology search options:\n"
             "  --spr-radius   VALUE                       SPR re-insertion radius for fast iterations (default: AUTO)\n"
-            "  --spr-cutoff   VALUE | off                 Relative LH cutoff for descending into subtrees (default: 1.0)\n"
+            "  --spr-cutoff   VALUE | off                 relative LH cutoff for descending into subtrees (default: 1.0)\n"
             "\n"
             "Bootstrapping options:\n"
-            "  --bs-trees     VALUE                       Number of bootstraps replicates (default: 100)\n"
+            "  --bs-trees     VALUE                       number of bootstraps replicates (default: 100)\n"
             "  --bs-trees     FILE                        Newick file containing set of bootstrap replicate trees (with --support)\n";
 
   cout << "\n"
