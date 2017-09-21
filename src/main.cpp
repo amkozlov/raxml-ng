@@ -100,8 +100,8 @@ void init_part_info(RaxmlInstance& instance)
 
   for (const auto& pinfo: parted_msa.part_list())
   {
-//    LOG_INFO << "|" << pinfo.name() << "|   |" << pinfo.model().to_string() << "|   |" <<
-//        pinfo.range_string() << "|" << endl;
+    LOG_DEBUG << "|" << pinfo.name() << "|   |" << pinfo.model().to_string() << "|   |" <<
+        pinfo.range_string() << "|" << endl;
 
     if (pinfo.model().name() == "LG4X")
       lg4x_count++;
