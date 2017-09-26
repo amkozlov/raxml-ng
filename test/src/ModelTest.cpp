@@ -187,3 +187,24 @@ TEST(ModelTest, LG_R4_user)
   EXPECT_EQ(model.ratecat_rates()[3], 1.6);
 }
 
+TEST(ModelTest, aliases)
+{
+  // buildup
+  auto model = Model(DataType::autodetect, "TrNef+G");
+
+  // tests
+  EXPECT_EQ(model.to_string(), "TN93ef+G4m");
+  EXPECT_EQ(model.data_type(), DataType::dna);
+  EXPECT_EQ(model.name(), "TN93ef");
+  EXPECT_EQ(model.num_states(), 4);
+  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_GAMMA);
+  EXPECT_EQ(model.num_ratecats(), 4);
+  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_ALPHA);
+
+  model = Model(DataType::autodetect, "TrN");
+  EXPECT_EQ(model.name(), "TN93");
+  model = Model(DataType::autodetect, "TPM1");
+  EXPECT_EQ(model.name(), "K81");
+  model = Model(DataType::autodetect, "TPM1uf");
+  EXPECT_EQ(model.name(), "K81uf");
+}
