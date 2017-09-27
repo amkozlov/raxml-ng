@@ -30,8 +30,8 @@ Documentation: [github wiki](https://github.com/amkozlov/raxml-ng/wiki)
 ```
 sudo apt-get install autotools-dev autoconf libtool flex bison libgmp3-dev
 ```
-For other systems, please make sure you have following packages/libraries installed:
-[`autoconf](https://www.gnu.org/software/autoconf/autoconf.html) [`automake`](https://www.gnu.org/software/automake/) [`libtool`](https://www.gnu.org/software/libtool/) [`GNU Bison`](http://www.gnu.org/software/bison/) [`Flex`](http://flex.sourceforge.net/) [`GMP`](https://gmplib.org/)
+For other systems, please make sure you have following packages/libraries installed:  
+[`autoconf`](https://www.gnu.org/software/autoconf/autoconf.html) [`automake`](https://www.gnu.org/software/automake/) [`libtool`](https://www.gnu.org/software/libtool/) [`GNU Bison`](http://www.gnu.org/software/bison/) [`Flex`](http://flex.sourceforge.net/) [`GMP`](https://gmplib.org/)
 
 2. **Build RAxML-NG.**
 
