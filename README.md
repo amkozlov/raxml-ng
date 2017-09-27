@@ -11,6 +11,8 @@ RAxML-NG offers improvements in speed, flexibility and user-friendliness over th
 RAxML-NG is currently under active development, and the mid-term goal is to have most functionality of RAxML 8.x covered.
 You can see some of the planned features [here](https://github.com/amkozlov/raxml-ng/issues).
 
+Documentation: [github wiki](https://github.com/amkozlov/raxml-ng/wiki)
+
 ## Installation instructions
 
 * For most desktop Unix/Linux and macOS systems, the easiest way to install RAxML-NG is by using the pre-compiled binary:  
@@ -23,6 +25,15 @@ You can see some of the planned features [here](https://github.com/amkozlov/raxm
 * Binaries for Windows will become available later on
 
 * If neither of the above options worked for you, please clone this repository and build RAxML-NG from scratch.
+
+1. **Install the dependecies.** On Ubuntu (and other Debian-based systems), you can simply run:
+```
+sudo apt-get install autotools-dev autoconf libtool flex bison libgmp3-dev
+```
+For other systems, please make sure you have following packages/libraries installed:
+[`autoconf](https://www.gnu.org/software/autoconf/autoconf.html) [`automake`](https://www.gnu.org/software/automake/) [`libtool`](https://www.gnu.org/software/libtool/) [`GNU Bison`](http://www.gnu.org/software/bison/) [`Flex`](http://flex.sourceforge.net/) [`GMP`](https://gmplib.org/)
+
+2. **Build RAxML-NG.**
 
 PTHREADS version:
 
