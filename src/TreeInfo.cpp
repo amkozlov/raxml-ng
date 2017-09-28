@@ -170,7 +170,9 @@ double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor
 
 double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
 {
-  double new_loglh;
+  double
+    cur_loglh = loglh(),
+    new_loglh = cur_loglh;
 
   /* optimize SUBSTITUTION RATES */
   if (params_to_optimize & PLLMOD_OPT_PARAM_SUBST_RATES)
@@ -183,6 +185,9 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                           RAXML_PARAM_EPSILON);
 
     LOG_DEBUG << "\t - after rates: logLH = " << new_loglh << endl;
+
+    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+    cur_loglh = new_loglh;
   }
 
   /* optimize BASE FREQS */
@@ -196,6 +201,8 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                           RAXML_PARAM_EPSILON);
 
     LOG_DEBUG << "\t - after freqs: logLH = " << new_loglh << endl;
+    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+    cur_loglh = new_loglh;
   }
 
   /* optimize ALPHA */
@@ -208,6 +215,8 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                       RAXML_PARAM_EPSILON);
 
    LOG_DEBUG << "\t - after alpha: logLH = " << new_loglh << endl;
+   assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+   cur_loglh = new_loglh;
   }
 
   if (params_to_optimize & PLLMOD_OPT_PARAM_PINV)
@@ -219,6 +228,8 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                       RAXML_PARAM_EPSILON);
 
     LOG_DEBUG << "\t - after p-inv: logLH = " << new_loglh << endl;
+    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+    cur_loglh = new_loglh;
   }
 
   /* optimize FREE RATES and WEIGHTS */
@@ -237,11 +248,16 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
 
     LOG_DEBUG << "\t - after freeR: logLH = " << new_loglh << endl;
 //    LOG_DEBUG << "\t - after freeR/crosscheck: logLH = " << loglh() << endl;
+    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+    cur_loglh = new_loglh;
   }
 
   if (params_to_optimize & PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE)
   {
     new_loglh = optimize_branches(lh_epsilon, 0.25);
+
+    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+    cur_loglh = new_loglh;
   }
 
   return new_loglh;
