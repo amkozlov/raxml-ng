@@ -170,7 +170,7 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Checkpoint& ckp)
   stream << ckp.version;
 
   // NB: accumulated runtime from past runs + current elapsed time
-  stream << ckp.elapsed_seconds + sysutil_elapsed_seconds();
+  stream << ckp.elapsed_seconds + global_timer().elapsed_seconds();
 
   stream << ckp.search_state;
 

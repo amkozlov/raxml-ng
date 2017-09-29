@@ -16,7 +16,9 @@ enum class Command
   evaluate,
   search,
   bootstrap,
-  all
+  all,
+  support,
+  terrace
 };
 
 enum class FileFormat
@@ -24,6 +26,7 @@ enum class FileFormat
   autodetect = 0,
   fasta,
   phylip,
+  iphylip,
   vcf,
   catg,
   binary
@@ -49,6 +52,14 @@ enum class ParamValue
   ML = 5
 };
 
+enum class AscBiasCorrection
+{
+  none = 0,
+  lewis = PLL_ATTRIB_AB_LEWIS,
+  felsenstein = PLL_ATTRIB_AB_FELSENSTEIN,
+  stamatakis = PLL_ATTRIB_AB_STAMATAKIS,
+};
+
 const std::string ParamValueNames[] = {"undefined", "equal", "user", "model", "empirical", "ML"};
 
 typedef std::vector<double> doubleVector;
@@ -59,6 +70,11 @@ typedef std::vector<IdNamePair> IdNameVector;
 typedef std::unordered_map<size_t,std::string> IdNameMap;
 typedef std::unordered_map<std::string,size_t> NameIdMap;
 typedef std::set<size_t> IDSet;
+
+typedef unsigned int WeightType;
+typedef std::vector<WeightType> WeightVector;
+typedef std::vector<WeightVector> WeightVectorList;
+typedef std::unordered_map<size_t, WeightVector> WeightVectorMap;
 
 /*
  * workaround needed for using enum as std::map key

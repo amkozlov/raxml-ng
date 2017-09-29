@@ -3,11 +3,6 @@
 
 #include "common.h"
 
-typedef unsigned int WeightType;
-typedef std::vector<WeightType> WeightVector;
-typedef std::vector<WeightVector> WeightVectorList;
-typedef std::unordered_map<size_t, WeightVector> WeightVectorMap;
-
 typedef std::vector<double> ProbVector;
 typedef std::vector<ProbVector> ProbVectorList;
 
@@ -70,6 +65,9 @@ public:
   const_iterator end() const { return _sequences.cend(); }
   const_iterator cbegin() { return _sequences.cbegin(); }
   const_iterator cend() { return _sequences.cend(); }
+
+  const_iterator label_cbegin() const { return _labels.cbegin(); }
+  const_iterator label_cend() const { return _labels.cend(); }
 
 private:
   // Data Members

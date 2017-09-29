@@ -5,6 +5,8 @@
 #include <unordered_map>
 #include <memory>
 
+#include <functional>
+
 #ifdef _RAXML_MPI
 #include <mpi.h>
 #endif

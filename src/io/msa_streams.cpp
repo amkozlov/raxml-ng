@@ -22,29 +22,30 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
   /* read sequences and make sure they are all of the same length */
   int sites = 0;
 
-  /* read the first sequence separately, so that the MSA object can be constructed */
-  pll_fasta_getnext(file, &header, &header_length, &sequence, &sequence_length, &sequence_number);
-  sites = sequence_length;
-
-  if (sites == -1 || sites == 0)
-    throw runtime_error{"Unable to read MSA file"};
-
-  msa = MSA(sites);
-
-  msa.append(sequence, header);
-
-  free(sequence);
-  free(header);
-
   /* read the rest */
   while (pll_fasta_getnext(file, &header, &header_length, &sequence, &sequence_length, &sequence_number))
   {
-    if (sites && sites != sequence_length)
-      throw runtime_error{"MSA file does not contain equal size sequences"};
+    if (!sites)
+    {
+      /* first sequence, init the MSA object */
+      if (sequence_length == -1 || sequence_length == 0)
+        throw runtime_error{"Unable to read MSA file"};
 
-    if (!sites) sites = sequence_length;
+      sites = sequence_length;
 
-    msa.append(sequence, header);
+      msa = MSA(sites);
+    }
+    else
+    {
+      if (sequence_length != sites)
+        throw runtime_error{"MSA file does not contain equal size sequences"};
+    }
+
+    /*trim trailing whitespace from the sequence label */
+    std::string label(header);
+    label.erase(label.find_last_not_of(" \n\r\t")+1);
+
+    msa.append(sequence, label);
     free(sequence);
     free(header);
   }
@@ -59,8 +60,15 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
 
 PhylipStream& operator>>(PhylipStream& stream, MSA& msa)
 {
-  unsigned int sequence_count;
-  pll_msa_t * pll_msa = pll_phylip_parse_msa(stream.fname().c_str(), &sequence_count);
+  pll_phylip_t * fd = pll_phylip_open(stream.fname().c_str(), pll_map_phylip);
+  if (!fd)
+    throw runtime_error(pll_errmsg);
+
+  pll_msa_t * pll_msa = stream.interleaved() ?
+      pll_phylip_parse_interleaved(fd) : pll_phylip_parse_sequential(fd);
+
+  pll_phylip_close(fd);
+
   if (pll_msa)
   {
     msa = MSA(pll_msa);
@@ -214,11 +222,12 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format)
   MSA msa;
 
   typedef pair<FileFormat, string> FormatNamePair;
-  static vector<FormatNamePair> msa_formats = { {FileFormat::phylip, "PHYLIP"},
-                                                 {FileFormat::fasta, "FASTA"},
-                                                 {FileFormat::catg, "CATG"},
-                                                 {FileFormat::vcf, "VCF"},
-                                                 {FileFormat::binary, "RAxML-binary"} };
+  static vector<FormatNamePair> msa_formats = { {FileFormat::iphylip, "IPHYLIP"},
+                                                {FileFormat::phylip, "PHYLIP"},
+                                                {FileFormat::fasta, "FASTA"},
+                                                {FileFormat::catg, "CATG"},
+                                                {FileFormat::vcf, "VCF"},
+                                                {FileFormat::binary, "RAxML-binary"} };
 
   auto fmt_begin = msa_formats.cbegin();
   auto fmt_end = msa_formats.cend();
@@ -247,9 +256,16 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format)
           return msa;
           break;
         }
+        case FileFormat::iphylip:
+        {
+          PhylipStream s(filename, true);
+          s >> msa;
+          return msa;
+          break;
+        }
         case FileFormat::phylip:
         {
-          PhylipStream s(filename);
+          PhylipStream s(filename, false);
           s >> msa;
           return msa;
           break;

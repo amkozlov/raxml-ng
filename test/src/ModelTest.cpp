@@ -25,7 +25,7 @@ TEST(ModelTest, GTR)
   auto model = Model(DataType::autodetect, "GTR+F+G");
 
   // tests
-  EXPECT_EQ(model.to_string(), "GTR+FC+G4");
+  EXPECT_EQ(model.to_string(), "GTR+FC+G4m");
   EXPECT_EQ(model.data_type(), DataType::dna);
   EXPECT_EQ(model.name(), "GTR");
   EXPECT_EQ(model.num_states(), 4);
@@ -57,7 +57,7 @@ TEST(ModelTest, JCI_user)
   auto model = Model(DataType::autodetect, "JC+G+IU{0.7}");
 
   // tests
-  EXPECT_EQ(model.to_string(), "JC+IU{0.7}+G4");
+  EXPECT_EQ(model.to_string(), "JC+IU{0.7}+G4m");
   EXPECT_EQ(model.data_type(), DataType::dna);
   EXPECT_EQ(model.name(), "JC");
   EXPECT_EQ(model.num_states(), 4);
@@ -73,7 +73,7 @@ TEST(ModelTest, JCFG_user)
   auto model = Model(DataType::autodetect, "JC+FC+G{2.5}");
 
   // tests
-  EXPECT_EQ(model.to_string(), "JC+FC+G4{2.5}");
+  EXPECT_EQ(model.to_string(), "JC+FC+G4m{2.5}");
   EXPECT_EQ(model.data_type(), DataType::dna);
   EXPECT_EQ(model.name(), "JC");
   EXPECT_EQ(model.num_states(), 4);
@@ -133,10 +133,10 @@ TEST(ModelTest, HKY_user_rates)
 TEST(ModelTest, LGFI)
 {
   // buildup
-  auto model = Model(DataType::autodetect, "LG+F+I+G8");
+  auto model = Model(DataType::autodetect, "LG+F+I+G8a");
 
   // tests
-  EXPECT_EQ(model.to_string(), "LG+FC+I+G8");
+  EXPECT_EQ(model.to_string(), "LG+FC+I+G8a");
   EXPECT_EQ(model.data_type(), DataType::protein);
   EXPECT_EQ(model.name(), "LG");
   EXPECT_EQ(model.num_states(), 20);
@@ -187,3 +187,24 @@ TEST(ModelTest, LG_R4_user)
   EXPECT_EQ(model.ratecat_rates()[3], 1.6);
 }
 
+TEST(ModelTest, aliases)
+{
+  // buildup
+  auto model = Model(DataType::autodetect, "TrNef+G");
+
+  // tests
+  EXPECT_EQ(model.to_string(), "TN93ef+G4m");
+  EXPECT_EQ(model.data_type(), DataType::dna);
+  EXPECT_EQ(model.name(), "TN93ef");
+  EXPECT_EQ(model.num_states(), 4);
+  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_GAMMA);
+  EXPECT_EQ(model.num_ratecats(), 4);
+  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_ALPHA);
+
+  model = Model(DataType::autodetect, "TrN");
+  EXPECT_EQ(model.name(), "TN93");
+  model = Model(DataType::autodetect, "TPM1");
+  EXPECT_EQ(model.name(), "K81");
+  model = Model(DataType::autodetect, "TPM1uf");
+  EXPECT_EQ(model.name(), "K81uf");
+}

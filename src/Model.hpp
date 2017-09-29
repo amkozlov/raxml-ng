@@ -117,6 +117,7 @@ public:
   const doubleVector& ratecat_rates() const { return _ratecat_rates; };
   const doubleVector& ratecat_weights() const { return _ratecat_weights; };
   const std::vector<unsigned int>& ratecat_submodels() const { return _ratecat_submodels; };
+  int gamma_mode() const { return _gamma_mode; };
 
   double alpha() const { return _alpha; };
   double pinv() const { return _pinv; };
@@ -127,6 +128,9 @@ public:
   std::string to_string(bool print_params = false) const;
   int params_to_optimize() const;
   ParamValue param_mode(int param) const { return _param_mode.at(param); };
+
+  AscBiasCorrection ascbias_type() const { return _ascbias_type; }
+  const WeightVector& ascbias_weights() const { return _ascbias_weights; }
 
   const std::shared_ptr<ErrorModel>& error_model() const { return _error_model; };
 
@@ -157,10 +161,14 @@ private:
   doubleVector _ratecat_rates;
   doubleVector _ratecat_weights;
   std::vector<unsigned int> _ratecat_submodels;
+  int _gamma_mode;
 
   double _alpha;
   double _pinv;
   double _brlen_scaler;
+
+  AscBiasCorrection _ascbias_type;
+  WeightVector _ascbias_weights;
 
   std::vector<SubstitutionModel> _submodels;
 

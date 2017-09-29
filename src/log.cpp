@@ -54,7 +54,7 @@ Logging& logger()
   return Logging::instance();
 }
 
-TimeStamp::TimeStamp() : secs(sysutil_elapsed_seconds())
+TimeStamp::TimeStamp() : secs(global_timer().elapsed_seconds())
 {
 };
 
@@ -62,6 +62,16 @@ LogStream& operator<<(LogStream& logstream, std::ostream& (*pf)(std::ostream&))
 {
   for (auto s: logstream.streams())
     *s << pf;
+
+  return logstream;
+}
+
+LogStream& operator<<(LogStream& logstream, const time_t& t)
+{
+  std::array<char, 128> buffer;
+  const auto timeinfo = std::localtime(&t);
+  strftime(buffer.data(), sizeof(buffer), "%d-%b-%Y %H:%M:%S", timeinfo);
+  logstream << buffer.data();
 
   return logstream;
 }

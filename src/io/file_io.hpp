@@ -29,7 +29,12 @@ private:
 class PhylipStream : public MSAFileStream
 {
 public:
-  PhylipStream(const std::string& fname) : MSAFileStream(fname) {}
+  PhylipStream(const std::string& fname, bool interleaved = true) :
+    MSAFileStream(fname), _interleaved(interleaved) {}
+
+  bool interleaved() const { return _interleaved; }
+private:
+  bool _interleaved;
 };
 
 class FastaStream : public MSAFileStream
@@ -98,5 +103,6 @@ RaxmlPartitionStream& operator>>(RaxmlPartitionStream& stream, PartitionedMSA& p
 RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const PartitionInfo& part_info);
 RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const PartitionedMSA& parted_msa);
 
+std::string to_newick_string_rooted(const Tree& tree, double root_brlen = 0.0);
 
 #endif /* RAXML_FILE_IO_HPP_ */

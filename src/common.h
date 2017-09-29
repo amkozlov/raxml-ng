@@ -8,8 +8,10 @@
 #include <iomanip>
 #include <sstream>
 #include <vector>
+#include <array>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
 #include <stdexcept>
 
 extern "C" {
@@ -25,6 +27,7 @@ extern "C" {
 #include "constants.hpp"
 #include "ParallelContext.hpp"
 #include "log.hpp"
+#include "SystemTimer.hpp"
 
 #define RAXML_DOUBLE_TOLERANCE    1e-14
 
@@ -56,6 +59,8 @@ extern "C" {
 #define RAXML_OPT_PARAM_SEQ_ERROR    (PLLMOD_OPT_PARAM_USER<<0)
 #define RAXML_OPT_PARAM_ADO_RATE     (PLLMOD_OPT_PARAM_USER<<1)
 
+#define RAXML_RATESCALERS_TAXA    2000
+
 /* used to supress compiler warnings about unused args */
 #define UNUSED(expr) while (0) { (void)(expr); }
 
@@ -77,7 +82,7 @@ unsigned long sysutil_get_memtotal();
 unsigned long sysutil_get_cpu_features();
 unsigned int sysutil_simd_autodetect();
 
-double sysutil_elapsed_seconds();
+const SystemTimer& global_timer();
 
 std::string sysutil_realpath(const std::string& path);
 bool sysutil_file_exists(const std::string& fname, int access_mode = F_OK);

@@ -12,7 +12,7 @@ Optimizer::~Optimizer ()
   // TODO Auto-generated destructor stub
 }
 
-double Optimizer::optimize(TreeInfo& treeinfo, double lh_epsilon)
+double Optimizer::optimize_model(TreeInfo& treeinfo, double lh_epsilon)
 {
   double new_loglh = treeinfo.loglh();
 
@@ -83,7 +83,7 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
   {
     cm.update_and_write(treeinfo);
     LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << fast_modopt_eps << ")" << endl;
-    loglh = optimize(treeinfo, fast_modopt_eps);
+    loglh = optimize_model(treeinfo, fast_modopt_eps);
   //  print_model_params(treeinfo, useropt);
 
     /* start spr rounds from the beginning */
@@ -124,9 +124,6 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
             spr_params.radius_max << ")" << endl;
         loglh = treeinfo.spr_round(spr_params);
 
-        if (!loglh)
-          throw runtime_error("ERROR in SPR round: " + string(pll_errmsg));
-
         if (loglh - best_loglh > 0.1)
         {
           /* LH improved, try to increase the radius */
@@ -151,7 +148,7 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
     /* optimize model parameters a bit more thoroughly */
     LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " <<
                                                             interim_modopt_eps << ")" << endl;
-    loglh = optimize(treeinfo, interim_modopt_eps);
+    loglh = optimize_model(treeinfo, interim_modopt_eps);
 
     /* reset iteration counter for fast SPRs */
     iter = 0;
@@ -188,7 +185,7 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
   {
     cm.update_and_write(treeinfo);
     LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << 1.0 << ")" << endl;
-    loglh = optimize(treeinfo, 1.0);
+    loglh = optimize_model(treeinfo, 1.0);
 
     /* init slow SPRs */
     spr_params.thorough = 1;
@@ -235,7 +232,53 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
   {
     cm.update_and_write(treeinfo);
     LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << _lh_epsilon << ")" << endl;
-    loglh = optimize(treeinfo, _lh_epsilon);
+    loglh = optimize_model(treeinfo, _lh_epsilon);
+  }
+
+  if (do_step(CheckpointStep::finish))
+    cm.update_and_write(treeinfo);
+
+  return loglh;
+}
+
+double Optimizer::evaluate(TreeInfo& treeinfo, CheckpointManager& cm)
+{
+  const double fast_modopt_eps = 10.;
+
+  SearchState local_search_state = cm.search_state();
+  auto& search_state = ParallelContext::master_thread() ? cm.search_state() : local_search_state;
+  ParallelContext::barrier();
+
+  double &loglh = search_state.loglh;
+
+  /* Compute initial LH of the starting tree */
+  loglh = treeinfo.loglh();
+
+  CheckpointStep resume_step = search_state.step;
+  auto do_step = [&search_state,resume_step](CheckpointStep step) -> bool
+      {
+        if (step >= resume_step)
+        {
+          search_state.step = step;
+          return true;
+        }
+        else
+          return false;;
+      };
+
+  if (do_step(CheckpointStep::brlenOpt))
+  {
+    cm.update_and_write(treeinfo);
+    LOG_PROGRESS(loglh) << "Initial branch length optimization" << endl;
+    loglh = treeinfo.optimize_branches(fast_modopt_eps, 1);
+  }
+
+  /* Model optimization */
+  if (do_step(CheckpointStep::modOpt1))
+  {
+    cm.update_and_write(treeinfo);
+    LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << _lh_epsilon << ")" << endl;
+    loglh = optimize_model(treeinfo);
   }
 
   if (do_step(CheckpointStep::finish))

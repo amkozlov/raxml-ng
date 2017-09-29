@@ -60,6 +60,7 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
 
       int retval = pllmod_treeinfo_init_partition(_pll_treeinfo, p, partition,
                                                   params_to_optimize,
+                                                  pinfo.model().gamma_mode(),
                                                   pinfo.model().alpha(),
                                                   pinfo.model().ratecat_submodels().data(),
                                                   pinfo.model().submodel(0).rate_sym().data());
@@ -163,8 +164,8 @@ void recompute_tip_clvs(const PartitionInfo& pinfo, pll_partition_t * partition)
   std::vector<double> tmp_clv;
   for (size_t i = 0; i < pinfo.msa().size(); ++i)
   {
-    pinfo.fill_tip_clv(i, tmp_clv, partition->states_padded);
-    pll_set_tip_clv(partition, i, tmp_clv.data());
+    pinfo.fill_tip_clv(i, tmp_clv);
+    pll_set_tip_clv(partition, i, tmp_clv.data(), PLL_FALSE);
   }
 }
 
@@ -207,6 +208,9 @@ int ParamVisitor::get_errmodel_param(const pllmod_treeinfo_t * treeinfo,
 
   assert(i == param_count);
 
+  UNUSED(treeinfo);
+  UNUSED(part_num);
+
   return PLL_SUCCESS;
 }
 
@@ -223,6 +227,8 @@ int ParamVisitor::set_errmodel_param(pllmod_treeinfo_t * treeinfo,
 
   auto ids = global_pinfo->model().error_model()->param_ids();
   auto params = global_pinfo->model().error_model()->params();
+
+  assert(param_count <= params.size());
 
   size_t i = 0;
   for (size_t j = 0; j < ids.size(); ++j)
@@ -297,7 +303,9 @@ double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor
 
 double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
 {
-  double new_loglh;
+  double
+    cur_loglh = loglh(),
+    new_loglh = cur_loglh;
 
   /* optimize SUBSTITUTION RATES */
   if (params_to_optimize & PLLMOD_OPT_PARAM_SUBST_RATES)
@@ -310,6 +318,9 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                           RAXML_PARAM_EPSILON);
 
     LOG_DEBUG << "\t - after rates: logLH = " << new_loglh << endl;
+
+    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+    cur_loglh = new_loglh;
   }
 
   /* optimize BASE FREQS */
@@ -323,6 +334,8 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                           RAXML_PARAM_EPSILON);
 
     LOG_DEBUG << "\t - after freqs: logLH = " << new_loglh << endl;
+    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+    cur_loglh = new_loglh;
   }
 
   /* optimize ALPHA */
@@ -335,6 +348,8 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                       RAXML_PARAM_EPSILON);
 
    LOG_DEBUG << "\t - after alpha: logLH = " << new_loglh << endl;
+   assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+   cur_loglh = new_loglh;
   }
 
   if (params_to_optimize & PLLMOD_OPT_PARAM_PINV)
@@ -346,6 +361,8 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                       RAXML_PARAM_EPSILON);
 
     LOG_DEBUG << "\t - after p-inv: logLH = " << new_loglh << endl;
+    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+    cur_loglh = new_loglh;
   }
 
   /* optimize FREE RATES and WEIGHTS */
@@ -364,6 +381,8 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
 
     LOG_DEBUG << "\t - after freeR: logLH = " << new_loglh << endl;
 //    LOG_DEBUG << "\t - after freeR/crosscheck: logLH = " << loglh() << endl;
+    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+    cur_loglh = new_loglh;
   }
 
   if (params_to_optimize & RAXML_OPT_PARAM_SEQ_ERROR)
@@ -424,6 +443,9 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
   if (params_to_optimize & PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE)
   {
     new_loglh = optimize_branches(lh_epsilon, 0.25);
+
+    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+    cur_loglh = new_loglh;
   }
 
   return new_loglh;
@@ -431,12 +453,17 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
 
 double TreeInfo::spr_round(spr_round_params& params)
 {
-  return pllmod_algo_spr_round(_pll_treeinfo, params.radius_min, params.radius_max,
+  double loglh = pllmod_algo_spr_round(_pll_treeinfo, params.radius_min, params.radius_max,
                                params.ntopol_keep, params.thorough,
                                RAXML_BRLEN_MIN, RAXML_BRLEN_MAX, RAXML_BRLEN_SMOOTHINGS,
                                0.1,
                                params.subtree_cutoff > 0. ? &params.cutoff_info : nullptr,
                                params.subtree_cutoff);
+
+  if (loglh)
+    return loglh;
+  else
+    throw runtime_error("ERROR in SPR round: " + string(pll_errmsg));
 }
 
 
@@ -478,7 +505,6 @@ void build_clv(ProbVector::const_iterator probs, size_t sites, WeightVector::con
                pll_partition_t* partition, bool normalize, std::vector<double>& clv)
 {
   const auto states = partition->states;
-  const auto states_padded = partition->states_padded;
   auto clvp = clv.begin();
 
   for (size_t i = 0; i < sites; ++i)
@@ -497,7 +523,7 @@ void build_clv(ProbVector::const_iterator probs, size_t sites, WeightVector::con
           clvp[j] = 1.0;
       }
 
-      clvp += states_padded;
+      clvp += states;
     }
 
     /* NB: clv has to be padded, but msa arrays are not! */
@@ -508,7 +534,7 @@ void build_clv(ProbVector::const_iterator probs, size_t sites, WeightVector::con
 }
 
 void set_partition_tips(const Options& opts, const MSA& msa, const PartitionRange& part_region,
-                        pll_partition_t* partition)
+                        pll_partition_t* partition, const unsigned int * charmap)
 {
   /* set pattern weights */
   if (!msa.weights().empty())
@@ -523,26 +549,27 @@ void set_partition_tips(const Options& opts, const MSA& msa, const PartitionRang
     auto weights_start = msa.weights().cbegin() + part_region.start;
 
     // we need a libpll function for that!
-    auto clv_size = partition->sites * partition->states_padded;
+    auto clv_size = partition->sites * partition->states;
     std::vector<double> tmp_clv(clv_size);
     for (size_t i = 0; i < msa.size(); ++i)
     {
       auto prob_start = msa.probs(i, part_region.start);
       build_clv(prob_start, partition->sites, weights_start, partition, normalize, tmp_clv);
-      pll_set_tip_clv(partition, i, tmp_clv.data());
+      pll_set_tip_clv(partition, i, tmp_clv.data(), PLL_FALSE);
     }
   }
   else
   {
     for (size_t i = 0; i < msa.size(); ++i)
     {
-      pll_set_tip_states(partition, i, partition->map, msa.at(i).c_str() + part_region.start);
+      pll_set_tip_states(partition, i, charmap, msa.at(i).c_str() + part_region.start);
     }
   }
 }
 
 void set_partition_tips(const Options& opts, const MSA& msa, const PartitionRange& part_region,
-                        pll_partition_t* partition, const WeightVector& weights)
+                        pll_partition_t* partition, const unsigned int * charmap,
+                        const WeightVector& weights)
 {
   assert(!weights.empty());
 
@@ -567,13 +594,13 @@ void set_partition_tips(const Options& opts, const MSA& msa, const PartitionRang
     auto weights_start = msa.weights().cbegin() + part_region.start;
 
     // we need a libpll function for that!
-    auto clv_size = part_region.length * partition->states_padded;
+    auto clv_size = part_region.length * partition->states;
     std::vector<double> tmp_clv(clv_size);
     for (size_t i = 0; i < msa.size(); ++i)
     {
       auto prob_start = msa.probs(i, part_region.start);
       build_clv(prob_start, part_region.length, weights_start, partition, normalize, tmp_clv);
-      pll_set_tip_clv(partition, i, tmp_clv.data());
+      pll_set_tip_clv(partition, i, tmp_clv.data(), PLL_FALSE);
     }
   }
   else
@@ -590,7 +617,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const PartitionRang
       }
       assert(pos == comp_weights.size());
 
-      pll_set_tip_states(partition, i, partition->map, bs_seq.data());
+      pll_set_tip_states(partition, i, charmap, bs_seq.data());
     }
   }
 
@@ -608,20 +635,34 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
   if (opts.use_rate_scalers && model.num_ratecats() > 1)
   {
     attrs |= PLL_ATTRIB_RATE_SCALERS;
-
-    if (model.num_states() != 4)
-    {
-      throw runtime_error("Per-rate scalers are implemented for DNA data only!\n");
-    }
   }
 
-  if (opts.use_tip_inner)
+  if (opts.use_repeats)
+  {
+     attrs |= PLL_ATTRIB_SITE_REPEATS;
+  }
+  else if (opts.use_tip_inner)
   {
     assert(!(opts.use_prob_msa));
     // TODO: use proper auto-tuning
     const unsigned long min_len_ti = 100;
     if ((unsigned long) msa.length() > min_len_ti)
       attrs |= PLL_ATTRIB_PATTERN_TIP;
+  }
+
+  /* error models compute tip CLVS, so cannot use site repeats / tip-inner */
+  if(pinfo.model().error_model())
+  {
+    attrs &= ~PLL_ATTRIB_SITE_REPEATS;
+    attrs &= ~PLL_ATTRIB_PATTERN_TIP;
+  }
+
+  // NOTE: if partition is split among multiple threads, asc. bias correction must be applied only once!
+  if (model.ascbias_type() == AscBiasCorrection::lewis ||
+      (model.ascbias_type() != AscBiasCorrection::none && part_region.master()))
+  {
+    attrs |=  PLL_ATTRIB_AB_FLAG;
+    attrs |= (unsigned int) model.ascbias_type();
   }
 
   /* part_length doesn't include columns with zero weight */
@@ -648,12 +689,13 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
   if (!partition)
     throw runtime_error("ERROR creating pll_partition: " + string(pll_errmsg));
 
-  partition->map = model.charmap();
+  if (part_region.master() && !model.ascbias_weights().empty())
+    pll_set_asc_state_weights(partition, model.ascbias_weights().data());
 
   if (part_length == part_region.length)
-    set_partition_tips(opts, msa, part_region, partition);
+    set_partition_tips(opts, msa, part_region, partition, model.charmap());
   else
-    set_partition_tips(opts, msa, part_region, partition, weights);
+    set_partition_tips(opts, msa, part_region, partition, model.charmap(), weights);
 
   // TODO: temp workaround!
   if (pinfo.model().error_model())

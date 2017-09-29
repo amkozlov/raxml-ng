@@ -101,7 +101,7 @@ void PartitionedMSA::set_model_empirical_params()
 {
   for (PartitionInfo& pinfo: _part_list)
   {
-    pinfo.set_modeL_empirical_params();
+    pinfo.set_model_empirical_params();
   }
 }
 

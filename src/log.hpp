@@ -101,9 +101,9 @@ LogStream& operator<<(LogStream& logstream, const T& object)
 }
 
 LogStream& operator<<(LogStream& logstream, std::ostream& (*pf)(std::ostream&));
-
 LogStream& operator<<(LogStream& logstream, const ProgressInfo& prog);
-
 LogStream& operator<<(LogStream& logstream, const TimeStamp& ts);
+LogStream& operator<<(LogStream& logstream, const time_t& t);
+
 
 #endif /* RAXML_LOG_HPP_ */

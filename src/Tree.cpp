@@ -157,6 +157,18 @@ IdNameVector Tree::tip_labels() const
   return result;
 }
 
+NameIdMap Tree::tip_ids() const
+{
+  NameIdMap result;
+  for (auto const& node: tip_nodes())
+    result.emplace(string(node->label), node->clv_index);
+
+  assert(!result.empty());
+
+  return result;
+}
+
+
 void Tree::reset_tip_ids(const NameIdMap& label_id_map)
 {
   if (label_id_map.size() != _num_tips)

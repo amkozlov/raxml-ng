@@ -50,8 +50,8 @@ public:
   // operations
   size_t mark_partition_sites(unsigned int part_num, std::vector<unsigned int>& site_part);
   void compress_patterns();
-  void set_modeL_empirical_params();
-  void fill_tip_clv(unsigned int tip_id, doubleVector& clv, unsigned int states_padded) const;
+  void set_model_empirical_params();
+  void fill_tip_clv(unsigned int tip_id, doubleVector& clv) const;
 
 private:
   std::string _name;

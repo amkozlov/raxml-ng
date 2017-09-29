@@ -37,6 +37,8 @@
 #include "LoadBalancer.hpp"
 #include "bootstrap/BootstrapGenerator.hpp"
 
+#include "terraces/TerraceWrapper.hpp"
+
 using namespace std;
 
 typedef vector<Tree> TreeList;
@@ -49,6 +51,7 @@ struct RaxmlInstance
   PartitionAssignmentList proc_part_assign;
   unique_ptr<LoadBalancer> load_balancer;
   unique_ptr<BootstrapTree> bs_tree;
+  unique_ptr<TerraceWrapper> terrace_wrapper;
 
   unique_ptr<NewickStream> start_tree_stream;
 
@@ -97,8 +100,8 @@ void init_part_info(RaxmlInstance& instance)
 
   for (const auto& pinfo: parted_msa.part_list())
   {
-//    LOG_INFO << "|" << pinfo.name() << "|   |" << pinfo.model().to_string() << "|   |" <<
-//        pinfo.range_string() << "|" << endl;
+    LOG_DEBUG << "|" << pinfo.name() << "|   |" << pinfo.model().to_string() << "|   |" <<
+        pinfo.range_string() << "|" << endl;
 
     if (pinfo.model().name() == "LG4X")
       lg4x_count++;
@@ -116,6 +119,11 @@ void check_msa(RaxmlInstance& instance)
 
   const auto& full_msa = instance.parted_msa.full_msa();
   const auto pll_msa = full_msa.pll_msa();
+
+  if (full_msa.size() < 4)
+  {
+    throw runtime_error("Your alignment contains less than 4 sequences!");
+  }
 
   unsigned long stats_mask = PLLMOD_MSA_STATS_DUP_TAXA | PLLMOD_MSA_STATS_DUP_SEQS;
 
@@ -232,6 +240,106 @@ void check_msa(RaxmlInstance& instance)
     }
   }
 
+  if (full_msa.size() > RAXML_RATESCALERS_TAXA && !instance.opts.use_rate_scalers)
+  {
+    LOG_INFO << "\nNOTE: Per-rate scalers were automatically enabled to prevent numerical issues "
+        "on taxa-rich alignments.\n";
+    LOG_INFO << "NOTE: You can use --force switch to skip this check and fall back to per-site scalers.\n";
+    instance.opts.use_rate_scalers = true;
+  }
+
+}
+
+void check_models(const RaxmlInstance& instance)
+{
+  for (const auto& pinfo: instance.parted_msa.part_list())
+  {
+    auto stats = pinfo.stats();
+    auto model = pinfo.model();
+
+    // check for non-recommended model combinations
+    if ((model.name() == "LG4X" || model.name() == "LG4M") &&
+        model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) != ParamValue::model)
+    {
+      throw runtime_error("Partition \"" + pinfo.name() +
+                          "\": You specified LG4M or LG4X model with shared stationary based frequencies (" +
+                          model.to_string(false) + ").\n"
+                          "Please be warned, that this is against the idea of LG4 models and hence it's not recommended!" + "\n"
+                          "If you know what you're doing, you can add --force command line switch to disable this safety check.");
+    }
+
+    // check for zero state frequencies
+    if (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::empirical)
+    {
+      for (unsigned int i = 0; i < stats->states; ++i)
+      {
+        if (!(stats->freqs[i] > 0.))
+        {
+          LOG_ERROR << "\nBase frequencies: ";
+          for (unsigned int j = 0; j < stats->states; ++j)
+            LOG_ERROR << stats->freqs[j] <<  " ";
+          LOG_ERROR << endl;
+
+          throw runtime_error("Frequency of state " + to_string(i) +
+                              " in partition " + pinfo.name() + " is 0!\n"
+                              "Please either change your partitioning scheme or "
+                              "use model state frequencies for this partition!");
+        }
+      }
+    }
+
+    // check partitions which contain invariant sites and have ascertainment bias enabled
+    if (model.ascbias_type() != AscBiasCorrection::none && stats->inv_cols_count > 0)
+    {
+      throw runtime_error("You enabled ascertainment bias correction for partition " +
+                           pinfo.name() + ", but it contains " +
+                           to_string(stats->inv_cols_count) + " invariant sites.\n"
+                          "This is not allowed! Please either remove invariant sites or "
+                          "disable ascertainment bias correction.");
+    }
+  }
+}
+
+void check_tree(const MSA& msa, const Tree& tree)
+{
+  auto missing_taxa = 0;
+  auto duplicate_taxa = 0;
+
+  if (msa.size() > tree.num_tips())
+    throw runtime_error("Alignment file contains more sequences than expected");
+  else if (msa.size() != tree.num_tips())
+    throw runtime_error("Some taxa are missing from the alignment file");
+
+  unordered_set<string> tree_labels;
+  unordered_set<string> msa_labels(msa.label_cbegin(), msa.label_cend());
+
+  for (const auto& tip: tree.tip_labels())
+  {
+    if (!tree_labels.insert(tip.second).second)
+    {
+      LOG_ERROR << "ERROR: Taxon name appears more than once in the tree: " << tip.second << endl;
+      duplicate_taxa++;
+    }
+
+    if (msa_labels.count(tip.second) == 0)
+    {
+      LOG_ERROR << "ERROR: Taxon name not found in the alignment: " << tip.second << endl;
+      missing_taxa++;
+    }
+  }
+
+  if (duplicate_taxa > 0)
+    throw runtime_error("Tree contains duplicate taxon names (see above)!");
+
+  if (missing_taxa > 0)
+    throw runtime_error("Please check that sequence labels in the alignment and in the tree file are identical!");
+
+  /* check for negative branch length */
+  for (const auto& branch: tree.topology())
+  {
+    if (branch.length < 0.)
+      throw runtime_error("Tree file contains negative branch lengths!");
+  }
 }
 
 void load_msa(RaxmlInstance& instance)
@@ -265,12 +373,19 @@ void load_msa(RaxmlInstance& instance)
   parted_msa.split_msa();
 
   /* check alignment */
-  check_msa(instance);
+  if (!opts.force_mode)
+    check_msa(instance);
 
   if (opts.use_pattern_compression)
     parted_msa.compress_patterns();
 
+//  if (parted_msa.part_count() > 1)
+//    instance.terrace_wrapper.reset(new TerraceWrapper(parted_msa));
+
   parted_msa.set_model_empirical_params();
+
+  if (!opts.force_mode)
+    check_models(instance);
 
   LOG_INFO << endl;
 
@@ -303,10 +418,7 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
       LOG_DEBUG << "Loaded user starting tree with " << tree.num_tips() << " taxa from: "
                            << opts.tree_file << endl;
 
-      if (msa.size() > tree.num_tips())
-        sysutil_fatal("Alignment file contains more sequences than expected");
-      else if (msa.size() != tree.num_tips())
-        sysutil_fatal("Some taxa are missing from the alignment file");
+      check_tree(msa, tree);
 
       break;
     }
@@ -515,6 +627,62 @@ void generate_bootstraps(RaxmlInstance& instance, const Checkpoint& checkp)
   }
 }
 
+void draw_bootstrap_support(const Options& opts)
+{
+  LOG_INFO << "Reading reference tree from file: " << opts.tree_file << endl;
+
+  Tree ref_tree;
+  NewickStream refs(opts.tree_file, std::ios::in);
+  refs >> ref_tree;
+
+  LOG_INFO << "Reference tree size: " << to_string(ref_tree.num_tips()) << endl << endl;
+
+  auto ref_tip_ids = ref_tree.tip_ids();
+
+  BootstrapTree sup_tree(ref_tree);
+
+  LOG_INFO << "Reading bootstrap trees from file: " << opts.bootstrap_trees_file() << endl;
+
+  NewickStream boots(opts.bootstrap_trees_file(), std::ios::in);
+  unsigned int bs_num = 0;
+  while (boots.peek() != EOF)
+  {
+    Tree bs_tree;
+    boots >> bs_tree;
+    try
+    {
+      bs_tree.reset_tip_ids(ref_tip_ids);
+    }
+    catch (out_of_range& e)
+    {
+      throw runtime_error("Bootstrap tree #" + to_string(bs_num+1) +
+                          " is not compatible with the reference tree!");
+    }
+    catch (invalid_argument& e)
+    {
+      throw runtime_error("Bootstrap tree #" + to_string(bs_num+1) +
+                          " has wrong number of tips: " + to_string(bs_tree.num_tips()));
+    }
+    sup_tree.add_bootstrap_tree(bs_tree);
+    bs_num++;
+  }
+
+  LOG_INFO << "Bootstrap trees found: " << bs_num << endl << endl;
+
+  if (bs_num < 2)
+  {
+    throw runtime_error("You must provide a file with multiple bootstrap trees!");
+  }
+
+  sup_tree.calc_support();
+
+  NewickStream sups(opts.support_tree_file(), std::ios::out);
+  sups << sup_tree;
+
+  LOG_INFO << "Best ML tree with bootstrap support values saved to: " <<
+      sysutil_realpath(opts.support_tree_file()) << endl << endl;
+}
+
 void draw_bootstrap_support(RaxmlInstance& instance, const Checkpoint& checkp)
 {
   Tree tree = checkp.tree;
@@ -528,6 +696,42 @@ void draw_bootstrap_support(RaxmlInstance& instance, const Checkpoint& checkp)
     instance.bs_tree->add_bootstrap_tree(tree);
   }
   instance.bs_tree->calc_support();
+}
+
+void check_terrace(const RaxmlInstance& instance, const Tree& tree)
+{
+  if (instance.parted_msa.part_count() > 1)
+  {
+    auto newick_str = to_newick_string_rooted(tree);
+    LOG_DEBUG << newick_str << endl << endl;
+//      auto terrace_size = instance.terrace_wrapper->get_terrace_size(newick_str);
+    TerraceWrapper terrace_wrapper(instance.parted_msa, newick_str);
+    try
+    {
+      auto terrace_size = terrace_wrapper.terrace_size();
+      if (terrace_size > 1)
+      {
+        LOG_WARN << "WARNING: Best-found ML tree lies on a terrace of size: "
+                 << terrace_size << endl << endl;
+
+        ofstream fs(instance.opts.terrace_file());
+        terrace_wrapper.print_terrace(fs);
+        LOG_INFO << "Tree terrace (in compressed Newick format) was saved to: "
+            << sysutil_realpath(instance.opts.terrace_file()) << endl << endl;
+
+        // TODO partial prints to multiline newick?
+        // if (terrace_size <= instance.opts.terrace_maxsize)
+      }
+      else
+      {
+        LOG_INFO << "NOTE: Tree does not lie on a phylogenetic terrace." << endl << endl;
+      }
+    }
+    catch (std::exception& e)
+    {
+      LOG_ERROR << "ERROR: Failed to compute terrace: " << e.what() << endl << endl;
+    }
+  }
 }
 
 void save_ml_trees(const Options& opts, const Checkpoint& checkp)
@@ -576,6 +780,8 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
     NewickStream nw_result(opts.best_tree_file());
     nw_result << best_tree;
 
+    check_terrace(instance, best_tree);
+
     if (checkp.ml_trees.size() > 1)
     {
       save_ml_trees(opts, checkp);
@@ -584,12 +790,6 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
     }
 
     LOG_INFO << "Best ML tree saved to: " << sysutil_realpath(opts.best_tree_file()) << endl;
-
-    RaxmlPartitionStream model_stream(opts.best_model_file(), true);
-    model_stream.print_model_params(true);
-    model_stream << instance.parted_msa;
-
-    LOG_INFO << "Optimized model saved to: " << sysutil_realpath(opts.best_model_file()) << endl;
 
     if (opts.command == Command::all)
     {
@@ -601,6 +801,16 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
       LOG_INFO << "Best ML tree with bootstrap support values saved to: " <<
           sysutil_realpath(opts.support_tree_file()) << endl;
     }
+  }
+
+  if (opts.command == Command::search || opts.command == Command::all ||
+      opts.command == Command::evaluate)
+  {
+    RaxmlPartitionStream model_stream(opts.best_model_file(), true);
+    model_stream.print_model_params(true);
+    model_stream << instance.parted_msa;
+
+    LOG_INFO << "Optimized model saved to: " << sysutil_realpath(opts.best_model_file()) << endl;
   }
 
   if (opts.command == Command::bootstrap || opts.command == Command::all)
@@ -622,13 +832,17 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
 
   LOG_INFO << "\nExecution log saved to: " << sysutil_realpath(opts.log_file()) << endl;
 
-  LOG_INFO << "\nElapsed time: " << FMT_PREC3(sysutil_elapsed_seconds()) << " seconds\n";
+  LOG_INFO << "\nAnalysis started: " << global_timer().start_time();
+  LOG_INFO << " / finished: " << global_timer().current_time() << std::endl;
+  LOG_INFO << "\nElapsed time: " << FMT_PREC3(global_timer().elapsed_seconds()) << " seconds";
   if (checkp.elapsed_seconds > 0.)
   {
-    LOG_INFO << "Total analysis time: " <<
-                FMT_PREC3(checkp.elapsed_seconds + sysutil_elapsed_seconds()) << " seconds\n";
+    LOG_INFO << " (this run) / ";
+    LOG_INFO << FMT_PREC3(checkp.elapsed_seconds + global_timer().elapsed_seconds()) <<
+        " seconds (total with restarts)";
   }
-  LOG_INFO << endl;
+
+  LOG_INFO << endl << endl;
 }
 
 void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
@@ -682,9 +896,8 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
       {
         LOG_INFO_TS << "Tree #" << start_tree_num <<
             ", initial LogLikelihood: " << FMT_LH(treeinfo->loglh()) << endl;
-        cm.search_state().loglh = treeinfo->optimize_branches(10., 1);
-        cm.search_state().loglh = optimizer.optimize(*treeinfo);
-        cm.update_and_write(*treeinfo);
+        LOG_PROGR << endl;
+        optimizer.evaluate(*treeinfo, cm);
       }
       else
       {
@@ -837,7 +1050,7 @@ int main(int argc, char** argv)
   }
   catch (OptionException &e)
   {
-    LOG_INFO << "ERROR: " << e.what() << std::endl;
+    LOG_INFO << "ERROR: " << e.message() << std::endl;
     clean_exit(EXIT_FAILURE);
   }
 
@@ -857,6 +1070,7 @@ int main(int argc, char** argv)
     case Command::search:
     case Command::bootstrap:
     case Command::all:
+    case Command::support:
       if (!instance.opts.redo_mode && instance.opts.result_files_exist())
       {
         LOG_ERROR << endl << "ERROR: Result files for the run with prefix `" <<
@@ -887,19 +1101,25 @@ int main(int argc, char** argv)
   print_banner();
   LOG_INFO << instance.opts;
 
-  switch (instance.opts.command)
+  try
   {
-    case Command::evaluate:
-    case Command::search:
-    case Command::bootstrap:
-    case Command::all:
+    switch (instance.opts.command)
     {
-      try
+      case Command::evaluate:
+      case Command::search:
+      case Command::bootstrap:
+      case Command::all:
       {
         if (instance.opts.redo_mode)
         {
           LOG_WARN << "WARNING: Running in REDO mode: existing checkpoints are ignored, "
               "and all result files will be overwritten!" << endl << endl;
+        }
+
+        if (instance.opts.force_mode)
+        {
+          LOG_WARN << "WARNING: Running in FORCE mode: all safety checks are disabled!"
+              << endl << endl;
         }
 
         /* init load balancer */
@@ -911,18 +1131,34 @@ int main(int argc, char** argv)
                                                                 std::ref(cm)));
 
         master_main(instance, cm);
+        break;
       }
-      catch(exception& e)
+      case Command::support:
+        draw_bootstrap_support(instance.opts);
+        break;
+      case Command::terrace:
       {
-        LOG_ERROR << endl << "ERROR: " << e.what() << endl << endl;
-        retval = EXIT_FAILURE;
+        init_part_info(instance);
+        load_msa(instance);
+        assert(instance.opts.start_tree == StartingTree::user);
+        LOG_INFO << "Loading tree from: " << instance.opts.tree_file << endl << endl;
+        if (!sysutil_file_exists(instance.opts.tree_file))
+          throw runtime_error("File not found: " + instance.opts.tree_file);
+        instance.start_tree_stream.reset(new NewickStream(instance.opts.tree_file, std::ios::in));
+        Tree tree = generate_tree(instance, instance.opts.start_tree);
+        check_terrace(instance, tree);
+        break;
       }
-      break;
+      case Command::none:
+      default:
+        LOG_ERROR << "Unknown command!" << endl;
+        retval = EXIT_FAILURE;
     }
-    case Command::none:
-    default:
-      LOG_ERROR << "Unknown command!" << endl;
-      retval = EXIT_FAILURE;
+  }
+  catch(exception& e)
+  {
+    LOG_ERROR << endl << "ERROR: " << e.what() << endl << endl;
+    retval = EXIT_FAILURE;
   }
 
   clean_exit(retval);

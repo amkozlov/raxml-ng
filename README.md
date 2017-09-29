@@ -1,4 +1,4 @@
-# RAxML New Generation
+# RAxML Next Generation
 
 [![DOI](https://zenodo.org/badge/75947982.svg)](https://zenodo.org/badge/latestdoi/75947982) [![License](https://img.shields.io/badge/license-AGPL-blue.svg)](http://www.gnu.org/licenses/agpl-3.0.en.html)
 
@@ -11,18 +11,29 @@ RAxML-NG offers improvements in speed, flexibility and user-friendliness over th
 RAxML-NG is currently under active development, and the mid-term goal is to have most functionality of RAxML 8.x covered.
 You can see some of the planned features [here](https://github.com/amkozlov/raxml-ng/issues).
 
+Documentation: [github wiki](https://github.com/amkozlov/raxml-ng/wiki)
+
 ## Installation instructions
 
 * For most desktop Unix/Linux and macOS systems, the easiest way to install RAxML-NG is by using the pre-compiled binary:  
-[**Download 64-bit Linux binary**](https://github.com/amkozlov/raxml-ng/releases/download/0.3.0/raxml-ng_v0.3.0b_linux_x86_64.zip)  
-[**Download 64-bit OSX/macOS binary**](https://github.com/amkozlov/raxml-ng/releases/download/0.3.0/raxml-ng_v0.3.0b_macos_x86_64.zip)
+[**Download 64-bit Linux binary**](https://github.com/amkozlov/raxml-ng/releases/download/0.5.0/raxml-ng_v0.5.0b_linux_x86_64.zip)  
+[**Download 64-bit OSX/macOS binary**](https://github.com/amkozlov/raxml-ng/releases/download/0.5.0/raxml-ng_v0.5.0b_macos_x86_64.zip)
 
 * For clusters/supercomputers (i.e., if you want to use MPI), please use the following installation package which contains pre-built *libpll*. You will need `GCC 4.8+` and `CMake 2.8+` in order to compile RAxML-NG for your system.  
-[**Download RAxML-NG-MPI for Linux**](https://github.com/amkozlov/raxml-ng/releases/download/0.3.0/raxml-ng_v0.3.0b_linux_x86_64_MPI.zip)
+[**Download RAxML-NG-MPI for Linux**](https://github.com/amkozlov/raxml-ng/releases/download/0.5.0/raxml-ng_v0.5.0b_linux_x86_64_MPI.zip)
 
 * Binaries for Windows will become available later on
 
 * If neither of the above options worked for you, please clone this repository and build RAxML-NG from scratch.
+
+1. **Install the dependecies.** On Ubuntu (and other Debian-based systems), you can simply run:
+```
+sudo apt-get install autotools-dev autoconf libtool flex bison libgmp3-dev
+```
+For other systems, please make sure you have following packages/libraries installed:  
+[`autoconf`](https://www.gnu.org/software/autoconf/autoconf.html) [`automake`](https://www.gnu.org/software/automake/) [`libtool`](https://www.gnu.org/software/libtool/) [`GNU Bison`](http://www.gnu.org/software/bison/) [`Flex`](http://flex.sourceforge.net/) [`GMP`](https://gmplib.org/)
+
+2. **Build RAxML-NG.**
 
 PTHREADS version:
 
@@ -41,6 +52,16 @@ git clone --recursive https://github.com/amkozlov/raxml-ng
 cd raxml-ng
 mkdir build && cd build
 cmake -DUSE_MPI=ON ..
+make
+```
+
+Portable PTHREADS version (static linkage, compatible with old non-AVX CPUs):
+
+```
+git clone --recursive https://github.com/amkozlov/raxml-ng
+cd raxml-ng
+mkdir build && cd build
+cmake -DSTATIC_BUILD=ON -DENABLE_RAXML_SIMD=OFF -DENABLE_PLLMOD_SIMD=OFF ..
 make
 ```
 
@@ -72,6 +93,10 @@ If still in doubt, please feel free to post to the [RAxML google group](https://
      (using multiple partitions with proportional branch lengths)
 
      `./raxml-ng --evaluate --msa testAA.fa --model partitions.txt --tree test.tree --brlen scaled`
+
+  4. Map support values from existing set of replicate trees:
+
+     `./raxml-ng --support --tree bestML.tree --bs-trees bootstraps.tree`
 
 ## License and citation
 

@@ -14,18 +14,20 @@ struct OutputFileNames
   std::string ml_trees;
   std::string bootstrap_trees;
   std::string support_tree;
+  std::string terrace;
 };
 
 class Options
 {
 public:
   Options() : cmdline(""), command(Command::none), use_tip_inner(true),
-  use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false),
-  optimize_model(true), optimize_brlen(true), redo_mode(false), log_level(LogLevel::progress),
+  use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false), use_repeats(true),
+  optimize_model(true), optimize_brlen(true), redo_mode(false), force_mode(false),
+  log_level(LogLevel::progress),
   msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
   random_seed(0), start_tree(StartingTree::random), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
   spr_cutoff(1.0), brlen_linkage(PLLMOD_TREE_BRLEN_SCALED), simd_arch(PLL_ATTRIB_ARCH_CPU),
-  num_searches(1), num_bootstraps(100),
+  num_searches(1), num_bootstraps(100), terrace_maxsize(100),
   tree_file(""), msa_file(""), model_file(""), outfile_prefix(""),
   num_threads(1), num_ranks(1)
   {};
@@ -40,11 +42,13 @@ public:
   bool use_pattern_compression;
   bool use_prob_msa;
   bool use_rate_scalers;
+  bool use_repeats;
 
   bool optimize_model;
   bool optimize_brlen;
 
   bool redo_mode;
+  bool force_mode;
 
   LogLevel log_level;
   FileFormat msa_format;
@@ -59,6 +63,7 @@ public:
 
   unsigned int num_searches;
   unsigned int num_bootstraps;
+  unsigned long long terrace_maxsize;
 
   /* I/O */
   std::string tree_file;
@@ -71,6 +76,8 @@ public:
   unsigned int num_threads;     /* number of threads */
   unsigned int num_ranks;       /* number of MPI ranks */
 
+  std::string simd_arch_name() const;
+
   std::string output_fname(const std::string& suffix) const;
 
   const std::string& log_file() const { return outfile_names.log; }
@@ -81,6 +88,7 @@ public:
   const std::string& ml_trees_file() const { return outfile_names.ml_trees; }
   const std::string& bootstrap_trees_file() const { return outfile_names.bootstrap_trees; }
   const std::string& support_tree_file() const { return outfile_names.support_tree; }
+  const std::string& terrace_file() const { return outfile_names.terrace; }
 
   void set_default_outfiles();
 

@@ -24,27 +24,60 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.ml_trees, "mlTrees");
   set_default_outfile(outfile_names.bootstrap_trees, "bootstraps");
   set_default_outfile(outfile_names.support_tree, "support");
+  set_default_outfile(outfile_names.terrace, "terrace");
 }
 
 bool Options::result_files_exist() const
 {
-  return sysutil_file_exists(best_tree_file()) || sysutil_file_exists(bootstrap_trees_file()) ||
-      sysutil_file_exists(support_tree_file()) || sysutil_file_exists(best_model_file());
+  switch (command)
+  {
+    case Command::evaluate:
+    case Command::search:
+      return sysutil_file_exists(best_tree_file()) || sysutil_file_exists(best_model_file());
+    case Command::bootstrap:
+      return sysutil_file_exists(bootstrap_trees_file());
+    case Command::all:
+      return sysutil_file_exists(best_tree_file()) || sysutil_file_exists(bootstrap_trees_file()) ||
+             sysutil_file_exists(support_tree_file()) || sysutil_file_exists(best_model_file());
+    case Command::support:
+      return sysutil_file_exists(support_tree_file());
+    case Command::terrace:
+      return sysutil_file_exists(terrace_file());
+    default:
+      return false;
+  }
 }
 
 void Options::remove_result_files() const
 {
-  if (sysutil_file_exists(best_tree_file()))
-    std::remove(best_tree_file().c_str());
-  if (sysutil_file_exists(best_model_file()))
-    std::remove(best_model_file().c_str());
-  if (sysutil_file_exists(bootstrap_trees_file()))
-    std::remove(bootstrap_trees_file().c_str());
-  if (sysutil_file_exists(support_tree_file()))
-    std::remove(support_tree_file().c_str());
+  if (command == Command::search || command == Command::all ||
+      command == Command::evaluate)
+  {
+    if (sysutil_file_exists(best_tree_file()))
+      std::remove(best_tree_file().c_str());
+    if (sysutil_file_exists(best_model_file()))
+      std::remove(best_model_file().c_str());
+  }
+
+  if (command == Command::bootstrap || command == Command::all)
+  {
+    if (sysutil_file_exists(bootstrap_trees_file()))
+      std::remove(bootstrap_trees_file().c_str());
+  }
+  if (command == Command::support || command == Command::all)
+  {
+    if (sysutil_file_exists(support_tree_file()))
+      std::remove(support_tree_file().c_str());
+  }
+
+  if (command == Command::terrace)
+  {
+    if (sysutil_file_exists(terrace_file()))
+      std::remove(terrace_file().c_str());
+  }
 }
 
-static string get_simd_arch_name(unsigned int simd_arch)
+string Options::simd_arch_name() const
 {
   switch(simd_arch)
   {
@@ -89,6 +122,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     case Command::all:
       stream << "ML tree search + bootstrapping";
       break;
+    case Command::support:
+      stream << "Compute bipartition support";
+      break;
     default:
       break;
   }
@@ -114,6 +150,8 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   stream << "  random seed: " << opts.random_seed << endl;
   stream << "  tip-inner: " << (opts.use_tip_inner ? "ON" : "OFF") << endl;
   stream << "  pattern compression: " << (opts.use_pattern_compression ? "ON" : "OFF") << endl;
+  stream << "  per-rate scalers: " << (opts.use_rate_scalers ? "ON" : "OFF") << endl;
+  stream << "  site repeats: " << (opts.use_repeats ? "ON" : "OFF") << endl;
 
   if (opts.command == Command::search)
   {
@@ -140,7 +178,7 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   stream << ")" << endl;
 
 
-  stream << "  SIMD kernels: " << get_simd_arch_name(opts.simd_arch) << endl;
+  stream << "  SIMD kernels: " << opts.simd_arch_name() << endl;
 
   stream << "  parallelization: ";
   if (opts.num_ranks > 1 && opts.num_threads > 1)

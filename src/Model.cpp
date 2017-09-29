@@ -26,7 +26,18 @@ const unordered_map<DataType, const unsigned int *,EnumClassHash>  DATATYPE_MAPS
 
 // TODO move it out of here
 class parse_error {};
-static bool read_param(istringstream& s, double& val)
+static string read_option(istringstream& s)
+{
+  ostringstream os;
+  while (s.peek() != '{' && s.peek() != '+' && s.peek() != EOF)
+  {
+    os.put(toupper(s.get()));
+  }
+  return os.str();
+}
+
+template<typename T>
+static bool read_param(istringstream& s, T& val)
 {
   if (s.peek() == '{' || s.peek() == '[')
   {
@@ -42,14 +53,15 @@ static bool read_param(istringstream& s, double& val)
     return false;
 }
 
-static bool read_param(istringstream& s, doubleVector& vec)
+template<typename T>
+static bool read_param(istringstream& s, std::vector<T>& vec)
 {
   if (s.peek() == '{' || s.peek() == '[')
   {
     int c = s.get();
     while (s && c != '}' && c != ']')
     {
-      double val;
+      T val;
       s >> val;
       vec.push_back(val);
       c = s.get();
@@ -63,7 +75,14 @@ static bool read_param(istringstream& s, doubleVector& vec)
     return false;
 }
 
-static void print_param(ostringstream& s, const doubleVector& vec)
+template<typename T>
+static void print_param(ostringstream& s, T val)
+{
+  s << "{" << val << "}";
+}
+
+template<typename T>
+static void print_param(ostringstream& s, const std::vector<T>& vec)
 {
   s << "{";
   size_t i = 0;
@@ -172,10 +191,14 @@ pllmod_mixture_model_t * Model::init_mix_model(const std::string &model_name)
 
 void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_model_t& mix_model)
 {
+  _gamma_mode = PLL_GAMMA_RATES_MEAN;
   _alpha = 1.0;
   _pinv = 0.0;
   _brlen_scaler = 1.0;
   _name = string(mix_model.name);
+
+  _ascbias_type = AscBiasCorrection::none;
+  _ascbias_weights.clear();
 
   _ratecat_rates.clear();
   _ratecat_weights.clear();
@@ -257,6 +280,50 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
       case '+':
         // proceed to the next token
         continue;
+      case 'A':
+      {
+        try
+        {
+          const string asc_str = "A" + read_option(ss);
+          if (asc_str == "ASC_LEWIS")
+          {
+            _ascbias_type = AscBiasCorrection::lewis;
+          }
+          else if (asc_str == "ASC_FELS")
+          {
+            _ascbias_type = AscBiasCorrection::felsenstein;
+            WeightType w;
+            if (read_param(ss, w))
+            {
+              _ascbias_weights.resize(_num_states, 0);
+              _ascbias_weights[0] = w;
+            }
+            else
+              throw parse_error();
+          }
+          else if (asc_str == "ASC_STAM")
+          {
+            _ascbias_type = AscBiasCorrection::stamatakis;
+            WeightVector v;
+            if (read_param(ss, v))
+            {
+              if (v.size() == _num_states)
+                _ascbias_weights.assign(v.cbegin(), v.cend());
+              else
+                throw parse_error();
+            }
+            else
+              throw parse_error();
+          }
+          else
+            throw parse_error();
+        }
+        catch (parse_error& e)
+        {
+          throw runtime_error(string("Invalid ascertainment bias correction specification: ") + s);
+        }
+        break;
+      }
       case 'F':
         try
         {
@@ -366,6 +433,17 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
           }
           else if (_num_ratecats == 1)
             _num_ratecats = 4;
+
+          if (ss.peek() == 'a' || ss.peek() == 'A')
+          {
+            ss.get();
+            _gamma_mode = PLL_GAMMA_RATES_MEDIAN;
+          }
+          else if (ss.peek() == 'm' || ss.peek() == 'M')
+          {
+            ss.get();
+            _gamma_mode = PLL_GAMMA_RATES_MEAN;
+          }
 
           if (read_param(ss, _alpha))
           {
@@ -533,7 +611,7 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
       case PLLMOD_UTIL_MIXTYPE_GAMMA:
         /* compute the discretized category rates from a gamma distribution
            with given alpha shape and store them in rate_cats  */
-        pll_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data());
+        pll_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _gamma_mode);
         if (_param_mode[PLLMOD_OPT_PARAM_ALPHA] == ParamValue::undefined)
           _param_mode[PLLMOD_OPT_PARAM_ALPHA] = ParamValue::ML;
         break;
@@ -542,7 +620,7 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
         if (_param_mode[PLLMOD_OPT_PARAM_FREE_RATES] == ParamValue::undefined)
         {
           /* use GAMMA rates as initial values -> can be changed */
-          pll_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data());
+          pll_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _gamma_mode);
           _param_mode[PLLMOD_OPT_PARAM_FREE_RATES] = ParamValue::ML;
         }
         if (_param_mode[PLLMOD_OPT_PARAM_RATE_WEIGHTS] == ParamValue::undefined)
@@ -618,6 +696,7 @@ std::string Model::to_string(bool print_params) const
     if (_rate_het == PLLMOD_UTIL_MIXTYPE_GAMMA)
     {
       model_string << "+G" << _num_ratecats;
+      model_string << (_gamma_mode == PLL_GAMMA_RATES_MEDIAN ? "a" : "m");
       if (out_param_mode.at(PLLMOD_OPT_PARAM_ALPHA) == ParamValue::user)
         model_string << "{" << _alpha << "}";
     }
@@ -632,10 +711,30 @@ std::string Model::to_string(bool print_params) const
     }
   }
 
+  switch(_ascbias_type)
+  {
+    case AscBiasCorrection::lewis:
+      model_string << "+ASC_LEWIS";
+      break;
+    case AscBiasCorrection::felsenstein:
+      model_string << "+ASC_FELS";
+      print_param(model_string, _ascbias_weights.at(0));
+      break;
+    case AscBiasCorrection::stamatakis:
+      model_string << "+ASC_STAM";
+      print_param(model_string, _ascbias_weights);
+      break;
+    default:
+      break;
+  }
+
   if (_error_model)
   {
     model_string << "+E";
-    print_param(model_string, _error_model->params());
+    if (out_param_mode.at(_error_model->param_ids().at(0)) == ParamValue::user)
+    {
+      print_param(model_string, _error_model->params());
+    }
   }
 
   return model_string.str();
@@ -807,9 +906,10 @@ LogStream& operator<<(LogStream& stream, const Model& m)
   stream << "   Rate heterogeneity: " << get_ratehet_mode_str(m);
   if (m.num_ratecats() > 1)
   {
-    stream << " (" << m.num_ratecats() << " cats)";
+    stream << " (" << m.num_ratecats() << " cats, " <<
+        (m.gamma_mode() == PLL_GAMMA_RATES_MEDIAN ? "median" : "mean") << ")";
     if (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_GAMMA)
-      stream << ",  alpha: " << setprecision(3) << m.alpha() << " ("  << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_ALPHA))
+      stream << ",  alpha: " << setprecision(6) << m.alpha() << " ("  << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_ALPHA))
                  << ")";
     stream << ",  weights&rates: ";
     for (size_t i = 0; i < m.num_ratecats(); ++i)
@@ -828,7 +928,7 @@ LogStream& operator<<(LogStream& stream, const Model& m)
       stream << "\nM" << i << ": ";
 
     for (size_t j = 0; j < m.base_freqs(i).size(); ++j)
-      stream << setprecision(3) << m.base_freqs(i)[j] << " ";
+      stream << setprecision(6) << m.base_freqs(i)[j] << " ";
   }
   stream << endl;
 

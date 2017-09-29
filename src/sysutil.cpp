@@ -10,7 +10,7 @@
 
 using namespace std;
 
-chrono::time_point<chrono::system_clock> start_time = chrono::system_clock::now();
+SystemTimer systimer;
 
 void sysutil_fatal(const char * format, ...)
 {
@@ -220,22 +220,15 @@ unsigned long sysutil_get_cpu_features()
 
 unsigned int sysutil_simd_autodetect()
 {
-  unsigned long features = sysutil_get_cpu_features();
-  if ((features & RAXML_CPU_AVX2) && (features & RAXML_CPU_FMA3))
+//  unsigned long features = sysutil_get_cpu_features();
+  if (PLL_STAT(avx2_present))
     return PLL_ATTRIB_ARCH_AVX2;
-  else if (features & RAXML_CPU_AVX)
+  else if (PLL_STAT(avx_present))
     return PLL_ATTRIB_ARCH_AVX;
-  else if (features & RAXML_CPU_SSE3)
+  else if (PLL_STAT(sse3_present))
     return PLL_ATTRIB_ARCH_SSE;
   else
     return PLL_ATTRIB_ARCH_CPU;
-}
-
-double sysutil_elapsed_seconds()
-{
-  chrono::time_point<chrono::system_clock> end_time = chrono::system_clock::now();
-  chrono::duration<double> elapsed_seconds = end_time - start_time;
-  return elapsed_seconds.count();
 }
 
 std::string sysutil_realpath(const std::string& path)
@@ -271,4 +264,10 @@ bool sysutil_file_exists(const std::string& fname, int access_mode)
 {
   return access(fname.c_str(), access_mode) == 0;
 }
+
+const SystemTimer& global_timer()
+{
+  return systimer;
+}
+
 

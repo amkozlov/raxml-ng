@@ -26,6 +26,8 @@ size_t PartitionInfo::mark_partition_sites(unsigned int part_num, std::vector<un
     /* try to parse strided format first */
     read = sscanf(range, "%lu-%lu\\%lu", &start, &end, &stride);
     if (read != 3)
+      read = sscanf(range, "%lu-%lu/%lu", &start, &end, &stride);
+    if (read != 3)
     {
       /* try to parse contiguous range format first */
       stride = 1;
@@ -96,6 +98,7 @@ const pllmod_msa_stats_t * PartitionInfo::stats() const
     unsigned long stats_mask = PLLMOD_MSA_STATS_GAP_PROP;
     stats_mask |= PLLMOD_MSA_STATS_FREQS;
     stats_mask |= PLLMOD_MSA_STATS_INV_PROP;
+    stats_mask |= PLLMOD_MSA_STATS_GAP_SEQS;
 
     if (_model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::empirical)
       stats_mask |= PLLMOD_MSA_STATS_SUBST_RATES;
@@ -107,37 +110,15 @@ const pllmod_msa_stats_t * PartitionInfo::stats() const
 };
 
 
-void PartitionInfo::set_modeL_empirical_params()
+void PartitionInfo::set_model_empirical_params()
 {
-  stats();
-
-  // check for zero state frequencies
-  if (_model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::empirical)
-  {
-    for (unsigned int i = 0; i < _stats->states; ++i)
-    {
-      if (!(_stats->freqs[i] > 0.))
-      {
-        LOG_ERROR << "\nBase frequencies: ";
-        for (unsigned int j = 0; j < _stats->states; ++j)
-          LOG_ERROR << _stats->freqs[j] <<  " ";
-        LOG_ERROR << endl;
-
-        throw runtime_error("Frequency of state " + to_string(i) +
-                            " in partition " + _name + " is 0!\n"
-                            "Please either change your partitioning scheme or "
-                            "use model state frequencies for this partition!");
-      }
-    }
-  }
-
   assign(_model, stats());
 }
 
-void PartitionInfo::fill_tip_clv(unsigned int tip_id, doubleVector& clv,
-                                 unsigned int states_padded) const
+void PartitionInfo::fill_tip_clv(unsigned int tip_id, doubleVector& clv) const
 {
-  auto clv_size = _msa.length() * states_padded;
+  auto states = _model.num_states();
+  auto clv_size = _msa.length() * states;
   clv.resize(clv_size);
   auto clvp = clv.begin();
   auto seq = _msa.at(tip_id);
@@ -154,12 +135,12 @@ void PartitionInfo::fill_tip_clv(unsigned int tip_id, doubleVector& clv,
     if (j == 0 && 0)
     {
       printf("state: %u ", state);
-      for (size_t k = 0; k < _model.num_states(); ++k)
+      for (size_t k = 0; k < states; ++k)
         printf("%lf ", clvp[k]);
       printf("\n");
     }
 
-    clvp += states_padded;
+    clvp += states;
   }
 
   assert(clvp == clv.end());

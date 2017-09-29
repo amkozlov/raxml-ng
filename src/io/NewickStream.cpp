@@ -2,6 +2,20 @@
 
 using namespace std;
 
+char * newick_name_cb(const pll_unode_t * node)
+{
+  return node->label ? strdup(node->label) : strdup("");
+}
+
+std::string to_newick_string_rooted(const Tree& tree, double root_brlen)
+{
+  char * newick_str = pll_utree_export_newick_rooted(&tree.pll_utree_root(),
+                                                     root_brlen);
+  std::string result = newick_str;
+  free(newick_str);
+  return result;
+}
+
 NewickStream& operator<<(NewickStream& stream, const pll_unode_t& root)
 {
   char * newick_str = pll_utree_export_newick(&root, nullptr);
