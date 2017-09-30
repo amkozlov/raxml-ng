@@ -897,9 +897,8 @@ LogStream& operator<<(LogStream& stream, const Model& m)
 
   if (m.error_model())
   {
-    stream << "   Error model: ";
-    for (auto p: m.error_model()->params())
-      stream << p << " ";
+    stream << "   Error model (" << get_param_mode_str(m.param_mode(RAXML_OPT_PARAM_SEQ_ERROR)) << "): ";
+    stream << *m.error_model();
     stream << endl;
   }
 

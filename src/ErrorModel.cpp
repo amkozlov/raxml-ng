@@ -18,11 +18,34 @@ static const char mut_dist[10][10] = {  {  0, 2, 2, 2, 1, 1, 1, 2, 2, 2 },   /* 
                                         {  2, 2, 1, 1, 2, 1, 1, 1, 1, 0 }    /* GT */
                                  };
 
+LogStream& operator<<(LogStream& stream, const ErrorModel& m)
+{
+  auto names = m.param_names();
+  auto values = m.params();
+  assert(names.size() == values.size());
+
+  for (size_t i = 0; i < names.size(); ++i)
+  {
+    stream << names[i] << ": " << values[i];
+    if (i < names.size() - 1)
+      stream << ",  ";
+  }
+
+  return stream;
+}
+
 intVector UniformErrorModel::param_ids() const
 {
   intVector ids;
   ids.push_back(RAXML_OPT_PARAM_SEQ_ERROR);
   return ids;
+}
+
+NameVector UniformErrorModel::param_names() const
+{
+  NameVector names;
+  names.push_back("SEQ_ERROR");
+  return names;
 }
 
 doubleVector UniformErrorModel::params() const
@@ -72,6 +95,14 @@ intVector GenotypeErrorModel::param_ids() const
   ids.push_back(RAXML_OPT_PARAM_SEQ_ERROR);
   ids.push_back(RAXML_OPT_PARAM_ADO_RATE);
   return ids;
+}
+
+NameVector GenotypeErrorModel::param_names() const
+{
+  NameVector names;
+  names.push_back("SEQ_ERROR");
+  names.push_back("ADO_RATE");
+  return names;
 }
 
 doubleVector GenotypeErrorModel::params() const

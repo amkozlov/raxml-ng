@@ -10,6 +10,7 @@ public:
   virtual ~ErrorModel() {};
 
   virtual intVector param_ids() const = 0;
+  virtual NameVector param_names() const = 0;
   virtual doubleVector params() const = 0;
   virtual void params(const doubleVector& pv) = 0;
 
@@ -29,6 +30,7 @@ public:
     ErrorModel(states), _seq_error_rate(RAXML_SEQ_ERROR_MIN) {};
 
   intVector param_ids() const override;
+  NameVector param_names() const override;
   doubleVector params() const override;
   void params(const doubleVector& pv) override;
 
@@ -51,6 +53,7 @@ public:
 
   intVector param_ids() const override;
   doubleVector params() const override;
+  NameVector param_names() const override;
   void params(const doubleVector& pv) override;
 
 protected:
@@ -61,6 +64,8 @@ protected:
 private:
   virtual void compute_state_probs(unsigned int state, doubleVector::iterator &clvp) const override;
 };
+
+LogStream& operator<<(LogStream& stream, const ErrorModel& m);
 
 
 #endif /* RAXML_ERRORMODEL_HPP_ */

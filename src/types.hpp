@@ -65,6 +65,7 @@ const std::string ParamValueNames[] = {"undefined", "equal", "user", "model", "e
 typedef std::vector<double> doubleVector;
 typedef std::vector<int> intVector;
 typedef std::vector<unsigned int> uintVector;
+typedef std::vector<std::string> NameVector;
 typedef std::pair<size_t,std::string> IdNamePair;
 typedef std::vector<IdNamePair> IdNameVector;
 typedef std::unordered_map<size_t,std::string> IdNameMap;
