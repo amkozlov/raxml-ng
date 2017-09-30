@@ -223,8 +223,8 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
   {
     new_loglh = -1 * pllmod_algo_opt_onedim_treeinfo(_pll_treeinfo,
                                                       PLLMOD_OPT_PARAM_PINV,
-                                                      PLLMOD_OPT_MIN_PINV,
-                                                      PLLMOD_OPT_MAX_PINV,
+                                                      RAXML_PINV_MIN,
+                                                      RAXML_PINV_MAX,
                                                       RAXML_PARAM_EPSILON);
 
     LOG_DEBUG << "\t - after p-inv: logLH = " << new_loglh << endl;
