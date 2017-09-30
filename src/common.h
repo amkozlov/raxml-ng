@@ -43,6 +43,9 @@ extern "C" {
 #define RAXML_BRLEN_MAX           100.
 #define RAXML_BRLEN_TOLERANCE     1.0e-7
 
+#define RAXML_PINV_MIN            1.0e-9
+#define RAXML_PINV_MAX            0.99
+
 #define RAXML_FREERATE_MIN        0.001
 #define RAXML_FREERATE_MAX        100.
 
