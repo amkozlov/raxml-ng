@@ -8,26 +8,18 @@ endif()
 
 message (STATUS "Building tests")
 
-file (GLOB_RECURSE raxml_test_sources ${PROJECT_SOURCE_DIR}/test/src/*.cpp ${PROJECT_SOURCE_DIR}/src/*.cpp)
+file (GLOB_RECURSE RAXML_TEST_SOURCES ${PROJECT_SOURCE_DIR}/test/src/*.cpp ${RAXML_SOURCES})
 
 # sources list now has 2 Main.cpp, old has to be removed
-list(REMOVE_ITEM raxml_test_sources "${PROJECT_SOURCE_DIR}/src/main.cpp")
+list(REMOVE_ITEM RAXML_TEST_SOURCES "${PROJECT_SOURCE_DIR}/src/main.cpp")
 
 include_directories (${PROJECT_SOURCE_DIR})
 
 set (EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/test/bin)
 
-add_executable        (raxml_test_module ${raxml_test_sources})
+add_executable        (raxml_test_module ${RAXML_TEST_SOURCES})
 
-target_link_libraries (raxml_test_module ${RAXML_LOCALDEPS_DIR}/lib/libterraces.a)
-target_link_libraries (raxml_test_module ${RAXML_LOCALDEPS_DIR}/lib/libpll_algorithm.a)
-target_link_libraries (raxml_test_module ${RAXML_LOCALDEPS_DIR}/lib/libpll_binary.a)
-target_link_libraries (raxml_test_module ${RAXML_LOCALDEPS_DIR}/lib/libpll_optimize.a)
-target_link_libraries (raxml_test_module ${RAXML_LOCALDEPS_DIR}/lib/libpll_msa.a)
-target_link_libraries (raxml_test_module ${RAXML_LOCALDEPS_DIR}/lib/libpll_tree.a)
-target_link_libraries (raxml_test_module ${RAXML_LOCALDEPS_DIR}/lib/libpll_util.a)
-target_link_libraries (raxml_test_module ${RAXML_LOCALDEPS_DIR}/lib/libpll.a)
-target_link_libraries (raxml_test_module m)
+target_link_libraries (raxml_test_module ${RAXML_LIBS})
 
 if(GMP_FOUND)
   target_link_libraries(raxml_test_module ${GMP_LIBRARIES})

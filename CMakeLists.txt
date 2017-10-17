@@ -15,9 +15,16 @@ set (ENABLE_PLLMOD_SIMD OFF CACHE BOOL "Enable SIMD instructions in pll-modules 
 # build a static binary
 set(STATIC_BUILD OFF CACHE BOOL "Build static binary")
 
-set(USE_GMP ON CACHE BOOL "Use Gnu Muliple precision (GMP) library ")
+set(USE_TERRAPHAST ON CACHE BOOL "Use phylogentic terraces library (terraphast) ")
+set(USE_GMP OFF CACHE BOOL "Use Gnu Muliple precision (GMP) library ")
 
 set(ENABLE_PTHREADS ${USE_PTHREADS})
+
+if(USE_TERRAPHAST)
+  set(ENABLE_GMP ON)
+else()
+  set(ENABLE_GMP ${USE_GMP})
+endif()
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -63,10 +70,11 @@ set (CMAKE_CXX_FLAGS          "-std=c++11 ${WARN_FLAGS}")
 set (CMAKE_CXX_FLAGS_DEBUG    "-g")
 set (CMAKE_CXX_FLAGS_RELEASE  "-O3 -DNDEBUG")
 
-if (USE_GMP)
+if (ENABLE_GMP)
 #find_package(GMP REQUIRED)
   set(GMP_FOUND ON)
   set(GMP_LIBRARIES gmpxx gmp)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_RAXML_GMP")
 endif()
 
 if (ENABLE_RAXML_SIMD)
@@ -106,12 +114,11 @@ if(ENABLE_MPI)
   endif()
 endif()
 
+if(USE_TERRAPHAST)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_RAXML_TERRAPHAST")
+endif()
+
 message(STATUS "Using flags: ${CMAKE_CXX_FLAGS}")
-
-#include_directories(${PROJECT_SOURCE_DIR}/libs/cereal/include)
-#include_directories(${PROJECT_SOURCE_DIR}/libs/cxxopts/src)
-#include_directories(${PROJECT_SOURCE_DIR}/libs/include/libpll)
-
 
 set(pll_dir ${PROJECT_SOURCE_DIR}/libs/pll-modules/libs/libpll/src)
 set(pll_binary_dir ${PROJECT_SOURCE_DIR}/libs/pll-modules/src/binary)

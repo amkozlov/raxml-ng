@@ -37,7 +37,9 @@
 #include "LoadBalancer.hpp"
 #include "bootstrap/BootstrapGenerator.hpp"
 
+#ifdef _RAXML_TERRAPHAST
 #include "terraces/TerraceWrapper.hpp"
+#endif
 
 using namespace std;
 
@@ -51,7 +53,7 @@ struct RaxmlInstance
   PartitionAssignmentList proc_part_assign;
   unique_ptr<LoadBalancer> load_balancer;
   unique_ptr<BootstrapTree> bs_tree;
-  unique_ptr<TerraceWrapper> terrace_wrapper;
+ // unique_ptr<TerraceWrapper> terrace_wrapper;
 
   unique_ptr<NewickStream> start_tree_stream;
 
@@ -700,6 +702,7 @@ void draw_bootstrap_support(RaxmlInstance& instance, const Checkpoint& checkp)
 
 void check_terrace(const RaxmlInstance& instance, const Tree& tree)
 {
+#ifdef _RAXML_TERRAPHAST
   if (instance.parted_msa.part_count() > 1)
   {
     auto newick_str = to_newick_string_rooted(tree);
@@ -732,6 +735,10 @@ void check_terrace(const RaxmlInstance& instance, const Tree& tree)
       LOG_ERROR << "ERROR: Failed to compute terrace: " << e.what() << endl << endl;
     }
   }
+#else
+  UNUSED(instance);
+  UNUSED(tree);
+#endif
 }
 
 void save_ml_trees(const Options& opts, const Checkpoint& checkp)
