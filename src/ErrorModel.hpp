@@ -28,6 +28,8 @@ class UniformErrorModel: public ErrorModel
 public:
   UniformErrorModel(unsigned int states) :
     ErrorModel(states), _seq_error_rate(RAXML_SEQ_ERROR_MIN) {};
+  UniformErrorModel(unsigned int states, double error_rate) :
+    ErrorModel(states), _seq_error_rate(error_rate) {};
 
   intVector param_ids() const override;
   NameVector param_names() const override;

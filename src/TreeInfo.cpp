@@ -5,7 +5,7 @@
 
 using namespace std;
 
-static PartitionInfo * global_pinfo;
+thread_local PartitionInfo * global_pinfo;
 
 TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
                     const PartitionAssignment& part_assign)

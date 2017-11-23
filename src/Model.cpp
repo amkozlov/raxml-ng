@@ -524,7 +524,7 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
         if (_data_type == DataType::diploid10)
           _error_model.reset(new GenotypeErrorModel());
         else
-          _error_model.reset(new UniformErrorModel(_num_states));
+          _error_model.reset(new UniformErrorModel(_num_states, 0.01));
 
         for (auto p: _error_model->param_ids())
          _param_mode[p] = ParamValue::ML;
