@@ -988,6 +988,13 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   load_msa(instance);
 
+  // we need 2 doubles for each partition AND threads to perform parallel reduction,
+  // so resize the buffer accordingly
+  const size_t reduce_buffer_size = std::max(1024lu, 2 * sizeof(double) *
+                                     parted_msa.part_count() * ParallelContext::num_threads());
+  LOG_DEBUG << "Parallel reduction buffer size: " << reduce_buffer_size/1024 << " KB\n\n";
+  ParallelContext::resize_buffer(reduce_buffer_size);
+
   /* init template tree */
   instance.random_tree = generate_tree(instance, StartingTree::random);
 

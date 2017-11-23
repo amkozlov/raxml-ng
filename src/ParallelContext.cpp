@@ -4,7 +4,7 @@
 
 using namespace std;
 
-// TODO: estimate based on #threads and #partitions?
+// This is just a default size; the buffer will be resized later according to #part and #threads
 #define PARALLEL_BUF_SIZE (128 * 1024)
 
 size_t ParallelContext::_num_threads = 1;
@@ -52,6 +52,11 @@ void ParallelContext::init_pthreads(const Options& opts, const std::function<voi
     _threads.emplace_back(ParallelContext::start_thread, i, thread_main);
   }
 #endif
+}
+
+void ParallelContext::resize_buffer(size_t size)
+{
+  _parallel_buf.reserve(size);
 }
 
 void ParallelContext::finalize(bool force)
