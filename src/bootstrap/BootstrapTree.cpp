@@ -54,6 +54,8 @@ void BootstrapTree::calc_support()
     bitv_hash_entry_t * e =  _pll_splits_hash->table[i];
     while (e != NULL)
     {
+      assert(e->support-1 <= _num_bs_trees);
+
 //      printf("split %d, support %d\n", e->bip_number, e->support);
       support[e->bip_number] = (unsigned char) round((e->support - 1) * 100 / _num_bs_trees);
       e = e->next;
@@ -71,6 +73,8 @@ void BootstrapTree::calc_support()
 
     /* this has to be an inner node! */
     assert(node->next);
+
+    assert(support[i] <= 100);
 
     node->label = node->next->label = node->next->next->label =
         strdup(std::to_string(support[i]).c_str());
