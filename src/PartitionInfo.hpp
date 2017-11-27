@@ -33,6 +33,7 @@ public:
   // getters
   const std::string& name() const { return _name; };
   const Model& model() const { return _model; };
+  Model& model() { return _model; };
   const std::string& range_string() const { return _range_string; };
   const MSA& msa() const { return _msa; };
   MSA& msa() { return _msa; };

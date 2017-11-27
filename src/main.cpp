@@ -98,20 +98,29 @@ void init_part_info(RaxmlInstance& instance)
   if (parted_msa.part_count() == 1)
     opts.brlen_linkage = PLLMOD_TREE_BRLEN_LINKED;
 
-  int lg4x_count = 0;
+  /* in the scaled brlen mode, use ML optimization of brlen scalers by default */
+  if (opts.brlen_linkage == PLLMOD_TREE_BRLEN_SCALED)
+  {
+    for (auto& pinfo: parted_msa.part_list())
+      pinfo.model().set_param_mode_default(PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER, ParamValue::ML);
+  }
+
+  int freerate_count = 0;
 
   for (const auto& pinfo: parted_msa.part_list())
   {
     LOG_DEBUG << "|" << pinfo.name() << "|   |" << pinfo.model().to_string() << "|   |" <<
         pinfo.range_string() << "|" << endl;
 
-    if (pinfo.model().name() == "LG4X")
-      lg4x_count++;
+    if (pinfo.model().ratehet_mode() == PLLMOD_UTIL_MIXTYPE_FREE)
+      freerate_count++;
   }
 
-  if (parted_msa.part_count() > 1 && lg4x_count > 0 && opts.brlen_linkage == PLLMOD_TREE_BRLEN_LINKED)
+  if (parted_msa.part_count() > 1 && freerate_count > 0 &&
+      opts.brlen_linkage == PLLMOD_TREE_BRLEN_LINKED)
   {
-    throw runtime_error("LG4X model is not supported in linked branch length mode, sorry :(");
+    throw runtime_error("LG4X and FreeRate models are not supported in linked branch length mode.\n"
+        "Please use the '--brlen scaled' option to switch into proportional branch length mode.");
   }
 }
 

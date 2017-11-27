@@ -322,6 +322,33 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
         }
         break;
       }
+      case 'B':
+        try
+        {
+          switch (toupper(ss.get()))
+          {
+            case EOF:
+            case '\0':
+            case '+':
+            case 'O':
+              param_mode = ParamValue::ML;
+              break;
+            case 'U':
+              if (read_param(ss, _brlen_scaler))
+                param_mode = ParamValue::user;
+              else
+                throw parse_error();
+              break;
+            default:
+              throw parse_error();
+          }
+          _param_mode[PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER] = param_mode;
+        }
+        catch(parse_error& e)
+        {
+          throw runtime_error(string("Invalid branch length scaler specification: ") + s);
+        }
+        break;
       case 'F':
         try
         {
@@ -678,6 +705,18 @@ std::string Model::to_string(bool print_params) const
         print_param(model_string, _ratecat_weights);
       }
     }
+  }
+
+  switch(out_param_mode.at(PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER))
+  {
+    case ParamValue::ML:
+      model_string << "+B";
+      break;
+    case ParamValue::user:
+      model_string << "+BU{" << _brlen_scaler << "}";
+      break;
+    default:
+      break;
   }
 
   switch(_ascbias_type)

@@ -142,6 +142,12 @@ public:
   void ratecat_rates(doubleVector const& value) { _ratecat_rates = value; };
   void ratecat_weights(doubleVector const& value) { _ratecat_weights = value; };
 
+  void set_param_mode_default(int param, ParamValue mode)
+  {
+    if (param_mode(param) == ParamValue::undefined)
+      _param_mode[param] = mode;
+  };
+
   /* initialization */
   void init_from_string(const std::string& model_string);
 

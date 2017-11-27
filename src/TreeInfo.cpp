@@ -37,11 +37,6 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
 
   // init partitions
   int optimize_branches = opts.optimize_brlen ? PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE : 0;
-  if (opts.optimize_model && opts.brlen_linkage == PLLMOD_TREE_BRLEN_SCALED &&
-      parted_msa.part_count() > 1)
-  {
-    optimize_branches |= PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER;
-  }
 
   for (size_t p = 0; p < parted_msa.part_count(); ++p)
   {
@@ -205,31 +200,50 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
     cur_loglh = new_loglh;
   }
 
-  /* optimize ALPHA */
-  if (params_to_optimize & PLLMOD_OPT_PARAM_ALPHA)
+  // TODO: co-optimization of PINV and ALPHA, mb with multiple starting points
+  if (0 &&
+      (params_to_optimize & PLLMOD_OPT_PARAM_ALPHA) &&
+      (params_to_optimize & PLLMOD_OPT_PARAM_PINV))
   {
-    new_loglh = -1 * pllmod_algo_opt_onedim_treeinfo(_pll_treeinfo,
-                                                      PLLMOD_OPT_PARAM_ALPHA,
-                                                      PLLMOD_OPT_MIN_ALPHA,
-                                                      PLLMOD_OPT_MAX_ALPHA,
-                                                      RAXML_PARAM_EPSILON);
-
-   LOG_DEBUG << "\t - after alpha: logLH = " << new_loglh << endl;
-   assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
-   cur_loglh = new_loglh;
+    new_loglh = -1 * pllmod_algo_opt_alpha_pinv (_pll_treeinfo->partitions[0],
+                                                 _pll_treeinfo->root,
+                                                 _pll_treeinfo->param_indices[0],
+                                                 PLLMOD_OPT_MIN_ALPHA,
+                                                 PLLMOD_OPT_MAX_ALPHA,
+                                                 &_pll_treeinfo->alphas[0],
+                                                 PLLMOD_OPT_MIN_PINV,
+                                                 PLLMOD_OPT_MAX_PINV,
+                                                 RAXML_BFGS_FACTOR,
+                                                 RAXML_PARAM_EPSILON);
   }
-
-  if (params_to_optimize & PLLMOD_OPT_PARAM_PINV)
+  else
   {
-    new_loglh = -1 * pllmod_algo_opt_onedim_treeinfo(_pll_treeinfo,
-                                                      PLLMOD_OPT_PARAM_PINV,
-                                                      RAXML_PINV_MIN,
-                                                      RAXML_PINV_MAX,
-                                                      RAXML_PARAM_EPSILON);
+    /* optimize ALPHA */
+    if (params_to_optimize & PLLMOD_OPT_PARAM_ALPHA)
+    {
+      new_loglh = -1 * pllmod_algo_opt_onedim_treeinfo(_pll_treeinfo,
+                                                        PLLMOD_OPT_PARAM_ALPHA,
+                                                        PLLMOD_OPT_MIN_ALPHA,
+                                                        PLLMOD_OPT_MAX_ALPHA,
+                                                        RAXML_PARAM_EPSILON);
 
-    LOG_DEBUG << "\t - after p-inv: logLH = " << new_loglh << endl;
-    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
-    cur_loglh = new_loglh;
+     LOG_DEBUG << "\t - after alpha: logLH = " << new_loglh << endl;
+     assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+     cur_loglh = new_loglh;
+    }
+
+    if (params_to_optimize & PLLMOD_OPT_PARAM_PINV)
+    {
+      new_loglh = -1 * pllmod_algo_opt_onedim_treeinfo(_pll_treeinfo,
+                                                        PLLMOD_OPT_PARAM_PINV,
+                                                        PLLMOD_OPT_MIN_PINV,
+                                                        PLLMOD_OPT_MAX_PINV,
+                                                        RAXML_PARAM_EPSILON);
+
+      LOG_DEBUG << "\t - after p-inv: logLH = " << new_loglh << endl;
+      assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+      cur_loglh = new_loglh;
+    }
   }
 
   /* optimize FREE RATES and WEIGHTS */
