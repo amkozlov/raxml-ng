@@ -21,6 +21,11 @@ set(USE_GMP OFF CACHE BOOL "Use Gnu Muliple precision (GMP) library ")
 set(ENABLE_PTHREADS ${USE_PTHREADS})
 
 if(USE_TERRAPHAST)
+  message (WARNING "Terraphast library support is not available in this release, and it has been disabled.")
+  set(USE_TERRAPHAST OFF)
+endif()
+
+if(USE_TERRAPHAST)
   set(ENABLE_GMP ON)
 else()
   set(ENABLE_GMP ${USE_GMP})
