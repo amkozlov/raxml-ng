@@ -18,7 +18,8 @@ enum class Command
   bootstrap,
   all,
   support,
-  terrace
+  terrace,
+  check
 };
 
 enum class FileFormat

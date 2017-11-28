@@ -125,6 +125,12 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     case Command::support:
       stream << "Compute bipartition support";
       break;
+    case Command::terrace:
+      stream << "Count/enumerate trees on a phylogenetic terrace";
+      break;
+    case Command::check:
+      stream << "Alignment validation";
+      break;
     default:
       break;
   }

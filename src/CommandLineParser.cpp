@@ -49,6 +49,7 @@ static struct option long_options[] =
   {"support",            no_argument,       0, 0 },  /*  30 */
   {"terrace",            no_argument,       0, 0 },  /*  31 */
   {"terrace-maxsize",    required_argument, 0, 0 },  /*  32 */
+  {"check",              no_argument,       0, 0 },  /*  33 */
 
   { 0, 0, 0, 0 }
 };
@@ -402,6 +403,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               + string(optarg) + ", please provide a positive integer number!");
         }
         break;
+      case 33: /* check */
+        opts.command = Command::check;
+        num_commands++;
+        break;
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -417,11 +422,16 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* check for mandatory options for each command */
   if (opts.command == Command::evaluate || opts.command == Command::search ||
       opts.command == Command::bootstrap || opts.command == Command::all ||
-      opts.command == Command::terrace)
+      opts.command == Command::terrace || opts.command == Command::check)
   {
     if (opts.msa_file.empty())
       throw OptionException("You must specify a multiple alignment file with --msa switch");
+  }
 
+  if (opts.command == Command::evaluate || opts.command == Command::search ||
+      opts.command == Command::bootstrap || opts.command == Command::all ||
+      opts.command == Command::terrace)
+  {
     if (opts.model_file.empty())
       throw OptionException("You must specify an evolutionary model with --model switch");
   }
@@ -495,15 +505,16 @@ void CommandLineParser::print_help()
 
   cout << "\n"
             "Commands (mutually exclusive):\n"
-            "  --help                                     display help information.\n"
-            "  --version                                  display version information.\n"
-            "  --evaluate                                 evaluate the likelihood of a tree.\n"
+            "  --help                                     display help information\n"
+            "  --version                                  display version information\n"
+            "  --evaluate                                 evaluate the likelihood of a tree\n"
             "  --search                                   ML tree search.\n"
-            "  --bootstrap                                bootstrapping.\n"
+            "  --bootstrap                                bootstrapping\n"
             "  --all                                      all-in-one (ML search + bootstrapping).\n"
             "  --support                                  compute bipartition support for a given reference tree (e.g., best ML tree)\n"
-            "                                             and a set of replicate trees (e.g., from a bootstrap analysis) \n"
+            "                                             and a set of replicate trees (e.g., from a bootstrap analysis)\n"
             "  --terrace                                  check whether tree lies on a phylogenetic terrace \n"
+            "  --check                                    check alignment correctness and remove empty columns/rows\n"
             "\n"
             "Input and output options:\n"
             "  --tree         FILE | rand{N} | pars{N}    starting tree: rand(om), pars(imony) or user-specified (newick file)\n"

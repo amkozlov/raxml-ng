@@ -385,10 +385,16 @@ void load_msa(RaxmlInstance& instance)
 
   /* check alignment */
   if (!opts.force_mode)
+  {
+    LOG_VERB_TS << "Validating alignment... " << endl;
     check_msa(instance);
+  }
 
   if (opts.use_pattern_compression)
+  {
+    LOG_VERB_TS << "Compressing alignment patterns... " << endl;
     parted_msa.compress_patterns();
+  }
 
 //  if (parted_msa.part_count() > 1)
 //    instance.terrace_wrapper.reset(new TerraceWrapper(parted_msa));
@@ -1170,6 +1176,22 @@ int main(int argc, char** argv)
         instance.start_tree_stream.reset(new NewickStream(instance.opts.tree_file, std::ios::in));
         Tree tree = generate_tree(instance, instance.opts.start_tree);
         check_terrace(instance, tree);
+        break;
+      }
+      case Command::check:
+      {
+        instance.opts.use_pattern_compression = false;
+        init_part_info(instance);
+        load_msa(instance);
+        if (instance.opts.start_tree == StartingTree::user)
+        {
+          LOG_INFO << "Loading tree from: " << instance.opts.tree_file << endl << endl;
+          if (!sysutil_file_exists(instance.opts.tree_file))
+            throw runtime_error("File not found: " + instance.opts.tree_file);
+          instance.start_tree_stream.reset(new NewickStream(instance.opts.tree_file, std::ios::in));
+          Tree tree = generate_tree(instance, instance.opts.start_tree);
+        }
+        LOG_INFO << "Alignment can be successfully read by RAxML-NG." << endl << endl;
         break;
       }
       case Command::none:
