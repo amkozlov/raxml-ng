@@ -58,6 +58,7 @@ struct PartitionAssignmentStats
 {
   PartitionAssignmentStats(const PartitionAssignmentList& part_assign)
   {
+    total_sites = 0;
     max_thread_sites = max_thread_parts = 0;
     min_thread_sites = min_thread_parts = std::numeric_limits<size_t>::max();
     for (auto pa: part_assign)
@@ -66,9 +67,11 @@ struct PartitionAssignmentStats
       min_thread_parts = std::min(min_thread_parts, pa.num_parts());
       max_thread_sites = std::max(max_thread_sites, pa.weight());
       max_thread_parts = std::max(max_thread_parts, pa.num_parts());
+      total_sites += pa.weight();
     }
   }
 
+  size_t total_sites;
   size_t min_thread_sites;
   size_t min_thread_parts;
   size_t max_thread_sites;

@@ -1029,6 +1029,30 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   /* run load balancing algorithm */
   balance_load(instance);
 
+  /* check that we have enough patterns per thread */
+  if (ParallelContext::master_rank() && ParallelContext::num_procs() > 1)
+  {
+    PartitionAssignmentStats stats(instance.proc_part_assign);
+    const size_t min_thread_pats = ParallelContext::num_threads() > 8 ? 500 : 150;
+    if (stats.min_thread_sites < min_thread_pats)
+    {
+      size_t opt_threads = trunc(stats.total_sites / (min_thread_pats*2)) + 1;
+      LOG_WARN << endl;
+      LOG_WARN << "WARNING: You are using too many threads (" << ParallelContext::num_threads() <<
+          ") for your alignment with " << stats.total_sites << " unique patterns." << endl;
+      LOG_WARN << "NOTE:    Please consider using " << opt_threads <<  " threads ('--threads " <<
+          opt_threads << "' option) for the optimal performance." << endl;
+      LOG_WARN << "NOTE:    As a general rule-of-thumb, please assign at least 200-1000 "
+          "alignment patterns per thread." << endl;
+
+      if (stats.min_thread_sites < 50 && !instance.opts.force_mode)
+        throw runtime_error("Too few patterns per thread! "
+                            "RAxML-NG will terminate now to avoid wasting resources.\n"
+                            "NOTE:  Please reduce the number of threads (see guidelines above).\n"
+                            "NOTE:  This check can be disabled with the '--force' option.");
+    }
+  }
+
   /* generate bootstrap replicates */
   generate_bootstraps(instance, cm.checkpoint());
 
