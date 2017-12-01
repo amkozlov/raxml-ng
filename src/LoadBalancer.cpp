@@ -83,7 +83,8 @@ PartitionAssignmentList KassianLoadBalancer::compute_assignments(const Partition
     total_sites += range.length;
   }
 
-  size_t max_sites = (total_sites - 1) / bins.size() + 1;
+  size_t orig_max_sites = (total_sites - 1) / bins.size() + 1;
+  size_t max_sites = orig_max_sites;
   size_t r = (max_sites * bins.size()) - total_sites;
   size_t target_full_bins = bins.size() - r;
   size_t curr_part = 0; // index in sorted_partitons (AND NOT IN _partitions)
@@ -121,16 +122,17 @@ PartitionAssignmentList KassianLoadBalancer::compute_assignments(const Partition
   stack<PartitionAssignment *> qlow_;
   stack<PartitionAssignment *> *qlow = &qlow_; // hack to assign qhigh to qlow when qlow is empty
   stack<PartitionAssignment *> qhigh;
-  for (unsigned int i = 0; i < current_bin; ++i)
+  for (unsigned int i = 0; i < bins.size(); ++i)
   {
-    if (!full[i])
+    if (bins[i].weight() >= max_sites)
+    {
+      full[i] = true;
+    }
+    else if (i < current_bin)
     {
       qhigh.push(&bins[i]);
     }
-  }
-  for (unsigned int i = current_bin; i < bins.size(); ++i)
-  {
-    if (!full[i])
+    else
     {
       qlow->push(&bins[i]);
     }
@@ -186,6 +188,8 @@ PartitionAssignmentList KassianLoadBalancer::compute_assignments(const Partition
       }
     }
   }
+
+  assert(orig_max_sites - max_sites <= 1);
 
   return bins;
 }

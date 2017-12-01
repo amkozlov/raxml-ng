@@ -27,6 +27,7 @@ static void check_assignment_kassian(const PartitionAssignment& part_sizes,
 
       const auto& part = part_sizes[pid];
       EXPECT_LE(range.length, part.length);
+      EXPECT_GT(range.length, 0);
       EXPECT_LT(range.start, part.length);
     }
   }
@@ -41,6 +42,22 @@ TEST(LoadBalanceTest, testSMALL)
   part_sizes.assign_sites(1, 0, 124);
   part_sizes.assign_sites(2, 0, 168);
   part_sizes.assign_sites(3, 0, 218);
+
+  // tests
+  check_assignment_kassian(part_sizes, 4);
+  check_assignment_kassian(part_sizes, 16);
+  check_assignment_kassian(part_sizes, 32);
+}
+
+TEST(LoadBalanceTest, testSMALL2)
+{
+  // buildup
+  PartitionAssignment part_sizes;
+
+  part_sizes.assign_sites(0, 0, 170);
+  part_sizes.assign_sites(1, 0, 112);
+  part_sizes.assign_sites(2, 0, 171);
+  part_sizes.assign_sites(3, 0, 228);
 
   // tests
   check_assignment_kassian(part_sizes, 4);
