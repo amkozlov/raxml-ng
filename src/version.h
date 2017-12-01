@@ -1,2 +1,2 @@
-#define RAXML_VERSION "0.5.1 BETA"
-#define RAXML_DATE "28.11.2017"
+#define RAXML_VERSION "0.5.1b BETA"
+#define RAXML_DATE "01.12.2017"
