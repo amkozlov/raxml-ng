@@ -132,6 +132,10 @@ void Model::autodetect_data_type(const std::string &model_name)
   {
     if (pllmod_util_model_exists_genotype(model_name.c_str()))
       _data_type = DataType::diploid10;
+    else if (model_name == "BIN")
+    {
+      _data_type = DataType::binary;
+    }
     else if (pllmod_util_model_exists_protein(model_name.c_str()) ||
              pllmod_util_model_exists_protmix(model_name.c_str()))
     {
@@ -165,6 +169,10 @@ pllmod_mixture_model_t * Model::init_mix_model(const std::string &model_name)
     else if (_data_type == DataType::dna)
     {
       modinfo =  pllmod_util_model_info_dna(model_cstr);
+    }
+    else if (_data_type == DataType::binary)
+    {
+      modinfo =  pllmod_util_model_create_custom("BIN", 2, NULL, NULL, NULL, NULL);
     }
     else if (_data_type == DataType::diploid10)
     {

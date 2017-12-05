@@ -191,7 +191,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.data_type = DataType::dna;
         else if (strcasecmp(optarg, "aa") == 0)
           opts.data_type = DataType::protein;
-        else if (strcasecmp(optarg, "binary") == 0)
+        else if (strcasecmp(optarg, "binary") == 0 || strcasecmp(optarg, "bin") == 0)
           opts.data_type = DataType::binary;
         else if (strcasecmp(optarg, "diploid10") == 0)
           opts.data_type = DataType::diploid10;
@@ -520,8 +520,8 @@ void CommandLineParser::print_help()
             "  --tree         FILE | rand{N} | pars{N}    starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
             "                                             N = number of trees (default: 20 in 'all-in-one' mode, 1 otherwise)\n"
             "  --msa          FILE                        alignment file\n"
-            "  --msa-format   VALUE                       alignment file type: FASTA, PHYLIP, VCF, CATG or AUTO-detect (default)\n"
-            "  --data-type    VALUE                       data type: DNA, AA, MULTI-state or AUTO-detect (default)\n"
+            "  --msa-format   VALUE                       alignment file type: FASTA, PHYLIP, CATG or AUTO-detect (default)\n"
+            "  --data-type    VALUE                       data type: DNA, AA, BIN(ary) or AUTO-detect (default)\n"
             "  --prefix       STRING                      prefix for output files (default: MSA file name)\n"
             "  --log          VALUE                       log verbosity: ERROR,WARNING,INFO,PROGRESS,DEBUG (default: PROGRESS)\n"
             "  --redo                                     overwrite existing result files and ignore checkpoints (default: OFF)\n"

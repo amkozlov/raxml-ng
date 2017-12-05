@@ -979,6 +979,16 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
     const Tree& tree = instance.random_tree;
     treeinfo.reset(new TreeInfo(opts, tree, master_msa, bs_part_assign, bs.site_weights));
 
+//    size_t sumw = 0;
+//    for (auto sw: bs.site_weights)
+//      for (auto w: sw)
+//      {
+//        sumw += w;
+//        LOG_INFO << w << "  ";
+//      }
+//
+//    LOG_INFO << "\n\nTotal BS sites: " << sumw << endl;
+
     Optimizer optimizer(opts);
     optimizer.optimize_topology(*treeinfo, cm);
 
@@ -1056,7 +1066,8 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   /* generate bootstrap replicates */
   generate_bootstraps(instance, cm.checkpoint());
 
-  instance.opts.remove_result_files();
+  if (ParallelContext::master_rank())
+    instance.opts.remove_result_files();
 
   thread_main(instance, cm);
 
