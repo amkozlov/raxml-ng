@@ -29,6 +29,7 @@ public:
   void append(const std::string& sequence, const std::string& header = "");
   void compress_patterns(const unsigned int * charmap);
 
+  bool empty() const { return _sequences.empty(); }
   size_t size() const { return _sequences.size(); }
   size_t length() const { return _length; }
   size_t num_sites() const { return _num_sites; }
@@ -37,6 +38,7 @@ public:
   const NameIdMap& label_id_map() const { return _label_id_map; }
   const pll_msa_t * pll_msa() const;
 
+  const container& labels() const { return _labels; };
   const std::string& label(size_t index) const { return _labels.at(index); }
   const std::string& at(const std::string& label) const
   { return _sequences.at(_label_id_map.at(label)); }
@@ -56,6 +58,9 @@ public:
   doubleVector state_freqs() const;
 
   void num_sites(const unsigned int sites) { _num_sites = sites; }
+  void weights(const WeightVector& v) { _weights = v; }
+  void weights(WeightVector&& v) { _weights = std::move(v); }
+
   void remove_sites(const std::vector<size_t>& site_indices);
 
   //Iterator Compatibility

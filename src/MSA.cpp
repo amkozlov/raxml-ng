@@ -93,7 +93,8 @@ void MSA::append(const string& sequence, const string& header)
     _length = sequence.length();
     if (!_num_sites)
       _num_sites = _length;
-    _weights.assign(_length, 1.);
+    if (_weights.empty())
+      _weights.assign(_length, 1.);
   }
 
   _dirty = true;
@@ -115,6 +116,11 @@ void MSA::compress_patterns(const unsigned int * charmap)
 
   _length = _pll_msa->length;
   _weights = WeightVector(w, w + _pll_msa->length);
+
+  for (auto& entry : _sequences)
+  {
+    entry.resize(_length);
+  }
 
   _dirty = false;
 }

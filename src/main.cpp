@@ -79,8 +79,32 @@ void init_part_info(RaxmlInstance& instance)
   auto& opts = instance.opts;
   auto& parted_msa = instance.parted_msa;
 
+  /* check if we have a binary input file */
+  if (opts.msa_format == FileFormat::binary ||
+      (opts.msa_format == FileFormat::autodetect && RBAStream::rba_file(opts.msa_file)))
+  {
+    LOG_INFO_TS << "Loading binary alignment from file: " << opts.msa_file << endl;
+
+    RBAStream bs(opts.msa_file);
+    bs >> parted_msa;
+
+    // binary probMSAs are not supported yet
+    instance.opts.use_prob_msa = false;
+
+    LOG_INFO_TS << "Alignment comprises " << parted_msa.taxon_count() << " taxa, " <<
+        parted_msa.part_count() << " partitions and " <<
+        parted_msa.total_length() << " patterns\n" << endl;
+
+    LOG_INFO << parted_msa;
+
+    LOG_INFO << endl;
+
+    if (opts.start_tree == StartingTree::parsimony && parted_msa.part_count() > 1)
+      throw runtime_error("Parsimony starting trees are not yet supported for partitioned binary "
+          "aligments.\nNOTE:  Please use PHYLIP/FASTA alignment files to generate parsimony starting trees.");
+  }
   /* check if model is a file */
-  if (sysutil_file_exists(opts.model_file))
+  else if (sysutil_file_exists(opts.model_file))
   {
     // read partition definitions from file
     RaxmlPartitionStream partfile(opts.model_file, ios::in);
@@ -88,11 +112,13 @@ void init_part_info(RaxmlInstance& instance)
 
 //    DBG("partitions found: %d\n", useropt->part_count);
   }
-  else
+  else if (!opts.model_file.empty())
   {
     // create and init single pseudo-partition
     parted_msa.emplace_part_info("noname", opts.data_type, opts.model_file);
   }
+  else
+    throw runtime_error("Please specify an evolutionary model with --model switch");
 
   /* make sure that linked branch length mode is set for unpartitioned alignments */
   if (parted_msa.part_count() == 1)
@@ -130,8 +156,9 @@ void check_msa(RaxmlInstance& instance)
 
   const auto& full_msa = instance.parted_msa.full_msa();
   const auto pll_msa = full_msa.pll_msa();
+  const auto taxon_count = instance.parted_msa.taxon_count();
 
-  if (full_msa.size() < 4)
+  if (taxon_count < 4)
   {
     throw runtime_error("Your alignment contains less than 4 sequences!");
   }
@@ -227,7 +254,7 @@ void check_msa(RaxmlInstance& instance)
   }
 
 
-  if (total_gap_cols > 0 || !gap_seqs.empty() > 0)
+  if (total_gap_cols > 0 || !gap_seqs.empty())
   {
     // save reduced MSA and partition files
     auto reduced_msa_fname = instance.opts.output_fname("reduced.phy");
@@ -251,7 +278,7 @@ void check_msa(RaxmlInstance& instance)
     }
   }
 
-  if (full_msa.size() > RAXML_RATESCALERS_TAXA && !instance.opts.use_rate_scalers)
+  if (taxon_count > RAXML_RATESCALERS_TAXA && !instance.opts.use_rate_scalers)
   {
     LOG_INFO << "\nNOTE: Per-rate scalers were automatically enabled to prevent numerical issues "
         "on taxa-rich alignments.\n";
@@ -282,13 +309,14 @@ void check_models(const RaxmlInstance& instance)
     // check for zero state frequencies
     if (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::empirical)
     {
-      for (unsigned int i = 0; i < stats->states; ++i)
+      const auto& freqs = stats.emp_base_freqs;
+      for (unsigned int i = 0; i < freqs.size(); ++i)
       {
-        if (!(stats->freqs[i] > 0.))
+        if (!(freqs[i] > 0.))
         {
           LOG_ERROR << "\nBase frequencies: ";
-          for (unsigned int j = 0; j < stats->states; ++j)
-            LOG_ERROR << stats->freqs[j] <<  " ";
+          for (unsigned int j = 0; j < freqs.size(); ++j)
+            LOG_ERROR << freqs[j] <<  " ";
           LOG_ERROR << endl;
 
           throw runtime_error("Frequency of state " + to_string(i) +
@@ -300,29 +328,29 @@ void check_models(const RaxmlInstance& instance)
     }
 
     // check partitions which contain invariant sites and have ascertainment bias enabled
-    if (model.ascbias_type() != AscBiasCorrection::none && stats->inv_cols_count > 0)
+    if (model.ascbias_type() != AscBiasCorrection::none && stats.inv_count > 0)
     {
       throw runtime_error("You enabled ascertainment bias correction for partition " +
                            pinfo.name() + ", but it contains " +
-                           to_string(stats->inv_cols_count) + " invariant sites.\n"
+                           to_string(stats.inv_count) + " invariant sites.\n"
                           "This is not allowed! Please either remove invariant sites or "
                           "disable ascertainment bias correction.");
     }
   }
 }
 
-void check_tree(const MSA& msa, const Tree& tree)
+void check_tree(const PartitionedMSA& msa, const Tree& tree)
 {
   auto missing_taxa = 0;
   auto duplicate_taxa = 0;
 
-  if (msa.size() > tree.num_tips())
+  if (msa.taxon_count() > tree.num_tips())
     throw runtime_error("Alignment file contains more sequences than expected");
-  else if (msa.size() != tree.num_tips())
+  else if (msa.taxon_count() != tree.num_tips())
     throw runtime_error("Some taxa are missing from the alignment file");
 
   unordered_set<string> tree_labels;
-  unordered_set<string> msa_labels(msa.label_cbegin(), msa.label_cend());
+  unordered_set<string> msa_labels(msa.taxon_names().cbegin(), msa.taxon_names().cend());
 
   for (const auto& tip: tree.tip_labels())
   {
@@ -412,6 +440,21 @@ void load_msa(RaxmlInstance& instance)
   LOG_INFO << parted_msa;
 
   LOG_INFO << endl;
+
+  if (!instance.opts.use_prob_msa)
+  {
+    auto binary_msa_fname = instance.opts.binary_msa_file();
+    if (sysutil_file_exists(binary_msa_fname) && !opts.redo_mode)
+    {
+      LOG_INFO << "NOTE: Binary MSA file already exists: " << binary_msa_fname << endl << endl;
+    }
+    else
+    {
+      RBAStream bs(binary_msa_fname);
+      bs << parted_msa;
+      LOG_INFO << "NOTE: Binary MSA file created: " << binary_msa_fname << endl << endl;
+    }
+  }
 }
 
 Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
@@ -420,7 +463,6 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
 
   const auto& opts = instance.opts;
   const auto& parted_msa = instance.parted_msa;
-  const auto& msa = parted_msa.full_msa();
 
   switch (type)
   {
@@ -435,21 +477,23 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
       LOG_DEBUG << "Loaded user starting tree with " << tree.num_tips() << " taxa from: "
                            << opts.tree_file << endl;
 
-      check_tree(msa, tree);
+      check_tree(parted_msa, tree);
 
       break;
     }
     case StartingTree::random:
       /* no starting tree provided, generate a random one */
 
-      LOG_DEBUG << "Generating a random starting tree with " << msa.size() << " taxa" << endl;
+      LOG_DEBUG << "Generating a random starting tree with " << parted_msa.taxon_count()
+                << " taxa" << endl;
 
-      tree = Tree::buildRandom(msa);
+      tree = Tree::buildRandom(parted_msa.taxon_names());
 
       break;
     case StartingTree::parsimony:
     {
-      LOG_DEBUG << "Generating a parsimony starting tree with " << msa.size() << " taxa" << endl;
+      LOG_DEBUG << "Generating a parsimony starting tree with " << parted_msa.taxon_count()
+                << " taxa" << endl;
 
       unsigned int score;
       tree = Tree::buildParsimony(parted_msa, rand(), opts.simd_arch, &score);
@@ -500,7 +544,6 @@ void build_start_trees(RaxmlInstance& instance, CheckpointManager& cm)
 {
   const auto& opts = instance.opts;
   const auto& parted_msa = instance.parted_msa;
-  const auto& msa = parted_msa.full_msa();
 
   switch (opts.start_tree)
   {
@@ -511,10 +554,12 @@ void build_start_trees(RaxmlInstance& instance, CheckpointManager& cm)
       instance.start_tree_stream.reset(new NewickStream(opts.tree_file, std::ios::in));
       break;
     case StartingTree::random:
-      LOG_INFO_TS << "Generating random starting tree(s) with " << msa.size() << " taxa" << endl;
+      LOG_INFO_TS << "Generating random starting tree(s) with " << parted_msa.taxon_count() <<
+                     " taxa" << endl;
       break;
     case StartingTree::parsimony:
-      LOG_INFO_TS << "Generating parsimony starting tree(s) with " << msa.size() << " taxa" << endl;
+      LOG_INFO_TS << "Generating parsimony starting tree(s) with " << parted_msa.taxon_count()
+                  << " taxa" << endl;
       break;
     default:
       assert(0);
@@ -539,7 +584,8 @@ void build_start_trees(RaxmlInstance& instance, CheckpointManager& cm)
     tree.fix_missing_brlens();
 
     /* make sure tip indices are consistent between MSA and pll_tree */
-    tree.reset_tip_ids(msa.label_id_map());
+    assert(!parted_msa.taxon_id_map().empty());
+    tree.reset_tip_ids(parted_msa.taxon_id_map());
 
     instance.start_trees.emplace_back(move(tree));
   }
@@ -1011,7 +1057,8 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   init_part_info(instance);
 
-  load_msa(instance);
+  if (instance.parted_msa.part_info(0).msa().empty())
+    load_msa(instance);
 
   // we need 2 doubles for each partition AND threads to perform parallel reduction,
   // so resize the buffer accordingly

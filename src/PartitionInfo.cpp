@@ -6,8 +6,6 @@ using namespace std;
 
 PartitionInfo::~PartitionInfo ()
 {
-  if (_stats)
-    pllmod_msa_destroy_stats(_stats);
 }
 
 size_t PartitionInfo::mark_partition_sites(unsigned int part_num, std::vector<unsigned int>& site_part)
@@ -91,9 +89,9 @@ pllmod_msa_stats_t * PartitionInfo::compute_stats(unsigned long stats_mask) cons
   return stats;
 }
 
-const pllmod_msa_stats_t * PartitionInfo::stats() const
+const PartitionStats& PartitionInfo::stats() const
 {
-  if (!_stats)
+  if (_stats.empty() && !_msa.empty())
   {
     unsigned long stats_mask = PLLMOD_MSA_STATS_GAP_PROP;
     stats_mask |= PLLMOD_MSA_STATS_FREQS;
@@ -103,14 +101,85 @@ const pllmod_msa_stats_t * PartitionInfo::stats() const
     if (_model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::empirical)
       stats_mask |= PLLMOD_MSA_STATS_SUBST_RATES;
 
-    _stats = compute_stats(stats_mask);
+    auto pll_stats = compute_stats(stats_mask);
+    auto states = _model.num_states();
+
+    _stats.site_count = _msa.num_sites();
+    _stats.pattern_count = _msa.num_patterns();
+    _stats.inv_count = pll_stats->inv_cols_count;
+    _stats.gap_prop = pll_stats->gap_prop;
+    _stats.emp_base_freqs.assign(pll_stats->freqs, pll_stats->freqs + states);
+
+    if (pll_stats->subst_rates)
+    {
+      _stats.emp_subst_rates.assign(pll_stats->subst_rates,
+                                    pll_stats->subst_rates + pllmod_util_subst_rate_count(states));
+    }
+
+    pllmod_msa_destroy_stats(pll_stats);
   }
 
   return _stats;
 };
 
-
 void PartitionInfo::set_model_empirical_params()
 {
   assign(_model, stats());
+}
+
+void assign(Model& model, const PartitionStats& stats)
+{
+  /* either compute empirical P-inv, or set the fixed user-specified value */
+  switch (model.param_mode(PLLMOD_OPT_PARAM_PINV))
+  {
+    case ParamValue::empirical:
+      model.pinv(stats.inv_prop());
+      break;
+    case ParamValue::ML:
+      /* use half of empirical pinv as a starting value */
+      model.pinv(stats.inv_prop() / 2);
+      break;
+    case ParamValue::user:
+    case ParamValue::undefined:
+      /* nothing to do here */
+      break;
+    default:
+      assert(0);
+  }
+
+   /* assign empirical base frequencies */
+  switch (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES))
+  {
+    case ParamValue::empirical:
+      assert(stats.emp_base_freqs.size() == model.num_states());
+      model.base_freqs(stats.emp_base_freqs);
+      break;
+    case ParamValue::user:
+    case ParamValue::equal:
+    case ParamValue::ML:
+    case ParamValue::model:
+      /* nothing to do here */
+      break;
+    default:
+      assert(0);
+  }
+
+  /* assign empirical substitution rates */
+  switch (model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES))
+  {
+    case ParamValue::empirical:
+    {
+      assert(stats.emp_subst_rates.size() == pllmod_util_subst_rate_count(model.num_states()));
+      model.subst_rates(stats.emp_subst_rates);
+      break;
+    }
+    case ParamValue::equal:
+    case ParamValue::user:
+    case ParamValue::ML:
+    case ParamValue::model:
+      /* nothing to do here */
+      break;
+    default:
+      assert(0);
+  }
 }

@@ -25,6 +25,7 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.bootstrap_trees, "bootstraps");
   set_default_outfile(outfile_names.support_tree, "support");
   set_default_outfile(outfile_names.terrace, "terrace");
+  set_default_outfile(outfile_names.binary_msa, "rba");
 }
 
 bool Options::result_files_exist() const

@@ -6,9 +6,8 @@
 class PartitionedMSA
 {
 public:
-  PartitionedMSA () {};
-  virtual
-  ~PartitionedMSA ();
+  PartitionedMSA() {};
+  PartitionedMSA(const NameList& taxon_names);
 
   // copy/move constructors and assignments
   PartitionedMSA (PartitionedMSA&& other) = default;
@@ -16,15 +15,21 @@ public:
 
   // getters
   const MSA& full_msa() const { return (part_count() == 1) ? _part_list.at(0).msa() : _full_msa; };
-  size_t part_count() const { return _part_list.size(); };
   const PartitionInfo& part_info(size_t index) const { return _part_list.at(index); };
   const Model& model(size_t index) const { return _part_list.at(index).model(); };
   const std::vector<PartitionInfo>& part_list() const { return _part_list; };
   std::vector<PartitionInfo>& part_list() { return _part_list; };
+  const NameList& taxon_names()  const { return _taxon_names; };
+  const NameIdMap& taxon_id_map() const { return _taxon_id_map; }
+
+  size_t taxon_count() const { return _taxon_names.size(); };
+  size_t part_count() const { return _part_list.size(); };
+  size_t total_sites() const;
+  size_t total_patterns() const;
   size_t total_length() const;
 
   // setters
-  void full_msa(MSA&& msa) { _full_msa = std::move(msa); };
+  void full_msa(MSA&& msa);
   void part_msa(size_t index, MSA&& msa) { _part_list.at(index).msa(std::move(msa)); };
   void part_msa(size_t index, const pll_msa_t * pll_msa)
   {
@@ -49,8 +54,11 @@ public:
 private:
   std::vector<PartitionInfo> _part_list;
   MSA _full_msa;
+  NameList _taxon_names;
+  NameIdMap _taxon_id_map;
 
   std::vector<unsigned int> get_site_part_assignment();
+  void set_taxon_names(const NameList& taxon_names);
 };
 
 std::ostream& operator<<(std::ostream& stream, const PartitionedMSA& part_msa);

@@ -7,16 +7,41 @@
 
 class Options;
 
+struct PartitionStats
+{
+  size_t site_count;
+  size_t pattern_count;
+  size_t inv_count;
+  double gap_prop;
+  doubleVector emp_base_freqs;
+  doubleVector emp_subst_rates;
+
+  double inv_prop() const { return site_count > 0 ? ((double) inv_count) / site_count : 0.;  };
+  bool empty() const { return site_count == 0; }
+
+  PartitionStats() : site_count(0), pattern_count(0), inv_count(0), gap_prop(0.),
+      emp_base_freqs(), emp_subst_rates() {}
+
+  PartitionStats(const PartitionStats& other) : site_count(other.site_count),
+      pattern_count(other.pattern_count), inv_count(other.inv_count), gap_prop(other.gap_prop),
+      emp_base_freqs(other.emp_base_freqs), emp_subst_rates(other.emp_subst_rates) {}
+};
+
 class PartitionInfo
 {
 public:
   PartitionInfo () :
-    _name(""), _range_string(""), _model(), _msa(), _stats(nullptr) {};
+    _name(""), _range_string(""), _model(), _msa(), _stats() {};
 
   PartitionInfo (const std::string &name, DataType data_type,
                  const std::string &model_string, const std::string &range_string = "") :
     _name(name), _range_string(range_string), _model(data_type, model_string), _msa(),
-    _stats(nullptr) {};
+    _stats() {};
+
+  PartitionInfo (const std::string &name, const PartitionStats &stats,
+                 const Model &model, const std::string &range_string = "") :
+    _name(name), _range_string(range_string), _model(model), _msa(),
+    _stats(stats) {};
 
   virtual ~PartitionInfo ();
 
@@ -26,8 +51,8 @@ public:
     _range_string = std::move(other._range_string);
     _model = std::move(other._model);
     _msa = std::move(other._msa);
-    _stats = other._stats;
-    other._stats = nullptr;
+    _stats = std::move(other._stats);
+    other._stats = PartitionStats();
   }
 
   // getters
@@ -37,7 +62,7 @@ public:
   const std::string& range_string() const { return _range_string; };
   const MSA& msa() const { return _msa; };
   MSA& msa() { return _msa; };
-  const pllmod_msa_stats_t * stats() const;
+  const PartitionStats& stats() const;
   pllmod_msa_stats_t * compute_stats(unsigned long stats_mask) const;
 
   // setters
@@ -57,7 +82,7 @@ private:
   std::string _range_string;
   Model _model;
   MSA _msa;
-  mutable pllmod_msa_stats_t * _stats;
+  mutable PartitionStats _stats;
 };
 
 
@@ -115,6 +140,8 @@ public:
 private:
   std::vector<size_t> _unassigned_sites;
 };
+
+void assign(Model& model, const PartitionStats& stats);
 
 
 #endif /* RAXML_PARTITIONINFO_HPP_ */

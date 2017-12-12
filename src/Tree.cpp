@@ -66,9 +66,13 @@ Tree Tree::buildRandom(size_t num_tips, const char * const* tip_labels)
   return tree;
 }
 
-Tree Tree::buildRandom(const MSA& msa)
+Tree Tree::buildRandom(const NameList& taxon_names)
 {
-  return Tree::buildRandom(msa.size(), (const char * const*) msa.pll_msa()->label);
+  std::vector<const char*> tip_labels(taxon_names.size(), nullptr);
+  for (size_t i = 0; i < taxon_names.size(); ++i)
+    tip_labels[i] = taxon_names[i].data();
+
+  return Tree::buildRandom(taxon_names.size(), (const char * const*) tip_labels.data());
 }
 
 Tree Tree::buildParsimony(const PartitionedMSA& parted_msa, unsigned int random_seed,
@@ -80,17 +84,25 @@ Tree Tree::buildParsimony(const PartitionedMSA& parted_msa, unsigned int random_
 
   const MSA& msa = parted_msa.full_msa();
 
+  // TODO: adapt for multi-partition datasets
+  assert(msa.length() == parted_msa.total_length());
+
+  auto taxon_names = parted_msa.taxon_names();
+  std::vector<const char*> tip_labels(taxon_names.size(), nullptr);
+  for (size_t i = 0; i < taxon_names.size(); ++i)
+    tip_labels[i] = taxon_names[i].data();
+
   // temporary workaround
   unsigned int num_states = parted_msa.model(0).num_states();
   const unsigned int * map = parted_msa.model(0).charmap();
   const unsigned int * weights = msa.weights().empty() ? nullptr : msa.weights().data();
 
-  tree._num_tips = msa.size();
+  tree._num_tips = parted_msa.taxon_count();
 
 
   tree._pll_utree = pllmod_utree_create_parsimony(msa.size(),
                                                   msa.length(),
-                                                  msa.pll_msa()->label,
+                                                  (char**) tip_labels.data(),
                                                   msa.pll_msa()->sequence,
                                                   weights,
                                                   map,

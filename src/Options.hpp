@@ -15,6 +15,7 @@ struct OutputFileNames
   std::string bootstrap_trees;
   std::string support_tree;
   std::string terrace;
+  std::string binary_msa;
 };
 
 class Options
@@ -89,6 +90,7 @@ public:
   const std::string& bootstrap_trees_file() const { return outfile_names.bootstrap_trees; }
   const std::string& support_tree_file() const { return outfile_names.support_tree; }
   const std::string& terrace_file() const { return outfile_names.terrace; }
+  const std::string& binary_msa_file() const { return outfile_names.binary_msa; }
 
   void set_default_outfiles();
 

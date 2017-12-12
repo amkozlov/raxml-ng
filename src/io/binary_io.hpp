@@ -4,6 +4,16 @@
 #include "../Model.hpp"
 #include "../Tree.hpp"
 
+enum class ModelBinaryFmt
+{
+  full = 0,
+  def,
+  params,
+  paramsML
+};
+
+typedef std::tuple<const Model&, ModelBinaryFmt> BinaryModel;
+
 class BasicBinaryStream
 {
 public:
@@ -21,7 +31,7 @@ public:
   void get(void *data, size_t size) { read(data, size); };
   void put(const void *data, size_t size) { write(data, size); };
 
-protected:
+public:
   virtual void read(void *data, size_t size) = 0;
   virtual void write(const void *data, size_t size) = 0;
 };
@@ -51,7 +61,7 @@ public:
   size_t pos() const { return _ptr - _buf;}
   char* reset() { _ptr = _buf; return _buf; }
 
-protected:
+public:
   void write(const void *data, size_t size)
   {
     if (_ptr + size > _buf + _size)
@@ -82,13 +92,15 @@ public:
   BinaryFileStream(const std::string fname, std::ios_base::openmode mode) :
     _fstream(fname, std::ios::binary | mode) {}
 
-protected:
+public:
   void write(const void *data, size_t size) { _fstream.write((char*) data, size); }
   void read(void *data, size_t size) { _fstream.read((char*) data, size); }
 
 private:
   std::fstream _fstream;
 };
+
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const std::string& s);
 
 template<typename T>
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, T v)
@@ -111,6 +123,7 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const std::vector<T>& v
 /**
  *  Reading
  */
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::string& s);
 
 template<typename T>
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, T& v)
@@ -135,21 +148,28 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::vector<T>& vec)
   return stream;
 }
 
-//BinaryStream& operator>>(BinaryStream& stream, SubstitutionModel& sm)
-//{
-//  stream >> sm.base_freqs();
-//  stream >> sm.subst_rates();
-//
-//  return stream;
-//}
-
 /**
  * Model I/O
  */
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const SubstitutionModel& sm);
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Model& m);
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, std::tuple<const Model&, ModelBinaryFmt> bm);
 
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, Model& m);
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::tuple<Model&, ModelBinaryFmt> bm);
+
+/**
+ * Partition I/O
+ */
+
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const PartitionStats& ps);
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, PartitionStats& ps);
+
+/**
+ * MSA I/O
+ */
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const MSA& m);
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, MSA& m);
 
 /**
  * TreeCollection I/O

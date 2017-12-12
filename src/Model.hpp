@@ -180,7 +180,6 @@ private:
   void init_model_opts(const std::string& model_opts, const pllmod_mixture_model_t& mix_model);
 };
 
-void assign(Model& model, const pllmod_msa_stats_t * stats);
 void assign(Model& model, const pll_partition_t * partition);
 void assign(pll_partition_t * partition, const Model& model);
 

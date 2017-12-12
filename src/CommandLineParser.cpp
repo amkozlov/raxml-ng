@@ -428,14 +428,6 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       throw OptionException("You must specify a multiple alignment file with --msa switch");
   }
 
-  if (opts.command == Command::evaluate || opts.command == Command::search ||
-      opts.command == Command::bootstrap || opts.command == Command::all ||
-      opts.command == Command::terrace)
-  {
-    if (opts.model_file.empty())
-      throw OptionException("You must specify an evolutionary model with --model switch");
-  }
-
   if (opts.command == Command::evaluate || opts.command == Command::support ||
       opts.command == Command::terrace)
   {
