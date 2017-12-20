@@ -14,7 +14,7 @@ const unordered_map<DataType,unsigned int,EnumClassHash>  DATATYPE_STATES { {Dat
                                                                             {DataType::diploid10, 10}
                                                                           };
 
-const unordered_map<DataType, const unsigned int *,EnumClassHash>  DATATYPE_MAPS {
+const unordered_map<DataType,const pll_state_t*,EnumClassHash>  DATATYPE_MAPS {
   {DataType::dna, pll_map_nt},
   {DataType::protein, pll_map_aa},
   {DataType::binary, pll_map_bin},
@@ -101,7 +101,7 @@ Model::Model (DataType data_type, const std::string &model_string) :
   init_from_string(model_string_tmp);
 }
 
-const unsigned int * Model::charmap() const
+const pll_state_t * Model::charmap() const
 {
   return DATATYPE_MAPS.at(_data_type);
 }
@@ -131,7 +131,9 @@ void Model::autodetect_data_type(const std::string &model_name)
   if (_data_type == DataType::autodetect)
   {
     if (pllmod_util_model_exists_genotype(model_name.c_str()))
+    {
       _data_type = DataType::diploid10;
+    }
     else if (model_name == "BIN")
     {
       _data_type = DataType::binary;

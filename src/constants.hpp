@@ -5,7 +5,7 @@
  * 16  = A/C = M  | 32  = A/G = R | 64   = A/T = W | 128 = C/G = S
  * 256 = C/T = Y  | 512 = G/T = K | 1023 = -/- = N                  */
 
-const unsigned int pll_map_diploid10[256] =
+const pll_state_t pll_map_diploid10[256] =
  {
    0,  0,   0,   0,  0,  0,  0,    0,    0,   0,  0,   0,  0,    0,    0,    0,
    0,  0,   0,   0,  0,  0,  0,    0,    0,   0,  0,   0,  0,    0,    0,    0,

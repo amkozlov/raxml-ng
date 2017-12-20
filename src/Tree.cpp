@@ -94,7 +94,7 @@ Tree Tree::buildParsimony(const PartitionedMSA& parted_msa, unsigned int random_
 
   // temporary workaround
   unsigned int num_states = parted_msa.model(0).num_states();
-  const unsigned int * map = parted_msa.model(0).charmap();
+  auto map = parted_msa.model(0).charmap();
   const unsigned int * weights = msa.weights().empty() ? nullptr : msa.weights().data();
 
   tree._num_tips = parted_msa.taxon_count();

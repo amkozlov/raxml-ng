@@ -140,7 +140,7 @@ double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor
     LOG_DEBUG << "\t - after brlen: logLH = " << new_loglh << endl;
 
     if (pll_errno)
-      throw runtime_error("ERROR in branch lenght optimization: " + string(pll_errmsg));
+      throw runtime_error("ERROR in branch length optimization: " + string(pll_errmsg));
   }
 
   /* optimize brlen scalers, if needed */
@@ -360,7 +360,7 @@ void build_clv(ProbVector::const_iterator probs, size_t sites, WeightVector::con
 }
 
 void set_partition_tips(const Options& opts, const MSA& msa, const PartitionRange& part_region,
-                        pll_partition_t* partition, const unsigned int * charmap)
+                        pll_partition_t* partition, const pll_state_t * charmap)
 {
   /* set pattern weights */
   if (!msa.weights().empty())
@@ -394,7 +394,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const PartitionRang
 }
 
 void set_partition_tips(const Options& opts, const MSA& msa, const PartitionRange& part_region,
-                        pll_partition_t* partition, const unsigned int * charmap,
+                        pll_partition_t* partition, const pll_state_t * charmap,
                         const WeightVector& weights)
 {
   assert(!weights.empty());

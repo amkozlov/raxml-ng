@@ -100,7 +100,7 @@ void MSA::append(const string& sequence, const string& header)
   _dirty = true;
 }
 
-void MSA::compress_patterns(const unsigned int * charmap)
+void MSA::compress_patterns(const pll_state_t * charmap)
 {
   update_pll_msa();
 

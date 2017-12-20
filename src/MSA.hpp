@@ -27,7 +27,7 @@ public:
   MSA& operator=(const MSA& other) = delete;
 
   void append(const std::string& sequence, const std::string& header = "");
-  void compress_patterns(const unsigned int * charmap);
+  void compress_patterns(const pll_state_t * charmap);
 
   bool empty() const { return _sequences.empty(); }
   size_t size() const { return _sequences.size(); }
