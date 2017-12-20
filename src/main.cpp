@@ -496,7 +496,12 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
                 << " taxa" << endl;
 
       unsigned int score;
-      tree = Tree::buildParsimony(parted_msa, rand(), opts.simd_arch, &score);
+      unsigned int attrs = opts.simd_arch;
+
+      // TODO: check if there is any reason not to use tip-inner
+      attrs |= PLL_ATTRIB_PATTERN_TIP;
+
+      tree = Tree::buildParsimony(parted_msa, rand(), attrs, &score);
 
       LOG_DEBUG << "Parsimony score of the starting tree: " << score << endl;
 
