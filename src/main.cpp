@@ -1095,19 +1095,27 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   if (ParallelContext::master_rank() && ParallelContext::num_procs() > 1)
   {
     PartitionAssignmentStats stats(instance.proc_part_assign);
-    const size_t min_thread_pats = ParallelContext::num_threads() > 8 ? 500 : 150;
-    if (stats.min_thread_sites < min_thread_pats)
+
+    const size_t soft_limit = 600;
+    const size_t hard_limit = 150;
+
+    // TODO: adapt for mixed alignments (e.g., DNA + AA partitions)
+    auto states = parted_msa.part_info(0).model().num_states();
+    const size_t norm_thread_pats = stats.min_thread_sites * (states / 4) *
+        (ParallelContext::num_threads() < 8 ? 3 : 1);
+    if (norm_thread_pats < soft_limit)
     {
-      size_t opt_threads = trunc(stats.total_sites / (min_thread_pats*2)) + 1;
+      size_t opt_threads = trunc(stats.total_sites / (soft_limit*2)) + 1;
       LOG_WARN << endl;
-      LOG_WARN << "WARNING: You are using too many threads (" << ParallelContext::num_threads() <<
+      LOG_WARN << "WARNING: You are probably using too many threads (" << ParallelContext::num_threads() <<
           ") for your alignment with " << stats.total_sites << " unique patterns." << endl;
-      LOG_WARN << "NOTE:    Please consider using " << opt_threads <<  " threads ('--threads " <<
-          opt_threads << "' option) for the optimal performance." << endl;
+      LOG_WARN << "NOTE:    For the optimal throughput, please consider using " << opt_threads <<
+          " threads ('--threads " << opt_threads << "' option)" << endl;
+      LOG_WARN << "NOTE:    and parallelize across starting trees/bootstrap replicates." << endl;
       LOG_WARN << "NOTE:    As a general rule-of-thumb, please assign at least 200-1000 "
           "alignment patterns per thread." << endl;
 
-      if (stats.min_thread_sites < 50 && !instance.opts.force_mode)
+      if (norm_thread_pats < hard_limit && !instance.opts.force_mode)
         throw runtime_error("Too few patterns per thread! "
                             "RAxML-NG will terminate now to avoid wasting resources.\n"
                             "NOTE:  Please reduce the number of threads (see guidelines above).\n"

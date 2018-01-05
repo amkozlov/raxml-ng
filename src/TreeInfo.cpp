@@ -456,6 +456,14 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
   const MSA& msa = pinfo.msa();
   const Model& model = pinfo.model();
 
+  /* part_length doesn't include columns with zero weight */
+  const size_t part_length = weights.empty() ? part_region.length :
+                             std::count_if(weights.begin() + part_region.start,
+                                           weights.begin() + part_region.start + part_region.length,
+                                           [](uintVector::value_type w) -> bool
+                                             { return w > 0; }
+                                           );
+
   unsigned int attrs = opts.simd_arch;
 
   if (opts.use_rate_scalers && model.num_ratecats() > 1)
@@ -470,10 +478,14 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
   else if (opts.use_tip_inner)
   {
     assert(!(opts.use_prob_msa));
-    // TODO: use proper auto-tuning
-    const unsigned long min_len_ti = 100;
-    if ((unsigned long) msa.length() > min_len_ti)
-      attrs |= PLL_ATTRIB_PATTERN_TIP;
+    // SSE3 tip-inner kernels are not implemented so far, so generic version will be faster
+    if (opts.simd_arch != PLL_ATTRIB_ARCH_SSE)
+    {
+      // TODO: use proper auto-tuning
+      const unsigned long min_len_ti = model.num_states() > 4 ? 40 : 100;
+      if ((unsigned long) part_length > min_len_ti)
+        attrs |= PLL_ATTRIB_PATTERN_TIP;
+    }
   }
 
   // NOTE: if partition is split among multiple threads, asc. bias correction must be applied only once!
@@ -483,14 +495,6 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
     attrs |=  PLL_ATTRIB_AB_FLAG;
     attrs |= (unsigned int) model.ascbias_type();
   }
-
-  /* part_length doesn't include columns with zero weight */
-  const size_t part_length = weights.empty() ? part_region.length :
-                             std::count_if(weights.begin() + part_region.start,
-                                           weights.begin() + part_region.start + part_region.length,
-                                           [](uintVector::value_type w) -> bool
-                                             { return w > 0; }
-                                           );
 
   BasicTree tree(msa.size());
   pll_partition_t * partition = pll_partition_create(
