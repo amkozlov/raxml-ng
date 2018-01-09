@@ -155,6 +155,7 @@ private:
   std::string _name;
   DataType _data_type;
   unsigned int _num_states;
+  std::shared_ptr<pll_state_t> _custom_charmap;
 
   unsigned int _rate_het;
   unsigned int _num_ratecats;

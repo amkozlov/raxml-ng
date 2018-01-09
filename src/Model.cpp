@@ -93,7 +93,7 @@ static void print_param(ostringstream& s, const std::vector<T>& vec)
 }
 
 Model::Model (DataType data_type, const std::string &model_string) :
-    _data_type(data_type)
+    _data_type(data_type), _custom_charmap(nullptr)
 {
   // RAxML compatibility hack, TODO: generic model name aliases
   const string model_string_tmp = model_string == "DNA" ? "GTR+G+F" : model_string;
@@ -103,7 +103,7 @@ Model::Model (DataType data_type, const std::string &model_string) :
 
 const pll_state_t * Model::charmap() const
 {
-  return DATATYPE_MAPS.at(_data_type);
+  return _custom_charmap ? _custom_charmap.get() : DATATYPE_MAPS.at(_data_type);
 }
 
 void Model::init_from_string(const std::string &model_string)
@@ -115,8 +115,22 @@ void Model::init_from_string(const std::string &model_string)
   /* guess data type */
   autodetect_data_type(model_name);
 
-  /* set number of states based on datatype (unless already set) */
-  _num_states = DATATYPE_STATES.at(_data_type);
+  assert(_data_type != DataType::autodetect);
+
+  /* set number of states based on datatype */
+  if (_data_type == DataType::multistate)
+  {
+    _num_states = pllmod_util_model_numstates_mult(model_name.c_str());
+    _custom_charmap = shared_ptr<pll_state_t>(pllmod_util_model_charmap_mult(_num_states), free);
+    if (!_custom_charmap)
+    {
+      assert(pll_errno);
+      throw runtime_error("Error in model specification (" + model_name +
+                          "): " + string(pll_errmsg));
+    }
+  }
+  else
+    _num_states = DATATYPE_STATES.at(_data_type);
 
   pllmod_mixture_model_t * mix_model = init_mix_model(model_name);
 
@@ -133,6 +147,10 @@ void Model::autodetect_data_type(const std::string &model_name)
     if (pllmod_util_model_exists_genotype(model_name.c_str()))
     {
       _data_type = DataType::diploid10;
+    }
+    else if (pllmod_util_model_exists_mult(model_name.c_str()))
+    {
+      _data_type = DataType::multistate;
     }
     else if (model_name == "BIN")
     {
@@ -180,6 +198,10 @@ pllmod_mixture_model_t * Model::init_mix_model(const std::string &model_name)
     {
       modinfo =  pllmod_util_model_info_genotype(model_cstr);
     }
+    else if (_data_type == DataType::multistate)
+    {
+      modinfo =  pllmod_util_model_info_mult(model_cstr);
+    }
 
     // TODO: user models must be defined explicitly
 //    /* pre-defined model not found; assume model string encodes rate symmetries */
@@ -187,11 +209,19 @@ pllmod_mixture_model_t * Model::init_mix_model(const std::string &model_name)
 //      modinfo =  pllmod_util_model_create_custom("USER", _num_states, NULL, NULL, model_cstr, NULL);
 
     if (!modinfo)
-      throw runtime_error("Invalid model name: " + model_name);
+    {
+      if (pll_errno)
+        throw runtime_error("Error in model initialization (" + model_name +
+                            "): " + string(pll_errmsg));
+      else
+        throw runtime_error("Invalid model name: " + model_name);
+    }
 
     /* create pseudo-mixture with 1 component */
     mix_model = pllmod_util_model_mixture_create(modinfo->name, 1, &modinfo, NULL, NULL,
                                                   PLLMOD_UTIL_MIXTYPE_FIXED);
+
+    pllmod_util_model_destroy(modinfo);
   }
 
   return mix_model;
