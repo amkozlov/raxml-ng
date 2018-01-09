@@ -74,6 +74,42 @@ static bool read_param(istringstream& s, std::vector<T>& vec)
 }
 
 template<typename T>
+static bool read_param_file(istringstream& s, std::vector<T>& vec)
+{
+  if (s.peek() == '{' || s.peek() == '[')
+  {
+    // first, try to interpret parameter value as a file name
+    auto delim = (s.peek() == '{') ? '}' : ']';
+    auto start = s.tellg();
+
+    // consume the opening bracket
+    s.get();
+
+    char fname[1024];
+    s.getline(fname, 1024, delim);
+    if (sysutil_file_exists(fname))
+    {
+      ifstream fs(fname);
+      while (!fs.eof())
+      {
+        T val;
+        fs >> val;
+        if (!fs.fail())
+          vec.push_back(val);
+      }
+      return true;
+    }
+    else
+    {
+      // if it failed, rewind the stream and try to parse as a list of values
+      s.seekg(start);
+      return read_param(s, vec);
+    }
+  }
+  return false;
+}
+
+template<typename T>
 static void print_param(ostringstream& s, T val)
 {
   s << "{" << val << "}";
@@ -267,7 +303,7 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
   try
   {
     doubleVector user_srates;
-    if (read_param(ss, user_srates))
+    if (read_param_file(ss, user_srates))
     {
       // TODO support multi-matrix models
       if (_submodels.size() > 0)
@@ -412,7 +448,7 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
 
               /* for now, read single set of frequencies */
               doubleVector user_freqs;
-              if (read_param(ss, user_freqs))
+              if (read_param_file(ss, user_freqs))
               {
                 if (user_freqs.size() != _num_states)
                 {
