@@ -79,6 +79,11 @@ void init_part_info(RaxmlInstance& instance)
   auto& opts = instance.opts;
   auto& parted_msa = instance.parted_msa;
 
+  if (!sysutil_file_exists(opts.msa_file))
+  {
+    throw runtime_error("Alignment file not found: " + opts.msa_file);
+  }
+
   /* check if we have a binary input file */
   if (opts.msa_format == FileFormat::binary ||
       (opts.msa_format == FileFormat::autodetect && RBAStream::rba_file(opts.msa_file)))
@@ -1101,7 +1106,10 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
     // TODO: adapt for mixed alignments (e.g., DNA + AA partitions)
     auto states = parted_msa.part_info(0).model().num_states();
-    const size_t norm_thread_pats = stats.min_thread_sites * (states / 4) *
+    for (const auto& p: parted_msa.part_list())
+      states = std::max(states, p.model().num_states());
+
+    const size_t norm_thread_pats = stats.min_thread_sites * (((double) states) / 4.) *
         (ParallelContext::num_threads() < 8 ? 3 : 1);
     if (norm_thread_pats < soft_limit)
     {
