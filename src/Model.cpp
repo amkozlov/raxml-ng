@@ -34,6 +34,26 @@ static string read_option(istringstream& s)
   return os.str();
 }
 
+static bool read_param(istringstream& s, string& val)
+{
+  if (s.peek() == '{' || s.peek() == '[')
+  {
+    auto delim = (s.peek() == '{') ? '}' : ']';
+
+    // consume the opening bracket
+    s.get();
+
+    char str[1024];
+    if (!s.getline(str, 1024, delim))
+      throw parse_error();
+    val = str;
+
+    return true;
+  }
+  else
+    return false;
+}
+
 template<typename T>
 static bool read_param(istringstream& s, T& val)
 {
@@ -554,6 +574,40 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
         catch(parse_error& e)
         {
           throw runtime_error(string("Invalid GAMMA specification: ") + s);
+        }
+        break;
+      case 'M':
+        try
+        {
+           std::string state_chars, gap_chars;
+           int case_sensitive = 1;
+
+           if (tolower(ss.peek()) == 'i')
+           {
+             ss.get();
+             case_sensitive = 0;
+           }
+
+           if (!read_param(ss, state_chars))
+             throw parse_error();
+
+           read_param(ss, gap_chars);
+
+           _custom_charmap = shared_ptr<pll_state_t>(
+               pllmod_util_charmap_create(_num_states,
+                                          state_chars.c_str(),
+                                          gap_chars.c_str(),
+                                          case_sensitive),
+               free);
+           if (!_custom_charmap)
+           {
+             assert(pll_errno);
+             throw parse_error();
+           }
+        }
+        catch(parse_error& e)
+        {
+          throw runtime_error(string("Invalid character map specification: ") + s);
         }
         break;
       case 'R':

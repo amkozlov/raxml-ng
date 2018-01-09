@@ -478,8 +478,9 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
   else if (opts.use_tip_inner)
   {
     assert(!(opts.use_prob_msa));
-    // SSE3 tip-inner kernels are not implemented so far, so generic version will be faster
-    if (opts.simd_arch != PLL_ATTRIB_ARCH_SSE)
+    // 1) SSE3 tip-inner kernels are not implemented so far, so generic version will be faster
+    // 2) same for state-rich models
+    if (opts.simd_arch != PLL_ATTRIB_ARCH_SSE && model.num_states() <= 20)
     {
       // TODO: use proper auto-tuning
       const unsigned long min_len_ti = model.num_states() > 4 ? 40 : 100;
