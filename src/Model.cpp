@@ -178,12 +178,9 @@ void Model::init_from_string(const std::string &model_string)
   {
     _num_states = pllmod_util_model_numstates_mult(model_name.c_str());
     _custom_charmap = shared_ptr<pll_state_t>(pllmod_util_model_charmap_mult(_num_states), free);
-    if (!_custom_charmap)
-    {
-      assert(pll_errno);
-      throw runtime_error("Error in model specification (" + model_name +
-                          "): " + string(pll_errmsg));
-    }
+
+    libpll_check_error("ERROR in model specification |" + model_name + "|");
+    assert(_custom_charmap);
   }
   else
     _num_states = DATATYPE_STATES.at(_data_type);
@@ -267,8 +264,7 @@ pllmod_mixture_model_t * Model::init_mix_model(const std::string &model_name)
     if (!modinfo)
     {
       if (pll_errno)
-        throw runtime_error("Error in model initialization (" + model_name +
-                            "): " + string(pll_errmsg));
+        libpll_check_error("ERROR model initialization |" + model_name + "|");
       else
         throw runtime_error("Invalid model name: " + model_name);
     }

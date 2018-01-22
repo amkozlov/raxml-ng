@@ -55,6 +55,8 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
 
   pll_fasta_close(file);
 
+  libpll_reset_error();
+
   return stream;
 }
 
@@ -283,6 +285,7 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format)
     }
     catch(exception &e)
     {
+      libpll_reset_error();
       if (format == FileFormat::autodetect)
         LOG_DEBUG << "Failed to load as " << fmt_begin->second << ": " << e.what() << endl;
       else

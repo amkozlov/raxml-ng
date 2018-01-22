@@ -73,8 +73,8 @@ pllmod_msa_stats_t * PartitionInfo::compute_stats(unsigned long stats_mask) cons
   pllmod_msa_stats_t * stats = pllmod_msa_compute_stats(_msa.pll_msa(), _model.num_states(),
                                                         _model.charmap(), weights, stats_mask);
 
-  if (!stats)
-    throw runtime_error(pll_errmsg);
+  libpll_check_error("ERROR computing MSA stats");
+  assert(stats);
 
   if ((stats_mask & PLLMOD_MSA_STATS_FREQS) &&_msa.probabilistic() &&
       _model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::empirical)

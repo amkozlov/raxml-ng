@@ -176,8 +176,8 @@ void check_msa(RaxmlInstance& instance)
                                                         NULL,
                                                         stats_mask);
 
-  if (!stats)
-    throw runtime_error(pll_errmsg);
+  libpll_check_error("ERROR computing MSA stats");
+  assert(stats);
 
   if (stats->dup_taxa_pairs_count > 0)
   {

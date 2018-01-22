@@ -111,8 +111,8 @@ Tree Tree::buildParsimony(const PartitionedMSA& parted_msa, unsigned int random_
                                                   random_seed,
                                                   pscore);
 
-  if (!tree._pll_utree)
-    throw runtime_error("ERROR building parsimony tree: " + string(pll_errmsg));
+  libpll_check_error("ERROR building parsimony tree");
+  assert(tree._pll_utree);
 
   return tree;
 }
@@ -123,12 +123,14 @@ Tree Tree::loadFromFile(const std::string& file_name)
 
   pll_utree_t * utree;
   pll_rtree_t * rtree;
+  const char* fname = file_name.c_str();
 
-  if (!(rtree = pll_rtree_parse_newick(file_name.c_str())))
+  if (!(rtree = pll_rtree_parse_newick(fname)))
   {
-    if (!(utree = pll_utree_parse_newick(file_name.c_str())))
+    utree = pll_utree_parse_newick(fname);
+    if (!utree)
     {
-      throw runtime_error("ERROR reading tree file: " + string(pll_errmsg));
+      libpll_check_error("ERROR reading tree file");
     }
   }
   else
@@ -138,7 +140,11 @@ Tree Tree::loadFromFile(const std::string& file_name)
 
     /* optional step if using default PLL clv/pmatrix index assignments */
     pll_utree_reset_template_indices(get_pll_utree_root(utree), utree->tip_count);
+
+    libpll_check_error("ERROR unrooting the tree");
   }
+
+  assert(utree);
 
   tree._num_tips = utree->tip_count;
   tree._pll_utree = utree;

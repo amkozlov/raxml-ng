@@ -26,8 +26,8 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
                                          tree.num_tips(),
                                          parted_msa.part_count(), opts.brlen_linkage);
 
-  if (!_pll_treeinfo)
-    throw runtime_error("ERROR creating treeinfo structure: " + string(pll_errmsg));
+  libpll_check_error("ERROR creating treeinfo structure");
+  assert(_pll_treeinfo);
 
   if (ParallelContext::num_procs() > 1)
   {
@@ -59,7 +59,10 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
                                                   pinfo.model().submodel(0).rate_sym().data());
 
       if (!retval)
-        throw runtime_error("ERROR adding treeinfo partition: " + string(pll_errmsg));
+      {
+        assert(pll_errno);
+        libpll_check_error("ERROR adding treeinfo partition");
+      }
 
       if (part_range->master())
         _parts_master.insert(p);
@@ -139,8 +142,8 @@ double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor
 
     LOG_DEBUG << "\t - after brlen: logLH = " << new_loglh << endl;
 
-    if (pll_errno)
-      throw runtime_error("ERROR in branch length optimization: " + string(pll_errmsg));
+    libpll_check_error("ERROR in branch length optimization");
+    assert(isfinite(new_loglh));
   }
 
   /* optimize brlen scalers, if needed */
@@ -157,14 +160,18 @@ double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor
     pllmod_treeinfo_normalize_brlen_scalers(_pll_treeinfo);
 
     LOG_DEBUG << "\t - after brlen scalers: logLH = " << new_loglh << endl;
-  }
 
+    libpll_check_error("ERROR in brlen scaler optimization");
+    assert(isfinite(new_loglh));
+  }
 
   return new_loglh;
 }
 
 double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
 {
+  assert(!pll_errno);
+
   double
     cur_loglh = loglh(),
     new_loglh = cur_loglh;
@@ -181,6 +188,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
 
     LOG_DEBUG << "\t - after rates: logLH = " << new_loglh << endl;
 
+    libpll_check_error("ERROR in substitution rates optimization");
     assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
     cur_loglh = new_loglh;
   }
@@ -196,6 +204,8 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                           RAXML_PARAM_EPSILON);
 
     LOG_DEBUG << "\t - after freqs: logLH = " << new_loglh << endl;
+
+    libpll_check_error("ERROR in base frequencies optimization");
     assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
     cur_loglh = new_loglh;
   }
@@ -228,10 +238,13 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                         RAXML_PARAM_EPSILON);
 
      LOG_DEBUG << "\t - after alpha: logLH = " << new_loglh << endl;
+
+     libpll_check_error("ERROR in alpha parameter optimization");
      assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
      cur_loglh = new_loglh;
     }
 
+    /* optimize PINV */
     if (params_to_optimize & PLLMOD_OPT_PARAM_PINV)
     {
       new_loglh = -1 * pllmod_algo_opt_onedim_treeinfo(_pll_treeinfo,
@@ -241,6 +254,8 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                         RAXML_PARAM_EPSILON);
 
       LOG_DEBUG << "\t - after p-inv: logLH = " << new_loglh << endl;
+
+      libpll_check_error("ERROR in p-inv optimization");
       assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
       cur_loglh = new_loglh;
     }
@@ -262,6 +277,8 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
 
     LOG_DEBUG << "\t - after freeR: logLH = " << new_loglh << endl;
 //    LOG_DEBUG << "\t - after freeR/crosscheck: logLH = " << loglh() << endl;
+
+    libpll_check_error("ERROR in FreeRate rates/weights optimization");
     assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
     cur_loglh = new_loglh;
   }
@@ -286,10 +303,11 @@ double TreeInfo::spr_round(spr_round_params& params)
                                params.subtree_cutoff > 0. ? &params.cutoff_info : nullptr,
                                params.subtree_cutoff);
 
-  if (loglh)
-    return loglh;
-  else
-    throw runtime_error("ERROR in SPR round: " + string(pll_errmsg));
+  libpll_check_error("ERROR in SPR round");
+
+  assert(isfinite(loglh) && loglh);
+
+  return loglh;
 }
 
 
@@ -510,8 +528,8 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
       attrs                    /* list of flags (SSE3/AVX, TIP-INNER special cases etc.) */
   );
 
-  if (!partition)
-    throw runtime_error("ERROR creating pll_partition: " + string(pll_errmsg));
+  libpll_check_error("ERROR creating pll_partition");
+  assert(partition);
 
   if (part_region.master() && !model.ascbias_weights().empty())
     pll_set_asc_state_weights(partition, model.ascbias_weights().data());
