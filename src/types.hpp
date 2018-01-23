@@ -78,6 +78,8 @@ typedef std::vector<WeightType> WeightVector;
 typedef std::vector<WeightVector> WeightVectorList;
 typedef std::unordered_map<size_t, WeightVector> WeightVectorMap;
 
+typedef std::default_random_engine RandomGenerator;
+
 /*
  * workaround needed for using enum as std::map key
  * code from: http://stackoverflow.com/a/24847480

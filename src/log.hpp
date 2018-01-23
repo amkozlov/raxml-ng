@@ -86,6 +86,7 @@ Logging& logger();
 
 #define LOG_INFO_TS LOG_INFO << "[" << TimeStamp() << "] "
 #define LOG_VERB_TS LOG_VERB << "[" << TimeStamp() << "] "
+#define LOG_DEBUG_TS LOG_DEBUG << "[" << TimeStamp() << "] "
 #define LOG_PROGRESS(loglh) LOG_PROGR << ProgressInfo(loglh)
 
 #define FMT_LH(loglh) setprecision(6) << loglh

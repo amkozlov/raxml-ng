@@ -104,6 +104,7 @@ public:
 
   /* getters */
   DataType data_type() const { return _data_type; };
+  std::string data_type_name() const;
   unsigned int num_states() const { return _num_states; };
   std::string name() const { return _name; };
 

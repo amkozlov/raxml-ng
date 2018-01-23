@@ -13,6 +13,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <stdexcept>
+#include <random>
 
 extern "C" {
 //#include <libpll/pll.h>

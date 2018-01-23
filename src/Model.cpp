@@ -192,6 +192,26 @@ void Model::init_from_string(const std::string &model_string)
   pllmod_util_model_mixture_destroy(mix_model);
 }
 
+std::string Model::data_type_name() const
+{
+  switch (_data_type)
+  {
+    case DataType::binary:
+      return "BIN";
+    case DataType::dna:
+      return "DNA";
+    case DataType::protein:
+      return "AA";
+    case DataType::diploid10:
+      return "GT";
+    case DataType::multistate:
+      return "MULTI" + std::to_string(_num_states);
+    case DataType::autodetect:
+      return "AUTO";
+    default:
+      return "UNKNOWN";
+  }
+}
 
 void Model::autodetect_data_type(const std::string &model_name)
 {

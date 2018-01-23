@@ -178,7 +178,7 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::tuple<Model&, Mode
   {
     std::string s = stream.get<std::string>();
 //    printf("\n%s\n", s.c_str());
-    m.init_from_string(s);
+    m = Model(DataType::autodetect, s);
   }
 
   if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER))

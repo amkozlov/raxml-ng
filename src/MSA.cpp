@@ -274,6 +274,7 @@ void MSA::remove_sites(const std::vector<size_t>& site_indices)
   if (!_weights.empty())
   {
     assert(_weights.size() == _length);
+    _num_sites = 0;
     size_t pos = 0;
     auto ignore = sorted_indicies.cbegin();
     for (size_t i = 0; i < _weights.size(); ++i)
@@ -281,6 +282,7 @@ void MSA::remove_sites(const std::vector<size_t>& site_indices)
       if (ignore == sorted_indicies.cend() || i != *ignore)
       {
         _weights[pos++] = _weights[i];
+        _num_sites += _weights[i];
       }
       else
         ignore++;
@@ -288,6 +290,8 @@ void MSA::remove_sites(const std::vector<size_t>& site_indices)
     assert(pos == new_length);
     _weights.resize(new_length);
   }
+  else
+    _num_sites = new_length;
 
   _length = new_length;
   _dirty = true;

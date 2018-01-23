@@ -6,6 +6,16 @@
 
 pll_unode_t* get_pll_utree_root(const pll_utree_t* tree);
 
+// seems to be the only way to have custom deleter for unique_ptr
+// without having to specify it every time during object creation
+namespace std
+{
+  template<>
+  struct default_delete<pll_utree_t> {
+    void operator()(pll_utree_t* ptr) { pll_utree_destroy(ptr, nullptr); }
+  };
+}
+
 struct TreeBranch
 {
   TreeBranch() : left_node_id(0), right_node_id(0), length(0.) {};
@@ -19,6 +29,7 @@ struct TreeBranch
 
 typedef std::vector<TreeBranch> TreeTopology;
 
+typedef std::unique_ptr<pll_utree_t> PllUTreeUniquePtr;
 typedef std::vector<pll_unode_t*> PllNodeVector;
 
 class BasicTree
@@ -47,6 +58,10 @@ public:
     _pll_utree(pll_utree_wraptree(pll_utree_graph_clone(&root), tip_count)) {}
   Tree(const pll_utree_t& pll_utree) :
     BasicTree(pll_utree.tip_count), _pll_utree(pll_utree_clone(&pll_utree)) {}
+  Tree(std::unique_ptr<pll_utree_t>&  pll_utree) :
+    BasicTree(pll_utree ? pll_utree->tip_count : 0), _pll_utree(pll_utree.release()) {}
+  Tree(std::unique_ptr<pll_utree_t>&&  pll_utree) :
+    BasicTree(pll_utree ? pll_utree->tip_count : 0), _pll_utree(pll_utree.release()) {}
 
   Tree (const Tree& other);
   Tree& operator=(const Tree& other);
@@ -68,17 +83,17 @@ public:
   void topology(const TreeTopology& topol);
 
   // TODO: use move semantics to transfer ownership?
-  pll_utree_t * pll_utree_copy() const { return pll_utree_clone(_pll_utree); }
+  pll_utree_t * pll_utree_copy() const { return pll_utree_clone(_pll_utree.get()); }
   const pll_utree_t& pll_utree() const { return *_pll_utree; }
 
   // TODO: store root explicitly
-  const pll_unode_t& pll_utree_root() const { return *get_pll_utree_root(_pll_utree); }
+  const pll_unode_t& pll_utree_root() const { return *get_pll_utree_root(_pll_utree.get()); }
 
   void fix_missing_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
   void reset_tip_ids(const NameIdMap& label_id_map);
 
 protected:
-  pll_utree_t* _pll_utree;
+  PllUTreeUniquePtr _pll_utree;
 
   mutable PllNodeVector _pll_utree_tips;
 

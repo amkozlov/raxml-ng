@@ -48,12 +48,17 @@ struct RaxmlInstance
 {
   Options opts;
   PartitionedMSA parted_msa;
+  unique_ptr<PartitionedMSA> parted_msa_parsimony;
   TreeList start_trees;
   BootstrapReplicateList bs_reps;
   PartitionAssignmentList proc_part_assign;
   unique_ptr<LoadBalancer> load_balancer;
   unique_ptr<BootstrapTree> bs_tree;
+
  // unique_ptr<TerraceWrapper> terrace_wrapper;
+
+//  unique_ptr<RandomGenerator> starttree_seed_gen;
+//  unique_ptr<RandomGenerator> bootstrap_seed_gen;
 
   unique_ptr<NewickStream> start_tree_stream;
 
@@ -103,10 +108,6 @@ void init_part_info(RaxmlInstance& instance)
     LOG_INFO << parted_msa;
 
     LOG_INFO << endl;
-
-    if (opts.start_tree == StartingTree::parsimony && parted_msa.part_count() > 1)
-      throw runtime_error("Parsimony starting trees are not yet supported for partitioned binary "
-          "aligments.\nNOTE:  Please use PHYLIP/FASTA alignment files to generate parsimony starting trees.");
   }
   /* check if model is a file */
   else if (sysutil_file_exists(opts.model_file))
@@ -506,7 +507,9 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
       // TODO: check if there is any reason not to use tip-inner
       attrs |= PLL_ATTRIB_PATTERN_TIP;
 
-      tree = Tree::buildParsimony(parted_msa, rand(), attrs, &score);
+      const PartitionedMSA& pars_msa = instance.parted_msa_parsimony ?
+                                    *instance.parted_msa_parsimony.get() :  instance.parted_msa;
+      tree = Tree::buildParsimony(pars_msa, rand(), attrs, &score);
 
       LOG_DEBUG << "Parsimony score of the starting tree: " << score << endl;
 
@@ -550,6 +553,78 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
   }
 }
 
+void build_parsimony_msa(RaxmlInstance& instance)
+{
+  // create 1 partition per datatype
+  const PartitionedMSA& orig_msa = instance.parted_msa;
+
+  instance.parted_msa_parsimony.reset(new PartitionedMSA(orig_msa.taxon_names()));
+  PartitionedMSA& pars_msa = *instance.parted_msa_parsimony.get();
+
+  std::unordered_map<string, PartitionInfo*> datatype_pinfo_map;
+  for (const auto& pinfo: orig_msa.part_list())
+  {
+    const auto& model = pinfo.model();
+    auto data_type_name = model.data_type_name();
+
+    auto iter = datatype_pinfo_map.find(data_type_name);
+    if (iter == datatype_pinfo_map.end())
+    {
+      pars_msa.emplace_part_info(data_type_name, model.data_type(), model.name());
+      auto& pars_pinfo = pars_msa.part_list().back();
+      pars_pinfo.msa(MSA(pinfo.msa().num_sites()));
+      datatype_pinfo_map[data_type_name] = &pars_pinfo;
+    }
+    else
+    {
+      auto& msa = iter->second->msa();
+      msa.num_sites(msa.num_sites() + pinfo.msa().num_sites());
+    }
+  }
+
+  // set_per-datatype MSA
+  for (size_t j = 0; j < orig_msa.taxon_count(); ++j)
+  {
+    for (auto& pars_pinfo: pars_msa.part_list())
+    {
+      auto pars_datatype = pars_pinfo.model().data_type_name();
+      std::string sequence;
+      sequence.resize(pars_pinfo.msa().num_sites());
+      size_t offset = 0;
+
+      for (const auto& pinfo: orig_msa.part_list())
+      {
+        // different datatype -> skip for now
+        if (pinfo.model().data_type_name() != pars_datatype)
+          continue;
+
+        const auto w = pinfo.msa().weights();
+        const auto s = pinfo.msa().at(j);
+
+        for (size_t k = 0; k < w.size(); ++k)
+        {
+          auto wk = w[k];
+          while(wk-- > 0)
+            sequence[offset++] = s[k];
+        }
+      }
+
+      assert(offset == sequence.size());
+
+      pars_pinfo.msa().append(sequence);
+    }
+  }
+
+  // compress patterns
+  if (instance.opts.use_pattern_compression)
+  {
+    for (auto& pinfo: pars_msa.part_list())
+    {
+      pinfo.compress_patterns();
+    }
+  }
+}
+
 void build_start_trees(RaxmlInstance& instance, CheckpointManager& cm)
 {
   const auto& opts = instance.opts;
@@ -568,6 +643,11 @@ void build_start_trees(RaxmlInstance& instance, CheckpointManager& cm)
                      " taxa" << endl;
       break;
     case StartingTree::parsimony:
+      if (parted_msa.part_count() > 1)
+      {
+        LOG_DEBUG_TS << "Generating MSA partitioned by data type for parsimony computation" << endl;
+        build_parsimony_msa(instance);
+      }
       LOG_INFO_TS << "Generating parsimony starting tree(s) with " << parted_msa.taxon_count()
                   << " taxa" << endl;
       break;
@@ -599,6 +679,9 @@ void build_start_trees(RaxmlInstance& instance, CheckpointManager& cm)
 
     instance.start_trees.emplace_back(move(tree));
   }
+
+  // free memory used for parsimony MSA
+  instance.parted_msa_parsimony.release();
 
   if (::ParallelContext::master_rank())
   {
