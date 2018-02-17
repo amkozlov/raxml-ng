@@ -50,10 +50,11 @@ static struct option long_options[] =
   {"terrace",            no_argument,       0, 0 },  /*  31 */
   {"terrace-maxsize",    required_argument, 0, 0 },  /*  32 */
   {"check",              no_argument,       0, 0 },  /*  33 */
+  {"parse",              no_argument,       0, 0 },  /*  34 */
 
-  {"blopt",              required_argument, 0, 0 },  /*  34 */
-  {"blmin",              required_argument, 0, 0 },  /*  35 */
-  {"blmax",              required_argument, 0, 0 },  /*  36 */
+  {"blopt",              required_argument, 0, 0 },  /*  35 */
+  {"blmin",              required_argument, 0, 0 },  /*  36 */
+  {"blmax",              required_argument, 0, 0 },  /*  37 */
 
   { 0, 0, 0, 0 }
 };
@@ -413,7 +414,11 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.command = Command::check;
         num_commands++;
         break;
-      case 34: /* branch length optimization method */
+      case 34: /* parse */
+        opts.command = Command::parse;
+        num_commands++;
+        break;
+      case 35: /* branch length optimization method */
         if (strcasecmp(optarg, "nr_fast") == 0)
           opts.brlen_opt_method = PLLMOD_OPT_BLO_NEWTON_FAST;
         else if (strcasecmp(optarg, "nr_oldfast") == 0)
@@ -431,13 +436,13 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         else
           throw InvalidOptionValueException("Unknown branch length optimization method: " + string(optarg));
         break;
-      case 35: /* min brlen */
+      case 36: /* min brlen */
         if(sscanf(optarg, "%lf", &opts.brlen_min) != 1 || opts.brlen_min <= 0.)
           throw InvalidOptionValueException("Invalid minimum branch length value: " +
                                             string(optarg) +
                                             ", please provide a positive real number.");
         break;
-      case 36: /* max brlen */
+      case 37: /* max brlen */
         if(sscanf(optarg, "%lf", &opts.brlen_max) != 1 || opts.brlen_max <= 0.)
           throw InvalidOptionValueException("Invalid maximum branch length value: " +
                                             string(optarg) +
@@ -458,7 +463,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* check for mandatory options for each command */
   if (opts.command == Command::evaluate || opts.command == Command::search ||
       opts.command == Command::bootstrap || opts.command == Command::all ||
-      opts.command == Command::terrace || opts.command == Command::check)
+      opts.command == Command::terrace || opts.command == Command::check ||
+      opts.command == Command::parse)
   {
     if (opts.msa_file.empty())
       throw OptionException("You must specify a multiple alignment file with --msa switch");
@@ -543,6 +549,7 @@ void CommandLineParser::print_help()
             "                                             and a set of replicate trees (e.g., from a bootstrap analysis)\n"
             "  --terrace                                  check whether tree lies on a phylogenetic terrace \n"
             "  --check                                    check alignment correctness and remove empty columns/rows\n"
+            "  --parse                                    parse alignment, compress patterns and create binary MSA file\n"
             "\n"
             "Input and output options:\n"
             "  --tree         FILE | rand{N} | pars{N}    starting tree: rand(om), pars(imony) or user-specified (newick file)\n"

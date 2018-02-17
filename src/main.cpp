@@ -450,7 +450,8 @@ void load_msa(RaxmlInstance& instance)
   if (!instance.opts.use_prob_msa)
   {
     auto binary_msa_fname = instance.opts.binary_msa_file();
-    if (sysutil_file_exists(binary_msa_fname) && !opts.redo_mode)
+    if (sysutil_file_exists(binary_msa_fname) && !opts.redo_mode &&
+        opts.command != Command::parse)
     {
       LOG_INFO << "NOTE: Binary MSA file already exists: " << binary_msa_fname << endl << endl;
     }
@@ -1365,8 +1366,9 @@ int main(int argc, char** argv)
         break;
       }
       case Command::check:
-      {
         instance.opts.use_pattern_compression = false;
+      case Command::parse:
+      {
         init_part_info(instance);
         load_msa(instance);
         if (instance.opts.start_tree == StartingTree::user)
