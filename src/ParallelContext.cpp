@@ -29,8 +29,8 @@ void ParallelContext::init_mpi(int argc, char * argv[])
 //    printf("size: %lu, rank: %lu\n", _num_ranks, _rank_id);
   }
 #else
-  UNUSED(argc);
-  UNUSED(argv);
+  RAXML_UNUSED(argc);
+  RAXML_UNUSED(argv);
 #endif
 }
 
@@ -142,21 +142,21 @@ void ParallelContext::thread_reduce(double * data, size_t size, int op)
   {
     switch(op)
     {
-      case PLLMOD_TREE_REDUCE_SUM:
+      case PLLMOD_COMMON_REDUCE_SUM:
       {
         data[i] = 0.;
         for (j = 0; j < ParallelContext::_num_threads; ++j)
           data[i] += double_buf[j * size + i];
       }
       break;
-      case PLLMOD_TREE_REDUCE_MAX:
+      case PLLMOD_COMMON_REDUCE_MAX:
       {
         data[i] = _parallel_buf[i];
         for (j = 1; j < ParallelContext::_num_threads; ++j)
           data[i] = max(data[i], double_buf[j * size + i]);
       }
       break;
-      case PLLMOD_TREE_REDUCE_MIN:
+      case PLLMOD_COMMON_REDUCE_MIN:
       {
         data[i] = _parallel_buf[i];
         for (j = 1; j < ParallelContext::_num_threads; ++j)
@@ -186,11 +186,11 @@ void ParallelContext::parallel_reduce(double * data, size_t size, int op)
     if (_thread_id == 0)
     {
       MPI_Op reduce_op;
-      if (op == PLLMOD_TREE_REDUCE_SUM)
+      if (op == PLLMOD_COMMON_REDUCE_SUM)
         reduce_op = MPI_SUM;
-      else if (op == PLLMOD_TREE_REDUCE_MAX)
+      else if (op == PLLMOD_COMMON_REDUCE_MAX)
         reduce_op = MPI_MAX;
-      else if (op == PLLMOD_TREE_REDUCE_MIN)
+      else if (op == PLLMOD_COMMON_REDUCE_MIN)
         reduce_op = MPI_MIN;
       else
         assert(0);
@@ -213,7 +213,7 @@ void ParallelContext::parallel_reduce(double * data, size_t size, int op)
 void ParallelContext::parallel_reduce_cb(void * context, double * data, size_t size, int op)
 {
   ParallelContext::parallel_reduce(data, size, op);
-  UNUSED(context);
+  RAXML_UNUSED(context);
 }
 
 void ParallelContext::thread_broadcast(size_t source_id, void * data, size_t size)
@@ -296,8 +296,8 @@ void ParallelContext::mpi_gather_custom(std::function<int(void*,int)> prepare_se
     MPI_Send(_parallel_buf.data(), send_size, MPI_BYTE, 0, 0, MPI_COMM_WORLD);
   }
 #else
-  UNUSED(prepare_send_cb);
-  UNUSED(process_recv_cb);
+  RAXML_UNUSED(prepare_send_cb);
+  RAXML_UNUSED(process_recv_cb);
 #endif
 }
 

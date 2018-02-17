@@ -128,10 +128,10 @@ void init_part_info(RaxmlInstance& instance)
 
   /* make sure that linked branch length mode is set for unpartitioned alignments */
   if (parted_msa.part_count() == 1)
-    opts.brlen_linkage = PLLMOD_TREE_BRLEN_LINKED;
+    opts.brlen_linkage = PLLMOD_COMMON_BRLEN_LINKED;
 
   /* in the scaled brlen mode, use ML optimization of brlen scalers by default */
-  if (opts.brlen_linkage == PLLMOD_TREE_BRLEN_SCALED)
+  if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_SCALED)
   {
     for (auto& pinfo: parted_msa.part_list())
       pinfo.model().set_param_mode_default(PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER, ParamValue::ML);
@@ -149,7 +149,7 @@ void init_part_info(RaxmlInstance& instance)
   }
 
   if (parted_msa.part_count() > 1 && freerate_count > 0 &&
-      opts.brlen_linkage == PLLMOD_TREE_BRLEN_LINKED)
+      opts.brlen_linkage == PLLMOD_COMMON_BRLEN_LINKED)
   {
     throw runtime_error("LG4X and FreeRate models are not supported in linked branch length mode.\n"
         "Please use the '--brlen scaled' option to switch into proportional branch length mode.");
@@ -890,8 +890,8 @@ void check_terrace(const RaxmlInstance& instance, const Tree& tree)
     }
   }
 #else
-  UNUSED(instance);
-  UNUSED(tree);
+  RAXML_UNUSED(instance);
+  RAXML_UNUSED(tree);
 #endif
 }
 

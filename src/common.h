@@ -17,6 +17,7 @@
 
 extern "C" {
 //#include <libpll/pll.h>
+#include <libpll/pllmod_common.h>
 #include <libpll/pll_optimize.h>
 #include <libpll/pll_msa.h>
 #include <libpll/pll_tree.h>
@@ -56,7 +57,7 @@ extern "C" {
 #define RAXML_RATESCALERS_TAXA    2000
 
 /* used to supress compiler warnings about unused args */
-#define UNUSED(expr) while (0) { (void)(expr); }
+#define RAXML_UNUSED(expr) PLLMOD_UNUSED(expr)
 
 // cpu features
 #define RAXML_CPU_SSE3  (1<<0)

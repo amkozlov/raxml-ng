@@ -90,6 +90,7 @@ public:
   const pll_unode_t& pll_utree_root() const { return *get_pll_utree_root(_pll_utree.get()); }
 
   void fix_missing_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
+  void reset_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
   void reset_tip_ids(const NameIdMap& label_id_map);
 
 protected:

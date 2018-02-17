@@ -110,7 +110,7 @@ TEST(CommandLineParserTest, search_complex2)
   EXPECT_EQ(StartingTree::random, options.start_tree);
   EXPECT_EQ("myRun", options.outfile_prefix);
   EXPECT_TRUE(options.use_prob_msa);
-  EXPECT_EQ(PLLMOD_TREE_BRLEN_LINKED, options.brlen_linkage);
+  EXPECT_EQ(PLLMOD_COMMON_BRLEN_LINKED, options.brlen_linkage);
   EXPECT_EQ(10, options.spr_radius);
   EXPECT_DOUBLE_EQ(0.5, options.spr_cutoff);
 }

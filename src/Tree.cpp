@@ -210,6 +210,11 @@ void Tree::fix_missing_brlens(double new_brlen)
   pllmod_utree_set_length_recursive(_pll_utree.get(), new_brlen, 1);
 }
 
+void Tree::reset_brlens(double new_brlen)
+{
+  pllmod_utree_set_length_recursive(_pll_utree.get(), new_brlen, 0);
+}
+
 PllNodeVector Tree::subnodes() const
 {
   PllNodeVector subnodes;

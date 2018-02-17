@@ -59,6 +59,9 @@ public:
 private:
   pllmod_treeinfo_t * _pll_treeinfo;
   IDSet _parts_master;
+  int _brlen_opt_method;
+  double _brlen_min;
+  double _brlen_max;
 
   void init(const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
             const PartitionAssignment& part_assign, const std::vector<uintVector>& site_weights);

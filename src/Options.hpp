@@ -27,10 +27,12 @@ public:
   log_level(LogLevel::progress),
   msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
   random_seed(0), start_tree(StartingTree::random), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
-  spr_cutoff(1.0), brlen_linkage(PLLMOD_TREE_BRLEN_SCALED), simd_arch(PLL_ATTRIB_ARCH_CPU),
+  spr_cutoff(1.0),
+  brlen_linkage(PLLMOD_COMMON_BRLEN_SCALED), brlen_opt_method(PLLMOD_OPT_BLO_NEWTON_FAST),
+  brlen_min(RAXML_BRLEN_MIN), brlen_max(RAXML_BRLEN_MAX),
   num_searches(1), num_bootstraps(100), terrace_maxsize(100),
   tree_file(""), msa_file(""), model_file(""), outfile_prefix(""),
-  num_threads(1), num_ranks(1)
+  num_threads(1), num_ranks(1), simd_arch(PLL_ATTRIB_ARCH_CPU)
   {};
 
   ~Options() = default;
@@ -60,7 +62,9 @@ public:
   int spr_radius;
   double spr_cutoff;
   int brlen_linkage;
-  unsigned int simd_arch;
+  int brlen_opt_method;
+  double brlen_min;
+  double brlen_max;
 
   unsigned int num_searches;
   unsigned int num_bootstraps;
@@ -76,6 +80,7 @@ public:
   /* parallelization stuff */
   unsigned int num_threads;     /* number of threads */
   unsigned int num_ranks;       /* number of MPI ranks */
+  unsigned int simd_arch;       /* vector instruction set */
 
   std::string simd_arch_name() const;
 

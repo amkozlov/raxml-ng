@@ -22,6 +22,10 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
                     const PartitionAssignment& part_assign,
                     const std::vector<uintVector>& site_weights)
 {
+  _brlen_min = opts.brlen_min;
+  _brlen_max = opts.brlen_max;
+  _brlen_opt_method = opts.brlen_opt_method;
+
   _pll_treeinfo = pllmod_treeinfo_create(pll_utree_graph_clone(&tree.pll_utree_root()),
                                          tree.num_tips(),
                                          parted_msa.part_count(), opts.brlen_linkage);
@@ -129,13 +133,16 @@ double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor
                                                                     _pll_treeinfo->root,
                                                                     _pll_treeinfo->param_indices,
                                                                     _pll_treeinfo->deriv_precomp,
+                                                                    _pll_treeinfo->branch_lengths,
                                                                     _pll_treeinfo->brlen_scalers,
-                                                                    RAXML_BRLEN_MIN,
-                                                                    RAXML_BRLEN_MAX,
+                                                                    _brlen_min,
+                                                                    _brlen_max,
                                                                     lh_epsilon,
                                                                     brlen_smooth_factor * RAXML_BRLEN_SMOOTHINGS,
                                                                     -1,  /* radius */
                                                                     1,    /* keep_update */
+                                                                    _brlen_opt_method,
+                                                                    _pll_treeinfo->brlen_linkage,
                                                                     _pll_treeinfo->parallel_context,
                                                                     _pll_treeinfo->parallel_reduce_cb
                                                                     );
@@ -147,7 +154,7 @@ double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor
   }
 
   /* optimize brlen scalers, if needed */
-  if (_pll_treeinfo->brlen_linkage == PLLMOD_TREE_BRLEN_SCALED &&
+  if (_pll_treeinfo->brlen_linkage == PLLMOD_COMMON_BRLEN_SCALED &&
       _pll_treeinfo->partition_count > 1)
   {
     new_loglh = -1 * pllmod_algo_opt_onedim_treeinfo(_pll_treeinfo,
@@ -215,16 +222,20 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
       (params_to_optimize & PLLMOD_OPT_PARAM_ALPHA) &&
       (params_to_optimize & PLLMOD_OPT_PARAM_PINV))
   {
-    new_loglh = -1 * pllmod_algo_opt_alpha_pinv (_pll_treeinfo->partitions[0],
-                                                 _pll_treeinfo->root,
-                                                 _pll_treeinfo->param_indices[0],
-                                                 PLLMOD_OPT_MIN_ALPHA,
-                                                 PLLMOD_OPT_MAX_ALPHA,
-                                                 &_pll_treeinfo->alphas[0],
-                                                 PLLMOD_OPT_MIN_PINV,
-                                                 PLLMOD_OPT_MAX_PINV,
-                                                 RAXML_BFGS_FACTOR,
-                                                 RAXML_PARAM_EPSILON);
+    new_loglh = -1 * pllmod_algo_opt_alpha_pinv_treeinfo(_pll_treeinfo,
+                                                         0,
+                                                         PLLMOD_OPT_MIN_ALPHA,
+                                                         PLLMOD_OPT_MAX_ALPHA,
+                                                         PLLMOD_OPT_MIN_PINV,
+                                                         PLLMOD_OPT_MAX_PINV,
+                                                         RAXML_BFGS_FACTOR,
+                                                         RAXML_PARAM_EPSILON);
+
+    LOG_DEBUG << "\t - after a+i  : logLH = " << new_loglh << endl;
+
+    libpll_check_error("ERROR in alpha/p-inv parameter optimization");
+    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+    cur_loglh = new_loglh;
   }
   else
   {
@@ -271,7 +282,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                           RAXML_PARAM_EPSILON);
 
     /* normalize scalers and scale the branches accordingly */
-    if (_pll_treeinfo->brlen_linkage == PLLMOD_TREE_BRLEN_SCALED &&
+    if (_pll_treeinfo->brlen_linkage == PLLMOD_COMMON_BRLEN_SCALED &&
         _pll_treeinfo->partition_count > 1)
       pllmod_treeinfo_normalize_brlen_scalers(_pll_treeinfo);
 
@@ -297,8 +308,8 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
 double TreeInfo::spr_round(spr_round_params& params)
 {
   double loglh = pllmod_algo_spr_round(_pll_treeinfo, params.radius_min, params.radius_max,
-                               params.ntopol_keep, params.thorough,
-                               RAXML_BRLEN_MIN, RAXML_BRLEN_MAX, RAXML_BRLEN_SMOOTHINGS,
+                               params.ntopol_keep, params.thorough, _brlen_opt_method,
+                               _brlen_min, _brlen_max, RAXML_BRLEN_SMOOTHINGS,
                                0.1,
                                params.subtree_cutoff > 0. ? &params.cutoff_info : nullptr,
                                params.subtree_cutoff);
