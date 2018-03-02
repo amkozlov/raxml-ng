@@ -67,7 +67,7 @@ set(RAXML_LIBS ${RAXML_LIBS} PARENT_SCOPE)
 
 #message(STATUS "Libs: ${RAXML_LIBS}")
 
-target_link_libraries(raxml_module ${RAXML_LIBS})
+target_link_libraries(raxml_module  ${RAXML_LIBS} gcc_s gcc)
 
 if(GMP_FOUND)
   target_link_libraries(raxml_module ${GMP_LIBRARIES})
@@ -79,12 +79,12 @@ endif()
 
 if(MPI_COMPILE_FLAGS)
   set_target_properties(raxml_module PROPERTIES
-                          COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
+    COMPILE_FLAGS "${MPI_COMPILE_FLAGS} -fPIC")
 endif()
 
 if(MPI_LINK_FLAGS)
   set_target_properties(raxml_module PROPERTIES
-                          LINK_FLAGS "${MPI_LINK_FLAGS}")
+    LINK_FLAGS "${MPI_LINK_FLAGS} -fPIC")
 endif()
 
 if(MPI_FOUND)
