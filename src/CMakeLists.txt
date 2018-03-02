@@ -2,6 +2,7 @@ file(GLOB RAXML_SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/io/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/bootstrap/*.cpp
                         )
+list(REMOVE_ITEM RAXML_SOURCES ${PROJECT_SOURCE_DIR}/src/main.cpp)
 
 if(USE_TERRAPHAST)
   file (GLOB TERRACE_SOURCES ${PROJECT_SOURCE_DIR}/src/terraces/*.cpp)
@@ -29,8 +30,10 @@ set(RAXML_LIBPLL_HEADERS ${RAXML_LOCALDEPS_DIR}/include/libpll/)
 set(PLLMOD_SRC "${PROJECT_SOURCE_DIR}/libs/pll-modules/src/")
 set(LIBPLL_SRC "${PROJECT_SOURCE_DIR}/libs/pll-modules/libs/libpll/src/")
 
-add_executable(raxml_module ${RAXML_SOURCES})
-message(STATUS "add sudirectory ${PROJECT_SOURCE_DIR}/libs/pll-modules/src")
+add_library(raxml_module MODULE ${RAXML_SOURCES})
+
+#add_executable(raxml_module ${RAXML_SOURCES})
+
 file(COPY ${PLLMOD_SRC}/pllmod_common.h
           ${PLLMOD_SRC}/algorithm/pllmod_algorithm.h
           ${PLLMOD_SRC}/binary/pll_binary.h
