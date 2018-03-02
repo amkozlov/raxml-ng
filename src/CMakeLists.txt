@@ -25,15 +25,33 @@ if(STATIC_BUILD)
   endif()
 endif()
 
-add_executable(raxml_module ${RAXML_SOURCES})
+set(RAXML_LIBPLL_HEADERS ${RAXML_LOCALDEPS_DIR}/include/libpll/)
+set(PLLMOD_SRC "${PROJECT_SOURCE_DIR}/libs/pll-modules/src/")
+set(LIBPLL_SRC "${PROJECT_SOURCE_DIR}/libs/pll-modules/libs/libpll/src/")
 
-set(RAXML_LIBS ${RAXML_LOCALDEPS_DIR}/lib/libpll_algorithm.a
-               ${RAXML_LOCALDEPS_DIR}/lib/libpll_binary.a
-               ${RAXML_LOCALDEPS_DIR}/lib/libpll_optimize.a
-               ${RAXML_LOCALDEPS_DIR}/lib/libpll_msa.a
-               ${RAXML_LOCALDEPS_DIR}/lib/libpll_tree.a
-               ${RAXML_LOCALDEPS_DIR}/lib/libpll_util.a
-               ${RAXML_LOCALDEPS_DIR}/lib/libpll.a
+add_executable(raxml_module ${RAXML_SOURCES})
+message(STATUS "add sudirectory ${PROJECT_SOURCE_DIR}/libs/pll-modules/src")
+file(COPY ${PLLMOD_SRC}/pllmod_common.h
+          ${PLLMOD_SRC}/algorithm/pllmod_algorithm.h
+          ${PLLMOD_SRC}/binary/pll_binary.h
+          ${PLLMOD_SRC}/msa/pll_msa.h
+          ${PLLMOD_SRC}/optimize/pll_optimize.h
+          ${PLLMOD_SRC}/tree/pll_tree.h
+          ${PLLMOD_SRC}/util/pllmod_util.h
+          ${LIBPLL_SRC}/pll.h
+          DESTINATION ${RAXML_LIBPLL_HEADERS})
+target_include_directories(raxml_module PRIVATE ${RAXML_LIBPLL_HEADERS})
+
+
+
+set(RAXML_LIBS 
+  pllmodalgorithm_static
+  pllmodbinary_static
+  pllmodmsa_static
+  pllmodoptimize_static
+  pllmodtree_static
+  pllmodutil_static
+  pll_static
                m
                )
 
