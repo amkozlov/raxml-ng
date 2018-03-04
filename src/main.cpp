@@ -22,7 +22,7 @@
 #include "Raxml.hpp"
 
 int main(int argc, char** argv)
-{
-  return raxml_main(argc, argv);
+{ 
+  return raxml_main(argc, argv, 0);
 }
 

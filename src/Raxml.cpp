@@ -1241,19 +1241,13 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   }
 }
 
-void clean_exit(int retval)
-{
-  ParallelContext::finalize(retval != EXIT_SUCCESS);
-  exit(retval);
-}
-
-int raxml_main(int argc, char** argv, int communicator)
+extern "C" int raxml_main(int argc, char** argv, void *communicator)
 {
   int retval = EXIT_SUCCESS;
 
   RaxmlInstance instance;
-
-  ParallelContext::init_mpi(argc, argv);
+  
+  ParallelContext::init_mpi(argc, argv, communicator);
 
   instance.opts.num_ranks = ParallelContext::num_ranks();
 
@@ -1267,7 +1261,7 @@ int raxml_main(int argc, char** argv, int communicator)
   catch (OptionException &e)
   {
     LOG_INFO << "ERROR: " << e.message() << std::endl;
-    clean_exit(EXIT_FAILURE);
+    return ParallelContext::clean_exit(EXIT_FAILURE);
   }
 
   /* handle trivial commands first */
@@ -1276,11 +1270,11 @@ int raxml_main(int argc, char** argv, int communicator)
     case Command::help:
       print_banner();
       cmdline.print_help();
-      clean_exit(EXIT_SUCCESS);
+      return ParallelContext::clean_exit(EXIT_SUCCESS);
       break;
     case Command::version:
       print_banner();
-      clean_exit(EXIT_SUCCESS);
+      return ParallelContext::clean_exit(EXIT_SUCCESS);
       break;
     case Command::evaluate:
     case Command::search:
@@ -1295,7 +1289,7 @@ int raxml_main(int argc, char** argv, int communicator)
                             "` already exist!\n" <<
                             "Please either choose a new prefix, remove old files, or add "
                             "--redo command line switch to overwrite them." << endl << endl;
-        clean_exit(EXIT_FAILURE);
+        return ParallelContext::clean_exit(EXIT_FAILURE);
       }
       break;
     default:
@@ -1394,7 +1388,6 @@ int raxml_main(int argc, char** argv, int communicator)
     retval = EXIT_FAILURE;
   }
 
-  clean_exit(retval);
-  return retval;
+  return ParallelContext::clean_exit(retval);
 }
 
