@@ -30,9 +30,8 @@ set(RAXML_LIBPLL_HEADERS ${RAXML_LOCALDEPS_DIR}/include/libpll/)
 set(PLLMOD_SRC "${PROJECT_SOURCE_DIR}/libs/pll-modules/src/")
 set(LIBPLL_SRC "${PROJECT_SOURCE_DIR}/libs/pll-modules/libs/libpll/src/")
 
-add_library(raxml_module MODULE ${RAXML_SOURCES})
-
-#add_executable(raxml_module ${RAXML_SOURCES})
+add_library(raxml_library MODULE ${RAXML_SOURCES})
+add_executable(raxml_module ${RAXML_SOURCES} ${PROJECT_SOURCE_DIR}/src/main.cpp)
 
 file(COPY ${PLLMOD_SRC}/pllmod_common.h
           ${PLLMOD_SRC}/algorithm/pllmod_algorithm.h
@@ -44,6 +43,7 @@ file(COPY ${PLLMOD_SRC}/pllmod_common.h
           ${LIBPLL_SRC}/pll.h
           DESTINATION ${RAXML_LIBPLL_HEADERS})
 target_include_directories(raxml_module PRIVATE ${RAXML_LIBPLL_HEADERS})
+target_include_directories(raxml_library PRIVATE ${RAXML_LIBPLL_HEADERS})
 
 
 
@@ -67,32 +67,43 @@ set(RAXML_LIBS ${RAXML_LIBS} PARENT_SCOPE)
 
 #message(STATUS "Libs: ${RAXML_LIBS}")
 
-target_link_libraries(raxml_module  ${RAXML_LIBS} gcc_s gcc)
+target_link_libraries(raxml_library  ${RAXML_LIBS} gcc_s gcc)
+target_link_libraries(raxml_module  ${RAXML_LIBS})
 
 if(GMP_FOUND)
   target_link_libraries(raxml_module ${GMP_LIBRARIES})
+  target_link_libraries(raxml_library ${GMP_LIBRARIES})
 endif()
 
 if(MPI_FOUND)
   target_link_libraries(raxml_module ${MPI_CXX_LIBRARIES})
+  target_link_libraries(raxml_library ${MPI_CXX_LIBRARIES})
 endif()
 
 if(MPI_COMPILE_FLAGS)
   set_target_properties(raxml_module PROPERTIES
+    COMPILE_FLAGS "${MPI_COMPILE_FLAGS} -fPIC")
+  set_target_properties(raxml_library  PROPERTIES
     COMPILE_FLAGS "${MPI_COMPILE_FLAGS} -fPIC")
 endif()
 
 if(MPI_LINK_FLAGS)
   set_target_properties(raxml_module PROPERTIES
     LINK_FLAGS "${MPI_LINK_FLAGS} -fPIC")
+  set_target_properties(raxml_library PROPERTIES
+    LINK_FLAGS "${MPI_LINK_FLAGS} -fPIC")
 endif()
 
 if(MPI_FOUND)
   set_target_properties(raxml_module PROPERTIES OUTPUT_NAME raxml-ng-mpi)
+  set_target_properties(raxml_library PROPERTIES OUTPUT_NAME raxml-ng-mpi)
 elseif(STATIC_BUILD)
   set_target_properties(raxml_module PROPERTIES OUTPUT_NAME raxml-ng-static)
+  set_target_properties(raxml_library PROPERTIES OUTPUT_NAME raxml-ng-static)
 else()
   set_target_properties(raxml_module PROPERTIES OUTPUT_NAME raxml-ng)
+  set_target_properties(raxml_library PROPERTIES OUTPUT_NAME raxml-ng)
 endif()
-
 set_target_properties(raxml_module PROPERTIES PREFIX "")
+set_target_properties(raxml_library PROPERTIES PREFIX "")
+
