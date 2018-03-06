@@ -2,7 +2,7 @@
 #define _RAXML_HPP_
 
 
-extern "C" int raxml_main(int argc, 
+extern "C" int exportable_main(int argc, 
     char** argv, 
     void *communicator);
 

@@ -23,6 +23,6 @@
 
 int main(int argc, char** argv)
 { 
-  return raxml_main(argc, argv, 0);
+  return exportable_main(argc, argv, 0);
 }
 

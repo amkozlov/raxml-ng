@@ -1241,7 +1241,7 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   }
 }
 
-extern "C" int raxml_main(int argc, char** argv, void *communicator)
+extern "C" int exportable_main(int argc, char** argv, void *communicator)
 {
   int retval = EXIT_SUCCESS;
 
