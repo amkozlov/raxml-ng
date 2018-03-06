@@ -105,6 +105,15 @@ if(ENABLE_PTHREADS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_RAXML_PTHREADS -pthread")
 endif()
 
+set(pll_dir ${PROJECT_SOURCE_DIR}/libs/pll-modules/libs/libpll/src)
+set(pll_binary_dir ${PROJECT_SOURCE_DIR}/libs/pll-modules/src/binary)
+set(pll_optimize_dir ${PROJECT_SOURCE_DIR}/libs/pll-modules/src/optimize)
+set(pll_msa_dir ${PROJECT_SOURCE_DIR}/libs/pll-modules/src/msa)
+# build dependencies
+set(RAXML_LOCALDEPS_DIR ${PROJECT_BINARY_DIR}/localdeps)
+add_subdirectory(${PROJECT_SOURCE_DIR}/libs)
+
+
 if(ENABLE_MPI)
   find_package(MPI)
   if(MPI_CXX_FOUND)
@@ -124,15 +133,6 @@ if(USE_TERRAPHAST)
 endif()
 
 message(STATUS "Using flags: ${CMAKE_CXX_FLAGS}")
-
-set(pll_dir ${PROJECT_SOURCE_DIR}/libs/pll-modules/libs/libpll/src)
-set(pll_binary_dir ${PROJECT_SOURCE_DIR}/libs/pll-modules/src/binary)
-set(pll_optimize_dir ${PROJECT_SOURCE_DIR}/libs/pll-modules/src/optimize)
-set(pll_msa_dir ${PROJECT_SOURCE_DIR}/libs/pll-modules/src/msa)
-
-# build dependencies
-set(RAXML_LOCALDEPS_DIR ${PROJECT_BINARY_DIR}/localdeps)
-add_subdirectory(${PROJECT_SOURCE_DIR}/libs)
 
 include_directories(${RAXML_LOCALDEPS_DIR}/include ${TERRACES_INCLUDE_DIR})
 
