@@ -525,6 +525,18 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
   return tree;
 }
 
+void add_start_tree(RaxmlInstance& instance, Tree&& tree)
+{
+  /* fix missing branch lengths */
+  tree.fix_missing_brlens();
+
+  /* make sure tip indices are consistent between MSA and pll_tree */
+  assert(!instance.parted_msa.taxon_id_map().empty());
+  tree.reset_tip_ids(instance.parted_msa.taxon_id_map());
+
+  instance.start_trees.emplace_back(tree);
+}
+
 void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
 {
   /* init checkpoint and set to the manager */
@@ -542,6 +554,24 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
   if (!instance.opts.redo_mode && cm.read())
   {
     const auto& ckp = cm.checkpoint();
+
+    // read start trees from file
+    if (sysutil_file_exists(instance.opts.start_tree_file()))
+    {
+      NewickStream ts(instance.opts.start_tree_file(), std::ios::in);
+      size_t i = 0;
+      while (ts.peek() != EOF)
+      {
+        Tree tree;
+        ts >> tree;
+        i++;
+
+        if (i > ckp.ml_trees.size())
+          add_start_tree(instance, move(tree));
+      }
+      assert(i == instance.opts.num_searches);
+    }
+
     for (const auto& m: ckp.models)
       instance.parted_msa.model(m.first, m.second);
 
@@ -631,6 +661,10 @@ void build_start_trees(RaxmlInstance& instance, CheckpointManager& cm)
   const auto& opts = instance.opts;
   const auto& parted_msa = instance.parted_msa;
 
+  /* all start trees were already generated/loaded -> return */
+  if (cm.checkpoint().ml_trees.size() + instance.start_trees.size() >= instance.opts.num_searches)
+    return;
+
   switch (opts.start_tree)
   {
     case StartingTree::user:
@@ -667,18 +701,7 @@ void build_start_trees(RaxmlInstance& instance, CheckpointManager& cm)
         instance.opts.num_searches++;
     }
 
-    // TODO: skip generation
-    if (i < cm.checkpoint().ml_trees.size())
-      continue;
-
-    /* fix missing branch lengths */
-    tree.fix_missing_brlens();
-
-    /* make sure tip indices are consistent between MSA and pll_tree */
-    assert(!parted_msa.taxon_id_map().empty());
-    tree.reset_tip_ids(parted_msa.taxon_id_map());
-
-    instance.start_trees.emplace_back(move(tree));
+    add_start_tree(instance, move(tree));
   }
 
   // free memory used for parsimony MSA
