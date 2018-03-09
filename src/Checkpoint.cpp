@@ -238,16 +238,8 @@ void assign_models(Checkpoint& ckp, const TreeInfo& treeinfo)
     assign_model(ckp, treeinfo, p);
 }
 
-void assign(Checkpoint& ckp, const TreeInfo& treeinfo)
+void assign_models(TreeInfo& treeinfo, const Checkpoint& ckp)
 {
-  assign_tree(ckp, treeinfo);
-  assign_models(ckp, treeinfo);
-}
-
-void assign(TreeInfo& treeinfo, const Checkpoint& ckp)
-{
-  treeinfo.tree(ckp.tree);
-
   const pllmod_treeinfo_t& pll_treeinfo = treeinfo.pll_treeinfo();
   for (auto& m: ckp.models)
   {
@@ -256,5 +248,21 @@ void assign(TreeInfo& treeinfo, const Checkpoint& ckp)
 
     treeinfo.model(m.first, m.second);
   }
+}
+
+void assign(Checkpoint& ckp, const TreeInfo& treeinfo)
+{
+  assign_tree(ckp, treeinfo);
+  assign_models(ckp, treeinfo);
+}
+
+void assign(TreeInfo& treeinfo, const Checkpoint& ckp)
+{
+  // TODO: it is currently not possible to change tree after pll_treeinfo has been created
+  // this should be fixed while doing refactoring to change pll_unode_t -> pll_tree_t
+  assert(0);
+  treeinfo.tree(ckp.tree);
+
+  assign_models(treeinfo, ckp);
 }
 

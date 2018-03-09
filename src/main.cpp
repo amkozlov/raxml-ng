@@ -572,9 +572,6 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
       assert(i == instance.opts.num_searches);
     }
 
-    for (const auto& m: ckp.models)
-      instance.parted_msa.model(m.first, m.second);
-
     LOG_INFO_TS << "NOTE: Resuming execution from checkpoint " <<
         "(logLH: " << ckp.loglh() <<
         ", ML trees: " << ckp.ml_trees.size() <<
@@ -1070,11 +1067,15 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
       if (use_ckp_tree)
       {
+        // restore search state from checkpoint (tree + model params)
         treeinfo.reset(new TreeInfo(opts, cm.checkpoint().tree, master_msa, part_assign));
+        assign_models(*treeinfo, cm.checkpoint());
         use_ckp_tree = false;
       }
       else
+      {
         treeinfo.reset(new TreeInfo(opts, tree, master_msa, part_assign));
+      }
 
       Optimizer optimizer(opts);
       if (opts.command == Command::evaluate)
