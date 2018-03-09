@@ -1173,6 +1173,14 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   auto const& opts = instance.opts;
   auto& parted_msa = instance.parted_msa;
 
+  /* if resuming from a checkpoint, use binary MSA (if exists) */
+  if (!instance.opts.redo_mode &&
+      sysutil_file_exists(instance.opts.checkp_file()) &&
+      sysutil_file_exists(instance.opts.binary_msa_file()))
+  {
+    instance.opts.msa_file = instance.opts.binary_msa_file();
+  }
+
   init_part_info(instance);
 
   if (instance.parted_msa.part_info(0).msa().empty())
