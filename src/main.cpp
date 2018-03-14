@@ -20,7 +20,6 @@
 */
 
 #include "Raxml.hpp"
-
 int main(int argc, char** argv)
 { 
   return exportable_main(argc, argv, 0);

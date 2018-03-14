@@ -297,3 +297,8 @@ void MSA::remove_sites(const std::vector<size_t>& site_indices)
   _dirty = true;
 }
 
+void MSA::update_num_sites()
+{
+  if (!_weights.empty())
+    _num_sites =  std::accumulate(_weights.begin(), _weights.end(), 0);
+}
