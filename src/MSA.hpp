@@ -58,8 +58,8 @@ public:
   doubleVector state_freqs() const;
 
   void num_sites(const unsigned int sites) { _num_sites = sites; }
-  void weights(const WeightVector& v) { _weights = v; }
-  void weights(WeightVector&& v) { _weights = std::move(v); }
+  void weights(const WeightVector& v) { _weights = v; update_num_sites(); }
+  void weights(WeightVector&& v) { _weights = std::move(v); update_num_sites(); }
 
   void remove_sites(const std::vector<size_t>& site_indices);
 
@@ -89,6 +89,8 @@ private:
 
   void update_pll_msa() const;
   void free_pll_msa() noexcept;
+
+  void update_num_sites();
 };
 
 #endif /* RAXML_MSA_HPP_ */
