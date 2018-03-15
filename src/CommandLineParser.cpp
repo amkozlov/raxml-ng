@@ -515,7 +515,12 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
     opts.num_bootstraps = 0;
   }
 
-  if (opts.num_searches == 0)
+  if (opts.command != Command::search && opts.command != Command::all &&
+      opts.command != Command::evaluate)
+  {
+    opts.num_searches = 0;
+  }
+  else if (opts.num_searches == 0)
   {
     opts.num_searches = (opts.command == Command::all) ? 20 : 1;
     if (opts.start_tree == StartingTree::user)
