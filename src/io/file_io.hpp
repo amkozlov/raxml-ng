@@ -101,8 +101,8 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa);
 CATGStream& operator>>(CATGStream& stream, MSA& msa);
 MSA msa_load_from_file(const std::string &filename, const FileFormat format);
 
-PhylipStream& operator<<(PhylipStream& stream, MSA& msa);
-PhylipStream& operator<<(PhylipStream& stream, PartitionedMSA& msa);
+PhylipStream& operator<<(PhylipStream& stream, const MSA& msa);
+PhylipStream& operator<<(PhylipStream& stream, const PartitionedMSA& msa);
 
 RBAStream& operator<<(RBAStream& stream, const PartitionedMSA& part_msa);
 RBAStream& operator>>(RBAStream& stream, PartitionedMSA& part_msa);

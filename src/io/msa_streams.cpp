@@ -82,7 +82,7 @@ PhylipStream& operator>>(PhylipStream& stream, MSA& msa)
   return stream;
 }
 
-PhylipStream& operator<<(PhylipStream& stream, MSA& msa)
+PhylipStream& operator<<(PhylipStream& stream, const MSA& msa)
 {
   auto retval = pllmod_msa_save_phylip(msa.pll_msa(), stream.fname().c_str());
 
@@ -92,7 +92,7 @@ PhylipStream& operator<<(PhylipStream& stream, MSA& msa)
   return stream;
 }
 
-PhylipStream& operator<<(PhylipStream& stream, PartitionedMSA& msa)
+PhylipStream& operator<<(PhylipStream& stream, const PartitionedMSA& msa)
 {
   ofstream fs(stream.fname());
 
