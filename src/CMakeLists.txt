@@ -32,7 +32,6 @@ set(LIBPLL_SRC "${PROJECT_SOURCE_DIR}/libs/pll-modules/libs/libpll/src/")
 
 if (BUILD_AS_LIBRARY)
   message(STATUS "Raxml will be built as a library")
-  list(REMOVE_ITEM RAXML_SOURCES ${PROJECT_SOURCE_DIR}/src/main.cpp)
   add_library(raxml_module MODULE ${RAXML_SOURCES})
 else()
   add_executable(raxml_module ${RAXML_SOURCES})
