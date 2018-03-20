@@ -49,6 +49,12 @@ static struct option long_options[] =
   {"support",            no_argument,       0, 0 },  /*  30 */
   {"terrace",            no_argument,       0, 0 },  /*  31 */
   {"terrace-maxsize",    required_argument, 0, 0 },  /*  32 */
+  {"check",              no_argument,       0, 0 },  /*  33 */
+  {"parse",              no_argument,       0, 0 },  /*  34 */
+
+  {"blopt",              required_argument, 0, 0 },  /*  35 */
+  {"blmin",              required_argument, 0, 0 },  /*  36 */
+  {"blmax",              required_argument, 0, 0 },  /*  37 */
 
   { 0, 0, 0, 0 }
 };
@@ -98,8 +104,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.spr_radius = -1;
   opts.spr_cutoff = 1.0;
 
-  /* default: scaled branch lengths */
-  opts.brlen_linkage = PLLMOD_TREE_BRLEN_LINKED;
+  /* default: linked branch lengths */
+  opts.brlen_linkage = PLLMOD_COMMON_BRLEN_LINKED;
+  opts.brlen_min = RAXML_BRLEN_MIN;
+  opts.brlen_max = RAXML_BRLEN_MAX;
 
   /* use all available cores per default */
 #if defined(_RAXML_PTHREADS) && !defined(_RAXML_MPI)
@@ -190,7 +198,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.data_type = DataType::dna;
         else if (strcasecmp(optarg, "aa") == 0)
           opts.data_type = DataType::protein;
-        else if (strcasecmp(optarg, "binary") == 0)
+        else if (strcasecmp(optarg, "binary") == 0 || strcasecmp(optarg, "bin") == 0)
           opts.data_type = DataType::binary;
         else if (strcasecmp(optarg, "diploid10") == 0)
           opts.data_type = DataType::diploid10;
@@ -231,12 +239,12 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
       case 14: /* branch length linkage mode */
         if (strcasecmp(optarg, "scaled") == 0)
-          opts.brlen_linkage = PLLMOD_TREE_BRLEN_SCALED;
+          opts.brlen_linkage = PLLMOD_COMMON_BRLEN_SCALED;
         else if (strcasecmp(optarg, "linked") == 0)
-          opts.brlen_linkage = PLLMOD_TREE_BRLEN_LINKED;
+          opts.brlen_linkage = PLLMOD_COMMON_BRLEN_LINKED;
         else if (strcasecmp(optarg, "unlinked") == 0)
         {
-          opts.brlen_linkage = PLLMOD_TREE_BRLEN_UNLINKED;
+          opts.brlen_linkage = PLLMOD_COMMON_BRLEN_UNLINKED;
           throw OptionException("Unlinked branch lengths not supported yet!");
         }
         else
@@ -402,6 +410,44 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               + string(optarg) + ", please provide a positive integer number!");
         }
         break;
+      case 33: /* check */
+        opts.command = Command::check;
+        num_commands++;
+        break;
+      case 34: /* parse */
+        opts.command = Command::parse;
+        num_commands++;
+        break;
+      case 35: /* branch length optimization method */
+        if (strcasecmp(optarg, "nr_fast") == 0)
+          opts.brlen_opt_method = PLLMOD_OPT_BLO_NEWTON_FAST;
+        else if (strcasecmp(optarg, "nr_oldfast") == 0)
+          opts.brlen_opt_method = PLLMOD_OPT_BLO_NEWTON_OLDFAST;
+        else if (strcasecmp(optarg, "nr_safe") == 0)
+          opts.brlen_opt_method = PLLMOD_OPT_BLO_NEWTON_SAFE;
+        else if (strcasecmp(optarg, "nr_oldsafe") == 0)
+          opts.brlen_opt_method = PLLMOD_OPT_BLO_NEWTON_OLDSAFE;
+        else if (strcasecmp(optarg, "nr_fallback") == 0)
+          opts.brlen_opt_method = PLLMOD_OPT_BLO_NEWTON_FALLBACK;
+        else if (strcasecmp(optarg, "nr_global") == 0)
+          opts.brlen_opt_method = PLLMOD_OPT_BLO_NEWTON_GLOBAL;
+        else if (strcasecmp(optarg, "off") == 0 || strcasecmp(optarg, "none") == 0)
+          opts.optimize_brlen = false;
+        else
+          throw InvalidOptionValueException("Unknown branch length optimization method: " + string(optarg));
+        break;
+      case 36: /* min brlen */
+        if(sscanf(optarg, "%lf", &opts.brlen_min) != 1 || opts.brlen_min <= 0.)
+          throw InvalidOptionValueException("Invalid minimum branch length value: " +
+                                            string(optarg) +
+                                            ", please provide a positive real number.");
+        break;
+      case 37: /* max brlen */
+        if(sscanf(optarg, "%lf", &opts.brlen_max) != 1 || opts.brlen_max <= 0.)
+          throw InvalidOptionValueException("Invalid maximum branch length value: " +
+                                            string(optarg) +
+                                            ", please provide a positive real number.");
+        break;
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -417,13 +463,11 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* check for mandatory options for each command */
   if (opts.command == Command::evaluate || opts.command == Command::search ||
       opts.command == Command::bootstrap || opts.command == Command::all ||
-      opts.command == Command::terrace)
+      opts.command == Command::terrace || opts.command == Command::check ||
+      opts.command == Command::parse)
   {
     if (opts.msa_file.empty())
       throw OptionException("You must specify a multiple alignment file with --msa switch");
-
-    if (opts.model_file.empty())
-      throw OptionException("You must specify an evolutionary model with --model switch");
   }
 
   if (opts.command == Command::evaluate || opts.command == Command::support ||
@@ -471,7 +515,12 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
     opts.num_bootstraps = 0;
   }
 
-  if (opts.num_searches == 0)
+  if (opts.command != Command::search && opts.command != Command::all &&
+      opts.command != Command::evaluate)
+  {
+    opts.num_searches = 0;
+  }
+  else if (opts.num_searches == 0)
   {
     opts.num_searches = (opts.command == Command::all) ? 20 : 1;
     if (opts.start_tree == StartingTree::user)
@@ -495,22 +544,24 @@ void CommandLineParser::print_help()
 
   cout << "\n"
             "Commands (mutually exclusive):\n"
-            "  --help                                     display help information.\n"
-            "  --version                                  display version information.\n"
-            "  --evaluate                                 evaluate the likelihood of a tree.\n"
+            "  --help                                     display help information\n"
+            "  --version                                  display version information\n"
+            "  --evaluate                                 evaluate the likelihood of a tree\n"
             "  --search                                   ML tree search.\n"
-            "  --bootstrap                                bootstrapping.\n"
+            "  --bootstrap                                bootstrapping\n"
             "  --all                                      all-in-one (ML search + bootstrapping).\n"
             "  --support                                  compute bipartition support for a given reference tree (e.g., best ML tree)\n"
-            "                                             and a set of replicate trees (e.g., from a bootstrap analysis) \n"
+            "                                             and a set of replicate trees (e.g., from a bootstrap analysis)\n"
             "  --terrace                                  check whether tree lies on a phylogenetic terrace \n"
+            "  --check                                    check alignment correctness and remove empty columns/rows\n"
+            "  --parse                                    parse alignment, compress patterns and create binary MSA file\n"
             "\n"
             "Input and output options:\n"
             "  --tree         FILE | rand{N} | pars{N}    starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
             "                                             N = number of trees (default: 20 in 'all-in-one' mode, 1 otherwise)\n"
             "  --msa          FILE                        alignment file\n"
-            "  --msa-format   VALUE                       alignment file type: FASTA, PHYLIP, VCF, CATG or AUTO-detect (default)\n"
-            "  --data-type    VALUE                       data type: DNA, AA, MULTI-state or AUTO-detect (default)\n"
+            "  --msa-format   VALUE                       alignment file type: FASTA, PHYLIP, CATG or AUTO-detect (default)\n"
+            "  --data-type    VALUE                       data type: DNA, AA, BIN(ary) or AUTO-detect (default)\n"
             "  --prefix       STRING                      prefix for output files (default: MSA file name)\n"
             "  --log          VALUE                       log verbosity: ERROR,WARNING,INFO,PROGRESS,DEBUG (default: PROGRESS)\n"
             "  --redo                                     overwrite existing result files and ignore checkpoints (default: OFF)\n"
@@ -528,6 +579,10 @@ void CommandLineParser::print_help()
             "Model options:\n"
             "  --model        <name>+G[n]+<Freqs> | FILE  model specification OR partition file (default: GTR+G4)\n"
             "  --brlen        linked | scaled | unlinked  branch length linkage between partitions (default: scaled)\n"
+            "  --blmin        VALUE                       minimum branch length (default: 1e-6)\n"
+            "  --blmax        VALUE                       maximum branch length (default: 100)\n"
+            "  --blopt        nr_fast    | nr_safe        branch length optimization method (default: nr_fast)\n"
+            "                 nr_oldfast | nr_oldsafe     \n"
             "  --opt-model    on | off                    ML optimization of all model parameters (default: ON)\n"
             "  --opt-branches on | off                    ML optimization of all branch lengths (default: ON)\n"
             "  --prob-msa     on | off                    use probabilistic alignment (works with CATG and VCF)\n"

@@ -18,7 +18,9 @@ enum class Command
   bootstrap,
   all,
   support,
-  terrace
+  terrace,
+  check,
+  parse
 };
 
 enum class FileFormat
@@ -66,6 +68,7 @@ typedef std::vector<double> doubleVector;
 typedef std::vector<int> intVector;
 typedef std::vector<unsigned int> uintVector;
 typedef std::vector<std::string> NameVector;
+typedef std::vector<std::string> NameList;
 typedef std::pair<size_t,std::string> IdNamePair;
 typedef std::vector<IdNamePair> IdNameVector;
 typedef std::unordered_map<size_t,std::string> IdNameMap;
@@ -76,6 +79,8 @@ typedef unsigned int WeightType;
 typedef std::vector<WeightType> WeightVector;
 typedef std::vector<WeightVector> WeightVectorList;
 typedef std::unordered_map<size_t, WeightVector> WeightVectorMap;
+
+typedef std::default_random_engine RandomGenerator;
 
 /*
  * workaround needed for using enum as std::map key

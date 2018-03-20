@@ -55,6 +55,8 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
 
   pll_fasta_close(file);
 
+  libpll_reset_error();
+
   return stream;
 }
 
@@ -80,7 +82,7 @@ PhylipStream& operator>>(PhylipStream& stream, MSA& msa)
   return stream;
 }
 
-PhylipStream& operator<<(PhylipStream& stream, MSA& msa)
+PhylipStream& operator<<(PhylipStream& stream, const MSA& msa)
 {
   auto retval = pllmod_msa_save_phylip(msa.pll_msa(), stream.fname().c_str());
 
@@ -90,7 +92,7 @@ PhylipStream& operator<<(PhylipStream& stream, MSA& msa)
   return stream;
 }
 
-PhylipStream& operator<<(PhylipStream& stream, PartitionedMSA& msa)
+PhylipStream& operator<<(PhylipStream& stream, const PartitionedMSA& msa)
 {
   ofstream fs(stream.fname());
 
@@ -283,6 +285,7 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format)
     }
     catch(exception &e)
     {
+      libpll_reset_error();
       if (format == FileFormat::autodetect)
         LOG_DEBUG << "Failed to load as " << fmt_begin->second << ": " << e.what() << endl;
       else

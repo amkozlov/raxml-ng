@@ -49,6 +49,13 @@ public:
   CATGStream(const std::string& fname) : MSAFileStream(fname) {}
 };
 
+class RBAStream : public MSAFileStream
+{
+public:
+  RBAStream(const std::string& fname) : MSAFileStream(fname) {}
+
+  static bool rba_file(const std::string& fname);
+};
 
 class RaxmlPartitionStream : public std::fstream
 {
@@ -94,8 +101,11 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa);
 CATGStream& operator>>(CATGStream& stream, MSA& msa);
 MSA msa_load_from_file(const std::string &filename, const FileFormat format);
 
-PhylipStream& operator<<(PhylipStream& stream, MSA& msa);
-PhylipStream& operator<<(PhylipStream& stream, PartitionedMSA& msa);
+PhylipStream& operator<<(PhylipStream& stream, const MSA& msa);
+PhylipStream& operator<<(PhylipStream& stream, const PartitionedMSA& msa);
+
+RBAStream& operator<<(RBAStream& stream, const PartitionedMSA& part_msa);
+RBAStream& operator>>(RBAStream& stream, PartitionedMSA& part_msa);
 
 RaxmlPartitionStream& operator>>(RaxmlPartitionStream& stream, PartitionInfo& part_info);
 RaxmlPartitionStream& operator>>(RaxmlPartitionStream& stream, PartitionedMSA& parted_msa);

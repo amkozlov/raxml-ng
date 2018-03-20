@@ -25,6 +25,7 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.bootstrap_trees, "bootstraps");
   set_default_outfile(outfile_names.support_tree, "support");
   set_default_outfile(outfile_names.terrace, "terrace");
+  set_default_outfile(outfile_names.binary_msa, "rba");
 }
 
 bool Options::result_files_exist() const
@@ -125,6 +126,12 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     case Command::support:
       stream << "Compute bipartition support";
       break;
+    case Command::terrace:
+      stream << "Count/enumerate trees on a phylogenetic terrace";
+      break;
+    case Command::check:
+      stream << "Alignment validation";
+      break;
     default:
       break;
   }
@@ -167,16 +174,40 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   }
 
   stream << "  branch lengths: ";
-  stream << (opts.optimize_brlen ? "ML estimate" : "user-specified") << " (";
-  if (opts.brlen_linkage == PLLMOD_TREE_BRLEN_SCALED)
+  if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_SCALED)
     stream << "proportional";
-  else if (opts.brlen_linkage == PLLMOD_TREE_BRLEN_UNLINKED)
+  else if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED)
     stream << "unlinked";
   else
     stream << "linked";
 
-  stream << ")" << endl;
+  stream << " (";
 
+  if (opts.optimize_brlen)
+  {
+    stream << "ML estimate, algorithm: ";
+    switch(opts.brlen_opt_method)
+    {
+      case PLLMOD_OPT_BLO_NEWTON_FAST:
+        stream << "NR-FAST";
+        break;
+      case PLLMOD_OPT_BLO_NEWTON_SAFE:
+        stream << "NR-SAFE";
+        break;
+      case PLLMOD_OPT_BLO_NEWTON_GLOBAL:
+        stream << "NR-GLOBAL";
+        break;
+      case PLLMOD_OPT_BLO_NEWTON_OLDFAST:
+        stream << "legacy NR-FAST";
+        break;
+      case PLLMOD_OPT_BLO_NEWTON_OLDSAFE:
+        stream << "legacy NR-SAFE";
+        break;
+    }
+  }
+  else
+    stream << "user-specified";
+  stream << ")" << endl;
 
   stream << "  SIMD kernels: " << opts.simd_arch_name() << endl;
 

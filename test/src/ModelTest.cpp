@@ -208,3 +208,26 @@ TEST(ModelTest, aliases)
   model = Model(DataType::autodetect, "TPM1uf");
   EXPECT_EQ(model.name(), "K81uf");
 }
+
+TEST(ModelTest, multistate)
+{
+  // buildup
+  auto model = Model(DataType::autodetect, "MULTI8_MK+G");
+
+  // tests
+  EXPECT_EQ("MULTI8_MK+G4m", model.to_string());
+  EXPECT_EQ(DataType::multistate, model.data_type());
+  EXPECT_EQ("MULTI8_MK", model.name());
+  EXPECT_EQ(8, model.num_states());
+  EXPECT_EQ(PLLMOD_UTIL_MIXTYPE_GAMMA, model.ratehet_mode());
+  EXPECT_EQ(4, model.num_ratecats());
+  EXPECT_EQ(PLLMOD_OPT_PARAM_ALPHA, model.params_to_optimize());
+  EXPECT_NE(nullptr, model.charmap());
+
+  model = Model(DataType::autodetect, "MULTI53_GTR");
+  EXPECT_EQ(DataType::multistate, model.data_type());
+  EXPECT_EQ(53, model.num_states());
+  EXPECT_EQ(PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_FREQUENCIES,
+            model.params_to_optimize());
+
+}

@@ -37,7 +37,9 @@
 #include "LoadBalancer.hpp"
 #include "bootstrap/BootstrapGenerator.hpp"
 
+#ifdef _RAXML_TERRAPHAST
 #include "terraces/TerraceWrapper.hpp"
+#endif
 
 using namespace std;
 
@@ -46,12 +48,18 @@ struct RaxmlInstance
 {
   Options opts;
   PartitionedMSA parted_msa;
+  unique_ptr<PartitionedMSA> parted_msa_parsimony;
   TreeList start_trees;
   BootstrapReplicateList bs_reps;
+  TreeList bs_start_trees;
   PartitionAssignmentList proc_part_assign;
   unique_ptr<LoadBalancer> load_balancer;
   unique_ptr<BootstrapTree> bs_tree;
-  unique_ptr<TerraceWrapper> terrace_wrapper;
+
+ // unique_ptr<TerraceWrapper> terrace_wrapper;
+
+//  unique_ptr<RandomGenerator> starttree_seed_gen;
+//  unique_ptr<RandomGenerator> bootstrap_seed_gen;
 
   unique_ptr<NewickStream> start_tree_stream;
 
@@ -77,8 +85,33 @@ void init_part_info(RaxmlInstance& instance)
   auto& opts = instance.opts;
   auto& parted_msa = instance.parted_msa;
 
+  if (!sysutil_file_exists(opts.msa_file))
+  {
+    throw runtime_error("Alignment file not found: " + opts.msa_file);
+  }
+
+  /* check if we have a binary input file */
+  if (opts.msa_format == FileFormat::binary ||
+      (opts.msa_format == FileFormat::autodetect && RBAStream::rba_file(opts.msa_file)))
+  {
+    LOG_INFO_TS << "Loading binary alignment from file: " << opts.msa_file << endl;
+
+    RBAStream bs(opts.msa_file);
+    bs >> parted_msa;
+
+    // binary probMSAs are not supported yet
+    instance.opts.use_prob_msa = false;
+
+    LOG_INFO_TS << "Alignment comprises " << parted_msa.taxon_count() << " taxa, " <<
+        parted_msa.part_count() << " partitions and " <<
+        parted_msa.total_length() << " patterns\n" << endl;
+
+    LOG_INFO << parted_msa;
+
+    LOG_INFO << endl;
+  }
   /* check if model is a file */
-  if (sysutil_file_exists(opts.model_file))
+  else if (sysutil_file_exists(opts.model_file))
   {
     // read partition definitions from file
     RaxmlPartitionStream partfile(opts.model_file, ios::in);
@@ -86,30 +119,41 @@ void init_part_info(RaxmlInstance& instance)
 
 //    DBG("partitions found: %d\n", useropt->part_count);
   }
-  else
+  else if (!opts.model_file.empty())
   {
     // create and init single pseudo-partition
     parted_msa.emplace_part_info("noname", opts.data_type, opts.model_file);
   }
+  else
+    throw runtime_error("Please specify an evolutionary model with --model switch");
 
   /* make sure that linked branch length mode is set for unpartitioned alignments */
   if (parted_msa.part_count() == 1)
-    opts.brlen_linkage = PLLMOD_TREE_BRLEN_LINKED;
+    opts.brlen_linkage = PLLMOD_COMMON_BRLEN_LINKED;
 
-  int lg4x_count = 0;
+  /* in the scaled brlen mode, use ML optimization of brlen scalers by default */
+  if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_SCALED)
+  {
+    for (auto& pinfo: parted_msa.part_list())
+      pinfo.model().set_param_mode_default(PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER, ParamValue::ML);
+  }
+
+  int freerate_count = 0;
 
   for (const auto& pinfo: parted_msa.part_list())
   {
     LOG_DEBUG << "|" << pinfo.name() << "|   |" << pinfo.model().to_string() << "|   |" <<
         pinfo.range_string() << "|" << endl;
 
-    if (pinfo.model().name() == "LG4X")
-      lg4x_count++;
+    if (pinfo.model().ratehet_mode() == PLLMOD_UTIL_MIXTYPE_FREE)
+      freerate_count++;
   }
 
-  if (parted_msa.part_count() > 1 && lg4x_count > 0 && opts.brlen_linkage == PLLMOD_TREE_BRLEN_LINKED)
+  if (parted_msa.part_count() > 1 && freerate_count > 0 &&
+      opts.brlen_linkage == PLLMOD_COMMON_BRLEN_LINKED)
   {
-    throw runtime_error("LG4X model is not supported in linked branch length mode, sorry :(");
+    throw runtime_error("LG4X and FreeRate models are not supported in linked branch length mode.\n"
+        "Please use the '--brlen scaled' option to switch into proportional branch length mode.");
   }
 }
 
@@ -119,8 +163,9 @@ void check_msa(RaxmlInstance& instance)
 
   const auto& full_msa = instance.parted_msa.full_msa();
   const auto pll_msa = full_msa.pll_msa();
+  const auto taxon_count = instance.parted_msa.taxon_count();
 
-  if (full_msa.size() < 4)
+  if (taxon_count < 4)
   {
     throw runtime_error("Your alignment contains less than 4 sequences!");
   }
@@ -133,8 +178,8 @@ void check_msa(RaxmlInstance& instance)
                                                         NULL,
                                                         stats_mask);
 
-  if (!stats)
-    throw runtime_error(pll_errmsg);
+  libpll_check_error("ERROR computing MSA stats");
+  assert(stats);
 
   if (stats->dup_taxa_pairs_count > 0)
   {
@@ -216,7 +261,7 @@ void check_msa(RaxmlInstance& instance)
   }
 
 
-  if (total_gap_cols > 0 || !gap_seqs.empty() > 0)
+  if (total_gap_cols > 0 || !gap_seqs.empty())
   {
     // save reduced MSA and partition files
     auto reduced_msa_fname = instance.opts.output_fname("reduced.phy");
@@ -240,7 +285,7 @@ void check_msa(RaxmlInstance& instance)
     }
   }
 
-  if (full_msa.size() > RAXML_RATESCALERS_TAXA && !instance.opts.use_rate_scalers)
+  if (taxon_count > RAXML_RATESCALERS_TAXA && !instance.opts.use_rate_scalers)
   {
     LOG_INFO << "\nNOTE: Per-rate scalers were automatically enabled to prevent numerical issues "
         "on taxa-rich alignments.\n";
@@ -271,13 +316,14 @@ void check_models(const RaxmlInstance& instance)
     // check for zero state frequencies
     if (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::empirical)
     {
-      for (unsigned int i = 0; i < stats->states; ++i)
+      const auto& freqs = stats.emp_base_freqs;
+      for (unsigned int i = 0; i < freqs.size(); ++i)
       {
-        if (!(stats->freqs[i] > 0.))
+        if (!(freqs[i] > 0.))
         {
           LOG_ERROR << "\nBase frequencies: ";
-          for (unsigned int j = 0; j < stats->states; ++j)
-            LOG_ERROR << stats->freqs[j] <<  " ";
+          for (unsigned int j = 0; j < freqs.size(); ++j)
+            LOG_ERROR << freqs[j] <<  " ";
           LOG_ERROR << endl;
 
           throw runtime_error("Frequency of state " + to_string(i) +
@@ -289,29 +335,29 @@ void check_models(const RaxmlInstance& instance)
     }
 
     // check partitions which contain invariant sites and have ascertainment bias enabled
-    if (model.ascbias_type() != AscBiasCorrection::none && stats->inv_cols_count > 0)
+    if (model.ascbias_type() != AscBiasCorrection::none && stats.inv_count > 0)
     {
       throw runtime_error("You enabled ascertainment bias correction for partition " +
                            pinfo.name() + ", but it contains " +
-                           to_string(stats->inv_cols_count) + " invariant sites.\n"
+                           to_string(stats.inv_count) + " invariant sites.\n"
                           "This is not allowed! Please either remove invariant sites or "
                           "disable ascertainment bias correction.");
     }
   }
 }
 
-void check_tree(const MSA& msa, const Tree& tree)
+void check_tree(const PartitionedMSA& msa, const Tree& tree)
 {
   auto missing_taxa = 0;
   auto duplicate_taxa = 0;
 
-  if (msa.size() > tree.num_tips())
+  if (msa.taxon_count() > tree.num_tips())
     throw runtime_error("Alignment file contains more sequences than expected");
-  else if (msa.size() != tree.num_tips())
+  else if (msa.taxon_count() != tree.num_tips())
     throw runtime_error("Some taxa are missing from the alignment file");
 
   unordered_set<string> tree_labels;
-  unordered_set<string> msa_labels(msa.label_cbegin(), msa.label_cend());
+  unordered_set<string> msa_labels(msa.taxon_names().cbegin(), msa.taxon_names().cend());
 
   for (const auto& tip: tree.tip_labels())
   {
@@ -374,10 +420,16 @@ void load_msa(RaxmlInstance& instance)
 
   /* check alignment */
   if (!opts.force_mode)
+  {
+    LOG_VERB_TS << "Validating alignment... " << endl;
     check_msa(instance);
+  }
 
   if (opts.use_pattern_compression)
+  {
+    LOG_VERB_TS << "Compressing alignment patterns... " << endl;
     parted_msa.compress_patterns();
+  }
 
 //  if (parted_msa.part_count() > 1)
 //    instance.terrace_wrapper.reset(new TerraceWrapper(parted_msa));
@@ -395,6 +447,32 @@ void load_msa(RaxmlInstance& instance)
   LOG_INFO << parted_msa;
 
   LOG_INFO << endl;
+
+  if (!instance.opts.use_prob_msa)
+  {
+    auto binary_msa_fname = instance.opts.binary_msa_file();
+    if (sysutil_file_exists(binary_msa_fname) && !opts.redo_mode &&
+        opts.command != Command::parse)
+    {
+      LOG_INFO << "NOTE: Binary MSA file already exists: " << binary_msa_fname << endl << endl;
+    }
+    else
+    {
+      RBAStream bs(binary_msa_fname);
+      bs << parted_msa;
+      LOG_INFO << "NOTE: Binary MSA file created: " << binary_msa_fname << endl << endl;
+    }
+  }
+}
+
+void prepare_tree(const RaxmlInstance& instance, Tree& tree)
+{
+  /* fix missing branch lengths */
+  tree.fix_missing_brlens();
+
+  /* make sure tip indices are consistent between MSA and pll_tree */
+  assert(!instance.parted_msa.taxon_id_map().empty());
+  tree.reset_tip_ids(instance.parted_msa.taxon_id_map());
 }
 
 Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
@@ -403,7 +481,6 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
 
   const auto& opts = instance.opts;
   const auto& parted_msa = instance.parted_msa;
-  const auto& msa = parted_msa.full_msa();
 
   switch (type)
   {
@@ -418,24 +495,33 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
       LOG_DEBUG << "Loaded user starting tree with " << tree.num_tips() << " taxa from: "
                            << opts.tree_file << endl;
 
-      check_tree(msa, tree);
+      check_tree(parted_msa, tree);
 
       break;
     }
     case StartingTree::random:
       /* no starting tree provided, generate a random one */
 
-      LOG_DEBUG << "Generating a random starting tree with " << msa.size() << " taxa" << endl;
+      LOG_DEBUG << "Generating a random starting tree with " << parted_msa.taxon_count()
+                << " taxa" << endl;
 
-      tree = Tree::buildRandom(msa);
+      tree = Tree::buildRandom(parted_msa.taxon_names());
 
       break;
     case StartingTree::parsimony:
     {
-      LOG_DEBUG << "Generating a parsimony starting tree with " << msa.size() << " taxa" << endl;
+      LOG_DEBUG << "Generating a parsimony starting tree with " << parted_msa.taxon_count()
+                << " taxa" << endl;
 
       unsigned int score;
-      tree = Tree::buildParsimony(parted_msa, rand(), opts.simd_arch, &score);
+      unsigned int attrs = opts.simd_arch;
+
+      // TODO: check if there is any reason not to use tip-inner
+      attrs |= PLL_ATTRIB_PATTERN_TIP;
+
+      const PartitionedMSA& pars_msa = instance.parted_msa_parsimony ?
+                                    *instance.parted_msa_parsimony.get() :  instance.parted_msa;
+      tree = Tree::buildParsimony(pars_msa, rand(), attrs, &score);
 
       LOG_DEBUG << "Parsimony score of the starting tree: " << score << endl;
 
@@ -446,6 +532,8 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
   }
 
   assert(!tree.empty());
+
+  prepare_tree(instance, tree);
 
   return tree;
 }
@@ -467,8 +555,26 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
   if (!instance.opts.redo_mode && cm.read())
   {
     const auto& ckp = cm.checkpoint();
-    for (const auto& m: ckp.models)
-      instance.parted_msa.model(m.first, m.second);
+
+    // read start trees from file
+    if (sysutil_file_exists(instance.opts.start_tree_file()))
+    {
+      NewickStream ts(instance.opts.start_tree_file(), std::ios::in);
+      size_t i = 0;
+      while (i < instance.opts.num_searches && ts.peek() != EOF)
+      {
+        Tree tree;
+        ts >> tree;
+        i++;
+
+        if (i > ckp.ml_trees.size())
+        {
+          prepare_tree(instance, tree);
+          instance.start_trees.emplace_back(tree);
+        }
+      }
+      assert(i == instance.opts.num_searches);
+    }
 
     LOG_INFO_TS << "NOTE: Resuming execution from checkpoint " <<
         "(logLH: " << ckp.loglh() <<
@@ -479,11 +585,86 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
   }
 }
 
+void build_parsimony_msa(RaxmlInstance& instance)
+{
+  // create 1 partition per datatype
+  const PartitionedMSA& orig_msa = instance.parted_msa;
+
+  instance.parted_msa_parsimony.reset(new PartitionedMSA(orig_msa.taxon_names()));
+  PartitionedMSA& pars_msa = *instance.parted_msa_parsimony.get();
+
+  std::unordered_map<string, PartitionInfo*> datatype_pinfo_map;
+  for (const auto& pinfo: orig_msa.part_list())
+  {
+    const auto& model = pinfo.model();
+    auto data_type_name = model.data_type_name();
+
+    auto iter = datatype_pinfo_map.find(data_type_name);
+    if (iter == datatype_pinfo_map.end())
+    {
+      pars_msa.emplace_part_info(data_type_name, model.data_type(), model.name());
+      auto& pars_pinfo = pars_msa.part_list().back();
+      pars_pinfo.msa(MSA(pinfo.msa().num_sites()));
+      datatype_pinfo_map[data_type_name] = &pars_pinfo;
+    }
+    else
+    {
+      auto& msa = iter->second->msa();
+      msa.num_sites(msa.num_sites() + pinfo.msa().num_sites());
+    }
+  }
+
+  // set_per-datatype MSA
+  for (size_t j = 0; j < orig_msa.taxon_count(); ++j)
+  {
+    for (auto& pars_pinfo: pars_msa.part_list())
+    {
+      auto pars_datatype = pars_pinfo.model().data_type_name();
+      std::string sequence;
+      sequence.resize(pars_pinfo.msa().num_sites());
+      size_t offset = 0;
+
+      for (const auto& pinfo: orig_msa.part_list())
+      {
+        // different datatype -> skip for now
+        if (pinfo.model().data_type_name() != pars_datatype)
+          continue;
+
+        const auto w = pinfo.msa().weights();
+        const auto s = pinfo.msa().at(j);
+
+        for (size_t k = 0; k < w.size(); ++k)
+        {
+          auto wk = w[k];
+          while(wk-- > 0)
+            sequence[offset++] = s[k];
+        }
+      }
+
+      assert(offset == sequence.size());
+
+      pars_pinfo.msa().append(sequence);
+    }
+  }
+
+  // compress patterns
+  if (instance.opts.use_pattern_compression)
+  {
+    for (auto& pinfo: pars_msa.part_list())
+    {
+      pinfo.compress_patterns();
+    }
+  }
+}
+
 void build_start_trees(RaxmlInstance& instance, CheckpointManager& cm)
 {
   const auto& opts = instance.opts;
   const auto& parted_msa = instance.parted_msa;
-  const auto& msa = parted_msa.full_msa();
+
+  /* all start trees were already generated/loaded -> return */
+  if (cm.checkpoint().ml_trees.size() + instance.start_trees.size() >= instance.opts.num_searches)
+    return;
 
   switch (opts.start_tree)
   {
@@ -494,10 +675,17 @@ void build_start_trees(RaxmlInstance& instance, CheckpointManager& cm)
       instance.start_tree_stream.reset(new NewickStream(opts.tree_file, std::ios::in));
       break;
     case StartingTree::random:
-      LOG_INFO_TS << "Generating random starting tree(s) with " << msa.size() << " taxa" << endl;
+      LOG_INFO_TS << "Generating random starting tree(s) with " << parted_msa.taxon_count() <<
+                     " taxa" << endl;
       break;
     case StartingTree::parsimony:
-      LOG_INFO_TS << "Generating parsimony starting tree(s) with " << msa.size() << " taxa" << endl;
+      if (parted_msa.part_count() > 1)
+      {
+        LOG_DEBUG_TS << "Generating MSA partitioned by data type for parsimony computation" << endl;
+        build_parsimony_msa(instance);
+      }
+      LOG_INFO_TS << "Generating parsimony starting tree(s) with " << parted_msa.taxon_count()
+                  << " taxa" << endl;
       break;
     default:
       assert(0);
@@ -514,18 +702,11 @@ void build_start_trees(RaxmlInstance& instance, CheckpointManager& cm)
         instance.opts.num_searches++;
     }
 
-    // TODO: skip generation
-    if (i < cm.checkpoint().ml_trees.size())
-      continue;
-
-    /* fix missing branch lengths */
-    tree.fix_missing_brlens();
-
-    /* make sure tip indices are consistent between MSA and pll_tree */
-    tree.reset_tip_ids(msa.label_id_map());
-
-    instance.start_trees.emplace_back(move(tree));
+    instance.start_trees.emplace_back(tree);
   }
+
+  // free memory used for parsimony MSA
+  instance.parted_msa_parsimony.release();
 
   if (::ParallelContext::master_rank())
   {
@@ -600,8 +781,10 @@ void balance_load(RaxmlInstance& instance, WeightVectorList part_site_weights)
     {
       const auto& pos_map = comp_pos_map[part_range.part_id];
       const auto comp_start = part_range.start;
-      part_range.start = comp_start > 0 ? pos_map[comp_start] : 0;
-      part_range.length = pos_map[comp_start + part_range.length - 1] - part_range.start + 1;
+      const auto comp_end = comp_start + part_range.length - 1;
+
+      part_range.start = (comp_start > 0) ? pos_map[comp_start] : 0;
+      part_range.length = pos_map[comp_end] - part_range.start + 1;
     }
   }
 
@@ -613,6 +796,7 @@ void generate_bootstraps(RaxmlInstance& instance, const Checkpoint& checkp)
 {
   if (instance.opts.command == Command::bootstrap || instance.opts.command == Command::all)
   {
+    /* generate replicate alignments */
     BootstrapGenerator bg;
     for (size_t b = 0; b < instance.opts.num_bootstraps; ++b)
     {
@@ -623,6 +807,17 @@ void generate_bootstraps(RaxmlInstance& instance, const Checkpoint& checkp)
         continue;
 
       instance.bs_reps.emplace_back(bg.generate(instance.parted_msa, seed));
+    }
+
+    /* generate starting trees for bootstrap searches */
+    for (size_t b = 0; b < instance.opts.num_bootstraps; ++b)
+    {
+      auto tree = generate_tree(instance, StartingTree::random);
+
+      if (b < checkp.bs_trees.size())
+        continue;
+
+      instance.bs_start_trees.emplace_back(move(tree));
     }
   }
 }
@@ -700,6 +895,7 @@ void draw_bootstrap_support(RaxmlInstance& instance, const Checkpoint& checkp)
 
 void check_terrace(const RaxmlInstance& instance, const Tree& tree)
 {
+#ifdef _RAXML_TERRAPHAST
   if (instance.parted_msa.part_count() > 1)
   {
     auto newick_str = to_newick_string_rooted(tree);
@@ -732,6 +928,10 @@ void check_terrace(const RaxmlInstance& instance, const Tree& tree)
       LOG_ERROR << "ERROR: Failed to compute terrace: " << e.what() << endl << endl;
     }
   }
+#else
+  RAXML_UNUSED(instance);
+  RAXML_UNUSED(tree);
+#endif
 }
 
 void save_ml_trees(const Options& opts, const Checkpoint& checkp)
@@ -860,6 +1060,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
   /* get partitions assigned to the current thread */
   auto const& part_assign = instance.proc_part_assign.at(ParallelContext::proc_id());
 
+  bool use_ckp_tree = true;
   if ((opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate ) && !instance.start_trees.empty())
   {
@@ -876,7 +1077,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
     }
 
     size_t start_tree_num = cm.checkpoint().ml_trees.size();
-    bool use_ckp_tree = cm.checkpoint().search_state.step != CheckpointStep::start;
+    use_ckp_tree = use_ckp_tree && cm.checkpoint().search_state.step != CheckpointStep::start;
     for (const auto& tree: instance.start_trees)
     {
       assert(!tree.empty());
@@ -885,11 +1086,15 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
       if (use_ckp_tree)
       {
+        // restore search state from checkpoint (tree + model params)
         treeinfo.reset(new TreeInfo(opts, cm.checkpoint().tree, master_msa, part_assign));
+        assign_models(*treeinfo, cm.checkpoint());
         use_ckp_tree = false;
       }
       else
+      {
         treeinfo.reset(new TreeInfo(opts, tree, master_msa, part_assign));
+      }
 
       Optimizer optimizer(opts);
       if (opts.command == Command::evaluate)
@@ -939,7 +1144,9 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   /* infer bootstrap trees if needed */
   size_t bs_num = cm.checkpoint().bs_trees.size();
-  for (const auto bs: instance.bs_reps)
+  auto bs_start_tree = instance.bs_start_trees.cbegin();
+  use_ckp_tree = use_ckp_tree && cm.checkpoint().search_state.step != CheckpointStep::start;
+  for (const auto& bs: instance.bs_reps)
   {
     ++bs_num;
 
@@ -952,10 +1159,27 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
     auto const& bs_part_assign = instance.proc_part_assign.at(ParallelContext::proc_id());
 
-//    Tree tree = Tree::buildRandom(master_msa.full_msa());
-    /* for now, use the same random tree for all bootstraps */
-    const Tree& tree = instance.random_tree;
-    treeinfo.reset(new TreeInfo(opts, tree, master_msa, bs_part_assign, bs.site_weights));
+    if (use_ckp_tree)
+    {
+      // restore search state from checkpoint (tree + model params)
+      treeinfo.reset(new TreeInfo(opts, cm.checkpoint().tree, master_msa, bs_part_assign, bs.site_weights));
+      assign_models(*treeinfo, cm.checkpoint());
+      use_ckp_tree = false;
+    }
+    else
+    {
+      treeinfo.reset(new TreeInfo(opts, *bs_start_tree, master_msa, bs_part_assign, bs.site_weights));
+    }
+
+//    size_t sumw = 0;
+//    for (auto sw: bs.site_weights)
+//      for (auto w: sw)
+//      {
+//        sumw += w;
+//        LOG_INFO << w << "  ";
+//      }
+//
+//    LOG_INFO << "\n\nTotal BS sites: " << sumw << endl;
 
     Optimizer optimizer(opts);
     optimizer.optimize_topology(*treeinfo, cm);
@@ -967,7 +1191,10 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
     cm.save_bs_tree();
     cm.reset_search_state();
+    ++bs_start_tree;
   }
+
+  assert(bs_start_tree == instance.bs_start_trees.cend());
 
   ParallelContext::thread_barrier();
 }
@@ -977,9 +1204,30 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   auto const& opts = instance.opts;
   auto& parted_msa = instance.parted_msa;
 
+  /* if resuming from a checkpoint, use binary MSA (if exists) */
+  if (!instance.opts.redo_mode &&
+      sysutil_file_exists(instance.opts.checkp_file()) &&
+      sysutil_file_exists(instance.opts.binary_msa_file()))
+  {
+    instance.opts.msa_file = instance.opts.binary_msa_file();
+  }
+
   init_part_info(instance);
 
-  load_msa(instance);
+  if (instance.parted_msa.part_info(0).msa().empty())
+    load_msa(instance);
+
+  // temp workaround: since MSA pattern compression calls rand(), it will change all random
+  // numbers generated afterwards. so just reset seed to the initial value to ensure that
+  // starting trees, BS replicates etc. are the same regardless whether pat.comp is ON or OFF
+  srand(instance.opts.random_seed);
+
+  // we need 2 doubles for each partition AND threads to perform parallel reduction,
+  // so resize the buffer accordingly
+  const size_t reduce_buffer_size = std::max(1024lu, 2 * sizeof(double) *
+                                     parted_msa.part_count() * ParallelContext::num_threads());
+  LOG_DEBUG << "Parallel reduction buffer size: " << reduce_buffer_size/1024 << " KB\n\n";
+  ParallelContext::resize_buffer(reduce_buffer_size);
 
   /* init template tree */
   instance.random_tree = generate_tree(instance, StartingTree::random);
@@ -1000,10 +1248,50 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   /* run load balancing algorithm */
   balance_load(instance);
 
+  /* check that we have enough patterns per thread */
+  if (ParallelContext::master_rank() && ParallelContext::num_procs() > 1)
+  {
+    PartitionAssignmentStats stats(instance.proc_part_assign);
+
+    const size_t soft_limit = 600;
+    const size_t hard_limit = 150;
+
+    // TODO: adapt for mixed alignments (e.g., DNA + AA partitions)
+    auto states = parted_msa.part_info(0).model().num_states();
+    for (const auto& p: parted_msa.part_list())
+      states = std::max(states, p.model().num_states());
+
+    const size_t norm_thread_pats = stats.min_thread_sites * (((double) states) / 4.) *
+        (ParallelContext::num_threads() < 8 ? 3 : 1);
+    if (norm_thread_pats < soft_limit)
+    {
+      size_t opt_threads = trunc(stats.total_sites / (soft_limit*2)) + 1;
+      LOG_WARN << endl;
+      LOG_WARN << "WARNING: You are probably using too many threads (" << ParallelContext::num_threads() <<
+          ") for your alignment with " << stats.total_sites << " unique patterns." << endl;
+      LOG_WARN << "NOTE:    For the optimal throughput, please consider using " << opt_threads <<
+          " threads ('--threads " << opt_threads << "' option)" << endl;
+      LOG_WARN << "NOTE:    and parallelize across starting trees/bootstrap replicates." << endl;
+      LOG_WARN << "NOTE:    As a general rule-of-thumb, please assign at least 200-1000 "
+          "alignment patterns per thread." << endl;
+
+      if (norm_thread_pats < hard_limit && !instance.opts.force_mode)
+        throw runtime_error("Too few patterns per thread! "
+                            "RAxML-NG will terminate now to avoid wasting resources.\n"
+                            "NOTE:  Please reduce the number of threads (see guidelines above).\n"
+                            "NOTE:  This check can be disabled with the '--force' option.");
+    }
+  }
+
+  // TEMP WORKAROUND: here we reset random seed once again to make sure that BS replicates
+  // are not affected by the number of ML search starting trees that has been generated before
+  srand(instance.opts.random_seed);
+
   /* generate bootstrap replicates */
   generate_bootstraps(instance, cm.checkpoint());
 
-  instance.opts.remove_result_files();
+  if (ParallelContext::master_rank())
+    instance.opts.remove_result_files();
 
   thread_main(instance, cm);
 
@@ -1147,6 +1435,23 @@ int main(int argc, char** argv)
         instance.start_tree_stream.reset(new NewickStream(instance.opts.tree_file, std::ios::in));
         Tree tree = generate_tree(instance, instance.opts.start_tree);
         check_terrace(instance, tree);
+        break;
+      }
+      case Command::check:
+        instance.opts.use_pattern_compression = false;
+      case Command::parse:
+      {
+        init_part_info(instance);
+        load_msa(instance);
+        if (instance.opts.start_tree == StartingTree::user)
+        {
+          LOG_INFO << "Loading tree from: " << instance.opts.tree_file << endl << endl;
+          if (!sysutil_file_exists(instance.opts.tree_file))
+            throw runtime_error("File not found: " + instance.opts.tree_file);
+          instance.start_tree_stream.reset(new NewickStream(instance.opts.tree_file, std::ios::in));
+          Tree tree = generate_tree(instance, instance.opts.start_tree);
+        }
+        LOG_INFO << "Alignment can be successfully read by RAxML-NG." << endl << endl;
         break;
       }
       case Command::none:

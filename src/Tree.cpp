@@ -9,10 +9,9 @@ Tree::Tree (const Tree& other) : BasicTree(other._num_tips),
 {
 }
 
-Tree::Tree (Tree&& other) : BasicTree(other._num_tips), _pll_utree(other._pll_utree)
+Tree::Tree (Tree&& other) : BasicTree(other._num_tips), _pll_utree(other._pll_utree.release())
 {
   other._num_tips = 0;
-  other._pll_utree = nullptr;
   swap(_pll_utree_tips, other._pll_utree_tips);
 }
 
@@ -20,11 +19,9 @@ Tree& Tree::operator=(const Tree& other)
 {
   if (this != &other)
   {
-    if (_pll_utree)
-      pll_utree_destroy(_pll_utree, nullptr);
-
-    _pll_utree = other.pll_utree_copy();
+    _pll_utree.reset(other.pll_utree_copy());
     _num_tips = other._num_tips;
+    _pll_utree_tips.clear();
   }
 
   return *this;
@@ -36,11 +33,7 @@ Tree& Tree::operator=(Tree&& other)
   {
     _num_tips = 0;
     _pll_utree_tips.clear();
-    if (_pll_utree)
-    {
-      pll_utree_destroy(_pll_utree, nullptr);
-     _pll_utree = nullptr;
-    }
+    _pll_utree.release();
 
     swap(_num_tips, other._num_tips);
     swap(_pll_utree, other._pll_utree);
@@ -52,71 +45,101 @@ Tree& Tree::operator=(Tree&& other)
 
 Tree::~Tree ()
 {
-  if (_pll_utree)
-    pll_utree_destroy(_pll_utree, nullptr);
 }
 
 Tree Tree::buildRandom(size_t num_tips, const char * const* tip_labels)
 {
-  Tree tree;
+  PllUTreeUniquePtr pll_utree(pllmod_utree_create_random(num_tips, tip_labels));
 
-  tree._num_tips = num_tips;
-  tree._pll_utree = pllmod_utree_create_random(num_tips, tip_labels);
+  libpll_check_error("ERROR building random tree");
+  assert(pll_utree);
 
-  return tree;
+  return Tree(pll_utree);
 }
 
-Tree Tree::buildRandom(const MSA& msa)
+Tree Tree::buildRandom(const NameList& taxon_names)
 {
-  return Tree::buildRandom(msa.size(), (const char * const*) msa.pll_msa()->label);
+  std::vector<const char*> tip_labels(taxon_names.size(), nullptr);
+  for (size_t i = 0; i < taxon_names.size(); ++i)
+    tip_labels[i] = taxon_names[i].data();
+
+  return Tree::buildRandom(taxon_names.size(), (const char * const*) tip_labels.data());
 }
 
 Tree Tree::buildParsimony(const PartitionedMSA& parted_msa, unsigned int random_seed,
                            unsigned int attributes, unsigned int * score)
 {
-  Tree tree;
   unsigned int lscore;
   unsigned int *pscore = score ? score : &lscore;
 
-  const MSA& msa = parted_msa.full_msa();
+  LOG_DEBUG << "Parsimony seed: " << random_seed << endl;
 
-  // temporary workaround
-  unsigned int num_states = parted_msa.model(0).num_states();
-  const unsigned int * map = parted_msa.model(0).charmap();
-  const unsigned int * weights = msa.weights().empty() ? nullptr : msa.weights().data();
+  auto taxon_names = parted_msa.taxon_names();
+  auto taxon_count = taxon_names.size();
+  std::vector<const char*> tip_labels(taxon_names.size(), nullptr);
+  for (size_t i = 0; i < taxon_names.size(); ++i)
+    tip_labels[i] = taxon_names[i].data();
 
-  tree._num_tips = msa.size();
+  // create pll_partitions
+  std::vector<pll_partition*> pars_partitions(parted_msa.part_count(), nullptr);
+  size_t i = 0;
+  for (const auto& pinfo: parted_msa.part_list())
+  {
+    const auto& model = pinfo.model();
+    const auto& msa = pinfo.msa();
 
+    auto partition = pll_partition_create(taxon_count,
+                                         0,   /* number of CLVs */
+                                         model.num_states(),
+                                         msa.length(),
+                                         1,
+                                         1, /* pmatrix count */
+                                         1,  /* rate_cats */
+                                         0,  /* scale buffers */
+                                         attributes);
 
-  tree._pll_utree = pllmod_utree_create_parsimony(msa.size(),
-                                                  msa.length(),
-                                                  msa.pll_msa()->label,
-                                                  msa.pll_msa()->sequence,
-                                                  weights,
-                                                  map,
-                                                  num_states,
-                                                  attributes,
-                                                  random_seed,
-                                                  pscore);
+    /* set pattern weights */
+    if (!msa.weights().empty())
+      pll_set_pattern_weights(partition, msa.weights().data());
 
-  if (!tree._pll_utree)
-    throw runtime_error("ERROR building parsimony tree: " + string(pll_errmsg));
+    /* set tip states */
+    for (size_t j = 0; j < msa.size(); ++j)
+    {
+      pll_set_tip_states(partition, j, model.charmap(), msa.at(j).c_str());
+    }
 
-  return tree;
+    pars_partitions[i++] = partition;
+  }
+  assert(i == pars_partitions.size());
+
+  PllUTreeUniquePtr pll_utree(pllmod_utree_create_parsimony_multipart(taxon_count,
+                                                                      (char* const*) tip_labels.data(),
+                                                                      pars_partitions.size(),
+                                                                      pars_partitions.data(),
+                                                                      random_seed,
+                                                                      pscore));
+
+  for (auto p: pars_partitions)
+    pll_partition_destroy(p);
+
+  libpll_check_error("ERROR building parsimony tree");
+  assert(pll_utree);
+
+  return Tree(pll_utree);
 }
 
 Tree Tree::loadFromFile(const std::string& file_name)
 {
-  Tree tree;
-
   pll_utree_t * utree;
   pll_rtree_t * rtree;
+  const char* fname = file_name.c_str();
 
-  if (!(rtree = pll_rtree_parse_newick(file_name.c_str())))
+  if (!(rtree = pll_rtree_parse_newick(fname)))
   {
-    if (!(utree = pll_utree_parse_newick(file_name.c_str())))
+    utree = pll_utree_parse_newick(fname);
+    if (!utree)
     {
-      throw runtime_error("ERROR reading tree file: " + string(pll_errmsg));
+      libpll_check_error("ERROR reading tree file");
     }
   }
   else
@@ -126,12 +149,13 @@ Tree Tree::loadFromFile(const std::string& file_name)
 
     /* optional step if using default PLL clv/pmatrix index assignments */
     pll_utree_reset_template_indices(get_pll_utree_root(utree), utree->tip_count);
+
+    libpll_check_error("ERROR unrooting the tree");
   }
 
-  tree._num_tips = utree->tip_count;
-  tree._pll_utree = utree;
+  assert(utree);
 
-  return tree;
+  return Tree(PllUTreeUniquePtr(utree));
 }
 
 PllNodeVector const& Tree::tip_nodes() const
@@ -184,7 +208,12 @@ void Tree::reset_tip_ids(const NameIdMap& label_id_map)
 
 void Tree::fix_missing_brlens(double new_brlen)
 {
-  pllmod_utree_set_length_recursive(_pll_utree, new_brlen, 1);
+  pllmod_utree_set_length_recursive(_pll_utree.get(), new_brlen, 1);
+}
+
+void Tree::reset_brlens(double new_brlen)
+{
+  pllmod_utree_set_length_recursive(_pll_utree.get(), new_brlen, 0);
 }
 
 PllNodeVector Tree::subnodes() const

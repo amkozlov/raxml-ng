@@ -105,10 +105,11 @@ public:
 
   /* getters */
   DataType data_type() const { return _data_type; };
+  std::string data_type_name() const;
   unsigned int num_states() const { return _num_states; };
   std::string name() const { return _name; };
 
-  const unsigned int* charmap() const;
+  const pll_state_t* charmap() const;
   const SubstitutionModel submodel(size_t i) const { return _submodels.at(i); };
 
   unsigned int ratehet_mode() const { return _rate_het; };
@@ -146,6 +147,11 @@ public:
   void ratecat_weights(doubleVector const& value) { _ratecat_weights = value; };
 
   void error_model_params(const doubleVector &param_vals) { _error_model->params(param_vals); };
+  void set_param_mode_default(int param, ParamValue mode)
+  {
+    if (param_mode(param) == ParamValue::undefined)
+      _param_mode[param] = mode;
+  };
 
   /* initialization */
   void init_from_string(const std::string& model_string);
@@ -154,6 +160,7 @@ private:
   std::string _name;
   DataType _data_type;
   unsigned int _num_states;
+  std::shared_ptr<pll_state_t> _custom_charmap;
 
   unsigned int _rate_het;
   unsigned int _num_ratecats;
@@ -182,7 +189,6 @@ private:
   void init_model_opts(const std::string& model_opts, const pllmod_mixture_model_t& mix_model);
 };
 
-void assign(Model& model, const pllmod_msa_stats_t * stats);
 void assign(Model& model, const pll_partition_t * partition);
 void assign(pll_partition_t * partition, const Model& model);
 

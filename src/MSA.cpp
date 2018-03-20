@@ -93,13 +93,14 @@ void MSA::append(const string& sequence, const string& header)
     _length = sequence.length();
     if (!_num_sites)
       _num_sites = _length;
-    _weights.assign(_length, 1.);
+    if (_weights.empty())
+      _weights.assign(_length, 1.);
   }
 
   _dirty = true;
 }
 
-void MSA::compress_patterns(const unsigned int * charmap)
+void MSA::compress_patterns(const pll_state_t * charmap)
 {
   update_pll_msa();
 
@@ -115,6 +116,11 @@ void MSA::compress_patterns(const unsigned int * charmap)
 
   _length = _pll_msa->length;
   _weights = WeightVector(w, w + _pll_msa->length);
+
+  for (auto& entry : _sequences)
+  {
+    entry.resize(_length);
+  }
 
   _dirty = false;
 }
@@ -268,6 +274,7 @@ void MSA::remove_sites(const std::vector<size_t>& site_indices)
   if (!_weights.empty())
   {
     assert(_weights.size() == _length);
+    _num_sites = 0;
     size_t pos = 0;
     auto ignore = sorted_indicies.cbegin();
     for (size_t i = 0; i < _weights.size(); ++i)
@@ -275,6 +282,7 @@ void MSA::remove_sites(const std::vector<size_t>& site_indices)
       if (ignore == sorted_indicies.cend() || i != *ignore)
       {
         _weights[pos++] = _weights[i];
+        _num_sites += _weights[i];
       }
       else
         ignore++;
@@ -282,8 +290,15 @@ void MSA::remove_sites(const std::vector<size_t>& site_indices)
     assert(pos == new_length);
     _weights.resize(new_length);
   }
+  else
+    _num_sites = new_length;
 
   _length = new_length;
   _dirty = true;
 }
 
+void MSA::update_num_sites()
+{
+  if (!_weights.empty())
+    _num_sites =  std::accumulate(_weights.begin(), _weights.end(), 0);
+}

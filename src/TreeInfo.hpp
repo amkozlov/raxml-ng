@@ -59,6 +59,9 @@ public:
 private:
   pllmod_treeinfo_t * _pll_treeinfo;
   IDSet _parts_master;
+  int _brlen_opt_method;
+  double _brlen_min;
+  double _brlen_max;
 
   PartitionedMSA _local_part_msa;
 

@@ -2,16 +2,27 @@
 
 using namespace std;
 
-PartitionedMSA::~PartitionedMSA ()
+PartitionedMSA::PartitionedMSA(const NameList& taxon_names)
 {
-  // TODO Auto-generated destructor stub
+  set_taxon_names(taxon_names);
 }
 
 PartitionedMSA& PartitionedMSA::operator=(PartitionedMSA&& other)
 {
   _part_list = std::move(other._part_list);
   _full_msa = std::move(other._full_msa);
+  _taxon_names = std::move(other._taxon_names);
+  _taxon_id_map = std::move(other._taxon_id_map);
    return *this;
+}
+
+void PartitionedMSA::set_taxon_names(const NameList& taxon_names)
+{
+  _taxon_names.assign(taxon_names.cbegin(), taxon_names.cend());
+  for (size_t i = 0; i < _taxon_names.size(); ++i)
+    _taxon_id_map[_taxon_names[i]] = i;
+
+  assert(_taxon_names.size() == taxon_names.size() && _taxon_id_map.size() == taxon_names.size());
 }
 
 std::vector<unsigned int> PartitionedMSA::get_site_part_assignment()
@@ -50,6 +61,13 @@ std::vector<unsigned int> PartitionedMSA::get_site_part_assignment()
     throw e_unassinged;
 
   return spa;
+}
+
+void PartitionedMSA::full_msa(MSA&& msa)
+{
+  _full_msa = std::move(msa);
+
+  set_taxon_names(_full_msa.labels());
 }
 
 void PartitionedMSA::split_msa()
@@ -97,6 +115,30 @@ size_t PartitionedMSA::total_length() const
   return sum;
 }
 
+size_t PartitionedMSA::total_sites() const
+{
+  size_t sum = 0;
+
+  for (const auto& pinfo: _part_list)
+  {
+    sum += pinfo.stats().site_count;
+  }
+
+  return sum;
+}
+
+size_t PartitionedMSA::total_patterns() const
+{
+  size_t sum = 0;
+
+  for (const auto& pinfo: _part_list)
+  {
+    sum += pinfo.stats().pattern_count;
+  }
+
+  return sum;
+}
+
 void PartitionedMSA::set_model_empirical_params()
 {
   for (PartitionInfo& pinfo: _part_list)
@@ -110,19 +152,20 @@ std::ostream& operator<<(std::ostream& stream, const PartitionedMSA& part_msa)
   for (size_t p = 0; p < part_msa.part_count(); ++p)
   {
     const PartitionInfo& pinfo = part_msa.part_info(p);
+    const auto pstats = pinfo.stats();
     stream << "Partition " << p << ": " << pinfo.name() << endl;
     stream << "Model: " << pinfo.model().to_string() << endl;
     if (pinfo.msa().num_patterns())
     {
-      stream << "Alignment sites / patterns: " << pinfo.msa().num_sites() <<
-          " / " << pinfo.msa().num_patterns() << endl;
+      stream << "Alignment sites / patterns: " << pstats.site_count <<
+          " / " << pstats.pattern_count << endl;
     }
     else
       stream << "Alignment sites: " << pinfo.msa().num_sites() << endl;
 
 //    stream << fixed;
-    stream << "Gaps: " << setprecision(2) << (pinfo.stats()->gap_prop * 100) << " %" << endl;
-    stream << "Invariant sites: " << setprecision(2) << (pinfo.stats()->inv_prop * 100) << " %" << endl;
+    stream << "Gaps: " << setprecision(2) << (pstats.gap_prop * 100) << " %" << endl;
+    stream << "Invariant sites: " << setprecision(2) << (pstats.inv_prop() * 100) << " %" << endl;
     stream << endl;
   }
 

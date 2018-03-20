@@ -16,7 +16,7 @@ const unordered_map<DataType,unsigned int,EnumClassHash>  DATATYPE_STATES { {Dat
                                                                             {DataType::diploid10, 10}
                                                                           };
 
-const unordered_map<DataType, const unsigned int *,EnumClassHash>  DATATYPE_MAPS {
+const unordered_map<DataType,const pll_state_t*,EnumClassHash>  DATATYPE_MAPS {
   {DataType::dna, pll_map_nt},
   {DataType::protein, pll_map_aa},
   {DataType::binary, pll_map_bin},
@@ -34,6 +34,26 @@ static string read_option(istringstream& s)
     os.put(toupper(s.get()));
   }
   return os.str();
+}
+
+static bool read_param(istringstream& s, string& val)
+{
+  if (s.peek() == '{' || s.peek() == '[')
+  {
+    auto delim = (s.peek() == '{') ? '}' : ']';
+
+    // consume the opening bracket
+    s.get();
+
+    char str[1024];
+    if (!s.getline(str, 1024, delim))
+      throw parse_error();
+    val = str;
+
+    return true;
+  }
+  else
+    return false;
 }
 
 template<typename T>
@@ -76,6 +96,42 @@ static bool read_param(istringstream& s, std::vector<T>& vec)
 }
 
 template<typename T>
+static bool read_param_file(istringstream& s, std::vector<T>& vec)
+{
+  if (s.peek() == '{' || s.peek() == '[')
+  {
+    // first, try to interpret parameter value as a file name
+    auto delim = (s.peek() == '{') ? '}' : ']';
+    auto start = s.tellg();
+
+    // consume the opening bracket
+    s.get();
+
+    char fname[1024];
+    s.getline(fname, 1024, delim);
+    if (sysutil_file_exists(fname))
+    {
+      ifstream fs(fname);
+      while (!fs.eof())
+      {
+        T val;
+        fs >> val;
+        if (!fs.fail())
+          vec.push_back(val);
+      }
+      return true;
+    }
+    else
+    {
+      // if it failed, rewind the stream and try to parse as a list of values
+      s.seekg(start);
+      return read_param(s, vec);
+    }
+  }
+  return false;
+}
+
+template<typename T>
 static void print_param(ostringstream& s, T val)
 {
   s << "{" << val << "}";
@@ -95,7 +151,7 @@ static void print_param(ostringstream& s, const std::vector<T>& vec)
 }
 
 Model::Model (DataType data_type, const std::string &model_string) :
-    _data_type(data_type)
+    _data_type(data_type), _custom_charmap(nullptr)
 {
   // RAxML compatibility hack, TODO: generic model name aliases
   const string model_string_tmp = model_string == "DNA" ? "GTR+G+F" : model_string;
@@ -103,9 +159,9 @@ Model::Model (DataType data_type, const std::string &model_string) :
   init_from_string(model_string_tmp);
 }
 
-const unsigned int * Model::charmap() const
+const pll_state_t * Model::charmap() const
 {
-  return DATATYPE_MAPS.at(_data_type);
+  return _custom_charmap ? _custom_charmap.get() : DATATYPE_MAPS.at(_data_type);
 }
 
 void Model::init_from_string(const std::string &model_string)
@@ -117,8 +173,19 @@ void Model::init_from_string(const std::string &model_string)
   /* guess data type */
   autodetect_data_type(model_name);
 
-  /* set number of states based on datatype (unless already set) */
-  _num_states = DATATYPE_STATES.at(_data_type);
+  assert(_data_type != DataType::autodetect);
+
+  /* set number of states based on datatype */
+  if (_data_type == DataType::multistate)
+  {
+    _num_states = pllmod_util_model_numstates_mult(model_name.c_str());
+    _custom_charmap = shared_ptr<pll_state_t>(pllmod_util_model_charmap_mult(_num_states), free);
+
+    libpll_check_error("ERROR in model specification |" + model_name + "|");
+    assert(_custom_charmap);
+  }
+  else
+    _num_states = DATATYPE_STATES.at(_data_type);
 
   pllmod_mixture_model_t * mix_model = init_mix_model(model_name);
 
@@ -127,13 +194,43 @@ void Model::init_from_string(const std::string &model_string)
   pllmod_util_model_mixture_destroy(mix_model);
 }
 
+std::string Model::data_type_name() const
+{
+  switch (_data_type)
+  {
+    case DataType::binary:
+      return "BIN";
+    case DataType::dna:
+      return "DNA";
+    case DataType::protein:
+      return "AA";
+    case DataType::diploid10:
+      return "GT";
+    case DataType::multistate:
+      return "MULTI" + std::to_string(_num_states);
+    case DataType::autodetect:
+      return "AUTO";
+    default:
+      return "UNKNOWN";
+  }
+}
 
 void Model::autodetect_data_type(const std::string &model_name)
 {
   if (_data_type == DataType::autodetect)
   {
     if (pllmod_util_model_exists_genotype(model_name.c_str()))
+    {
       _data_type = DataType::diploid10;
+    }
+    else if (pllmod_util_model_exists_mult(model_name.c_str()))
+    {
+      _data_type = DataType::multistate;
+    }
+    else if (model_name == "BIN")
+    {
+      _data_type = DataType::binary;
+    }
     else if (pllmod_util_model_exists_protein(model_name.c_str()) ||
              pllmod_util_model_exists_protmix(model_name.c_str()))
     {
@@ -168,9 +265,17 @@ pllmod_mixture_model_t * Model::init_mix_model(const std::string &model_name)
     {
       modinfo =  pllmod_util_model_info_dna(model_cstr);
     }
+    else if (_data_type == DataType::binary)
+    {
+      modinfo =  pllmod_util_model_create_custom("BIN", 2, NULL, NULL, NULL, NULL);
+    }
     else if (_data_type == DataType::diploid10)
     {
       modinfo =  pllmod_util_model_info_genotype(model_cstr);
+    }
+    else if (_data_type == DataType::multistate)
+    {
+      modinfo =  pllmod_util_model_info_mult(model_cstr);
     }
 
     // TODO: user models must be defined explicitly
@@ -179,11 +284,18 @@ pllmod_mixture_model_t * Model::init_mix_model(const std::string &model_name)
 //      modinfo =  pllmod_util_model_create_custom("USER", _num_states, NULL, NULL, model_cstr, NULL);
 
     if (!modinfo)
-      throw runtime_error("Invalid model name: " + model_name);
+    {
+      if (pll_errno)
+        libpll_check_error("ERROR model initialization |" + model_name + "|");
+      else
+        throw runtime_error("Invalid model name: " + model_name);
+    }
 
     /* create pseudo-mixture with 1 component */
     mix_model = pllmod_util_model_mixture_create(modinfo->name, 1, &modinfo, NULL, NULL,
                                                   PLLMOD_UTIL_MIXTYPE_FIXED);
+
+    pllmod_util_model_destroy(modinfo);
   }
 
   return mix_model;
@@ -229,7 +341,7 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
   try
   {
     doubleVector user_srates;
-    if (read_param(ss, user_srates))
+    if (read_param_file(ss, user_srates))
     {
       // TODO support multi-matrix models
       if (_submodels.size() > 0)
@@ -324,6 +436,33 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
         }
         break;
       }
+      case 'B':
+        try
+        {
+          switch (toupper(ss.get()))
+          {
+            case EOF:
+            case '\0':
+            case '+':
+            case 'O':
+              param_mode = ParamValue::ML;
+              break;
+            case 'U':
+              if (read_param(ss, _brlen_scaler))
+                param_mode = ParamValue::user;
+              else
+                throw parse_error();
+              break;
+            default:
+              throw parse_error();
+          }
+          _param_mode[PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER] = param_mode;
+        }
+        catch(parse_error& e)
+        {
+          throw runtime_error(string("Invalid branch length scaler specification: ") + s);
+        }
+        break;
       case 'F':
         try
         {
@@ -347,7 +486,7 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
 
               /* for now, read single set of frequencies */
               doubleVector user_freqs;
-              if (read_param(ss, user_freqs))
+              if (read_param_file(ss, user_freqs))
               {
                 if (user_freqs.size() != _num_states)
                 {
@@ -453,6 +592,40 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
         catch(parse_error& e)
         {
           throw runtime_error(string("Invalid GAMMA specification: ") + s);
+        }
+        break;
+      case 'M':
+        try
+        {
+           std::string state_chars, gap_chars;
+           int case_sensitive = 1;
+
+           if (tolower(ss.peek()) == 'i')
+           {
+             ss.get();
+             case_sensitive = 0;
+           }
+
+           if (!read_param(ss, state_chars))
+             throw parse_error();
+
+           read_param(ss, gap_chars);
+
+           _custom_charmap = shared_ptr<pll_state_t>(
+               pllmod_util_charmap_create(_num_states,
+                                          state_chars.c_str(),
+                                          gap_chars.c_str(),
+                                          case_sensitive),
+               free);
+           if (!_custom_charmap)
+           {
+             assert(pll_errno);
+             throw parse_error();
+           }
+        }
+        catch(parse_error& e)
+        {
+          throw runtime_error(string("Invalid character map specification: ") + s);
         }
         break;
       case 'R':
@@ -711,6 +884,18 @@ std::string Model::to_string(bool print_params) const
     }
   }
 
+  switch(out_param_mode.at(PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER))
+  {
+    case ParamValue::ML:
+      model_string << "+B";
+      break;
+    case ParamValue::user:
+      model_string << "+BU{" << _brlen_scaler << "}";
+      break;
+    default:
+      break;
+  }
+
   switch(_ascbias_type)
   {
     case AscBiasCorrection::lewis:
@@ -751,72 +936,6 @@ int Model::params_to_optimize() const
   }
 
   return params_to_optimize;
-}
-
-void assign(Model& model, const pllmod_msa_stats_t * stats)
-{
-  /* either compute empirical P-inv, or set the fixed user-specified value */
-  switch (model.param_mode(PLLMOD_OPT_PARAM_PINV))
-  {
-    case ParamValue::empirical:
-      model.pinv(stats->inv_prop);
-      break;
-    case ParamValue::ML:
-      /* use half of empirical pinv as a starting value */
-      model.pinv(stats->inv_prop / 2);
-      break;
-    case ParamValue::user:
-    case ParamValue::undefined:
-      /* nothing to do here */
-      break;
-    default:
-      assert(0);
-  }
-
-   /* assign empirical base frequencies */
-  switch (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES))
-  {
-    case ParamValue::empirical:
-//      if (_model.data_type == DataType::diploid10)
-//        /* for now, use a separate function to compute emp. freqs for diploid10 data*/
-//        alloc_freqs = base_freqs = get_diploid10_empirircal_freqs(msa);
-//      else
-      {
-//        base_freqs = pllmod_msa_empirical_frequencies(partition);
-        assert(stats->freqs && stats->states == model.num_states());
-        model.base_freqs(doubleVector(stats->freqs, stats->freqs + stats->states));
-      }
-      break;
-    case ParamValue::user:
-    case ParamValue::equal:
-    case ParamValue::ML:
-    case ParamValue::model:
-      /* nothing to do here */
-      break;
-    default:
-      assert(0);
-  }
-
-  /* assign empirical substitution rates */
-  switch (model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES))
-  {
-    case ParamValue::empirical:
-    {
-//      double * subst_rates = pllmod_msa_empirical_subst_rates(partition);
-      size_t n_subst_rates = pllmod_util_subst_rate_count(stats->states);
-      model.subst_rates(doubleVector(stats->subst_rates,
-                                     stats->subst_rates + n_subst_rates));
-      break;
-    }
-    case ParamValue::equal:
-    case ParamValue::user:
-    case ParamValue::ML:
-    case ParamValue::model:
-      /* nothing to do here */
-      break;
-    default:
-      assert(0);
-  }
 }
 
 void assign(Model& model, const pll_partition_t * partition)

@@ -1,11 +1,7 @@
 #ifndef RAXML_BOOTSTRAP_BOOTSTRAPGENERATOR_HPP_
 #define RAXML_BOOTSTRAP_BOOTSTRAPGENERATOR_HPP_
 
-#include <random>
-
 #include "../PartitionedMSA.hpp"
-
-typedef std::default_random_engine RandomGenerator;
 
 struct BootstrapReplicate
 {

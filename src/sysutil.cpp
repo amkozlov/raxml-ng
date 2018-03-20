@@ -27,6 +27,18 @@ void sysutil_fatal_libpll()
   sysutil_fatal("ERROR(%d): %s\n", pll_errno, pll_errmsg);
 }
 
+void libpll_check_error(const std::string& errmsg = "ERROR in libpll")
+{
+  if (pll_errno)
+    throw runtime_error(errmsg +  " (LIBPLL-" + to_string(pll_errno) + "): " + string(pll_errmsg));
+}
+
+void libpll_reset_error()
+{
+  pll_errno = 0;
+  strcpy(pll_errmsg, "");
+}
+
 void * xmemalign(size_t size, size_t alignment)
 {
   void * t = NULL;

@@ -13,9 +13,11 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <stdexcept>
+#include <random>
 
 extern "C" {
 //#include <libpll/pll.h>
+#include <libpll/pllmod_common.h>
 #include <libpll/pll_optimize.h>
 #include <libpll/pll_msa.h>
 #include <libpll/pll_tree.h>
@@ -43,6 +45,9 @@ extern "C" {
 #define RAXML_BRLEN_MAX           100.
 #define RAXML_BRLEN_TOLERANCE     1.0e-7
 
+#define RAXML_PINV_MIN            1.0e-9
+#define RAXML_PINV_MAX            0.99
+
 #define RAXML_FREERATE_MIN        0.001
 #define RAXML_FREERATE_MAX        100.
 
@@ -62,7 +67,7 @@ extern "C" {
 #define RAXML_RATESCALERS_TAXA    2000
 
 /* used to supress compiler warnings about unused args */
-#define UNUSED(expr) while (0) { (void)(expr); }
+#define RAXML_UNUSED(expr) PLLMOD_UNUSED(expr)
 
 // cpu features
 #define RAXML_CPU_SSE3  (1<<0)
@@ -73,6 +78,8 @@ extern "C" {
 /* system utils */
 void sysutil_fatal(const char * format, ...);
 void sysutil_fatal_libpll();
+void libpll_check_error(const std::string& errmsg);
+void libpll_reset_error();
 
 double sysutil_gettime();
 void sysutil_show_rusage();

@@ -106,6 +106,7 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, Checkpoint& ckp);
 
 void assign_tree(Checkpoint& ckp, const TreeInfo& treeinfo);
 void assign_models(Checkpoint& ckp, const TreeInfo& treeinfo);
+void assign_models(TreeInfo& treeinfo, const Checkpoint& ckp);
 
 void assign(Checkpoint& ckp, const TreeInfo& treeinfo);
 void assign(TreeInfo& treeinfo, const Checkpoint& ckp);
