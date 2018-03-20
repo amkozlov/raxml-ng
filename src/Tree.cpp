@@ -21,6 +21,7 @@ Tree& Tree::operator=(const Tree& other)
   {
     _pll_utree.reset(other.pll_utree_copy());
     _num_tips = other._num_tips;
+    _pll_utree_tips.clear();
   }
 
   return *this;
