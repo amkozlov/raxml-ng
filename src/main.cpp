@@ -51,6 +51,7 @@ struct RaxmlInstance
   unique_ptr<PartitionedMSA> parted_msa_parsimony;
   TreeList start_trees;
   BootstrapReplicateList bs_reps;
+  TreeList bs_start_trees;
   PartitionAssignmentList proc_part_assign;
   unique_ptr<LoadBalancer> load_balancer;
   unique_ptr<BootstrapTree> bs_tree;
@@ -464,6 +465,16 @@ void load_msa(RaxmlInstance& instance)
   }
 }
 
+void prepare_tree(const RaxmlInstance& instance, Tree& tree)
+{
+  /* fix missing branch lengths */
+  tree.fix_missing_brlens();
+
+  /* make sure tip indices are consistent between MSA and pll_tree */
+  assert(!instance.parted_msa.taxon_id_map().empty());
+  tree.reset_tip_ids(instance.parted_msa.taxon_id_map());
+}
+
 Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
 {
   Tree tree;
@@ -522,19 +533,9 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
 
   assert(!tree.empty());
 
+  prepare_tree(instance, tree);
+
   return tree;
-}
-
-void add_start_tree(RaxmlInstance& instance, Tree&& tree)
-{
-  /* fix missing branch lengths */
-  tree.fix_missing_brlens();
-
-  /* make sure tip indices are consistent between MSA and pll_tree */
-  assert(!instance.parted_msa.taxon_id_map().empty());
-  tree.reset_tip_ids(instance.parted_msa.taxon_id_map());
-
-  instance.start_trees.emplace_back(tree);
 }
 
 void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
@@ -560,14 +561,17 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
     {
       NewickStream ts(instance.opts.start_tree_file(), std::ios::in);
       size_t i = 0;
-      while (ts.peek() != EOF)
+      while (i < instance.opts.num_searches && ts.peek() != EOF)
       {
         Tree tree;
         ts >> tree;
         i++;
 
         if (i > ckp.ml_trees.size())
-          add_start_tree(instance, move(tree));
+        {
+          prepare_tree(instance, tree);
+          instance.start_trees.emplace_back(tree);
+        }
       }
       assert(i == instance.opts.num_searches);
     }
@@ -698,7 +702,7 @@ void build_start_trees(RaxmlInstance& instance, CheckpointManager& cm)
         instance.opts.num_searches++;
     }
 
-    add_start_tree(instance, move(tree));
+    instance.start_trees.emplace_back(tree);
   }
 
   // free memory used for parsimony MSA
@@ -777,8 +781,10 @@ void balance_load(RaxmlInstance& instance, WeightVectorList part_site_weights)
     {
       const auto& pos_map = comp_pos_map[part_range.part_id];
       const auto comp_start = part_range.start;
-      part_range.start = comp_start > 0 ? pos_map[comp_start] : 0;
-      part_range.length = pos_map[comp_start + part_range.length - 1] - part_range.start + 1;
+      const auto comp_end = comp_start + part_range.length - 1;
+
+      part_range.start = (comp_start > 0) ? pos_map[comp_start] : 0;
+      part_range.length = pos_map[comp_end] - part_range.start + 1;
     }
   }
 
@@ -790,6 +796,7 @@ void generate_bootstraps(RaxmlInstance& instance, const Checkpoint& checkp)
 {
   if (instance.opts.command == Command::bootstrap || instance.opts.command == Command::all)
   {
+    /* generate replicate alignments */
     BootstrapGenerator bg;
     for (size_t b = 0; b < instance.opts.num_bootstraps; ++b)
     {
@@ -800,6 +807,17 @@ void generate_bootstraps(RaxmlInstance& instance, const Checkpoint& checkp)
         continue;
 
       instance.bs_reps.emplace_back(bg.generate(instance.parted_msa, seed));
+    }
+
+    /* generate starting trees for bootstrap searches */
+    for (size_t b = 0; b < instance.opts.num_bootstraps; ++b)
+    {
+      auto tree = generate_tree(instance, StartingTree::random);
+
+      if (b < checkp.bs_trees.size())
+        continue;
+
+      instance.bs_start_trees.emplace_back(move(tree));
     }
   }
 }
@@ -1042,6 +1060,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
   /* get partitions assigned to the current thread */
   auto const& part_assign = instance.proc_part_assign.at(ParallelContext::proc_id());
 
+  bool use_ckp_tree = true;
   if ((opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate ) && !instance.start_trees.empty())
   {
@@ -1058,7 +1077,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
     }
 
     size_t start_tree_num = cm.checkpoint().ml_trees.size();
-    bool use_ckp_tree = cm.checkpoint().search_state.step != CheckpointStep::start;
+    use_ckp_tree = use_ckp_tree && cm.checkpoint().search_state.step != CheckpointStep::start;
     for (const auto& tree: instance.start_trees)
     {
       assert(!tree.empty());
@@ -1125,7 +1144,9 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   /* infer bootstrap trees if needed */
   size_t bs_num = cm.checkpoint().bs_trees.size();
-  for (const auto bs: instance.bs_reps)
+  auto bs_start_tree = instance.bs_start_trees.cbegin();
+  use_ckp_tree = use_ckp_tree && cm.checkpoint().search_state.step != CheckpointStep::start;
+  for (const auto& bs: instance.bs_reps)
   {
     ++bs_num;
 
@@ -1138,10 +1159,17 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
     auto const& bs_part_assign = instance.proc_part_assign.at(ParallelContext::proc_id());
 
-//    Tree tree = Tree::buildRandom(master_msa.full_msa());
-    /* for now, use the same random tree for all bootstraps */
-    const Tree& tree = instance.random_tree;
-    treeinfo.reset(new TreeInfo(opts, tree, master_msa, bs_part_assign, bs.site_weights));
+    if (use_ckp_tree)
+    {
+      // restore search state from checkpoint (tree + model params)
+      treeinfo.reset(new TreeInfo(opts, cm.checkpoint().tree, master_msa, bs_part_assign, bs.site_weights));
+      assign_models(*treeinfo, cm.checkpoint());
+      use_ckp_tree = false;
+    }
+    else
+    {
+      treeinfo.reset(new TreeInfo(opts, *bs_start_tree, master_msa, bs_part_assign, bs.site_weights));
+    }
 
 //    size_t sumw = 0;
 //    for (auto sw: bs.site_weights)
@@ -1163,7 +1191,10 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
     cm.save_bs_tree();
     cm.reset_search_state();
+    ++bs_start_tree;
   }
+
+  assert(bs_start_tree == instance.bs_start_trees.cend());
 
   ParallelContext::thread_barrier();
 }
@@ -1185,6 +1216,11 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   if (instance.parted_msa.part_info(0).msa().empty())
     load_msa(instance);
+
+  // temp workaround: since MSA pattern compression calls rand(), it will change all random
+  // numbers generated afterwards. so just reset seed to the initial value to ensure that
+  // starting trees, BS replicates etc. are the same regardless whether pat.comp is ON or OFF
+  srand(instance.opts.random_seed);
 
   // we need 2 doubles for each partition AND threads to perform parallel reduction,
   // so resize the buffer accordingly
@@ -1246,6 +1282,10 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
                             "NOTE:  This check can be disabled with the '--force' option.");
     }
   }
+
+  // TEMP WORKAROUND: here we reset random seed once again to make sure that BS replicates
+  // are not affected by the number of ML search starting trees that has been generated before
+  srand(instance.opts.random_seed);
 
   /* generate bootstrap replicates */
   generate_bootstraps(instance, cm.checkpoint());
