@@ -13,6 +13,7 @@ endif()
 set(RAXML_SOURCES ${RAXML_SOURCES} PARENT_SCOPE)
 
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
+set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 
 # enable static linking
 if(STATIC_BUILD)
@@ -25,7 +26,12 @@ if(STATIC_BUILD)
   endif()
 endif()
 
-add_executable(raxml_module ${RAXML_SOURCES})
+if (BUILD_AS_LIBRARY)
+  message(STATUS "RAxML-NG will be built as a library.")
+  add_library(raxml_module MODULE ${RAXML_SOURCES})
+else()
+  add_executable(raxml_module ${RAXML_SOURCES})
+endif()
 
 set(RAXML_LIBS ${RAXML_LOCALDEPS_DIR}/lib/libpll_algorithm.a
                ${RAXML_LOCALDEPS_DIR}/lib/libpll_binary.a
@@ -47,6 +53,10 @@ set(RAXML_LIBS ${RAXML_LIBS} PARENT_SCOPE)
 #message(STATUS "Libs: ${RAXML_LIBS}")
 
 target_link_libraries(raxml_module ${RAXML_LIBS})
+
+if (BUILD_AS_LIBRARY)
+  target_link_libraries(raxml_module gcc_s gcc)
+endif()
 
 if(GMP_FOUND)
   target_link_libraries(raxml_module ${GMP_LIBRARIES})

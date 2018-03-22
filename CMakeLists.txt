@@ -61,7 +61,7 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 endif()
 
 set (raxml-ng_VERSION_MAJOR 0)
-set (raxml-ng_VERSION_MINOR 5)
+set (raxml-ng_VERSION_MINOR 6)
 
 set (CMAKE_BUILD_TYPE DEBUG)
 #set (CMAKE_BUILD_TYPE RELEASE)
@@ -117,6 +117,10 @@ if(ENABLE_MPI)
     # disable static build for MPI
     set(STATIC_BUILD OFF)
   endif()
+endif()
+
+if(BUILD_AS_LIBRARY)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_RAXML_BUILD_AS_LIB -fPIC")
 endif()
 
 if(USE_TERRAPHAST)

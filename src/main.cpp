@@ -1474,7 +1474,7 @@ int internal_main(int argc, char** argv, void* comm)
 
 extern "C" int dll_main(int argc, char** argv, void* comm)
 {
-  return internal_main(argc, argv, 0);
+  return internal_main(argc, argv, comm);
 }
 
 #else
