@@ -37,17 +37,7 @@ else()
   add_executable(raxml_module ${RAXML_SOURCES})
 endif()
 
-file(COPY ${PLLMOD_SRC}/pllmod_common.h
-          ${PLLMOD_SRC}/algorithm/pllmod_algorithm.h
-          ${PLLMOD_SRC}/binary/pll_binary.h
-          ${PLLMOD_SRC}/msa/pll_msa.h
-          ${PLLMOD_SRC}/optimize/pll_optimize.h
-          ${PLLMOD_SRC}/tree/pll_tree.h
-          ${PLLMOD_SRC}/util/pllmod_util.h
-          ${LIBPLL_SRC}/pll.h
-          DESTINATION ${RAXML_LIBPLL_HEADERS})
-
-target_include_directories(raxml_module PRIVATE ${RAXML_LIBPLL_HEADERS})
+target_include_directories(raxml_module PRIVATE ${PLLMOD_EXPORTED_INCLUDE_PATH})
 
 set(RAXML_LIBS 
   pllmodalgorithm_static
