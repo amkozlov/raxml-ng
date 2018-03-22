@@ -129,8 +129,11 @@ CATGStream& operator>>(CATGStream& stream, MSA& msa)
   catch(exception& e)
   {
     LOG_DEBUG << e.what() << endl;
-    throw runtime_error("Invalid alignment dimensions!");
+    taxa_count = site_count = 0;
   }
+
+  if (!taxa_count || !site_count)
+    throw runtime_error("Invalid alignment dimensions!");
 
   LOG_DEBUG << "CATG: taxa: " << taxa_count << ", sites: " << site_count << endl;
 
@@ -150,10 +153,10 @@ CATGStream& operator>>(CATGStream& stream, MSA& msa)
   catch (exception& e)
   {
     LOG_DEBUG << e.what() << endl;
-    throw runtime_error("Wrong number of taxon labels!");
   }
 
-  assert (msa.size() == taxa_count);
+  if (msa.size() != taxa_count)
+    throw runtime_error("Wrong number of taxon labels!");
 
   /* this is mapping for DNA: CATG -> ACGT, for other datatypes we assume 1:1 mapping */
   std::vector<size_t> state_map({1, 0, 3, 2});
