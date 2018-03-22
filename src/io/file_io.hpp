@@ -5,6 +5,7 @@
 
 #include "../Tree.hpp"
 #include "../bootstrap/BootstrapTree.hpp"
+#include "../bootstrap/BootstrapGenerator.hpp"
 
 class NewickStream : public std::fstream
 {
@@ -76,7 +77,7 @@ public:
       *this << part_info.range_string();
     else
     {
-      auto part_len = part_info.msa().length();
+      auto part_len = part_info.msa().num_sites();
       *this << (_offset+1) << "-" << (_offset+part_len);
       _offset += part_len;
     }
@@ -103,6 +104,7 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format);
 
 PhylipStream& operator<<(PhylipStream& stream, const MSA& msa);
 PhylipStream& operator<<(PhylipStream& stream, const PartitionedMSA& msa);
+PhylipStream& operator<<(PhylipStream& stream, const BootstrapMSA& bs_msa);
 
 RBAStream& operator<<(RBAStream& stream, const PartitionedMSA& part_msa);
 RBAStream& operator>>(RBAStream& stream, PartitionedMSA& part_msa);
