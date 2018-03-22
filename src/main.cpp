@@ -1313,19 +1313,19 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   }
 }
 
-void clean_exit(int retval)
+int clean_exit(int retval)
 {
   ParallelContext::finalize(retval != EXIT_SUCCESS);
-  exit(retval);
+  return retval;
 }
 
-int main(int argc, char** argv)
+int internal_main(int argc, char** argv, void* comm)
 {
   int retval = EXIT_SUCCESS;
 
   RaxmlInstance instance;
 
-  ParallelContext::init_mpi(argc, argv);
+  ParallelContext::init_mpi(argc, argv, comm);
 
   instance.opts.num_ranks = ParallelContext::num_ranks();
 
@@ -1339,7 +1339,7 @@ int main(int argc, char** argv)
   catch (OptionException &e)
   {
     LOG_INFO << "ERROR: " << e.message() << std::endl;
-    clean_exit(EXIT_FAILURE);
+    return clean_exit(EXIT_FAILURE);
   }
 
   /* handle trivial commands first */
@@ -1348,11 +1348,11 @@ int main(int argc, char** argv)
     case Command::help:
       print_banner();
       cmdline.print_help();
-      clean_exit(EXIT_SUCCESS);
+      return clean_exit(EXIT_SUCCESS);
       break;
     case Command::version:
       print_banner();
-      clean_exit(EXIT_SUCCESS);
+      return clean_exit(EXIT_SUCCESS);
       break;
     case Command::evaluate:
     case Command::search:
@@ -1367,7 +1367,7 @@ int main(int argc, char** argv)
                             "` already exist!\n" <<
                             "Please either choose a new prefix, remove old files, or add "
                             "--redo command line switch to overwrite them." << endl << endl;
-        clean_exit(EXIT_FAILURE);
+        return clean_exit(EXIT_FAILURE);
       }
       break;
     default:
@@ -1466,6 +1466,22 @@ int main(int argc, char** argv)
     retval = EXIT_FAILURE;
   }
 
-  clean_exit(retval);
-  return retval;
+  return clean_exit(retval);
 }
+
+
+#ifdef _RAXML_BUILD_AS_LIB
+
+extern "C" int dll_main(int argc, char** argv, void* comm)
+{
+  return internal_main(argc, argv, 0);
+}
+
+#else
+
+int main(int argc, char** argv)
+{
+  return internal_main(argc, argv, 0);
+}
+
+#endif

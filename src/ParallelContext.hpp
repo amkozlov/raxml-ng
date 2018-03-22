@@ -30,7 +30,7 @@ class Options;
 class ParallelContext
 {
 public:
-  static void init_mpi(int argc, char * argv[]);
+  static void init_mpi(int argc, char * argv[], void * comm);
   static void init_pthreads(const Options& opts, const std::function<void()>& thread_main);
   static void resize_buffer(size_t size);
 
@@ -82,6 +82,11 @@ private:
 
   static size_t _rank_id;
   static thread_local size_t _thread_id;
+
+#ifdef _RAXML_MPI
+  static bool _owns_comm;
+  static MPI_Comm _comm;
+#endif
 
   static void start_thread(size_t thread_id, const std::function<void()>& thread_main);
   static void parallel_reduce(double * data, size_t size, int op);

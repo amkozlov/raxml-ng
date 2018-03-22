@@ -16,21 +16,40 @@ std::vector<char> ParallelContext::_parallel_buf;
 std::unordered_map<ThreadIDType, ParallelContext> ParallelContext::_thread_ctx_map;
 MutexType ParallelContext::mtx;
 
-void ParallelContext::init_mpi(int argc, char * argv[])
+#ifdef _RAXML_MPI
+MPI_Comm ParallelContext::_comm = MPI_COMM_WORLD;
+bool ParallelContext::_owns_comm = true;
+#endif
+
+void ParallelContext::init_mpi(int argc, char * argv[], void * comm)
 {
 #ifdef _RAXML_MPI
   {
     int tmp;
-    MPI_Init(&argc, &argv);
-    MPI_Comm_rank(MPI_COMM_WORLD, &tmp);
+
+    if (comm)
+    {
+      // TODO we should think how to get rid of this ugly cast!
+      _comm = *((MPI_Comm*) comm);
+      _owns_comm = false;
+    }
+    else
+    {
+      _comm = MPI_COMM_WORLD;
+      _owns_comm = true;
+      MPI_Init(&argc, &argv);
+    }
+
+    MPI_Comm_rank(_comm, &tmp);
     _rank_id = (size_t) tmp;
-    MPI_Comm_size(MPI_COMM_WORLD, &tmp);
+    MPI_Comm_size(_comm, &tmp);
     _num_ranks = (size_t) tmp;
 //    printf("size: %lu, rank: %lu\n", _num_ranks, _rank_id);
   }
 #else
   RAXML_UNUSED(argc);
   RAXML_UNUSED(argv);
+  RAXML_UNUSED(comm);
 #endif
 }
 
@@ -73,12 +92,17 @@ void ParallelContext::finalize(bool force)
 #endif
 
 #ifdef _RAXML_MPI
-  if (force)
-    MPI_Abort(MPI_COMM_WORLD, -1);
-  else
-    MPI_Barrier(MPI_COMM_WORLD);
+  if (_owns_comm)
+  {
+    if (force)
+      MPI_Abort(_comm, -1);
+    else
+      MPI_Barrier(_comm);
 
-  MPI_Finalize();
+    MPI_Finalize();
+  }
+  else
+    MPI_Barrier(_comm);
 #endif
 }
 
@@ -97,7 +121,7 @@ void ParallelContext::mpi_barrier()
 {
 #ifdef _RAXML_MPI
   if (_thread_id == 0 && _num_ranks > 1)
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(_comm);
 #endif
 }
 
@@ -196,10 +220,10 @@ void ParallelContext::parallel_reduce(double * data, size_t size, int op)
         assert(0);
 
 #if 1
-      MPI_Allreduce(MPI_IN_PLACE, data, size, MPI_DOUBLE, reduce_op, MPI_COMM_WORLD);
+      MPI_Allreduce(MPI_IN_PLACE, data, size, MPI_DOUBLE, reduce_op, _comm);
 #else
       // not sure if MPI_IN_PLACE will work in all cases...
-      MPI_Allreduce(data, _parallel_buf.data(), size, MPI_DOUBLE, reduce_op, MPI_COMM_WORLD);
+      MPI_Allreduce(data, _parallel_buf.data(), size, MPI_DOUBLE, reduce_op, _comm);
       memcpy(data, _parallel_buf.data(), size * sizeof(double));
 #endif
     }
@@ -275,7 +299,7 @@ void ParallelContext::mpi_gather_custom(std::function<int(void*,int)> prepare_se
     {
       int recv_size;
       MPI_Status status;
-      MPI_Probe(r, 0, MPI_COMM_WORLD, &status);
+      MPI_Probe(r, 0, _comm, &status);
       MPI_Get_count(&status, MPI_BYTE, &recv_size);
 
 //      printf("recv: %lu\n", recv_size);
@@ -283,7 +307,7 @@ void ParallelContext::mpi_gather_custom(std::function<int(void*,int)> prepare_se
       _parallel_buf.reserve(recv_size);
 
       MPI_Recv((void*) _parallel_buf.data(), recv_size, MPI_BYTE,
-               r, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+               r, 0, _comm, MPI_STATUS_IGNORE);
 
       process_recv_cb(_parallel_buf.data(), recv_size);
     }
@@ -293,7 +317,7 @@ void ParallelContext::mpi_gather_custom(std::function<int(void*,int)> prepare_se
     auto send_size = prepare_send_cb(_parallel_buf.data(), _parallel_buf.capacity());
 //    printf("sent: %lu\n", send_size);
 
-    MPI_Send(_parallel_buf.data(), send_size, MPI_BYTE, 0, 0, MPI_COMM_WORLD);
+    MPI_Send(_parallel_buf.data(), send_size, MPI_BYTE, 0, 0, _comm);
   }
 #else
   RAXML_UNUSED(prepare_send_cb);
