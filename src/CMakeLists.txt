@@ -13,6 +13,7 @@ endif()
 set(RAXML_SOURCES ${RAXML_SOURCES} PARENT_SCOPE)
 
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
+set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 
 # enable static linking
 if(STATIC_BUILD)
@@ -25,17 +26,36 @@ if(STATIC_BUILD)
   endif()
 endif()
 
-add_executable(raxml_module ${RAXML_SOURCES})
+if (BUILD_AS_LIBRARY)
+  message(STATUS "RAxML-NG will be built as a library.")
+  add_library(raxml_module MODULE ${RAXML_SOURCES})
+else()
+  add_executable(raxml_module ${RAXML_SOURCES})
+endif()
 
-set(RAXML_LIBS ${RAXML_LOCALDEPS_DIR}/lib/libpll_algorithm.a
-               ${RAXML_LOCALDEPS_DIR}/lib/libpll_binary.a
-               ${RAXML_LOCALDEPS_DIR}/lib/libpll_optimize.a
-               ${RAXML_LOCALDEPS_DIR}/lib/libpll_msa.a
-               ${RAXML_LOCALDEPS_DIR}/lib/libpll_tree.a
-               ${RAXML_LOCALDEPS_DIR}/lib/libpll_util.a
-               ${RAXML_LOCALDEPS_DIR}/lib/libpll.a
-               m
-               )
+
+if (USE_LIBPLL_CMAKE)
+  target_include_directories(raxml_module PRIVATE ${PLLMOD_EXPORTED_INCLUDE_PATH})
+  set(LIBPLL_LIBS  pllmodalgorithm_static
+                   pllmodbinary_static
+                   pllmodmsa_static
+                   pllmodoptimize_static
+                   pllmodtree_static
+                   pllmodutil_static
+                   pll_static
+                   )
+else()
+  set(LIBPLL_LIBS ${RAXML_LOCALDEPS_DIR}/lib/libpll_algorithm.a
+                  ${RAXML_LOCALDEPS_DIR}/lib/libpll_binary.a
+                  ${RAXML_LOCALDEPS_DIR}/lib/libpll_optimize.a
+                  ${RAXML_LOCALDEPS_DIR}/lib/libpll_msa.a
+                  ${RAXML_LOCALDEPS_DIR}/lib/libpll_tree.a
+                  ${RAXML_LOCALDEPS_DIR}/lib/libpll_util.a
+                  ${RAXML_LOCALDEPS_DIR}/lib/libpll.a
+                  )
+endif()
+
+set(RAXML_LIBS ${LIBPLL_LIBS} m)
 
 if(USE_TERRAPHAST)
   set(RAXML_LIBS ${RAXML_LOCALDEPS_DIR}/lib/libterraces.a ${RAXML_LIBS})
@@ -47,6 +67,10 @@ set(RAXML_LIBS ${RAXML_LIBS} PARENT_SCOPE)
 #message(STATUS "Libs: ${RAXML_LIBS}")
 
 target_link_libraries(raxml_module ${RAXML_LIBS})
+
+if (BUILD_AS_LIBRARY)
+  target_link_libraries(raxml_module gcc_s gcc)
+endif()
 
 if(GMP_FOUND)
   target_link_libraries(raxml_module ${GMP_LIBRARIES})

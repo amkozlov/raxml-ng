@@ -10,6 +10,8 @@ struct BootstrapReplicate
 
 typedef std::vector<BootstrapReplicate> BootstrapReplicateList;
 
+typedef std::tuple<const PartitionedMSA&, const BootstrapReplicate&> BootstrapMSA;
+
 class BootstrapGenerator
 {
 public:

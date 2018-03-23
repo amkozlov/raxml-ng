@@ -113,6 +113,43 @@ PhylipStream& operator<<(PhylipStream& stream, const PartitionedMSA& msa)
   return stream;
 }
 
+PhylipStream& operator<<(PhylipStream& stream, const BootstrapMSA& bs_msa)
+{
+  ofstream fs(stream.fname());
+
+  const auto& msa = std::get<0>(bs_msa);
+  const auto& bsrep = std::get<1>(bs_msa);
+
+  auto taxa = msa.taxon_count();
+  auto sites = msa.total_sites();
+  fs << taxa << " " << sites << endl;
+
+  for (size_t i = 0; i < taxa; ++i)
+  {
+    fs << msa.taxon_names().at(i) << " ";
+    for (size_t p = 0; p < msa.part_count(); ++p)
+    {
+      const auto& w = bsrep.site_weights.at(p);
+      const auto& m = msa.part_info(p).msa();
+      const auto& seq = m.at(i);
+
+      assert(w.size() == seq.size());
+
+      size_t wsum = 0;
+      for (size_t j = 0; j < seq.length(); ++j)
+      {
+        wsum += w[j];
+        for (size_t k = 0; k < w[j]; ++k)
+          fs << seq[j];
+      }
+
+      assert(wsum == m.num_sites());
+    }
+    fs << endl;
+  }
+
+  return stream;
+}
 
 CATGStream& operator>>(CATGStream& stream, MSA& msa)
 {
@@ -129,8 +166,11 @@ CATGStream& operator>>(CATGStream& stream, MSA& msa)
   catch(exception& e)
   {
     LOG_DEBUG << e.what() << endl;
-    throw runtime_error("Invalid alignment dimensions!");
+    taxa_count = site_count = 0;
   }
+
+  if (!taxa_count || !site_count)
+    throw runtime_error("Invalid alignment dimensions!");
 
   LOG_DEBUG << "CATG: taxa: " << taxa_count << ", sites: " << site_count << endl;
 
@@ -150,10 +190,10 @@ CATGStream& operator>>(CATGStream& stream, MSA& msa)
   catch (exception& e)
   {
     LOG_DEBUG << e.what() << endl;
-    throw runtime_error("Wrong number of taxon labels!");
   }
 
-  assert (msa.size() == taxa_count);
+  if (msa.size() != taxa_count)
+    throw runtime_error("Wrong number of taxon labels!");
 
   /* this is mapping for DNA: CATG -> ACGT, for other datatypes we assume 1:1 mapping */
   std::vector<size_t> state_map({1, 0, 3, 2});

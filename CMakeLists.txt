@@ -3,6 +3,9 @@ cmake_minimum_required (VERSION 2.8.10 FATAL_ERROR)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES  ON)
 
+set(USE_LIBPLL_CMAKE OFF CACHE BOOL "Use CMake to build libpll and pll-modules")
+set(BUILD_AS_LIBRARY OFF CACHE BOOL "Build RAxML-NG as shared library (instead of stand-alone executable)")
+
 set (USE_PTHREADS ON CACHE BOOL "Enable multi-threading support (PTHREADS)")
 set (USE_MPI OFF CACHE BOOL "Enable MPI support")
 set (USE_VCF OFF)
@@ -31,8 +34,8 @@ else()
   set(ENABLE_GMP ${USE_GMP})
 endif()
 
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_EXTENSIONS OFF)
+#set(CMAKE_CXX_STANDARD 14)
+#set(CMAKE_CXX_EXTENSIONS OFF)
 
 project (raxml-ng C CXX)
 
@@ -61,7 +64,7 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 endif()
 
 set (raxml-ng_VERSION_MAJOR 0)
-set (raxml-ng_VERSION_MINOR 5)
+set (raxml-ng_VERSION_MINOR 6)
 
 set (CMAKE_BUILD_TYPE DEBUG)
 #set (CMAKE_BUILD_TYPE RELEASE)
@@ -105,6 +108,25 @@ if(ENABLE_PTHREADS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_RAXML_PTHREADS -pthread")
 endif()
 
+if(BUILD_AS_LIBRARY)
+  # building shared library only works with CMake!
+  set(USE_LIBPLL_CMAKE ON)
+
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_RAXML_BUILD_AS_LIB -fPIC")
+endif()
+
+if(USE_TERRAPHAST)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_RAXML_TERRAPHAST")
+endif()
+
+message(STATUS "Using flags: ${CMAKE_CXX_FLAGS}")
+
+# build dependencies
+set(RAXML_LOCALDEPS_DIR ${PROJECT_BINARY_DIR}/localdeps)
+add_subdirectory(${PROJECT_SOURCE_DIR}/libs)
+
+include_directories(${RAXML_LOCALDEPS_DIR}/include ${TERRACES_INCLUDE_DIR})
+
 if(ENABLE_MPI)
   find_package(MPI)
   if(MPI_CXX_FOUND)
@@ -118,23 +140,6 @@ if(ENABLE_MPI)
     set(STATIC_BUILD OFF)
   endif()
 endif()
-
-if(USE_TERRAPHAST)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_RAXML_TERRAPHAST")
-endif()
-
-message(STATUS "Using flags: ${CMAKE_CXX_FLAGS}")
-
-set(pll_dir ${PROJECT_SOURCE_DIR}/libs/pll-modules/libs/libpll/src)
-set(pll_binary_dir ${PROJECT_SOURCE_DIR}/libs/pll-modules/src/binary)
-set(pll_optimize_dir ${PROJECT_SOURCE_DIR}/libs/pll-modules/src/optimize)
-set(pll_msa_dir ${PROJECT_SOURCE_DIR}/libs/pll-modules/src/msa)
-
-# build dependencies
-set(RAXML_LOCALDEPS_DIR ${PROJECT_BINARY_DIR}/localdeps)
-add_subdirectory(${PROJECT_SOURCE_DIR}/libs)
-
-include_directories(${RAXML_LOCALDEPS_DIR}/include ${TERRACES_INCLUDE_DIR})
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/src)
 
