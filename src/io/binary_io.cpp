@@ -66,6 +66,7 @@ static bool save_modparam(const Model& m, ModelBinaryFmt fmt, unsigned int param
   switch (pmode)
   {
     case ParamValue::model:
+    case ParamValue::equal:
     case ParamValue::undefined:
       return false;
     case ParamValue::user:
