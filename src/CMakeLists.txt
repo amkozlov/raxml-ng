@@ -68,7 +68,7 @@ set(RAXML_LIBS ${RAXML_LIBS} PARENT_SCOPE)
 
 target_link_libraries(raxml_module ${RAXML_LIBS})
 
-if (BUILD_AS_LIBRARY)
+if (BUILD_AS_LIBRARY AND NOT APPLE)
   target_link_libraries(raxml_module gcc_s gcc)
 endif()
 
