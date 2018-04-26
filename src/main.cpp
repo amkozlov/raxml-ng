@@ -97,6 +97,16 @@ void init_part_info(RaxmlInstance& instance)
   if (opts.msa_format == FileFormat::binary ||
       (opts.msa_format == FileFormat::autodetect && RBAStream::rba_file(opts.msa_file)))
   {
+    if (!opts.model_file.empty())
+    {
+      LOG_WARN <<
+          "WARNING: The model you specified on the command line (" << opts.model_file <<
+                    ") will be ignored " << endl <<
+          "         since the binary MSA file already contains a model definition." << endl <<
+          "         Please re-run RAxML-NG with the original PHYLIP/FASTA alignment "
+                   "if you want to change the model." << endl << endl;
+    }
+
     LOG_INFO_TS << "Loading binary alignment from file: " << opts.msa_file << endl;
 
     RBAStream bs(opts.msa_file);
