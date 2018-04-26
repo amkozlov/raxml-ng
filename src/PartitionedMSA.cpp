@@ -51,10 +51,7 @@ std::vector<unsigned int> PartitionedMSA::get_site_part_assignment()
   for (size_t i = 0; i < full_len; ++i)
   {
     if (!spa[i])
-    {
-      LOG_INFO << "ERROR: Alignment site " << i+1 << " is not assigned to any partition!" << endl;
       e_unassinged.add_unassigned_site(i+1);
-    }
   }
 
   if (e_unassinged.count() > 0)

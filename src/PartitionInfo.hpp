@@ -108,10 +108,10 @@ public:
 
   void pinfo2(const PartitionInfo& pinfo2) { part2_name = pinfo2.name(); }
 
-  virtual const std::string message() const
+  virtual void update_message() const
   {
-    return format_message("Alignment site %u assigned to multiple partitions: \"%s\" and \"%s\"!",
-                          _site, part1_name.c_str(), part2_name.c_str());
+    _message = format_message("Alignment site %u assigned to multiple partitions: "
+        "\"%s\" and \"%s\"!", _site, part1_name.c_str(), part2_name.c_str());
   };
 
 private:
@@ -131,10 +131,16 @@ public:
 
   void add_unassigned_site(size_t site) { _unassigned_sites.push_back(site); }
 
-  virtual const std::string message() const
+  virtual void update_message() const
   {
-    return format_message("Found %u site(s) which are not assigned to any partition.\n"
-        "Please fix your data!", _unassigned_sites.size());
+    std::stringstream ss;
+    ss << "Found " << _unassigned_sites.size() <<
+        " alignment site(s) which are not assigned to any partition:" << std::endl;
+    for (auto s: _unassigned_sites)
+      ss << s << " ";
+
+    ss << std::endl << "Please fix your data!";
+    _message = ss.str();
   };
 
 private:

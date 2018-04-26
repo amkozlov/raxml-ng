@@ -103,19 +103,23 @@ public:
   {
   }
 
-  virtual const char* what() const noexcept { return message().c_str(); }
+  virtual const char* what() const noexcept
+  { return message().c_str(); }
 
-  virtual const std::string message() const { return _message; };
+  virtual const std::string& message() const
+  { update_message(); return _message; };
 
 protected:
-  std::string _message;
+  mutable std::string _message;
+
+  virtual void update_message() const { };
 
   template<typename ... Args>
   std::string format_message(const std::string& fmt, Args ... args) const
   {
     size_t size = std::snprintf(nullptr, 0, fmt.c_str(), args ...) + 1;
     std::string msg;
-    msg.reserve(size);
+    msg.resize(size);
     std::snprintf(&msg[0], size, fmt.c_str(), args ...);
     return msg;
   }
