@@ -437,7 +437,8 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
       case 'B':
         try
         {
-          switch (toupper(ss.get()))
+          int mode = ss.peek() == '{' ? 'U' : toupper(ss.get());
+          switch (mode)
           {
             case EOF:
             case '\0':
@@ -464,7 +465,8 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
       case 'F':
         try
         {
-          switch (toupper(ss.get()))
+          int mode = ss.peek() == '{' ? 'U' : toupper(ss.get());
+          switch (mode)
           {
             case EOF:
             case '\0':
@@ -532,7 +534,8 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
       case 'I':
         try
         {
-          switch (toupper(ss.get()))
+          int mode = ss.peek() == '{' ? 'U' : toupper(ss.get());
+          switch (mode)
           {
             case EOF:
             case '\0':
