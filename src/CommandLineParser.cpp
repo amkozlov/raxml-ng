@@ -57,6 +57,7 @@ static struct option long_options[] =
   {"blmax",              required_argument, 0, 0 },  /*  37 */
 
   {"tree-constraint",    required_argument, 0, 0 },  /*  38 */
+  {"nofiles",            no_argument,       0, 0 },  /*  39 */
 
   { 0, 0, 0, 0 }
 };
@@ -128,6 +129,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   opts.redo_mode = false;
   opts.force_mode = false;
+  opts.nofiles_mode = false;
 
   bool log_level_set = false;
 
@@ -453,6 +455,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 38: /* constraint tree */
         opts.constraint_tree_file = optarg;
         break;
+      case 39: /* no output files (only console output) */
+        opts.nofiles_mode = true;
+        break;
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -581,6 +586,7 @@ void CommandLineParser::print_help()
             "  --simd         none | sse3 | avx | avx2    vector instruction set to use (default: auto-detect).\n"
             "  --rate-scalers on | off                    use individual CLV scalers for each rate category (default: OFF)\n"
             "  --force                                    disable all safety checks (please think twice!)\n"
+            "  --nofiles                                  do not create any output files, print results to the terminal only\n"
             "\n"
             "Model options:\n"
             "  --model        <name>+G[n]+<Freqs> | FILE  model specification OR partition file (default: GTR+G4)\n"

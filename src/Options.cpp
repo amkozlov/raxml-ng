@@ -5,7 +5,10 @@ using namespace std;
 
 string Options::output_fname(const string& suffix) const
 {
-  return (outfile_prefix.empty() ? msa_file : outfile_prefix) + ".raxml." + suffix;
+  if (nofiles_mode)
+    return "";
+  else
+    return (outfile_prefix.empty() ? msa_file : outfile_prefix) + ".raxml." + suffix;
 }
 
 void Options::set_default_outfile(std::string& fname, const std::string& suffix)
@@ -30,6 +33,9 @@ void Options::set_default_outfiles()
 
 bool Options::result_files_exist() const
 {
+  if (nofiles_mode)
+    return false;
+
   switch (command)
   {
     case Command::evaluate:

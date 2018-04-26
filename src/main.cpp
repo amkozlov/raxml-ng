@@ -274,7 +274,7 @@ void check_msa(RaxmlInstance& instance)
   }
 
 
-  if (total_gap_cols > 0 || !gap_seqs.empty())
+  if ((total_gap_cols > 0 || !gap_seqs.empty()) && !instance.opts.nofiles_mode)
   {
     // save reduced MSA and partition files
     auto reduced_msa_fname = instance.opts.output_fname("reduced.phy");
@@ -461,7 +461,7 @@ void load_msa(RaxmlInstance& instance)
 
   LOG_INFO << endl;
 
-  if (!instance.opts.use_prob_msa)
+  if (!instance.opts.use_prob_msa && !instance.opts.binary_msa_file().empty())
   {
     auto binary_msa_fname = instance.opts.binary_msa_file();
     if (sysutil_file_exists(binary_msa_fname) && !opts.redo_mode &&
@@ -891,11 +891,14 @@ void draw_bootstrap_support(const Options& opts)
 
   sup_tree.calc_support();
 
-  NewickStream sups(opts.support_tree_file(), std::ios::out);
-  sups << sup_tree;
+  if (!opts.support_tree_file().empty())
+  {
+    NewickStream sups(opts.support_tree_file(), std::ios::out);
+    sups << sup_tree;
 
-  LOG_INFO << "Best ML tree with bootstrap support values saved to: " <<
-      sysutil_realpath(opts.support_tree_file()) << endl << endl;
+    LOG_INFO << "Best ML tree with bootstrap support values saved to: " <<
+        sysutil_realpath(opts.support_tree_file()) << endl << endl;
+  }
 }
 
 void draw_bootstrap_support(RaxmlInstance& instance, const Checkpoint& checkp)
@@ -982,9 +985,12 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
 
   if (opts.command == Command::evaluate)
   {
-    save_ml_trees(opts, checkp);
+    if (!opts.ml_trees_file().empty())
+    {
+      save_ml_trees(opts, checkp);
 
-    LOG_INFO << "\nAll optimized tree(s) saved to: " << sysutil_realpath(opts.ml_trees_file()) << endl;
+      LOG_INFO << "\nAll optimized tree(s) saved to: " << sysutil_realpath(opts.ml_trees_file()) << endl;
+    }
   }
 
   if (opts.command == Command::search || opts.command == Command::all)
@@ -997,60 +1003,73 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
 
     best_tree.topology(best->second);
 
-    NewickStream nw_result(opts.best_tree_file());
-    nw_result << best_tree;
-
     check_terrace(instance, best_tree);
 
-    if (checkp.ml_trees.size() > 1)
+    if (checkp.ml_trees.size() > 1 && !opts.ml_trees_file().empty())
     {
       save_ml_trees(opts, checkp);
 
       LOG_INFO << "All ML trees saved to: " << sysutil_realpath(opts.ml_trees_file()) << endl;
     }
 
-    LOG_INFO << "Best ML tree saved to: " << sysutil_realpath(opts.best_tree_file()) << endl;
+    if (!opts.best_tree_file().empty())
+    {
+      NewickStream nw_result(opts.best_tree_file());
+      nw_result << best_tree;
+
+      LOG_INFO << "Best ML tree saved to: " << sysutil_realpath(opts.best_tree_file()) << endl;
+    }
 
     if (opts.command == Command::all)
     {
       assert(instance.bs_tree);
 
-      NewickStream nw(opts.support_tree_file(), std::ios::out);
-      nw << *instance.bs_tree;
+      if (!opts.support_tree_file().empty())
+      {
+        NewickStream nw(opts.support_tree_file(), std::ios::out);
+        nw << *instance.bs_tree;
 
-      LOG_INFO << "Best ML tree with bootstrap support values saved to: " <<
-          sysutil_realpath(opts.support_tree_file()) << endl;
+        LOG_INFO << "Best ML tree with bootstrap support values saved to: " <<
+            sysutil_realpath(opts.support_tree_file()) << endl;
+      }
     }
   }
 
   if (opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate)
   {
-    RaxmlPartitionStream model_stream(opts.best_model_file(), true);
-    model_stream.print_model_params(true);
-    model_stream << instance.parted_msa;
+    if (!opts.best_model_file().empty())
+    {
+      RaxmlPartitionStream model_stream(opts.best_model_file(), true);
+      model_stream.print_model_params(true);
+      model_stream << instance.parted_msa;
 
-    LOG_INFO << "Optimized model saved to: " << sysutil_realpath(opts.best_model_file()) << endl;
+      LOG_INFO << "Optimized model saved to: " << sysutil_realpath(opts.best_model_file()) << endl;
+    }
   }
 
   if (opts.command == Command::bootstrap || opts.command == Command::all)
   {
     // TODO now only master process writes the output, this will have to change with
     // coarse-grained parallelization scheme (parallel start trees/bootstraps)
-//    NewickStream nw(opts.bootstrap_trees_file(), std::ios::out | std::ios::app);
-    NewickStream nw(opts.bootstrap_trees_file(), std::ios::out);
-
-    Tree bs_tree = checkp.tree;
-    for (auto topol: checkp.bs_trees)
+    if (!opts.bootstrap_trees_file().empty())
     {
-      bs_tree.topology(topol.second);
-      nw << bs_tree;
-    }
+  //    NewickStream nw(opts.bootstrap_trees_file(), std::ios::out | std::ios::app);
+      NewickStream nw(opts.bootstrap_trees_file(), std::ios::out);
 
-    LOG_INFO << "Bootstrap trees saved to: " << sysutil_realpath(opts.bootstrap_trees_file()) << endl;
+      Tree bs_tree = checkp.tree;
+      for (auto topol: checkp.bs_trees)
+      {
+        bs_tree.topology(topol.second);
+        nw << bs_tree;
+      }
+
+      LOG_INFO << "Bootstrap trees saved to: " << sysutil_realpath(opts.bootstrap_trees_file()) << endl;
+    }
   }
 
-  LOG_INFO << "\nExecution log saved to: " << sysutil_realpath(opts.log_file()) << endl;
+  if (!opts.log_file().empty())
+      LOG_INFO << "\nExecution log saved to: " << sysutil_realpath(opts.log_file()) << endl;
 
   LOG_INFO << "\nAnalysis started: " << global_timer().start_time();
   LOG_INFO << " / finished: " << global_timer().current_time() << std::endl;
@@ -1418,7 +1437,7 @@ int internal_main(int argc, char** argv, void* comm)
   logger().set_log_level(instance.opts.log_level);
 
   /* only master process writes the log file */
-  if (ParallelContext::master())
+  if (ParallelContext::master() && !instance.opts.log_file().empty())
   {
     auto mode = !instance.opts.redo_mode && sysutil_file_exists(instance.opts.checkp_file()) ?
         ios::app : ios::out;
