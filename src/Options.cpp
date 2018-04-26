@@ -154,6 +154,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     stream << " (" << opts.num_searches << ")";
   stream << endl;
 
+  if (!opts.constraint_tree_file.empty())
+    stream << "  topological constraint: " << opts.constraint_tree_file << endl;
+
   stream << "  random seed: " << opts.random_seed << endl;
   stream << "  tip-inner: " << (opts.use_tip_inner ? "ON" : "OFF") << endl;
   stream << "  pattern compression: " << (opts.use_pattern_compression ? "ON" : "OFF") << endl;

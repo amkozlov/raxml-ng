@@ -66,6 +66,9 @@ struct RaxmlInstance
   /* this is just a dummy random tree used for convenience, e,g, if we need tip labels or
    * just 'any' valid tree for the alignment at hand */
   Tree random_tree;
+
+  /* topological constraint */
+  Tree constraint_tree;
 };
 
 void print_banner()
@@ -481,6 +484,7 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
 
   const auto& opts = instance.opts;
   const auto& parted_msa = instance.parted_msa;
+  const auto  tree_rand_seed = rand();
 
   switch (type)
   {
@@ -505,7 +509,10 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
       LOG_DEBUG << "Generating a random starting tree with " << parted_msa.taxon_count()
                 << " taxa" << endl;
 
-      tree = Tree::buildRandom(parted_msa.taxon_names());
+      if (instance.constraint_tree.empty())
+        tree = Tree::buildRandom(parted_msa.taxon_names(), tree_rand_seed);
+      else
+        tree = Tree::buildRandomConstrained(instance.constraint_tree, tree_rand_seed);
 
       break;
     case StartingTree::parsimony:
@@ -520,8 +527,8 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
       attrs |= PLL_ATTRIB_PATTERN_TIP;
 
       const PartitionedMSA& pars_msa = instance.parted_msa_parsimony ?
-                                    *instance.parted_msa_parsimony.get() :  instance.parted_msa;
-      tree = Tree::buildParsimony(pars_msa, rand(), attrs, &score);
+                                    *instance.parted_msa_parsimony.get() : instance.parted_msa;
+      tree = Tree::buildParsimony(pars_msa, tree_rand_seed, attrs, &score);
 
       LOG_DEBUG << "Parsimony score of the starting tree: " << score << endl;
 
@@ -556,8 +563,10 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
   {
     const auto& ckp = cm.checkpoint();
 
-    // read start trees from file
-    if (sysutil_file_exists(instance.opts.start_tree_file()))
+    // read start trees from file to avoid re-generation
+    // NOTE: doesn't work for constrained tree search
+    if (sysutil_file_exists(instance.opts.start_tree_file()) &&
+        instance.opts.constraint_tree_file.empty())
     {
       NewickStream ts(instance.opts.start_tree_file(), std::ios::in);
       size_t i = 0;
@@ -702,7 +711,8 @@ void build_start_trees(RaxmlInstance& instance, CheckpointManager& cm)
         instance.opts.num_searches++;
     }
 
-    instance.start_trees.emplace_back(tree);
+    if (i >= cm.checkpoint().ml_trees.size())
+      instance.start_trees.emplace_back(tree);
   }
 
   // free memory used for parsimony MSA
@@ -1096,6 +1106,8 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
         treeinfo.reset(new TreeInfo(opts, tree, master_msa, part_assign));
       }
 
+      treeinfo->set_topology_constraint(instance.constraint_tree);
+
       Optimizer optimizer(opts);
       if (opts.command == Command::evaluate)
       {
@@ -1171,6 +1183,8 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
       treeinfo.reset(new TreeInfo(opts, *bs_start_tree, master_msa, bs_part_assign, bs.site_weights));
     }
 
+    treeinfo->set_topology_constraint(instance.constraint_tree);
+
 //    size_t sumw = 0;
 //    for (auto sw: bs.site_weights)
 //      for (auto w: sw)
@@ -1216,6 +1230,21 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   if (instance.parted_msa.part_info(0).msa().empty())
     load_msa(instance);
+
+  if (!opts.constraint_tree_file.empty())
+  {
+    NewickStream nw_cons(opts.constraint_tree_file, std::ios::in);
+    Tree& cons_tree = instance.constraint_tree;
+    nw_cons >> cons_tree;
+
+    LOG_INFO_TS << "Loaded constraint tree with " << cons_tree.num_tips() << " taxa" << endl;
+
+    /* make sure tip indices are consistent between MSA and pll_tree */
+    cons_tree.reset_tip_ids(parted_msa.taxon_id_map());
+
+//    pll_utree_show_ascii(&cons_tree.pll_utree_root(), PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH |
+//                                     PLL_UTREE_SHOW_CLV_INDEX );
+  }
 
   // temp workaround: since MSA pattern compression calls rand(), it will change all random
   // numbers generated afterwards. so just reset seed to the initial value to ensure that
@@ -1391,6 +1420,15 @@ int internal_main(int argc, char** argv, void* comm)
 
   try
   {
+    if (!instance.opts.constraint_tree_file.empty() &&
+        instance.opts.start_tree != StartingTree::random)
+    {
+      throw runtime_error(string("") +
+          (instance.opts.start_tree == StartingTree::user ? "User" : "Parsimony") +
+          " starting trees are not supported in combination with constrained tree inference.\n" +
+          "       Please use random starting trees instead.");
+    }
+
     switch (instance.opts.command)
     {
       case Command::evaluate:

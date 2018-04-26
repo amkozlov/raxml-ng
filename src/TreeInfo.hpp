@@ -47,6 +47,8 @@ public:
 
   void model(size_t partition_id, const Model& model);
 
+  void set_topology_constraint(const Tree& cons_tree);
+
   double loglh(bool incremental = false);
   double optimize_params(int params_to_optimize, double lh_epsilon);
   double optimize_params_all(double lh_epsilon)
@@ -73,6 +75,5 @@ void assign(Model& model, const TreeInfo& treeinfo, size_t partition_id);
 
 pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& pinfo,
                                       const PartitionRange& part_region, const uintVector& weights);
-
 
 #endif /* RAXML_TREEINFO_HPP_ */

@@ -26,7 +26,7 @@ NewickStream& operator<<(NewickStream& stream, const pll_unode_t& root)
 
 NewickStream& operator<<(NewickStream& stream, const pll_utree_t& tree)
 {
-  stream << *get_pll_utree_root(&tree);
+  stream << *tree.vroot;
   return stream;
 }
 
@@ -57,7 +57,7 @@ NewickStream& operator>>(NewickStream& stream, Tree& tree)
       utree = pll_rtree_unroot(rtree);
 
       /* optional step if using default PLL clv/pmatrix index assignments */
-      pll_utree_reset_template_indices(get_pll_utree_root(utree), utree->tip_count);
+      pll_utree_reset_template_indices(utree->vroot, utree->tip_count);
     }
   }
 

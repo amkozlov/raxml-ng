@@ -4,8 +4,6 @@
 #include "common.h"
 #include "PartitionedMSA.hpp"
 
-pll_unode_t* get_pll_utree_root(const pll_utree_t* tree);
-
 // seems to be the only way to have custom deleter for unique_ptr
 // without having to specify it every time during object creation
 namespace std
@@ -70,8 +68,9 @@ public:
 
   virtual ~Tree();
 
-  static Tree buildRandom(size_t num_tips, const char * const* tip_labels);
-  static Tree buildRandom(const NameList& taxon_names);
+  static Tree buildRandom(size_t num_tips, const char * const* tip_labels, unsigned int random_seed);
+  static Tree buildRandom(const NameList& taxon_names, unsigned int random_seed);
+  static Tree buildRandomConstrained(const Tree& constrained_tree, unsigned int random_seed);
   static Tree buildParsimony(const PartitionedMSA& parted_msa, unsigned int random_seed,
                              unsigned int attributes, unsigned int * score = nullptr);
   static Tree loadFromFile(const std::string& file_name);
@@ -86,8 +85,8 @@ public:
   pll_utree_t * pll_utree_copy() const { return pll_utree_clone(_pll_utree.get()); }
   const pll_utree_t& pll_utree() const { return *_pll_utree; }
 
-  // TODO: store root explicitly
-  const pll_unode_t& pll_utree_root() const { return *get_pll_utree_root(_pll_utree.get()); }
+  const pll_unode_t& pll_utree_root() const { return *_pll_utree->vroot; }
+  bool empty() const { return _num_tips == 0; }
 
   void fix_missing_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
   void reset_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);

@@ -321,6 +321,11 @@ double TreeInfo::spr_round(spr_round_params& params)
   return loglh;
 }
 
+void TreeInfo::set_topology_constraint(const Tree& cons_tree)
+{
+  if (!cons_tree.empty())
+    pllmod_treeinfo_set_constraint_tree(_pll_treeinfo, &cons_tree.pll_utree());
+}
 
 void assign(PartitionedMSA& parted_msa, const TreeInfo& treeinfo)
 {
@@ -554,5 +559,3 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
 
   return partition;
 }
-
-

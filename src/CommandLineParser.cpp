@@ -56,6 +56,8 @@ static struct option long_options[] =
   {"blmin",              required_argument, 0, 0 },  /*  36 */
   {"blmax",              required_argument, 0, 0 },  /*  37 */
 
+  {"tree-constraint",    required_argument, 0, 0 },  /*  38 */
+
   { 0, 0, 0, 0 }
 };
 
@@ -448,6 +450,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
                                             string(optarg) +
                                             ", please provide a positive real number.");
         break;
+      case 38: /* constraint tree */
+        opts.constraint_tree_file = optarg;
+        break;
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -559,11 +564,12 @@ void CommandLineParser::print_help()
             "Input and output options:\n"
             "  --tree         FILE | rand{N} | pars{N}    starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
             "                                             N = number of trees (default: 20 in 'all-in-one' mode, 1 otherwise)\n"
-            "  --msa          FILE                        alignment file\n"
-            "  --msa-format   VALUE                       alignment file type: FASTA, PHYLIP, CATG or AUTO-detect (default)\n"
-            "  --data-type    VALUE                       data type: DNA, AA, BIN(ary) or AUTO-detect (default)\n"
-            "  --prefix       STRING                      prefix for output files (default: MSA file name)\n"
-            "  --log          VALUE                       log verbosity: ERROR,WARNING,INFO,PROGRESS,DEBUG (default: PROGRESS)\n"
+            "  --msa             FILE                     alignment file\n"
+            "  --msa-format      VALUE                    alignment file format: FASTA, PHYLIP, CATG or AUTO-detect (default)\n"
+            "  --data-type       VALUE                    data type: DNA, AA, BIN(ary) or AUTO-detect (default)\n"
+            "  --tree-constraint FILE                     constraint tree\n"
+            "  --prefix          STRING                   prefix for output files (default: MSA file name)\n"
+            "  --log             VALUE                    log verbosity: ERROR,WARNING,INFO,PROGRESS,DEBUG (default: PROGRESS)\n"
             "  --redo                                     overwrite existing result files and ignore checkpoints (default: OFF)\n"
             "\n"
             "General options:\n"

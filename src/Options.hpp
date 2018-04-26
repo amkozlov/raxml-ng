@@ -31,7 +31,7 @@ public:
   brlen_linkage(PLLMOD_COMMON_BRLEN_SCALED), brlen_opt_method(PLLMOD_OPT_BLO_NEWTON_FAST),
   brlen_min(RAXML_BRLEN_MIN), brlen_max(RAXML_BRLEN_MAX),
   num_searches(1), num_bootstraps(100), terrace_maxsize(100),
-  tree_file(""), msa_file(""), model_file(""), outfile_prefix(""),
+  tree_file(""), constraint_tree_file(""), msa_file(""), model_file(""), outfile_prefix(""),
   num_threads(1), num_ranks(1), simd_arch(PLL_ATTRIB_ARCH_CPU)
   {};
 
@@ -72,6 +72,7 @@ public:
 
   /* I/O */
   std::string tree_file;
+  std::string constraint_tree_file;
   std::string msa_file;
   std::string model_file;     /* could be also model string */
   std::string outfile_prefix;

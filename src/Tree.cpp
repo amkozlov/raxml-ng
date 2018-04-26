@@ -47,9 +47,10 @@ Tree::~Tree ()
 {
 }
 
-Tree Tree::buildRandom(size_t num_tips, const char * const* tip_labels)
+Tree Tree::buildRandom(size_t num_tips, const char * const* tip_labels,
+                       unsigned int random_seed)
 {
-  PllUTreeUniquePtr pll_utree(pllmod_utree_create_random(num_tips, tip_labels));
+  PllUTreeUniquePtr pll_utree(pllmod_utree_create_random(num_tips, tip_labels, random_seed));
 
   libpll_check_error("ERROR building random tree");
   assert(pll_utree);
@@ -57,14 +58,32 @@ Tree Tree::buildRandom(size_t num_tips, const char * const* tip_labels)
   return Tree(pll_utree);
 }
 
-Tree Tree::buildRandom(const NameList& taxon_names)
+Tree Tree::buildRandom(const NameList& taxon_names, unsigned int random_seed)
 {
   std::vector<const char*> tip_labels(taxon_names.size(), nullptr);
   for (size_t i = 0; i < taxon_names.size(); ++i)
     tip_labels[i] = taxon_names[i].data();
 
-  return Tree::buildRandom(taxon_names.size(), (const char * const*) tip_labels.data());
+  return Tree::buildRandom(taxon_names.size(), (const char * const*) tip_labels.data(),
+                           random_seed);
 }
+
+Tree Tree::buildRandomConstrained(const Tree& constrained_tree, unsigned int random_seed)
+{
+  PllUTreeUniquePtr pll_utree(pllmod_utree_resolve_multi(&constrained_tree.pll_utree(),
+                                                         random_seed, nullptr));
+
+  if (!pll_utree)
+  {
+    assert(pll_errno);
+    libpll_check_error("ERROR in building a randomized constrained tree");
+  }
+
+//  pll_utree_check_integrity(pll_utree.get())
+
+  return Tree(pll_utree);
+}
+
 
 Tree Tree::buildParsimony(const PartitionedMSA& parted_msa, unsigned int random_seed,
                            unsigned int attributes, unsigned int * score)
@@ -148,7 +167,7 @@ Tree Tree::loadFromFile(const std::string& file_name)
     utree = pll_rtree_unroot(rtree);
 
     /* optional step if using default PLL clv/pmatrix index assignments */
-    pll_utree_reset_template_indices(get_pll_utree_root(utree), utree->tip_count);
+    pll_utree_reset_template_indices(utree->vroot, utree->tip_count);
 
     libpll_check_error("ERROR unrooting the tree");
   }
@@ -272,7 +291,8 @@ void Tree::topology(const TreeTopology& topol)
 
     // important: make sure all branches have distinct pmatrix indices!
     left_node->pmatrix_index = right_node->pmatrix_index = pmatrix_index++;
-//    printf("%u %u %lf %d\n", branch.left_node_id, branch.right_node_id, branch.length, left_node->pmatrix_index);
+//    printf("%u %u %lf %d  (%u - %u) \n", branch.left_node_id, branch.right_node_id,
+//           branch.length, left_node->pmatrix_index, left_node->clv_index, right_node->clv_index);
   }
 
   assert(pmatrix_index == num_branches());
@@ -294,9 +314,4 @@ void TreeCollection::push_back(double score, const Tree& tree)
 void TreeCollection::push_back(double score, TreeTopology&& topol)
 {
   _trees.emplace_back(score, topol);
-}
-
-pll_unode_t* get_pll_utree_root(const pll_utree_t* tree)
-{
-  return tree->nodes[tree->tip_count + tree->inner_count - 1];
 }
