@@ -59,6 +59,7 @@ static struct option long_options[] =
   {"tree-constraint",    required_argument, 0, 0 },  /*  38 */
   {"nofiles",            no_argument,       0, 0 },  /*  39 */
   {"start",              no_argument,       0, 0 },  /*  40 */
+  {"loglh",              no_argument,       0, 0 },  /*  41 */
 
   { 0, 0, 0, 0 }
 };
@@ -463,6 +464,13 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.command = Command::start;
         num_commands++;
         break;
+      case 41: /* compute tree logLH w/o optimization */
+        opts.command = Command::evaluate;
+        opts.optimize_model = false;
+        opts.optimize_brlen = false;
+        opts.nofiles_mode = true;
+        num_commands++;
+        break;
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -489,7 +497,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       opts.command == Command::terrace)
   {
     if (opts.tree_file.empty())
-      throw OptionException("Mandatory switch --tree");
+      throw OptionException("Please provide a valid Newick file as an argument of --tree option.");
   }
 
   if (opts.command == Command::start && opts.start_tree == StartingTree::user)
@@ -568,7 +576,7 @@ void CommandLineParser::print_help()
             "Commands (mutually exclusive):\n"
             "  --help                                     display help information\n"
             "  --version                                  display version information\n"
-            "  --evaluate                                 evaluate the likelihood of a tree\n"
+            "  --evaluate                                 evaluate the likelihood of a tree (with model+brlen optimization)\n"
             "  --search                                   ML tree search.\n"
             "  --bootstrap                                bootstrapping\n"
             "  --all                                      all-in-one (ML search + bootstrapping).\n"
@@ -578,6 +586,7 @@ void CommandLineParser::print_help()
             "  --check                                    check alignment correctness and remove empty columns/rows\n"
             "  --parse                                    parse alignment, compress patterns and create binary MSA file\n"
             "  --start                                    generate parsimony/random starting trees and exit\n"
+            "  --loglh                                    compute the likelihood of a fixed tree (no model/brlen optimization)\n"
             "\n"
             "Input and output options:\n"
             "  --tree         FILE | rand{N} | pars{N}    starting tree: rand(om), pars(imony) or user-specified (newick file)\n"

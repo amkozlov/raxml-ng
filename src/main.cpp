@@ -1170,28 +1170,27 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
       Optimizer optimizer(opts);
       if (opts.command == Command::evaluate)
       {
+        // check if we have anything to ooptimize
         LOG_INFO_TS << "Tree #" << start_tree_num <<
             ", initial LogLikelihood: " << FMT_LH(treeinfo->loglh()) << endl;
-        LOG_PROGR << endl;
-        optimizer.evaluate(*treeinfo, cm);
+        if (opts.optimize_brlen || opts.optimize_brlen)
+        {
+          LOG_PROGR << endl;
+          optimizer.evaluate(*treeinfo, cm);
+          LOG_PROGR << endl;
+          LOG_INFO_TS << "Tree #" << start_tree_num <<
+              ", final logLikelihood: " << FMT_LH(cm.checkpoint().loglh()) << endl;
+          LOG_PROGR << endl;
+        }
       }
       else
       {
         optimizer.optimize_topology(*treeinfo, cm);
-      }
-
-      LOG_PROGR << endl;
-      if (opts.command == Command::evaluate)
-      {
-        LOG_INFO_TS << "Tree #" << start_tree_num <<
-            ", final logLikelihood: " << FMT_LH(cm.checkpoint().loglh()) << endl;
-      }
-      else
-      {
+        LOG_PROGR << endl;
         LOG_INFO_TS << "ML tree search #" << start_tree_num <<
             ", logLikelihood: " << FMT_LH(cm.checkpoint().loglh()) << endl;
+        LOG_PROGR << endl;
       }
-      LOG_PROGR << endl;
 
       cm.save_ml_tree();
       cm.reset_search_state();
