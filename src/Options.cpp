@@ -50,6 +50,8 @@ bool Options::result_files_exist() const
       return sysutil_file_exists(support_tree_file());
     case Command::terrace:
       return sysutil_file_exists(terrace_file());
+    case Command::start:
+      return sysutil_file_exists(start_tree_file());
     default:
       return false;
   }
@@ -81,6 +83,12 @@ void Options::remove_result_files() const
   {
     if (sysutil_file_exists(terrace_file()))
       std::remove(terrace_file().c_str());
+  }
+
+  if (command == Command::start)
+  {
+    if (sysutil_file_exists(start_tree_file()))
+      std::remove(start_tree_file().c_str());
   }
 }
 
@@ -137,6 +145,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       break;
     case Command::check:
       stream << "Alignment validation";
+      break;
+    case Command::start:
+      stream << "Starting tree generation";
       break;
     default:
       break;

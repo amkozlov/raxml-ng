@@ -58,6 +58,7 @@ static struct option long_options[] =
 
   {"tree-constraint",    required_argument, 0, 0 },  /*  38 */
   {"nofiles",            no_argument,       0, 0 },  /*  39 */
+  {"start",              no_argument,       0, 0 },  /*  40 */
 
   { 0, 0, 0, 0 }
 };
@@ -458,6 +459,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 39: /* no output files (only console output) */
         opts.nofiles_mode = true;
         break;
+      case 40: /* start tree generation */
+        opts.command = Command::start;
+        num_commands++;
+        break;
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -474,7 +479,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   if (opts.command == Command::evaluate || opts.command == Command::search ||
       opts.command == Command::bootstrap || opts.command == Command::all ||
       opts.command == Command::terrace || opts.command == Command::check ||
-      opts.command == Command::parse)
+      opts.command == Command::parse || opts.command == Command::start)
   {
     if (opts.msa_file.empty())
       throw OptionException("You must specify a multiple alignment file with --msa switch");
@@ -485,6 +490,13 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   {
     if (opts.tree_file.empty())
       throw OptionException("Mandatory switch --tree");
+  }
+
+  if (opts.command == Command::start && opts.start_tree == StartingTree::user)
+  {
+    throw OptionException("You specified a user starting tree) for the starting tree generation "
+        "command, which does not make any sense!\n"
+        "Please choose whether you want to generate parsimony or random starting trees!");
   }
 
   if (opts.command == Command::support)
@@ -526,7 +538,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   }
 
   if (opts.command != Command::search && opts.command != Command::all &&
-      opts.command != Command::evaluate)
+      opts.command != Command::evaluate && opts.command != Command::start)
   {
     opts.num_searches = 0;
   }
@@ -565,6 +577,7 @@ void CommandLineParser::print_help()
             "  --terrace                                  check whether tree lies on a phylogenetic terrace \n"
             "  --check                                    check alignment correctness and remove empty columns/rows\n"
             "  --parse                                    parse alignment, compress patterns and create binary MSA file\n"
+            "  --start                                    generate parsimony/random starting trees and exit\n"
             "\n"
             "Input and output options:\n"
             "  --tree         FILE | rand{N} | pars{N}    starting tree: rand(om), pars(imony) or user-specified (newick file)\n"

@@ -20,7 +20,8 @@ enum class Command
   support,
   terrace,
   check,
-  parse
+  parse,
+  start
 };
 
 enum class FileFormat
