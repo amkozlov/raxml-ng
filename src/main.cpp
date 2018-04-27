@@ -297,15 +297,6 @@ void check_msa(RaxmlInstance& instance)
       LOG_INFO << sysutil_realpath(reduced_part_fname) << endl;
     }
   }
-
-  if (taxon_count > RAXML_RATESCALERS_TAXA && !instance.opts.use_rate_scalers)
-  {
-    LOG_INFO << "\nNOTE: Per-rate scalers were automatically enabled to prevent numerical issues "
-        "on taxa-rich alignments.\n";
-    LOG_INFO << "NOTE: You can use --force switch to skip this check and fall back to per-site scalers.\n";
-    instance.opts.use_rate_scalers = true;
-  }
-
 }
 
 void check_models(const RaxmlInstance& instance)
@@ -398,6 +389,19 @@ void check_tree(const PartitionedMSA& msa, const Tree& tree)
   {
     if (branch.length < 0.)
       throw runtime_error("Tree file contains negative branch lengths!");
+  }
+}
+
+void check_options(RaxmlInstance& instance)
+{
+  if (instance.parted_msa.taxon_count() > RAXML_RATESCALERS_TAXA &&
+      !instance.opts.use_rate_scalers)
+  {
+    LOG_INFO << "\nNOTE: Per-rate scalers were automatically enabled to prevent numerical issues "
+        "on taxa-rich alignments." << endl;
+    LOG_INFO << "NOTE: You can use --force switch to skip this check "
+        "and fall back to per-site scalers." << endl << endl;
+    instance.opts.use_rate_scalers = true;
   }
 }
 
@@ -1285,10 +1289,13 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   load_constraint(instance);
 
+  if (!opts.force_mode)
+    check_options(instance);
+
   // temp workaround: since MSA pattern compression calls rand(), it will change all random
   // numbers generated afterwards. so just reset seed to the initial value to ensure that
   // starting trees, BS replicates etc. are the same regardless whether pat.comp is ON or OFF
-  srand(instance.opts.random_seed);
+  srand(opts.random_seed);
 
   // we need 2 doubles for each partition AND threads to perform parallel reduction,
   // so resize the buffer accordingly
@@ -1392,17 +1399,18 @@ int internal_main(int argc, char** argv, void* comm)
   int retval = EXIT_SUCCESS;
 
   RaxmlInstance instance;
+  auto& opts = instance.opts;
 
   ParallelContext::init_mpi(argc, argv, comm);
 
-  instance.opts.num_ranks = ParallelContext::num_ranks();
+  opts.num_ranks = ParallelContext::num_ranks();
 
   logger().add_log_stream(&cout);
 
   CommandLineParser cmdline;
   try
   {
-    cmdline.parse_options(argc, argv, instance.opts);
+    cmdline.parse_options(argc, argv, opts);
   }
   catch (OptionException &e)
   {
@@ -1411,7 +1419,7 @@ int internal_main(int argc, char** argv, void* comm)
   }
 
   /* handle trivial commands first */
-  switch (instance.opts.command)
+  switch (opts.command)
   {
     case Command::help:
       print_banner();
@@ -1428,11 +1436,10 @@ int internal_main(int argc, char** argv, void* comm)
     case Command::all:
     case Command::support:
     case Command::start:
-      if (!instance.opts.redo_mode && instance.opts.result_files_exist())
+      if (!opts.redo_mode && opts.result_files_exist())
       {
         LOG_ERROR << endl << "ERROR: Result files for the run with prefix `" <<
-                            (instance.opts.outfile_prefix.empty() ?
-                                instance.opts.msa_file : instance.opts.outfile_prefix) <<
+                            (opts.outfile_prefix.empty() ? opts.msa_file : opts.outfile_prefix) <<
                             "` already exist!\n" <<
                             "Please either choose a new prefix, remove old files, or add "
                             "--redo command line switch to overwrite them." << endl << endl;
@@ -1444,7 +1451,7 @@ int internal_main(int argc, char** argv, void* comm)
   }
 
   /* now get to the real stuff */
-  srand(instance.opts.random_seed);
+  srand(opts.random_seed);
   logger().set_log_level(instance.opts.log_level);
 
   /* only master process writes the log file */
@@ -1452,37 +1459,37 @@ int internal_main(int argc, char** argv, void* comm)
   {
     auto mode = !instance.opts.redo_mode && sysutil_file_exists(instance.opts.checkp_file()) ?
         ios::app : ios::out;
-    logger().set_log_filename(instance.opts.log_file(), mode);
+    logger().set_log_filename(opts.log_file(), mode);
   }
 
   print_banner();
-  LOG_INFO << instance.opts;
+  LOG_INFO << opts;
 
   try
   {
-    if (!instance.opts.constraint_tree_file.empty() &&
-        instance.opts.start_tree != StartingTree::random)
+    if (!opts.constraint_tree_file.empty() &&
+        opts.start_tree != StartingTree::random)
     {
       throw runtime_error(string("") +
-          (instance.opts.start_tree == StartingTree::user ? "User" : "Parsimony") +
+          (opts.start_tree == StartingTree::user ? "User" : "Parsimony") +
           " starting trees are not supported in combination with constrained tree inference.\n" +
           "       Please use random starting trees instead.");
     }
 
-    switch (instance.opts.command)
+    switch (opts.command)
     {
       case Command::evaluate:
       case Command::search:
       case Command::bootstrap:
       case Command::all:
       {
-        if (instance.opts.redo_mode)
+        if (opts.redo_mode)
         {
           LOG_WARN << "WARNING: Running in REDO mode: existing checkpoints are ignored, "
               "and all result files will be overwritten!" << endl << endl;
         }
 
-        if (instance.opts.force_mode)
+        if (opts.force_mode)
         {
           LOG_WARN << "WARNING: Running in FORCE mode: all safety checks are disabled!"
               << endl << endl;
@@ -1491,41 +1498,41 @@ int internal_main(int argc, char** argv, void* comm)
         /* init load balancer */
         instance.load_balancer.reset(new KassianLoadBalancer());
 
-        CheckpointManager cm(instance.opts.checkp_file());
-        ParallelContext::init_pthreads(instance.opts, std::bind(thread_main,
-                                                                std::ref(instance),
-                                                                std::ref(cm)));
+        CheckpointManager cm(opts.checkp_file());
+        ParallelContext::init_pthreads(opts, std::bind(thread_main,
+                                                       std::ref(instance),
+                                                       std::ref(cm)));
 
         master_main(instance, cm);
         break;
       }
       case Command::support:
-        draw_bootstrap_support(instance.opts);
+        draw_bootstrap_support(opts);
         break;
       case Command::terrace:
       {
         load_parted_msa(instance);
-        assert(instance.opts.start_tree == StartingTree::user);
-        LOG_INFO << "Loading tree from: " << instance.opts.tree_file << endl << endl;
-        if (!sysutil_file_exists(instance.opts.tree_file))
-          throw runtime_error("File not found: " + instance.opts.tree_file);
-        instance.start_tree_stream.reset(new NewickStream(instance.opts.tree_file, std::ios::in));
-        Tree tree = generate_tree(instance, instance.opts.start_tree);
+        assert(opts.start_tree == StartingTree::user);
+        LOG_INFO << "Loading tree from: " << opts.tree_file << endl << endl;
+        if (!sysutil_file_exists(opts.tree_file))
+          throw runtime_error("File not found: " + opts.tree_file);
+        instance.start_tree_stream.reset(new NewickStream(opts.tree_file, std::ios::in));
+        Tree tree = generate_tree(instance, opts.start_tree);
         check_terrace(instance, tree);
         break;
       }
       case Command::check:
-        instance.opts.use_pattern_compression = false;
+        opts.use_pattern_compression = false;
       case Command::parse:
       {
         load_parted_msa(instance);
-        if (instance.opts.start_tree == StartingTree::user)
+        if (opts.start_tree == StartingTree::user)
         {
-          LOG_INFO << "Loading tree from: " << instance.opts.tree_file << endl << endl;
-          if (!sysutil_file_exists(instance.opts.tree_file))
-            throw runtime_error("File not found: " + instance.opts.tree_file);
-          instance.start_tree_stream.reset(new NewickStream(instance.opts.tree_file, std::ios::in));
-          Tree tree = generate_tree(instance, instance.opts.start_tree);
+          LOG_INFO << "Loading tree from: " << opts.tree_file << endl << endl;
+          if (!sysutil_file_exists(opts.tree_file))
+            throw runtime_error("File not found: " + opts.tree_file);
+          instance.start_tree_stream.reset(new NewickStream(opts.tree_file, std::ios::in));
+          Tree tree = generate_tree(instance, opts.start_tree);
         }
         LOG_INFO << "Alignment can be successfully read by RAxML-NG." << endl << endl;
         break;
@@ -1534,10 +1541,10 @@ int internal_main(int argc, char** argv, void* comm)
       {
         load_parted_msa(instance);
         build_start_trees(instance, 0);
-        if (!instance.opts.start_tree_file().empty())
+        if (!opts.start_tree_file().empty())
         {
           LOG_INFO << "\nAll starting trees saved to: " <<
-              sysutil_realpath(instance.opts.start_tree_file()) << endl << endl;
+              sysutil_realpath(opts.start_tree_file()) << endl << endl;
         }
         else
         {
