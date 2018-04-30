@@ -41,6 +41,9 @@ TEST(ModelTest, GTR_R_user)
 
   // tests
   EXPECT_EQ(model.to_string(), "GTR{0.2/1/2/4/7/1}+FC+R3");
+  EXPECT_EQ(model.to_string(false, 2), "GTR{0.20/1.00/2.00/4.00/7.00/1.00}+FC+R3");
+  EXPECT_EQ(model.to_string(true, 3),
+            "GTR{0.200/1.000/2.000/4.000/7.000/1.000}+FC+R3{0.189/0.712/2.099}{0.333/0.333/0.333}");
   EXPECT_EQ(model.data_type(), DataType::dna);
   EXPECT_EQ(model.name(), "GTR");
   EXPECT_EQ(model.num_states(), 4);

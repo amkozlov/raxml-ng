@@ -31,6 +31,7 @@ public:
   brlen_linkage(PLLMOD_COMMON_BRLEN_SCALED), brlen_opt_method(PLLMOD_OPT_BLO_NEWTON_FAST),
   brlen_min(RAXML_BRLEN_MIN), brlen_max(RAXML_BRLEN_MAX),
   num_searches(1), num_bootstraps(100), terrace_maxsize(100),
+  precision(RAXML_DEFAULT_PRECISION),
   tree_file(""), constraint_tree_file(""), msa_file(""), model_file(""), outfile_prefix(""),
   num_threads(1), num_ranks(1), simd_arch(PLL_ATTRIB_ARCH_CPU)
   {};
@@ -70,6 +71,8 @@ public:
   unsigned int num_searches;
   unsigned int num_bootstraps;
   unsigned long long terrace_maxsize;
+
+  unsigned int precision;
 
   /* I/O */
   std::string tree_file;

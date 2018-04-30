@@ -1072,6 +1072,7 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
     {
       RaxmlPartitionStream model_stream(opts.best_model_file(), true);
       model_stream.print_model_params(true);
+      model_stream << fixed << setprecision(logger().precision(LogElement::model));
       model_stream << instance.parted_msa;
 
       LOG_INFO << "Optimized model saved to: " << sysutil_realpath(opts.best_model_file()) << endl;
@@ -1451,7 +1452,8 @@ int internal_main(int argc, char** argv, void* comm)
 
   /* now get to the real stuff */
   srand(opts.random_seed);
-  logger().set_log_level(instance.opts.log_level);
+  logger().log_level(instance.opts.log_level);
+  logger().precision(instance.opts.precision, LogElement::all);
 
   /* only master process writes the log file */
   if (ParallelContext::master() && !instance.opts.log_file().empty())

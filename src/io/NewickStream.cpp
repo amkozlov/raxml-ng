@@ -7,6 +7,16 @@ char * newick_name_cb(const pll_unode_t * node)
   return node->label ? strdup(node->label) : strdup("");
 }
 
+char * newick_print_cb(const pll_unode_t * node)
+{
+  // that's ugly, but cannot find a better solution so far...
+  const unsigned int precision = logger().precision(LogElement::brlen);
+
+  char * newick;
+  asprintf(&newick, "%s:%.*lf", node->label, precision, node->length);
+  return newick;
+}
+
 std::string to_newick_string_rooted(const Tree& tree, double root_brlen)
 {
   char * newick_str = pll_utree_export_newick_rooted(&tree.pll_utree_root(),
@@ -18,7 +28,7 @@ std::string to_newick_string_rooted(const Tree& tree, double root_brlen)
 
 NewickStream& operator<<(NewickStream& stream, const pll_unode_t& root)
 {
-  char * newick_str = pll_utree_export_newick(&root, nullptr);
+  char * newick_str = pll_utree_export_newick(&root, newick_print_cb);
   stream << newick_str << std::endl;
   free(newick_str);
   return stream;

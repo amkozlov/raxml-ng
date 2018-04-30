@@ -122,7 +122,7 @@ RaxmlPartitionStream& operator>>(RaxmlPartitionStream& stream, PartitionedMSA& p
 
 RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const PartitionInfo& part_info)
 {
-  stream << part_info.model().to_string(stream.print_model_params()) << ", ";
+  stream << part_info.model().to_string(stream.print_model_params(), stream.precision()) << ", ";
   stream << part_info.name() << " = ";
   stream.put_range(part_info);
   stream << std::endl;

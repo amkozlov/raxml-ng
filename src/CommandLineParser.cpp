@@ -60,6 +60,7 @@ static struct option long_options[] =
   {"nofiles",            no_argument,       0, 0 },  /*  39 */
   {"start",              no_argument,       0, 0 },  /*  40 */
   {"loglh",              no_argument,       0, 0 },  /*  41 */
+  {"precision",          required_argument, 0, 0 },  /*  42 */
 
   { 0, 0, 0, 0 }
 };
@@ -471,6 +472,13 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.nofiles_mode = true;
         num_commands++;
         break;
+      case 42:  /* precision */
+        if (sscanf(optarg, "%u", &opts.precision) != 1 || opts.precision == 0)
+        {
+          throw InvalidOptionValueException("Invalid precision: %s " + string(optarg) +
+                                            ", please provide a positive integer number!");
+        }
+        break;
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -598,6 +606,8 @@ void CommandLineParser::print_help()
             "  --prefix          STRING                   prefix for output files (default: MSA file name)\n"
             "  --log             VALUE                    log verbosity: ERROR,WARNING,INFO,PROGRESS,DEBUG (default: PROGRESS)\n"
             "  --redo                                     overwrite existing result files and ignore checkpoints (default: OFF)\n"
+            "  --nofiles                                  do not create any output files, print results to the terminal only\n"
+            "  --precision       VALUE                    number of decimal places to print (default: 6)\n"
             "\n"
             "General options:\n"
             "  --seed         VALUE                       seed for pseudo-random number generator (default: current time)\n"
@@ -608,7 +618,6 @@ void CommandLineParser::print_help()
             "  --simd         none | sse3 | avx | avx2    vector instruction set to use (default: auto-detect).\n"
             "  --rate-scalers on | off                    use individual CLV scalers for each rate category (default: OFF)\n"
             "  --force                                    disable all safety checks (please think twice!)\n"
-            "  --nofiles                                  do not create any output files, print results to the terminal only\n"
             "\n"
             "Model options:\n"
             "  --model        <name>+G[n]+<Freqs> | FILE  model specification OR partition file (default: GTR+G4)\n"

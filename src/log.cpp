@@ -12,7 +12,9 @@ void LogStream::add_stream(std::ostream* stream)
   }
 }
 
-Logging::Logging() : _log_level(LogLevel::info), _logfile()
+Logging::Logging() : _log_level(LogLevel::info), _logfile(),
+    _precision_loglh(RAXML_DEFAULT_PRECISION), _precision_model(RAXML_DEFAULT_PRECISION),
+    _precision_brlen(RAXML_DEFAULT_PRECISION)
 {
   /* add file stream to the list, even though it's to attached to a file yet */
   _full_stream.add_stream(&_logfile);
@@ -44,15 +46,55 @@ void Logging::add_log_stream(std::ostream* stream)
     _full_stream.add_stream(stream);
 }
 
-void Logging::set_log_level(LogLevel level)
+void Logging::log_level(LogLevel level)
 {
   _log_level = level;
+}
+
+void Logging::precision(unsigned int prec, LogElement elem)
+{
+  switch(elem)
+  {
+    case LogElement::loglh:
+      _precision_loglh = prec;
+      break;
+    case LogElement::model:
+      _precision_model = prec;
+      break;
+    case LogElement::brlen:
+      _precision_brlen = prec;
+      break;
+    case LogElement::all:
+      _precision_loglh = _precision_model = _precision_brlen = prec;
+      break;
+    default:
+      assert(0);
+  }
+}
+
+unsigned int Logging::precision(LogElement elem) const
+{
+  switch(elem)
+  {
+    case LogElement::loglh:
+      return _precision_loglh;
+    case LogElement::model:
+      return _precision_model;
+    case LogElement::brlen:
+      return _precision_brlen;
+    case LogElement::all:
+      return RAXML_DEFAULT_PRECISION;
+    default:
+      assert(0);
+      return 0;
+  }
 }
 
 Logging& logger()
 {
   return Logging::instance();
 }
+
 
 TimeStamp::TimeStamp() : secs(global_timer().elapsed_seconds())
 {
