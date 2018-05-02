@@ -13,7 +13,8 @@ char * newick_print_cb(const pll_unode_t * node)
   const unsigned int precision = logger().precision(LogElement::brlen);
 
   char * newick;
-  asprintf(&newick, "%s:%.*lf", node->label, precision, node->length);
+  asprintf(&newick, "%s:%.*lf",
+           node->label ? node->label : "" , precision, node->length);
   return newick;
 }
 
