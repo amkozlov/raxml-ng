@@ -36,6 +36,7 @@
 #include "ParallelContext.hpp"
 #include "LoadBalancer.hpp"
 #include "bootstrap/BootstrapGenerator.hpp"
+#include "autotune/ResourceEstimator.hpp"
 
 #ifdef _RAXML_TERRAPHAST
 #include "terraces/TerraceWrapper.hpp"
@@ -473,7 +474,7 @@ void load_msa(RaxmlInstance& instance)
     {
       LOG_INFO << "NOTE: Binary MSA file already exists: " << binary_msa_fname << endl << endl;
     }
-    else
+    else if (opts.command != Command::check)
     {
       RBAStream bs(binary_msa_fname);
       bs << parted_msa;
@@ -1033,6 +1034,9 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
 
     best_tree.topology(best->second);
 
+//    pll_utree_show_ascii(&best_tree.pll_utree_root(), PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH |
+//                                     PLL_UTREE_SHOW_CLV_INDEX );
+
     check_terrace(instance, best_tree);
 
     if (checkp.ml_trees.size() > 1 && !opts.ml_trees_file().empty())
@@ -1113,6 +1117,31 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
   }
 
   LOG_INFO << endl << endl;
+}
+
+void print_resources(const RaxmlInstance& instance)
+{
+  StaticResourceEstimator resEstimator(instance.parted_msa, instance.opts);
+  auto res = resEstimator.estimate();
+
+  LOG_DEBUG << "* Per-taxon CLV size (elements)                 : "
+      << res.taxon_clv_size << endl;
+  LOG_INFO << "* Estimated memory requirements : " <<
+      (size_t) (((float) res.total_mem_size) / (1024 * 1024) + 1) << " MB" << endl << endl;
+  LOG_INFO << "* Recommended number of threads / MPI processes " << endl
+      <<      "       for a single run (minimum response time) : "
+      << res.num_threads_response
+      << endl
+      <<      "      for batch processing (maximum throughput) : "
+      << res.num_threads_throughput
+      << endl
+//      <<      "                                       balanced : " <<
+//      res.num_threads_balanced
+      << endl;
+
+  LOG_INFO << endl << "Please note that numbers given above are rough estimates only. " << endl <<
+      "Actual memory consumption and parallel performance on your system can differ!"
+      << endl << endl;
 }
 
 void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
@@ -1535,6 +1564,9 @@ int internal_main(int argc, char** argv, void* comm)
           instance.start_tree_stream.reset(new NewickStream(opts.tree_file, std::ios::in));
           Tree tree = generate_tree(instance, opts.start_tree);
         }
+        if (opts.command == Command::parse)
+          print_resources(instance);
+
         LOG_INFO << "Alignment can be successfully read by RAxML-NG." << endl << endl;
         break;
       }

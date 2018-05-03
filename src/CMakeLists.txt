@@ -1,6 +1,7 @@
 file(GLOB RAXML_SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp 
                         ${PROJECT_SOURCE_DIR}/src/io/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/bootstrap/*.cpp
+                        ${PROJECT_SOURCE_DIR}/src/autotune/*.cpp
                         )
 
 if(USE_TERRAPHAST)

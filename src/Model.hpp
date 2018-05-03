@@ -132,6 +132,9 @@ public:
   AscBiasCorrection ascbias_type() const { return _ascbias_type; }
   const WeightVector& ascbias_weights() const { return _ascbias_weights; }
 
+  /* per alignment site, given in elements (NOT in bytes) */
+  size_t clv_entry_size() const { return _num_states * _num_ratecats; }
+
   /* setters */
   void alpha(double value) { _alpha = value; };
   void pinv(double value) { _pinv = value; };

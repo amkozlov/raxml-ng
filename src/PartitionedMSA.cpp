@@ -136,6 +136,18 @@ size_t PartitionedMSA::total_patterns() const
   return sum;
 }
 
+size_t PartitionedMSA::taxon_clv_size() const
+{
+  size_t clv_size = 0;
+
+  for (const auto& pinfo: _part_list)
+  {
+    clv_size += pinfo.taxon_clv_size();
+  }
+
+  return clv_size;
+}
+
 void PartitionedMSA::set_model_empirical_params()
 {
   for (PartitionInfo& pinfo: _part_list)
