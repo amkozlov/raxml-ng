@@ -1539,6 +1539,7 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::support:
         draw_bootstrap_support(opts);
         break;
+#ifdef _RAXML_TERRAPHAST
       case Command::terrace:
       {
         load_parted_msa(instance);
@@ -1551,6 +1552,7 @@ int internal_main(int argc, char** argv, void* comm)
         check_terrace(instance, tree);
         break;
       }
+#endif
       case Command::check:
         opts.use_pattern_compression = false;
       case Command::parse:

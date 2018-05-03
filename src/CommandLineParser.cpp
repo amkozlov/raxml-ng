@@ -407,8 +407,13 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         num_commands++;
         break;
       case 31: /* terrace */
+#ifdef _RAXML_TERRAPHAST
         opts.command = Command::terrace;
         num_commands++;
+#else
+        throw  OptionException("Unsupported command: --terrace.\n"
+            "Please build RAxML-NG with TERRAPHAST support.");
+#endif
         break;
       case 32:  /* maximum number of terrace trees to output */
         if (sscanf(optarg, "%llu", &opts.terrace_maxsize) != 1 || opts.terrace_maxsize == 0)
@@ -590,7 +595,9 @@ void CommandLineParser::print_help()
             "  --all                                      all-in-one (ML search + bootstrapping).\n"
             "  --support                                  compute bipartition support for a given reference tree (e.g., best ML tree)\n"
             "                                             and a set of replicate trees (e.g., from a bootstrap analysis)\n"
-            "  --terrace                                  check whether tree lies on a phylogenetic terrace \n"
+#ifdef _RAXML_TERRAPHAST
+            "  --terrace                                  check whether a tree lies on a phylogenetic terrace \n"
+#endif
             "  --check                                    check alignment correctness and remove empty columns/rows\n"
             "  --parse                                    parse alignment, compress patterns and create binary MSA file\n"
             "  --start                                    generate parsimony/random starting trees and exit\n"
