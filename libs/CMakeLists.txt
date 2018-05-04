@@ -35,8 +35,13 @@ endif()
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${RAXML_LOCALDEPS_DIR}/lib)
 
-# build terraphast I
+# build terraphast-one
 if(USE_TERRAPHAST)
-  add_subdirectory(terraphast/terraphastI)
-  set(TERRACES_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/terraphast/terraphastI/include PARENT_SCOPE)
+  set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/terraphast/cmake)
+  set(TERRAPHAST_BUILD_APPS OFF)
+  set(TERRAPHAST_BUILD_TESTS OFF)
+  set(TERRAPHAST_BUILD_CLIB OFF)
+  set(TERRAPHAST_USE_GMP OFF)
+  add_subdirectory(terraphast)
+  set(TERRACES_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/terraphast/include PARENT_SCOPE)
 endif()

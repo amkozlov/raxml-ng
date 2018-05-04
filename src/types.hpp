@@ -74,6 +74,7 @@ typedef std::vector<IdNamePair> IdNameVector;
 typedef std::unordered_map<size_t,std::string> IdNameMap;
 typedef std::unordered_map<std::string,size_t> NameIdMap;
 typedef std::set<size_t> IDSet;
+typedef std::vector<size_t> IDVector;
 
 typedef unsigned int WeightType;
 typedef std::vector<WeightType> WeightVector;

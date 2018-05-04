@@ -2,6 +2,7 @@
 #define RAXML_TERRACES_TERRACEWRAPPER_HPP_
 
 #include <terraces/advanced.hpp>
+#include <terraces/parser.hpp>
 
 class PartitionedMSA;
 
@@ -14,9 +15,10 @@ public:
   void print_terrace(std::ostream& output);
 
 private:
-  terraces::bitmatrix bm_;
-  terraces::name_map names_;
-  terraces::supertree_data supertree_;
+  terraces::bitmatrix _bm;
+  terraces::name_map _names;
+  terraces::index_map _indices;
+  terraces::supertree_data _supertree;
 };
 
 #endif /* RAXML_TERRACES_TERRACEWRAPPER_HPP_ */

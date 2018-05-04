@@ -108,8 +108,9 @@ const PartitionStats& PartitionInfo::stats() const
     _stats.pattern_count = _msa.num_patterns();
     _stats.inv_count = pll_stats->inv_cols_count;
     _stats.gap_prop = pll_stats->gap_prop;
-    _stats.emp_base_freqs.assign(pll_stats->freqs, pll_stats->freqs + states);
+    _stats.gap_seqs.assign(pll_stats->gap_seqs, pll_stats->gap_seqs + pll_stats->gap_seqs_count);
 
+    _stats.emp_base_freqs.assign(pll_stats->freqs, pll_stats->freqs + states);
     if (pll_stats->subst_rates)
     {
       _stats.emp_subst_rates.assign(pll_stats->subst_rates,

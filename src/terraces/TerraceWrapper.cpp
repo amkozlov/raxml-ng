@@ -58,52 +58,59 @@ void set(terraces::bitmatrix& bm, terraces::index_map indices, bool val)
 }
 
 TerraceWrapper::TerraceWrapper (const PartitionedMSA& parted_msa, const std::string& nwk_string) :
-    bm_(parted_msa.full_msa().size() * 2 - 1, parted_msa.part_count())
+    _bm(parted_msa.taxon_count(), parted_msa.part_count())
 {
-  auto tree = parse_nwk(nwk_string);
+  /* init index<->name maps */
+  _names.resize(parted_msa.taxon_count());
+  for (size_t i = 0; i < parted_msa.taxon_count(); ++i)
+  {
+    auto label = parted_msa.taxon_names().at(i);
+    _indices[label] = i;
+    _names[i] = label;
+  }
 
   /* init partition presence/absence matrix */
-  assert(bm_.rows() == tree.tree.size());
-  set(bm_, tree.indices, true);
-  for (size_t p = 0; p < bm_.cols(); ++p)
+//  set(bm_, tree.indices, true);
+  set(_bm, true);
+  for (size_t p = 0; p < _bm.cols(); ++p)
   {
     auto& pinfo = parted_msa.part_info(p);
-    for (size_t i = 0; i < pinfo.stats()->gap_seqs_count; ++i)
+    for (size_t i = 0; i < pinfo.stats().gap_seq_count(); ++i)
     {
-      auto seq_id = pinfo.stats()->gap_seqs[i];
-      auto label = parted_msa.full_msa().label(seq_id);
-      auto row = tree.indices[label];
-      bm_.set(row, p, false);
+      auto seq_id = pinfo.stats().gap_seqs[i];
+      _bm.set(seq_id, p, false);
     }
   }
 
-  LOG_DEBUG << bm_ << std::endl;
+  LOG_DEBUG << _bm << std::endl;
 
-  auto root_index = find_root(bm_);
+  auto root_index = find_root(_bm);
 
   if (root_index == terraces::none)
     throw terraces::no_usable_root_error("Cannot find any taxon with data in all partitions!");
 
+  auto tree = parse_nwk(nwk_string, _indices);
+//  assert(_bm.rows() == tree.size());
+
   LOG_DEBUG << "root:" << root_index << ": ";
-  LOG_DEBUG << tree.names.at(root_index) <<  std::endl;
+  LOG_DEBUG << _names.at(root_index) <<  std::endl;
 
   LOG_DEBUG << "Names:" << std::endl;
-  for (auto n: tree.names)
+  for (auto n: _names)
     LOG_DEBUG << n << std::endl;
   LOG_DEBUG << std::endl;
 
-  names_ = tree.names;
-  reroot_inplace(tree.tree, root_index);
-  supertree_ = prepare_constraints(tree.tree, bm_, tree.names, root_index);
+//  reroot_inplace(tree.tree, root_index);
+  _supertree = prepare_constraints(tree, _bm, root_index);
 }
 
 std::uint64_t TerraceWrapper::terrace_size()
 {
-  return count_terrace(supertree_);
+  return count_terrace(_supertree);
 }
 
 void TerraceWrapper::print_terrace(std::ostream& output)
 {
-  auto result = terraces::print_terrace(supertree_, names_, output);
+  auto result = terraces::print_terrace(_supertree, _names, output);
 }
 
