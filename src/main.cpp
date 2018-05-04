@@ -964,13 +964,16 @@ void check_terrace(const RaxmlInstance& instance, const Tree& tree)
         LOG_WARN << "WARNING: Best-found ML tree lies on a terrace of size: "
                  << terrace_size << endl << endl;
 
-        ofstream fs(instance.opts.terrace_file());
-        terrace_wrapper.print_terrace(fs);
-        LOG_INFO << "Tree terrace (in compressed Newick format) was saved to: "
-            << sysutil_realpath(instance.opts.terrace_file()) << endl << endl;
+        if (!instance.opts.terrace_file().empty())
+        {
+          ofstream fs(instance.opts.terrace_file());
+          terrace_wrapper.print_terrace(fs);
+          LOG_INFO << "Tree terrace (in compressed Newick format) was saved to: "
+              << sysutil_realpath(instance.opts.terrace_file()) << endl << endl;
 
-        // TODO partial prints to multiline newick?
-        // if (terrace_size <= instance.opts.terrace_maxsize)
+          // TODO partial prints to multiline newick?
+          // if (terrace_size <= instance.opts.terrace_maxsize)
+        }
       }
       else
       {

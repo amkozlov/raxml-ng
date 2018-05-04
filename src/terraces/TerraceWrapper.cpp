@@ -3,6 +3,7 @@
 #include "../PartitionedMSA.hpp"
 
 #include <terraces/errors.hpp>
+#include <terraces/rooting.hpp>
 
 using namespace terraces;
 
@@ -70,7 +71,6 @@ TerraceWrapper::TerraceWrapper (const PartitionedMSA& parted_msa, const std::str
   }
 
   /* init partition presence/absence matrix */
-//  set(bm_, tree.indices, true);
   set(_bm, true);
   for (size_t p = 0; p < _bm.cols(); ++p)
   {
@@ -100,7 +100,7 @@ TerraceWrapper::TerraceWrapper (const PartitionedMSA& parted_msa, const std::str
     LOG_DEBUG << n << std::endl;
   LOG_DEBUG << std::endl;
 
-//  reroot_inplace(tree.tree, root_index);
+  reroot_at_taxon_inplace(tree, root_index);
   _supertree = prepare_constraints(tree, _bm, root_index);
 }
 
