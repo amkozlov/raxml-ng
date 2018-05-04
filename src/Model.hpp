@@ -100,7 +100,7 @@ public:
   Model (DataType data_type = DataType::autodetect, const std::string &model_string = "GTR");
   Model (const std::string &model_string) : Model(DataType::autodetect, model_string) {};
 
-  Model(const Model& other) = default;
+  Model(const Model&) = default;
 
   /* getters */
   DataType data_type() const { return _data_type; };

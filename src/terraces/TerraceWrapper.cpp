@@ -112,5 +112,6 @@ std::uint64_t TerraceWrapper::terrace_size()
 void TerraceWrapper::print_terrace(std::ostream& output)
 {
   auto result = terraces::print_terrace(_supertree, _names, output);
+  RAXML_UNUSED(result);
 }
 
