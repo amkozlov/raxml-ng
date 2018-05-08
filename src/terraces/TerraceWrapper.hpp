@@ -5,11 +5,12 @@
 #include <terraces/parser.hpp>
 
 class PartitionedMSA;
+class Tree;
 
 class TerraceWrapper
 {
 public:
-  TerraceWrapper (const PartitionedMSA& part_msa, const std::string& nwk_string);
+  TerraceWrapper (const PartitionedMSA& part_msa, const Tree& tree);
 
   std::uint64_t terrace_size();
   void print_terrace(std::ostream& output);

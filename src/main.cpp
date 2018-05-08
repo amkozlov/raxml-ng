@@ -952,10 +952,8 @@ void check_terrace(const RaxmlInstance& instance, const Tree& tree)
 #ifdef _RAXML_TERRAPHAST
   if (instance.parted_msa.part_count() > 1)
   {
-    auto newick_str = to_newick_string_rooted(tree);
-    LOG_DEBUG << newick_str << endl << endl;
 //      auto terrace_size = instance.terrace_wrapper->get_terrace_size(newick_str);
-    TerraceWrapper terrace_wrapper(instance.parted_msa, newick_str);
+    TerraceWrapper terrace_wrapper(instance.parted_msa, tree);
     try
     {
       auto terrace_size = terrace_wrapper.terrace_size();
@@ -1468,6 +1466,7 @@ int internal_main(int argc, char** argv, void* comm)
     case Command::all:
     case Command::support:
     case Command::start:
+    case Command::terrace:
       if (!opts.redo_mode && opts.result_files_exist())
       {
         LOG_ERROR << endl << "ERROR: Result files for the run with prefix `" <<

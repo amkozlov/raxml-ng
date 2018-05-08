@@ -1,6 +1,7 @@
 #include <algorithm>
 
 #include "Tree.hpp"
+#include "io/file_io.hpp"
 
 using namespace std;
 
@@ -79,6 +80,9 @@ Tree Tree::buildRandomConstrained(const Tree& constrained_tree, unsigned int ran
     libpll_check_error("ERROR in building a randomized constrained tree");
   }
 
+//  pll_utree_show_ascii(pll_utree->vroot, PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH |
+//                                   PLL_UTREE_SHOW_CLV_INDEX );
+
 //  pll_utree_check_integrity(pll_utree.get())
 
   return Tree(pll_utree);
@@ -149,32 +153,12 @@ Tree Tree::buildParsimony(const PartitionedMSA& parted_msa, unsigned int random_
 
 Tree Tree::loadFromFile(const std::string& file_name)
 {
-  pll_utree_t * utree;
-  pll_rtree_t * rtree;
-  const char* fname = file_name.c_str();
+  Tree tree;
+  NewickStream ns(file_name, std::ios::in);
 
-  if (!(rtree = pll_rtree_parse_newick(fname)))
-  {
-    utree = pll_utree_parse_newick(fname);
-    if (!utree)
-    {
-      libpll_check_error("ERROR reading tree file");
-    }
-  }
-  else
-  {
-//    LOG_INFO << "NOTE: You provided a rooted tree; it will be automatically unrooted." << endl;
-    utree = pll_rtree_unroot(rtree);
+  ns >> tree;
 
-    /* optional step if using default PLL clv/pmatrix index assignments */
-    pll_utree_reset_template_indices(utree->vroot, utree->tip_count);
-
-    libpll_check_error("ERROR unrooting the tree");
-  }
-
-  assert(utree);
-
-  return Tree(PllUTreeUniquePtr(utree));
+  return tree;
 }
 
 PllNodeVector const& Tree::tip_nodes() const

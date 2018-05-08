@@ -1,6 +1,7 @@
 #include "TerraceWrapper.hpp"
 
 #include "../PartitionedMSA.hpp"
+#include "../io/file_io.hpp"
 
 #include <terraces/errors.hpp>
 #include <terraces/rooting.hpp>
@@ -58,7 +59,7 @@ void set(terraces::bitmatrix& bm, terraces::index_map indices, bool val)
       bm.set(it.second, col, val);
 }
 
-TerraceWrapper::TerraceWrapper (const PartitionedMSA& parted_msa, const std::string& nwk_string) :
+TerraceWrapper::TerraceWrapper (const PartitionedMSA& parted_msa, const Tree& tree) :
     _bm(parted_msa.taxon_count(), parted_msa.part_count())
 {
   /* init index<->name maps */
@@ -82,26 +83,29 @@ TerraceWrapper::TerraceWrapper (const PartitionedMSA& parted_msa, const std::str
     }
   }
 
-  LOG_DEBUG << _bm << std::endl;
+  LOG_DEBUG << std::endl << "Binary matrix:" << std::endl << _bm << std::endl;
 
   auto root_index = find_root(_bm);
 
   if (root_index == terraces::none)
     throw terraces::no_usable_root_error("Cannot find any taxon with data in all partitions!");
 
-  auto tree = parse_nwk(nwk_string, _indices);
+  auto newick_str = to_newick_string_rooted(tree);
+  LOG_DEBUG << "Tree: " << newick_str << std::endl << std::endl;
+
+  auto terra_tree = parse_nwk(newick_str, _indices);
 //  assert(_bm.rows() == tree.size());
 
-  LOG_DEBUG << "root:" << root_index << ": ";
-  LOG_DEBUG << _names.at(root_index) <<  std::endl;
+  LOG_DEBUG << "root (" << root_index << "): ";
+  LOG_DEBUG << _names.at(root_index) <<  std::endl <<  std::endl;
 
   LOG_DEBUG << "Names:" << std::endl;
   for (auto n: _names)
     LOG_DEBUG << n << std::endl;
   LOG_DEBUG << std::endl;
 
-  reroot_at_taxon_inplace(tree, root_index);
-  _supertree = prepare_constraints(tree, _bm, root_index);
+  reroot_at_taxon_inplace(terra_tree, root_index);
+  _supertree = prepare_constraints(terra_tree, _bm, root_index);
 }
 
 std::uint64_t TerraceWrapper::terrace_size()
