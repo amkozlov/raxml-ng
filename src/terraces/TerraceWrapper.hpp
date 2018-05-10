@@ -3,6 +3,7 @@
 
 #include <terraces/advanced.hpp>
 #include <terraces/parser.hpp>
+#include <terraces/errors.hpp>
 
 class PartitionedMSA;
 class Tree;
@@ -13,6 +14,8 @@ public:
   TerraceWrapper (const PartitionedMSA& part_msa, const Tree& tree);
 
   std::uint64_t terrace_size();
+  void print_terrace_newick(std::ostream& output);
+  void print_terrace_compressed(std::ostream& output);
   void print_terrace(std::ostream& output);
 
 private:
