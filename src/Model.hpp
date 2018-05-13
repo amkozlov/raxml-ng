@@ -97,6 +97,8 @@ private:
 class Model
 {
 public:
+  typedef std::unordered_map<int,ParamValue> ParamModeMap;
+
   Model (DataType data_type = DataType::autodetect, const std::string &model_string = "GTR");
   Model (const std::string &model_string) : Model(DataType::autodetect, model_string) {};
 
@@ -127,6 +129,7 @@ public:
 
   std::string to_string(bool print_params = false, unsigned int precision = 0) const;
   int params_to_optimize() const;
+  const ParamModeMap& param_mode() const { return _param_mode; }
   ParamValue param_mode(int param) const { return _param_mode.at(param); };
 
   AscBiasCorrection ascbias_type() const { return _ascbias_type; }
@@ -146,6 +149,7 @@ public:
   void ratecat_rates(doubleVector const& value) { _ratecat_rates = value; };
   void ratecat_weights(doubleVector const& value) { _ratecat_weights = value; };
 
+  void param_mode(int param, ParamValue mode) { _param_mode[param] = mode; };
   void set_param_mode_default(int param, ParamValue mode)
   {
     if (param_mode(param) == ParamValue::undefined)
@@ -178,7 +182,7 @@ private:
 
   std::vector<SubstitutionModel> _submodels;
 
-  std::unordered_map<int,ParamValue> _param_mode;
+  ParamModeMap _param_mode;
 
   void autodetect_data_type(const std::string& model_name);
   pllmod_mixture_model_t * init_mix_model(const std::string& model_name);

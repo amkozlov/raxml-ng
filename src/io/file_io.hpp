@@ -55,7 +55,7 @@ class RBAStream : public MSAFileStream
 public:
   RBAStream(const std::string& fname) : MSAFileStream(fname) {}
 
-  static bool rba_file(const std::string& fname);
+  static bool rba_file(const std::string& fname, bool check_version = false);
 };
 
 class RaxmlPartitionStream : public std::fstream

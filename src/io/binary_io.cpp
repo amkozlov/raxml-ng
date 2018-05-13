@@ -93,6 +93,8 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, std::tuple<const Model&
   {
     auto s = m.to_string(false);
     stream << s;
+
+    stream << m.param_mode();
   }
 
   if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER))
@@ -180,6 +182,10 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::tuple<Model&, Mode
     std::string s = stream.get<std::string>();
 //    printf("\n%s\n", s.c_str());
     m = Model(DataType::autodetect, s);
+
+    auto param_mode_map = stream.get<Model::ParamModeMap>();
+    for (auto e: param_mode_map)
+      m.param_mode(e.first, e.second);
   }
 
   if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER))

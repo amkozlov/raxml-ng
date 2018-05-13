@@ -1310,7 +1310,8 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   /* if resuming from a checkpoint, use binary MSA (if exists) */
   if (!instance.opts.redo_mode &&
       sysutil_file_exists(instance.opts.checkp_file()) &&
-      sysutil_file_exists(instance.opts.binary_msa_file()))
+      sysutil_file_exists(instance.opts.binary_msa_file()) &&
+      RBAStream::rba_file(instance.opts.binary_msa_file(), true))
   {
     instance.opts.msa_file = instance.opts.binary_msa_file();
   }
