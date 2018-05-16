@@ -34,6 +34,10 @@ public:
 
   void parse_options(int argc, char** argv, Options &opts);
   void print_help();
+
+private:
+  void compute_num_searches(Options &opts);
+  void check_options(Options &opts);
 };
 
 #endif /* SRC_COMMANDLINEPARSER_HPP_ */

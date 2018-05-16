@@ -1,6 +1,16 @@
 #ifndef RAXML_TYPES_HPP_
 #define RAXML_TYPES_HPP_
 
+#include <string>
+#include <vector>
+#include <array>
+#include <set>
+#include <map>
+#include <unordered_map>
+#include <unordered_set>
+#include <random>
+
+
 enum class StartingTree
 {
   random,
@@ -75,6 +85,7 @@ typedef std::unordered_map<size_t,std::string> IdNameMap;
 typedef std::unordered_map<std::string,size_t> NameIdMap;
 typedef std::set<size_t> IDSet;
 typedef std::vector<size_t> IDVector;
+typedef std::map<StartingTree,size_t> StartingTreeMap;
 
 typedef unsigned int WeightType;
 typedef std::vector<WeightType> WeightVector;

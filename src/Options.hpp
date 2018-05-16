@@ -26,7 +26,7 @@ public:
   optimize_model(true), optimize_brlen(true), redo_mode(false), force_mode(false),
   nofiles_mode(false),  log_level(LogLevel::progress),
   msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
-  random_seed(0), start_tree(StartingTree::random), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
+  random_seed(0), start_trees(), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
   spr_cutoff(1.0),
   brlen_linkage(PLLMOD_COMMON_BRLEN_SCALED), brlen_opt_method(PLLMOD_OPT_BLO_NEWTON_FAST),
   brlen_min(RAXML_BRLEN_MIN), brlen_max(RAXML_BRLEN_MAX),
@@ -59,7 +59,7 @@ public:
   FileFormat msa_format;
   DataType data_type;
   long random_seed;
-  StartingTree start_tree;
+  StartingTreeMap start_trees;
   double lh_epsilon;
   int spr_radius;
   double spr_cutoff;

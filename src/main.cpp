@@ -104,8 +104,9 @@ void init_part_info(RaxmlInstance& instance)
           "WARNING: The model you specified on the command line (" << opts.model_file <<
                     ") will be ignored " << endl <<
           "         since the binary MSA file already contains a model definition." << endl <<
-          "         Please re-run RAxML-NG with the original PHYLIP/FASTA alignment "
-                   "if you want to change the model." << endl << endl;
+          "         If you want to change the model, please re-run RAxML-NG "  << endl <<
+          "         with the original PHYLIP/FASTA alignment and --redo option."
+          << endl << endl;
     }
 
     LOG_INFO_TS << "Loading binary alignment from file: " << opts.msa_file << endl;
@@ -558,7 +559,7 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
       break;
     }
     default:
-      sysutil_fatal("Unknown starting tree type: %d\n", opts.start_tree);
+      sysutil_fatal("Unknown starting tree type: %d\n", opts.start_trees);
   }
 
   assert(!tree.empty());
@@ -593,7 +594,7 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
     {
       NewickStream ts(instance.opts.start_tree_file(), std::ios::in);
       size_t i = 0;
-      while (i < instance.opts.num_searches && ts.peek() != EOF)
+      while (ts.peek() != EOF)
       {
         Tree tree;
         ts >> tree;
@@ -605,7 +606,15 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
           instance.start_trees.emplace_back(tree);
         }
       }
-      assert(i == instance.opts.num_searches);
+      if (instance.opts.start_trees.count(StartingTree::user) > 0)
+      {
+        // in case of user startitng trees, we do not know num_searches
+        // until we read trees from the file. that's why we update num_searches here.
+        assert(i >= instance.opts.num_searches);
+        instance.opts.num_searches = i;
+      }
+      else
+        assert(i == instance.opts.num_searches);
     }
 
     LOG_INFO_TS << "NOTE: Resuming execution from checkpoint " <<
@@ -709,51 +718,64 @@ void build_parsimony_msa(RaxmlInstance& instance)
 
 void build_start_trees(RaxmlInstance& instance, size_t skip_trees)
 {
-  const auto& opts = instance.opts;
+  auto& opts = instance.opts;
   const auto& parted_msa = instance.parted_msa;
 
   /* all start trees were already generated/loaded -> return */
   if (skip_trees + instance.start_trees.size() >= instance.opts.num_searches)
     return;
 
-  switch (opts.start_tree)
+  for (auto& st_tree: opts.start_trees)
   {
-    case StartingTree::user:
-      LOG_INFO_TS << "Loading user starting tree(s) from: " << opts.tree_file << endl;
-      if (!sysutil_file_exists(opts.tree_file))
-        throw runtime_error("File not found: " + opts.tree_file);
-      instance.start_tree_stream.reset(new NewickStream(opts.tree_file, std::ios::in));
-      break;
-    case StartingTree::random:
-      LOG_INFO_TS << "Generating " << opts.num_searches << " random starting tree(s) with "
-                  << parted_msa.taxon_count() << " taxa" << endl;
-      break;
-    case StartingTree::parsimony:
-      if (parted_msa.part_count() > 1)
-      {
-        LOG_DEBUG_TS << "Generating MSA partitioned by data type for parsimony computation" << endl;
-        build_parsimony_msa(instance);
-      }
-      LOG_INFO_TS << "Generating " << opts.num_searches << " parsimony starting tree(s) with "
-                  << parted_msa.taxon_count() << " taxa" << endl;
-      break;
-    default:
-      assert(0);
-  }
-
-  for (size_t i = 0; i < opts.num_searches; ++i)
-  {
-    auto tree = generate_tree(instance, opts.start_tree);
-
-    // TODO use universal starting tree generator
-    if (opts.start_tree == StartingTree::user)
+    auto st_tree_type = st_tree.first;
+    auto& st_tree_count = st_tree.second;
+    switch (st_tree_type)
     {
-      if (instance.start_tree_stream->peek() != EOF)
-        instance.opts.num_searches++;
+      case StartingTree::user:
+        LOG_INFO_TS << "Loading user starting tree(s) from: " << opts.tree_file << endl;
+        if (!sysutil_file_exists(opts.tree_file))
+          throw runtime_error("File not found: " + opts.tree_file);
+        instance.start_tree_stream.reset(new NewickStream(opts.tree_file, std::ios::in));
+        break;
+      case StartingTree::random:
+        LOG_INFO_TS << "Generating " << st_tree_count << " random starting tree(s) with "
+                    << parted_msa.taxon_count() << " taxa" << endl;
+        break;
+      case StartingTree::parsimony:
+        if (parted_msa.part_count() > 1)
+        {
+          LOG_DEBUG_TS << "Generating MSA partitioned by data type for parsimony computation" << endl;
+          build_parsimony_msa(instance);
+        }
+        LOG_INFO_TS << "Generating " << st_tree_count << " parsimony starting tree(s) with "
+                    << parted_msa.taxon_count() << " taxa" << endl;
+        break;
+      default:
+        assert(0);
     }
 
-    if (i >= skip_trees)
+    for (size_t i = 0; i < st_tree_count; ++i)
+    {
+      auto tree = generate_tree(instance, st_tree_type);
+
+      // TODO use universal starting tree generator
+      if (st_tree_type == StartingTree::user)
+      {
+        if (instance.start_tree_stream->peek() != EOF)
+        {
+          st_tree_count++;
+          opts.num_searches++;
+        }
+      }
+
+      if (skip_trees > 0)
+      {
+        skip_trees--;
+        continue;
+      }
+
       instance.start_trees.emplace_back(tree);
+    }
   }
 
   // free memory used for parsimony MSA
@@ -1537,11 +1559,12 @@ int internal_main(int argc, char** argv, void* comm)
   try
   {
     if (!opts.constraint_tree_file.empty() &&
-        opts.start_tree != StartingTree::random)
+        (opts.start_trees.count(StartingTree::parsimony) > 0 ||
+         opts.start_trees.count(StartingTree::user)))
     {
       throw runtime_error(string("") +
-          (opts.start_tree == StartingTree::user ? "User" : "Parsimony") +
-          " starting trees are not supported in combination with constrained tree inference.\n" +
+          " User and parsimony starting trees are not supported in combination with "
+          "constrained tree inference.\n" +
           "       Please use random starting trees instead.");
     }
 
@@ -1582,12 +1605,12 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::terrace:
       {
         load_parted_msa(instance);
-        assert(opts.start_tree == StartingTree::user);
+        assert(!opts.tree_file.empty());
         LOG_INFO << "Loading tree from: " << opts.tree_file << endl << endl;
         if (!sysutil_file_exists(opts.tree_file))
           throw runtime_error("File not found: " + opts.tree_file);
         instance.start_tree_stream.reset(new NewickStream(opts.tree_file, std::ios::in));
-        Tree tree = generate_tree(instance, opts.start_tree);
+        Tree tree = generate_tree(instance, StartingTree::user);
         check_terrace(instance, tree);
         break;
       }
@@ -1597,13 +1620,13 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::parse:
       {
         load_parted_msa(instance);
-        if (opts.start_tree == StartingTree::user)
+        if (!opts.tree_file.empty())
         {
           LOG_INFO << "Loading tree from: " << opts.tree_file << endl << endl;
           if (!sysutil_file_exists(opts.tree_file))
             throw runtime_error("File not found: " + opts.tree_file);
           instance.start_tree_stream.reset(new NewickStream(opts.tree_file, std::ios::in));
-          Tree tree = generate_tree(instance, opts.start_tree);
+          Tree tree = generate_tree(instance, StartingTree::user);
         }
         if (opts.command == Command::parse)
           print_resources(instance);

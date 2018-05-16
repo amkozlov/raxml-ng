@@ -155,20 +155,24 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   stream << endl;
 
   stream << "  start tree(s): ";
-  switch(opts.start_tree)
+  for (auto it = opts.start_trees.cbegin(); it != opts.start_trees.cend(); ++it)
   {
-    case StartingTree::random:
-      stream << "random";
-      break;
-    case StartingTree::parsimony:
-      stream << "parsimony";
-      break;
-    case StartingTree::user:
-      stream << "user";
-      break;
+    if (it != opts.start_trees.cbegin())
+      stream << " + ";
+
+    switch(it->first)
+    {
+      case StartingTree::random:
+        stream << "random" << " (" << it->second << ")";
+        break;
+      case StartingTree::parsimony:
+        stream << "parsimony" << " (" << it->second << ")";
+        break;
+      case StartingTree::user:
+        stream << "user";
+        break;
+    }
   }
-  if (opts.num_searches > 1)
-    stream << " (" << opts.num_searches << ")";
   stream << endl;
 
   if (!opts.constraint_tree_file.empty())

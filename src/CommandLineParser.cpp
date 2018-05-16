@@ -86,13 +86,98 @@ std::vector<std::string> split_string(const std::string& s, char delim)
    return tokens;
 }
 
+void CommandLineParser::check_options(Options &opts)
+{
+  /* check for mandatory options for each command */
+  if (opts.command == Command::evaluate || opts.command == Command::search ||
+      opts.command == Command::bootstrap || opts.command == Command::all ||
+      opts.command == Command::terrace || opts.command == Command::check ||
+      opts.command == Command::parse || opts.command == Command::start)
+  {
+    if (opts.msa_file.empty())
+      throw OptionException("You must specify a multiple alignment file with --msa switch");
+  }
+
+  if (opts.command == Command::evaluate || opts.command == Command::support ||
+      opts.command == Command::terrace)
+  {
+    if (opts.tree_file.empty())
+      throw OptionException("Please provide a valid Newick file as an argument of --tree option.");
+  }
+
+  if (opts.command == Command::start && !opts.tree_file.empty())
+  {
+    throw OptionException("You specified a user starting tree) for the starting tree generation "
+        "command, which does not make any sense!\n"
+        "Please choose whether you want to generate parsimony or random starting trees!");
+  }
+
+  if (opts.command == Command::support)
+  {
+    assert(!opts.tree_file.empty());
+
+    if (opts.outfile_prefix.empty())
+      opts.outfile_prefix = opts.tree_file;
+
+    if (opts.outfile_names.bootstrap_trees.empty())
+    {
+      throw OptionException("You must specify a Newick file with replicate trees, e.g., "
+          "--bs-trees bootstrap.nw");
+    }
+  }
+
+  if (opts.simd_arch > sysutil_simd_autodetect())
+  {
+    if (opts.force_mode)
+      pll_hardware_ignore();
+    else
+    {
+      throw OptionException("Cannot detect " + opts.simd_arch_name() +
+                            " instruction set on your system. If you are absolutely sure "
+                            "it is supported, please use --force option to disable this check.");
+    }
+  }
+}
+
+void CommandLineParser::compute_num_searches(Options &opts)
+{
+  if (opts.command == Command::search || opts.command == Command::all ||
+      opts.command == Command::evaluate || opts.command == Command::start)
+  {
+    if (opts.start_trees.empty())
+    {
+      if (opts.command == Command::all)
+      {
+        opts.start_trees[StartingTree::random] = 10;
+        opts.start_trees[StartingTree::parsimony] = 10;
+      }
+      else
+        opts.start_trees[StartingTree::random] = 1;
+    }
+    else
+    {
+      auto def_tree_count = (opts.command == Command::all) ? 20 : 1;
+      for (auto& it: opts.start_trees)
+      {
+        if (it.first == StartingTree::user)
+          it.second = 1;
+        else
+          it.second = it.second > 0 ? it.second : def_tree_count;
+      }
+    }
+
+    for (const auto& it: opts.start_trees)
+      opts.num_searches += it.second;
+  }
+}
+
 void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 {
   opts.cmdline = get_cmdline(argc, argv);
 
   /* if no command specified, default to --search (or --help if no args were given) */
   opts.command = (argc > 1) ? Command::search : Command::help;
-  opts.start_tree = StartingTree::random;
+  opts.start_trees.clear();
   opts.random_seed = (long)time(NULL);
 
   /* compress alignment patterns by default */
@@ -135,8 +220,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.num_threads = 1;
 #endif
 
-//  opts.model_file = "GTR+G+F";
   opts.model_file = "";
+  opts.tree_file = "";
 
   // autodetect CPU instruction set and use respective SIMD kernels
   opts.simd_arch = sysutil_simd_autodetect();
@@ -186,22 +271,39 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
 
       case 5: /* starting tree */
-        if (strcasecmp(optarg, "rand") == 0 || strcasecmp(optarg, "random") == 0 ||
-            sscanf(optarg, "rand{%u}", &opts.num_searches) == 1 ||
-            sscanf(optarg, "random{%u}", &opts.num_searches) == 1)
         {
-          opts.start_tree = StartingTree::random;
-        }
-        else if (strcasecmp(optarg, "pars") == 0 || strcasecmp(optarg, "parsimony") == 0 ||
-            sscanf(optarg, "pars{%u}", &opts.num_searches) == 1 ||
-            sscanf(optarg, "parsimony{%u}", &opts.num_searches) == 1)
-        {
-          opts.start_tree = StartingTree::parsimony;
-        }
-        else
-        {
-          opts.start_tree = StartingTree::user;
-          opts.tree_file = optarg;
+          auto start_trees = split_string(optarg, ',');
+          for (const auto& st_tree: start_trees)
+          {
+            StartingTree st_tree_type;
+            unsigned int num_searches = 0;
+            if (st_tree == "rand" || st_tree == "random" ||
+                sscanf(st_tree.c_str(), "rand{%u}", &num_searches) == 1 ||
+                sscanf(st_tree.c_str(), "random{%u}", &num_searches) == 1)
+            {
+              st_tree_type = StartingTree::random;
+            }
+            else if (st_tree ==  "pars" || st_tree == "parsimony" ||
+                sscanf(st_tree.c_str(), "pars{%u}", &num_searches) == 1 ||
+                sscanf(st_tree.c_str(), "parsimony{%u}", &num_searches) == 1)
+            {
+              st_tree_type = StartingTree::parsimony;
+            }
+            else
+            {
+              if (opts.tree_file.empty())
+              {
+                st_tree_type = StartingTree::user;
+                opts.tree_file = st_tree;
+              }
+              else
+              {
+                throw InvalidOptionValueException("Invalid --tree argument: " + string(optarg)
+                                                  + ". Only one tree file is allowed!");
+              }
+            }
+            opts.start_trees[st_tree_type] = num_searches;
+          }
         }
         break;
 
@@ -516,79 +618,14 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   if (num_commands > 1)
     throw OptionException("More than one command specified");
 
-  /* check for mandatory options for each command */
-  if (opts.command == Command::evaluate || opts.command == Command::search ||
-      opts.command == Command::bootstrap || opts.command == Command::all ||
-      opts.command == Command::terrace || opts.command == Command::check ||
-      opts.command == Command::parse || opts.command == Command::start)
-  {
-    if (opts.msa_file.empty())
-      throw OptionException("You must specify a multiple alignment file with --msa switch");
-  }
-
-  if (opts.command == Command::evaluate || opts.command == Command::support ||
-      opts.command == Command::terrace)
-  {
-    if (opts.tree_file.empty())
-      throw OptionException("Please provide a valid Newick file as an argument of --tree option.");
-  }
-
-  if (opts.command == Command::start && opts.start_tree == StartingTree::user)
-  {
-    throw OptionException("You specified a user starting tree) for the starting tree generation "
-        "command, which does not make any sense!\n"
-        "Please choose whether you want to generate parsimony or random starting trees!");
-  }
-
-  if (opts.command == Command::support)
-  {
-    if (opts.outfile_prefix.empty())
-      opts.outfile_prefix = opts.tree_file;
-
-    if (opts.outfile_names.bootstrap_trees.empty())
-    {
-      throw OptionException("You must specify a Newick file with replicate trees, e.g., "
-          "--bs-trees bootstrap.nw");
-    }
-  }
-
-  if (opts.command == Command::terrace)
-  {
-    if (opts.start_tree != StartingTree::user)
-    {
-      throw OptionException("You must specify a tree file in the Newick format, e.g., "
-          "--tree bestTree.nw");
-    }
-  }
-
-  if (opts.simd_arch > sysutil_simd_autodetect())
-  {
-    if (opts.force_mode)
-      pll_hardware_ignore();
-    else
-    {
-      throw OptionException("Cannot detect " + opts.simd_arch_name() +
-                            " instruction set on your system. If you are absolutely sure "
-                            "it is supported, please use --force option to disable this check.");
-    }
-  }
+  check_options(opts);
 
   if (opts.command != Command::bootstrap && opts.command != Command::all)
   {
     opts.num_bootstraps = 0;
   }
 
-  if (opts.command != Command::search && opts.command != Command::all &&
-      opts.command != Command::evaluate && opts.command != Command::start)
-  {
-    opts.num_searches = 0;
-  }
-  else if (opts.num_searches == 0)
-  {
-    opts.num_searches = (opts.command == Command::all) ? 20 : 1;
-    if (opts.start_tree == StartingTree::user)
-      opts.num_searches = 1;
-  }
+  compute_num_searches(opts);
 
   /* set default log output level  */
   if (!log_level_set)
