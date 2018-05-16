@@ -61,6 +61,7 @@ static struct option long_options[] =
   {"start",              no_argument,       0, 0 },  /*  40 */
   {"loglh",              no_argument,       0, 0 },  /*  41 */
   {"precision",          required_argument, 0, 0 },  /*  42 */
+  {"outgroup",           required_argument, 0, 0 },  /*  43 */
 
   { 0, 0, 0, 0 }
 };
@@ -71,6 +72,18 @@ static std::string get_cmdline(int argc, char** argv)
   for (int i = 0; i < argc; ++i)
     s << argv[i] << (i < argc-1 ? " " : "");
   return s.str();
+}
+
+std::vector<std::string> split_string(const std::string& s, char delim)
+{
+   std::vector<std::string> tokens;
+   std::string token;
+   std::istringstream ss(s);
+   while (std::getline(ss, token, delim))
+   {
+      tokens.push_back(token);
+   }
+   return tokens;
 }
 
 void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
@@ -484,6 +497,13 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
                                             ", please provide a positive integer number!");
         }
         break;
+      case 43:  /* outgroup */
+        opts.outgroup_taxa = split_string(optarg, ',');
+        if (opts.outgroup_taxa.empty())
+        {
+          throw InvalidOptionValueException("Invalid outgroup: %s " + string(optarg));
+        }
+        break;
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -615,6 +635,7 @@ void CommandLineParser::print_help()
             "  --redo                                     overwrite existing result files and ignore checkpoints (default: OFF)\n"
             "  --nofiles                                  do not create any output files, print results to the terminal only\n"
             "  --precision       VALUE                    number of decimal places to print (default: 6)\n"
+            "  --outgroup        o1,o2,..,oN              comma-separated list of outgroup taxon names (it's just a drawing option!)\n"
             "\n"
             "General options:\n"
             "  --seed         VALUE                       seed for pseudo-random number generator (default: current time)\n"

@@ -73,6 +73,7 @@ public:
   unsigned long long terrace_maxsize;
 
   unsigned int precision;
+  NameList outgroup_taxa;
 
   /* I/O */
   std::string tree_file;

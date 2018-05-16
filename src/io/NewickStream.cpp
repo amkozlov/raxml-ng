@@ -30,8 +30,16 @@ std::string to_newick_string_rooted(const Tree& tree, double root_brlen)
 NewickStream& operator<<(NewickStream& stream, const pll_unode_t& root)
 {
   char * newick_str = pll_utree_export_newick(&root, newick_print_cb);
-  stream << newick_str << std::endl;
-  free(newick_str);
+  if (newick_str)
+  {
+    stream << newick_str << std::endl;
+    free(newick_str);
+  }
+  else
+  {
+    assert(pll_errno);
+    libpll_check_error("Failed to generate Newick");
+  }
   return stream;
 }
 

@@ -282,6 +282,28 @@ void Tree::topology(const TreeTopology& topol)
   assert(pmatrix_index == num_branches());
 }
 
+void Tree::reroot(const NameList& outgroup_taxa)
+{
+  // collect tip node indices
+  NameIdMap name_id_map;
+  for (auto const& node: tip_nodes())
+    name_id_map.emplace(string(node->label), node->node_index);
+
+  // find tip ids for outgroup taxa
+  uintVector tip_ids;
+  for (const auto& label: outgroup_taxa)
+  {
+    const auto tip_id = name_id_map.at(label);
+    tip_ids.push_back(tip_id);
+  }
+
+  // re-root tree with the outgroup
+  int res = pllmod_utree_outgroup_root(_pll_utree.get(), tip_ids.data(), tip_ids.size());
+
+  if (!res)
+    libpll_check_error("Unable to reroot tree");
+}
+
 TreeCollection::const_iterator TreeCollection::best() const
 {
   return std::max_element(_trees.cbegin(), _trees.cend(),

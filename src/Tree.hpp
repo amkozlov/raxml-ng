@@ -91,6 +91,7 @@ public:
   void fix_missing_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
   void reset_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
   void reset_tip_ids(const NameIdMap& label_id_map);
+  void reroot(const NameList& outgroup_taxa);
 
 protected:
   PllUTreeUniquePtr _pll_utree;

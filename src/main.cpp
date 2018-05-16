@@ -932,10 +932,30 @@ void draw_bootstrap_support(const Options& opts)
   }
 }
 
+void postprocess_tree(const Options& opts, Tree& tree)
+{
+  if (!opts.outgroup_taxa.empty())
+  {
+    try
+    {
+      tree.reroot(opts.outgroup_taxa);
+    }
+    catch (std::runtime_error& e)
+    {
+      if (pll_errno == PLLMOD_TREE_ERROR_POLYPHYL_OUTGROUP)
+        LOG_WARN << "WARNING: " << e.what() << endl << endl;
+      else
+        throw e;
+    }
+  }
+}
+
 void draw_bootstrap_support(RaxmlInstance& instance, const Checkpoint& checkp)
 {
   Tree tree = checkp.tree;
   tree.topology(checkp.ml_trees.best_topology());
+
+  postprocess_tree(instance.opts, tree);
 
   instance.bs_tree.reset(new BootstrapTree(tree));
 
@@ -952,10 +972,9 @@ void check_terrace(const RaxmlInstance& instance, const Tree& tree)
 #ifdef _RAXML_TERRAPHAST
   if (instance.parted_msa.part_count() > 1)
   {
-//      auto terrace_size = instance.terrace_wrapper->get_terrace_size(newick_str);
-    TerraceWrapper terrace_wrapper(instance.parted_msa, tree);
     try
     {
+      TerraceWrapper terrace_wrapper(instance.parted_msa, tree);
       auto terrace_size = terrace_wrapper.terrace_size();
       if (terrace_size > 1)
       {
@@ -978,9 +997,22 @@ void check_terrace(const RaxmlInstance& instance, const Tree& tree)
         LOG_INFO << "NOTE: Tree does not lie on a phylogenetic terrace." << endl << endl;
       }
     }
-    catch (std::exception& e)
+    catch (terraces::no_usable_root_error& e)
     {
-      LOG_ERROR << "ERROR: Failed to compute terrace: " << e.what() << endl << endl;
+      if (instance.opts.command == Command::terrace)
+      {
+        LOG_ERROR << "ERROR: Cannot check for phylogenetic terraces "
+            "since no comprehensive taxon is found." << endl << endl;
+      }
+      else
+      {
+        LOG_VERB << "NOTE: Cannot check for phylogenetic terraces "
+            "since no comprehensive taxon is found." << endl << endl;
+      }
+    }
+    catch (std::runtime_error& e)
+    {
+      LOG_ERROR << "ERROR: Unexpected terraphast error: " << e.what() << endl << endl;
     }
   }
 #else
@@ -996,6 +1028,7 @@ void save_ml_trees(const Options& opts, const Checkpoint& checkp)
   for (auto topol: checkp.ml_trees)
   {
     ml_tree.topology(topol.second);
+    postprocess_tree(opts, ml_tree);
     nw << ml_tree;
   }
 }
@@ -1034,6 +1067,8 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
     Tree best_tree = checkp.tree;
 
     best_tree.topology(best->second);
+
+    postprocess_tree(opts, best_tree);
 
 //    pll_utree_show_ascii(&best_tree.pll_utree_root(), PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH |
 //                                     PLL_UTREE_SHOW_CLV_INDEX );
@@ -1097,6 +1132,7 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
       for (auto topol: checkp.bs_trees)
       {
         bs_tree.topology(topol.second);
+        postprocess_tree(opts, bs_tree);
         nw << bs_tree;
       }
 
