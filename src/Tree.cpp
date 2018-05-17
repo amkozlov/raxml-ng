@@ -48,6 +48,16 @@ Tree::~Tree ()
 {
 }
 
+size_t Tree::num_inner() const
+{
+  return _pll_utree ? _pll_utree->inner_count : BasicTree::num_inner();
+}
+
+size_t Tree::num_branches() const
+{
+  return _pll_utree ? _pll_utree->edge_count : BasicTree::num_branches();
+}
+
 Tree Tree::buildRandom(size_t num_tips, const char * const* tip_labels,
                        unsigned int random_seed)
 {
@@ -229,13 +239,14 @@ PllNodeVector Tree::subnodes() const
 
     for (size_t i = 0; i < _pll_utree->tip_count + _pll_utree->inner_count; ++i)
     {
-      auto node = _pll_utree->nodes[i];
-      subnodes[node->node_index] = node;
-      if (node->next)
+      auto start = _pll_utree->nodes[i];
+      auto node = start;
+      do
       {
-        subnodes[node->next->node_index] = node->next;
-        subnodes[node->next->next->node_index] = node->next->next;
+        subnodes[node->node_index] = node;
+        node = node->next;
       }
+      while (node && node != start);
     }
   }
 
@@ -282,7 +293,7 @@ void Tree::topology(const TreeTopology& topol)
   assert(pmatrix_index == num_branches());
 }
 
-void Tree::reroot(const NameList& outgroup_taxa)
+void Tree::reroot(const NameList& outgroup_taxa, bool add_root_node)
 {
   // collect tip node indices
   NameIdMap name_id_map;
@@ -298,7 +309,8 @@ void Tree::reroot(const NameList& outgroup_taxa)
   }
 
   // re-root tree with the outgroup
-  int res = pllmod_utree_outgroup_root(_pll_utree.get(), tip_ids.data(), tip_ids.size());
+  int res = pllmod_utree_outgroup_root(_pll_utree.get(), tip_ids.data(), tip_ids.size(),
+                                       add_root_node);
 
   if (!res)
     libpll_check_error("Unable to reroot tree");

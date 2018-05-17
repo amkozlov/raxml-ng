@@ -895,6 +895,31 @@ void generate_bootstraps(RaxmlInstance& instance, const Checkpoint& checkp)
   }
 }
 
+void reroot_tree_with_outgroup(const Options& opts, Tree& tree, bool add_root_node)
+{
+  if (!opts.outgroup_taxa.empty())
+  {
+    try
+    {
+      tree.reroot(opts.outgroup_taxa, add_root_node);
+    }
+    catch (std::runtime_error& e)
+    {
+      if (pll_errno == PLLMOD_TREE_ERROR_POLYPHYL_OUTGROUP)
+        LOG_WARN << "WARNING: " << e.what() << endl << endl;
+      else
+        throw e;
+    }
+  }
+}
+
+void postprocess_tree(const Options& opts, Tree& tree)
+{
+  reroot_tree_with_outgroup(opts, tree, true);
+  // TODO: collapse short branches
+  // TODO: regraft previously removed duplicate seqs etc.
+}
+
 void draw_bootstrap_support(const Options& opts)
 {
   LOG_INFO << "Reading reference tree from file: " << opts.tree_file << endl;
@@ -906,6 +931,8 @@ void draw_bootstrap_support(const Options& opts)
   LOG_INFO << "Reference tree size: " << to_string(ref_tree.num_tips()) << endl << endl;
 
   auto ref_tip_ids = ref_tree.tip_ids();
+
+  reroot_tree_with_outgroup(opts, ref_tree, false);
 
   BootstrapTree sup_tree(ref_tree);
 
@@ -944,6 +971,8 @@ void draw_bootstrap_support(const Options& opts)
 
   sup_tree.calc_support();
 
+  reroot_tree_with_outgroup(opts, sup_tree, true);
+
   if (!opts.support_tree_file().empty())
   {
     NewickStream sups(opts.support_tree_file(), std::ios::out);
@@ -954,30 +983,12 @@ void draw_bootstrap_support(const Options& opts)
   }
 }
 
-void postprocess_tree(const Options& opts, Tree& tree)
-{
-  if (!opts.outgroup_taxa.empty())
-  {
-    try
-    {
-      tree.reroot(opts.outgroup_taxa);
-    }
-    catch (std::runtime_error& e)
-    {
-      if (pll_errno == PLLMOD_TREE_ERROR_POLYPHYL_OUTGROUP)
-        LOG_WARN << "WARNING: " << e.what() << endl << endl;
-      else
-        throw e;
-    }
-  }
-}
-
 void draw_bootstrap_support(RaxmlInstance& instance, const Checkpoint& checkp)
 {
   Tree tree = checkp.tree;
   tree.topology(checkp.ml_trees.best_topology());
 
-  postprocess_tree(instance.opts, tree);
+  reroot_tree_with_outgroup(instance.opts, tree, false);
 
   instance.bs_tree.reset(new BootstrapTree(tree));
 
@@ -1046,9 +1057,9 @@ void check_terrace(const RaxmlInstance& instance, const Tree& tree)
 void save_ml_trees(const Options& opts, const Checkpoint& checkp)
 {
   NewickStream nw(opts.ml_trees_file(), std::ios::out);
-  Tree ml_tree = checkp.tree;
   for (auto topol: checkp.ml_trees)
   {
+    Tree ml_tree = checkp.tree;
     ml_tree.topology(topol.second);
     postprocess_tree(opts, ml_tree);
     nw << ml_tree;
@@ -1090,12 +1101,12 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
 
     best_tree.topology(best->second);
 
+    check_terrace(instance, best_tree);
+
     postprocess_tree(opts, best_tree);
 
 //    pll_utree_show_ascii(&best_tree.pll_utree_root(), PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH |
 //                                     PLL_UTREE_SHOW_CLV_INDEX );
-
-    check_terrace(instance, best_tree);
 
     if (checkp.ml_trees.size() > 1 && !opts.ml_trees_file().empty())
     {
@@ -1115,6 +1126,8 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
     if (opts.command == Command::all)
     {
       assert(instance.bs_tree);
+
+      postprocess_tree(instance.opts, *instance.bs_tree);
 
       if (!opts.support_tree_file().empty())
       {
@@ -1150,9 +1163,9 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
   //    NewickStream nw(opts.bootstrap_trees_file(), std::ios::out | std::ios::app);
       NewickStream nw(opts.bootstrap_trees_file(), std::ios::out);
 
-      Tree bs_tree = checkp.tree;
       for (auto topol: checkp.bs_trees)
       {
+        Tree bs_tree = checkp.tree;
         bs_tree.topology(topol.second);
         postprocess_tree(opts, bs_tree);
         nw << bs_tree;

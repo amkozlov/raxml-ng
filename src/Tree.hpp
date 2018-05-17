@@ -34,14 +34,15 @@ class BasicTree
 {
 public:
   BasicTree(size_t num_tips) : _num_tips(num_tips) {}
+  virtual ~BasicTree() {}
 
   bool empty() const { return _num_tips == 0; };
-  size_t num_tips() const { return _num_tips; };
-  size_t num_inner() const { return _num_tips - 2; };
-  size_t num_nodes() const { return _num_tips + _num_tips - 2; };
-  size_t num_subnodes() const { return _num_tips + num_inner() * 3; };
-  size_t num_branches() const { return _num_tips + _num_tips - 3; };
-  size_t num_splits() const { return _num_tips - 3; };
+  virtual size_t num_tips() const { return _num_tips; };
+  virtual size_t num_inner() const { return _num_tips - 2; };
+  virtual size_t num_nodes() const { return num_tips() + num_inner(); };
+  virtual size_t num_subnodes() const { return num_branches() * 2; };
+  virtual size_t num_branches() const { return _num_tips + _num_tips - 3; };
+  virtual size_t num_splits() const { return num_branches() - _num_tips; };
 
 protected:
   size_t _num_tips;
@@ -91,7 +92,11 @@ public:
   void fix_missing_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
   void reset_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
   void reset_tip_ids(const NameIdMap& label_id_map);
-  void reroot(const NameList& outgroup_taxa);
+  void reroot(const NameList& outgroup_taxa, bool add_root_node = false);
+
+public:
+  size_t num_inner() const;
+  size_t num_branches() const;
 
 protected:
   PllUTreeUniquePtr _pll_utree;

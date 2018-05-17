@@ -79,4 +79,18 @@ void BootstrapTree::calc_support()
     node->label = node->next->label = node->next->next->label =
         strdup(std::to_string(support[i]).c_str());
   }
+
+  // set support value for the root branch to both adjacent nodes
+  auto root = _pll_utree->vroot;
+  if (!root->label && root->back->next)
+  {
+    assert(root->back->label);
+    root->label = root->next->label = root->next->next->label = strdup(root->back->label);
+  }
+  else if (!root->back->label && root->next)
+  {
+    assert(root->label);
+    root->back->label = root->back->next->label = root->back->next->next->label =
+        strdup(root->label);
+  }
 }
