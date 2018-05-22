@@ -71,7 +71,8 @@ public:
 
   static Tree buildRandom(size_t num_tips, const char * const* tip_labels, unsigned int random_seed);
   static Tree buildRandom(const NameList& taxon_names, unsigned int random_seed);
-  static Tree buildRandomConstrained(const Tree& constrained_tree, unsigned int random_seed);
+  static Tree buildRandomConstrained(const NameList& taxon_names, unsigned int random_seed,
+                                     const Tree& constrained_tree);
   static Tree buildParsimony(const PartitionedMSA& parted_msa, unsigned int random_seed,
                              unsigned int attributes, unsigned int * score = nullptr);
   static Tree loadFromFile(const std::string& file_name);
@@ -93,6 +94,7 @@ public:
   void reset_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
   void reset_tip_ids(const NameIdMap& label_id_map);
   void reroot(const NameList& outgroup_taxa, bool add_root_node = false);
+  void insert_tips_random(const NameList& tip_names, unsigned int random_seed = 0);
 
 public:
   size_t num_inner() const;

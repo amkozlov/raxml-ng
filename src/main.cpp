@@ -57,6 +57,12 @@ struct RaxmlInstance
   unique_ptr<LoadBalancer> load_balancer;
   unique_ptr<BootstrapTree> bs_tree;
 
+  // mapping taxon name -> tip_id/clv_id in the tree
+  NameIdMap tip_id_map;
+
+  // mapping tip_id in the tree (array index) -> sequence index in MSA
+  IDVector tip_msa_idmap;
+
  // unique_ptr<TerraceWrapper> terrace_wrapper;
 
 //  unique_ptr<RandomGenerator> starttree_seed_gen;
@@ -490,6 +496,9 @@ void load_parted_msa(RaxmlInstance& instance)
 
   if (instance.parted_msa.part_info(0).msa().empty())
     load_msa(instance);
+
+  // use MSA sequences IDs as "normalized" tip IDs in all trees
+  instance.tip_id_map = instance.parted_msa.taxon_id_map();
 }
 
 void prepare_tree(const RaxmlInstance& instance, Tree& tree)
@@ -499,7 +508,7 @@ void prepare_tree(const RaxmlInstance& instance, Tree& tree)
 
   /* make sure tip indices are consistent between MSA and pll_tree */
   assert(!instance.parted_msa.taxon_id_map().empty());
-  tree.reset_tip_ids(instance.parted_msa.taxon_id_map());
+  tree.reset_tip_ids(instance.tip_id_map);
 }
 
 Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
@@ -536,7 +545,8 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
       if (instance.constraint_tree.empty())
         tree = Tree::buildRandom(parted_msa.taxon_names(), tree_rand_seed);
       else
-        tree = Tree::buildRandomConstrained(instance.constraint_tree, tree_rand_seed);
+        tree = Tree::buildRandomConstrained(parted_msa.taxon_names(), tree_rand_seed,
+                                            instance.constraint_tree);
 
       break;
     case StartingTree::parsimony:
@@ -634,10 +644,53 @@ void load_constraint(RaxmlInstance& instance)
     Tree& cons_tree = instance.constraint_tree;
     nw_cons >> cons_tree;
 
-    LOG_INFO_TS << "Loaded constraint tree with " << cons_tree.num_tips() << " taxa" << endl;
+    LOG_INFO_TS << "Loaded " <<
+        (cons_tree.num_tips() == instance.parted_msa.taxon_count() ? "" : "non-") <<
+        "comprehensive constraint tree with " << cons_tree.num_tips() << " taxa" << endl;
+
+    // check if taxa names are consistent between contraint tree and MSA
+    {
+      NameList missing_taxa;
+      for (const auto& l: cons_tree.tip_labels())
+      {
+        if (!instance.parted_msa.taxon_id_map().count(l.second))
+          missing_taxa.push_back(l.second);;
+      }
+
+      if (!missing_taxa.empty())
+      {
+        stringstream ss;
+        ss << "Following " << missing_taxa.size() <<
+            " taxa present in the constraint tree can not be found in the alignment: " << endl;
+        for (const auto& taxon: missing_taxa)
+          ss << taxon << endl;
+        throw runtime_error(ss.str());
+      }
+    }
+
+    if (cons_tree.num_tips() < instance.parted_msa.taxon_count())
+    {
+      // incomplete constraint tree -> adjust tip IDs such that all taxa in the constraint tree
+      // go before the remaining free taxa
+      instance.tip_id_map.clear();
+      instance.tip_msa_idmap.resize(instance.parted_msa.taxon_count());
+      auto cons_name_map = cons_tree.tip_ids();
+      size_t seq_id = 0;
+      size_t cons_tip_id = 0;
+      size_t free_tip_id = cons_tree.num_tips();
+      for (const auto& name: instance.parted_msa.taxon_names())
+      {
+        auto tip_id = cons_name_map.count(name) ? cons_tip_id++ : free_tip_id++;
+        instance.tip_id_map[name] = tip_id;
+        instance.tip_msa_idmap[tip_id] = seq_id++;
+      }
+      assert(cons_tip_id == cons_tree.num_tips());
+      assert(free_tip_id == instance.tip_id_map.size());
+      assert(instance.tip_id_map.size() == instance.parted_msa.taxon_count());
+    }
 
     /* make sure tip indices are consistent between MSA and pll_tree */
-    cons_tree.reset_tip_ids(instance.parted_msa.taxon_id_map());
+    cons_tree.reset_tip_ids(instance.tip_id_map);
 
 //    pll_utree_show_ascii(&cons_tree.pll_utree_root(), PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH |
 //                                     PLL_UTREE_SHOW_CLV_INDEX );
@@ -1105,8 +1158,9 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
 
     postprocess_tree(opts, best_tree);
 
-//    pll_utree_show_ascii(&best_tree.pll_utree_root(), PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH |
-//                                     PLL_UTREE_SHOW_CLV_INDEX );
+//    pll_utree_show_ascii(&best_tree.pll_utree_root(),
+//                         PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH | PLL_UTREE_SHOW_CLV_INDEX );
+//    printf("\n\n");
 
     if (checkp.ml_trees.size() > 1 && !opts.ml_trees_file().empty())
     {
@@ -1258,13 +1312,14 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
       if (use_ckp_tree)
       {
         // restore search state from checkpoint (tree + model params)
-        treeinfo.reset(new TreeInfo(opts, cm.checkpoint().tree, master_msa, part_assign));
+        treeinfo.reset(new TreeInfo(opts, cm.checkpoint().tree, master_msa,
+                                    instance.tip_msa_idmap, part_assign));
         assign_models(*treeinfo, cm.checkpoint());
         use_ckp_tree = false;
       }
       else
       {
-        treeinfo.reset(new TreeInfo(opts, tree, master_msa, part_assign));
+        treeinfo.reset(new TreeInfo(opts, tree, master_msa, instance.tip_msa_idmap, part_assign));
       }
 
       treeinfo->set_topology_constraint(instance.constraint_tree);
@@ -1334,13 +1389,15 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
     if (use_ckp_tree)
     {
       // restore search state from checkpoint (tree + model params)
-      treeinfo.reset(new TreeInfo(opts, cm.checkpoint().tree, master_msa, bs_part_assign, bs.site_weights));
+      treeinfo.reset(new TreeInfo(opts, cm.checkpoint().tree, master_msa, instance.tip_msa_idmap,
+                                  bs_part_assign, bs.site_weights));
       assign_models(*treeinfo, cm.checkpoint());
       use_ckp_tree = false;
     }
     else
     {
-      treeinfo.reset(new TreeInfo(opts, *bs_start_tree, master_msa, bs_part_assign, bs.site_weights));
+      treeinfo.reset(new TreeInfo(opts, *bs_start_tree, master_msa, instance.tip_msa_idmap,
+                                  bs_part_assign, bs.site_weights));
     }
 
     treeinfo->set_topology_constraint(instance.constraint_tree);

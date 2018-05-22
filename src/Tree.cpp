@@ -79,7 +79,8 @@ Tree Tree::buildRandom(const NameList& taxon_names, unsigned int random_seed)
                            random_seed);
 }
 
-Tree Tree::buildRandomConstrained(const Tree& constrained_tree, unsigned int random_seed)
+Tree Tree::buildRandomConstrained(const NameList& taxon_names, unsigned int random_seed,
+                                  const Tree& constrained_tree)
 {
   PllUTreeUniquePtr pll_utree(pllmod_utree_resolve_multi(&constrained_tree.pll_utree(),
                                                          random_seed, nullptr));
@@ -90,12 +91,30 @@ Tree Tree::buildRandomConstrained(const Tree& constrained_tree, unsigned int ran
     libpll_check_error("ERROR in building a randomized constrained tree");
   }
 
-//  pll_utree_show_ascii(pll_utree->vroot, PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH |
-//                                   PLL_UTREE_SHOW_CLV_INDEX );
+  Tree tree(pll_utree);
 
-//  pll_utree_check_integrity(pll_utree.get())
+  if (taxon_names.size() > tree.num_tips())
+  {
+    // constraint tree is not comprehensive -> add free taxa
+    auto free_tip_count = taxon_names.size() - tree.num_tips();
+    auto cons_tips = tree.tip_ids();
+    NameList free_tips;
+    free_tips.reserve(free_tip_count);
 
-  return Tree(pll_utree);
+    for (const auto& t: taxon_names)
+    {
+      if (!cons_tips.count(t))
+        free_tips.push_back(t);
+    }
+
+    assert(free_tips.size() == free_tip_count);
+
+    tree.insert_tips_random(free_tips, random_seed);
+  }
+
+//  pll_utree_check_integrity(&tree.pll_utree());
+
+  return tree;
 }
 
 
@@ -205,10 +224,31 @@ NameIdMap Tree::tip_ids() const
   return result;
 }
 
+void Tree::insert_tips_random(const NameList& tip_names, unsigned int random_seed)
+{
+  _pll_utree_tips.clear();
+
+  std::vector<const char*> tip_labels(tip_names.size(), nullptr);
+  for (size_t i = 0; i < tip_names.size(); ++i)
+    tip_labels[i] = tip_names[i].data();
+
+  int retval = pllmod_utree_extend_random(_pll_utree.get(),
+                                          tip_labels.size(),
+                                          (const char * const*) tip_labels.data(),
+                                          random_seed);
+
+  if (retval)
+    _num_tips = _pll_utree->tip_count;
+  else
+  {
+    assert(pll_errno);
+    libpll_check_error("ERROR in randomized tree extension");
+  }
+}
 
 void Tree::reset_tip_ids(const NameIdMap& label_id_map)
 {
-  if (label_id_map.size() != _num_tips)
+  if (label_id_map.size() < _num_tips)
     throw invalid_argument("Invalid map size");
 
   for (auto& node: tip_nodes())

@@ -6,19 +6,22 @@
 using namespace std;
 
 TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
+                    const IDVector& tip_msa_idmap,
                     const PartitionAssignment& part_assign)
 {
-  init(opts, tree, parted_msa, part_assign, std::vector<uintVector>());
+  init(opts, tree, parted_msa, tip_msa_idmap, part_assign, std::vector<uintVector>());
 }
 
 TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
+                    const IDVector& tip_msa_idmap,
                     const PartitionAssignment& part_assign,
                     const std::vector<uintVector>& site_weights)
 {
-  init(opts, tree, parted_msa, part_assign, site_weights);
+  init(opts, tree, parted_msa, tip_msa_idmap, part_assign, site_weights);
 }
 
 void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
+                    const IDVector& tip_msa_idmap,
                     const PartitionAssignment& part_assign,
                     const std::vector<uintVector>& site_weights)
 {
@@ -53,7 +56,8 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
     {
       /* create and init PLL partition structure */
       const auto& weights = site_weights.empty() ? pinfo.msa().weights() : site_weights.at(p);
-      pll_partition_t * partition = create_pll_partition(opts, pinfo, *part_range, weights);
+      pll_partition_t * partition = create_pll_partition(opts, pinfo, tip_msa_idmap,
+                                                         *part_range, weights);
 
       int retval = pllmod_treeinfo_init_partition(_pll_treeinfo, p, partition,
                                                   params_to_optimize,
@@ -393,7 +397,8 @@ void build_clv(ProbVector::const_iterator probs, size_t sites, WeightVector::con
   assert(clvp == clv.end());
 }
 
-void set_partition_tips(const Options& opts, const MSA& msa, const PartitionRange& part_region,
+void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip_msa_idmap,
+                        const PartitionRange& part_region,
                         pll_partition_t* partition, const pll_state_t * charmap)
 {
   /* set pattern weights */
@@ -411,23 +416,26 @@ void set_partition_tips(const Options& opts, const MSA& msa, const PartitionRang
     // we need a libpll function for that!
     auto clv_size = partition->sites * partition->states;
     std::vector<double> tmp_clv(clv_size);
-    for (size_t i = 0; i < msa.size(); ++i)
+    for (size_t tip_id = 0; tip_id < partition->tips; ++tip_id)
     {
-      auto prob_start = msa.probs(i, part_region.start);
+      auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
+      auto prob_start = msa.probs(seq_id, part_region.start);
       build_clv(prob_start, partition->sites, weights_start, partition, normalize, tmp_clv);
-      pll_set_tip_clv(partition, i, tmp_clv.data(), PLL_FALSE);
+      pll_set_tip_clv(partition, tip_id, tmp_clv.data(), PLL_FALSE);
     }
   }
   else
   {
-    for (size_t i = 0; i < msa.size(); ++i)
+    for (size_t tip_id = 0; tip_id < partition->tips; ++tip_id)
     {
-      pll_set_tip_states(partition, i, charmap, msa.at(i).c_str() + part_region.start);
+      auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
+      pll_set_tip_states(partition, tip_id, charmap, msa.at(seq_id).c_str() + part_region.start);
     }
   }
 }
 
-void set_partition_tips(const Options& opts, const MSA& msa, const PartitionRange& part_region,
+void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip_msa_idmap,
+                        const PartitionRange& part_region,
                         pll_partition_t* partition, const pll_state_t * charmap,
                         const WeightVector& weights)
 {
@@ -456,19 +464,21 @@ void set_partition_tips(const Options& opts, const MSA& msa, const PartitionRang
     // we need a libpll function for that!
     auto clv_size = part_region.length * partition->states;
     std::vector<double> tmp_clv(clv_size);
-    for (size_t i = 0; i < msa.size(); ++i)
+    for (size_t tip_id = 0; tip_id < partition->tips; ++tip_id)
     {
-      auto prob_start = msa.probs(i, part_region.start);
+      auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
+      auto prob_start = msa.probs(seq_id, part_region.start);
       build_clv(prob_start, part_region.length, weights_start, partition, normalize, tmp_clv);
-      pll_set_tip_clv(partition, i, tmp_clv.data(), PLL_FALSE);
+      pll_set_tip_clv(partition, tip_id, tmp_clv.data(), PLL_FALSE);
     }
   }
   else
   {
     std::vector<char> bs_seq(part_region.length);
-    for (size_t i = 0; i < msa.size(); ++i)
+    for (size_t tip_id = 0; tip_id < partition->tips; ++tip_id)
     {
-      const char * full_seq = msa.at(i).c_str();
+      auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
+      const char * full_seq = msa.at(seq_id).c_str();
       size_t pos = 0;
       for (size_t j = pstart; j < pend; ++j)
       {
@@ -477,7 +487,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const PartitionRang
       }
       assert(pos == comp_weights.size());
 
-      pll_set_tip_states(partition, i, charmap, bs_seq.data());
+      pll_set_tip_states(partition, tip_id, charmap, bs_seq.data());
     }
   }
 
@@ -485,6 +495,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const PartitionRang
 }
 
 pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& pinfo,
+                                      const IDVector& tip_msa_idmap,
                                       const PartitionRange& part_region, const uintVector& weights)
 {
   const MSA& msa = pinfo.msa();
@@ -551,9 +562,9 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
     pll_set_asc_state_weights(partition, model.ascbias_weights().data());
 
   if (part_length == part_region.length)
-    set_partition_tips(opts, msa, part_region, partition, model.charmap());
+    set_partition_tips(opts, msa, tip_msa_idmap, part_region, partition, model.charmap());
   else
-    set_partition_tips(opts, msa, part_region, partition, model.charmap(), weights);
+    set_partition_tips(opts, msa, tip_msa_idmap, part_region, partition, model.charmap(), weights);
 
   assign(partition, model);
 

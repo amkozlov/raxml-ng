@@ -27,9 +27,10 @@ class TreeInfo
 {
 public:
   TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
-            const PartitionAssignment& part_assign);
+            const IDVector& tip_msa_idmap, const PartitionAssignment& part_assign);
   TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
-            const PartitionAssignment& part_assign, const std::vector<uintVector>& site_weights);
+            const IDVector& tip_msa_idmap, const PartitionAssignment& part_assign,
+            const std::vector<uintVector>& site_weights);
   virtual
   ~TreeInfo ();
 
@@ -66,7 +67,8 @@ private:
   double _brlen_max;
 
   void init(const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
-            const PartitionAssignment& part_assign, const std::vector<uintVector>& site_weights);
+            const IDVector& tip_msa_idmap, const PartitionAssignment& part_assign,
+            const std::vector<uintVector>& site_weights);
 };
 
 void assign(PartitionedMSA& parted_msa, const TreeInfo& treeinfo);
@@ -74,6 +76,7 @@ void assign(Model& model, const TreeInfo& treeinfo, size_t partition_id);
 
 
 pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& pinfo,
+                                      const IDVector& tip_msa_idmap,
                                       const PartitionRange& part_region, const uintVector& weights);
 
 #endif /* RAXML_TREEINFO_HPP_ */
