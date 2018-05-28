@@ -569,7 +569,7 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
       break;
     }
     default:
-      sysutil_fatal("Unknown starting tree type: %d\n", opts.start_trees);
+      sysutil_fatal("Unknown starting tree type: %d\n", type);
   }
 
   assert(!tree.empty());
