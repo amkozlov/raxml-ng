@@ -175,14 +175,14 @@ void ParallelContext::thread_reduce(double * data, size_t size, int op)
       break;
       case PLLMOD_COMMON_REDUCE_MAX:
       {
-        data[i] = _parallel_buf[i];
+        data[i] = double_buf[i];
         for (j = 1; j < ParallelContext::_num_threads; ++j)
           data[i] = max(data[i], double_buf[j * size + i]);
       }
       break;
       case PLLMOD_COMMON_REDUCE_MIN:
       {
-        data[i] = _parallel_buf[i];
+        data[i] = double_buf[i];
         for (j = 1; j < ParallelContext::_num_threads; ++j)
           data[i] = min(data[i], double_buf[j * size + i]);
       }
