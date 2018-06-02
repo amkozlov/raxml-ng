@@ -221,6 +221,22 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::tuple<Model&, Mode
   return stream;
 }
 
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const TreeTopology& t)
+{
+  stream << t.edges;
+  stream << t.brlens;
+
+  return stream;
+}
+
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, TreeTopology& t)
+{
+  stream >> t.edges;
+  stream >> t.brlens;
+
+  return stream;
+}
+
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const TreeCollection& c)
 {
   stream << c.size();

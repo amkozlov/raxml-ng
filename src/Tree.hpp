@@ -25,7 +25,23 @@ struct TreeBranch
   double length;
 };
 
-typedef std::vector<TreeBranch> TreeTopology;
+struct TreeTopology
+{
+  typedef std::vector<TreeBranch> edge_container;
+  typedef typename edge_container::iterator        iterator;
+  typedef typename edge_container::const_iterator  const_iterator;
+
+  //Iterator Compatibility
+  iterator begin() { return edges.begin(); }
+  iterator end() { return edges.end(); }
+  const_iterator begin() const { return edges.cbegin(); }
+  const_iterator end() const { return edges.cend(); }
+  const_iterator cbegin() { return edges.cbegin(); }
+  const_iterator cend() { return edges.cend(); }
+
+  edge_container edges;
+  std::vector<doubleVector> brlens;
+};
 
 typedef std::unique_ptr<pll_utree_t> PllUTreeUniquePtr;
 typedef std::vector<pll_unode_t*> PllNodeVector;
@@ -83,6 +99,12 @@ public:
   TreeTopology topology() const;
   void topology(const TreeTopology& topol);
 
+  const std::vector<doubleVector>& partition_brlens() const { return _partition_brlens; }
+  const doubleVector& partition_brlens(size_t partition_idx) const;
+  void partition_brlens(size_t partition_idx, const doubleVector& brlens);
+  void partition_brlens(size_t partition_idx, doubleVector&& brlens);
+  void add_partition_brlens(doubleVector&& brlens);
+
   // TODO: use move semantics to transfer ownership?
   pll_utree_t * pll_utree_copy() const { return pll_utree_clone(_pll_utree.get()); }
   const pll_utree_t& pll_utree() const { return *_pll_utree; }
@@ -92,6 +114,9 @@ public:
 
   void fix_missing_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
   void reset_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
+  void apply_partition_brlens(size_t partition_idx);
+  void apply_avg_brlens(const doubleVector& partition_contributions);
+
   void reset_tip_ids(const NameIdMap& label_id_map);
   void reroot(const NameList& outgroup_taxa, bool add_root_node = false);
   void insert_tips_random(const NameList& tip_names, unsigned int random_seed = 0);
@@ -102,6 +127,7 @@ public:
 
 protected:
   PllUTreeUniquePtr _pll_utree;
+  std::vector<doubleVector> _partition_brlens;
 
   mutable PllNodeVector _pll_utree_tips;
 

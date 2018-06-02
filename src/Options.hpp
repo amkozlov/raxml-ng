@@ -11,6 +11,7 @@ struct OutputFileNames
   std::string start_tree;
   std::string best_tree;
   std::string best_model;
+  std::string partition_trees;
   std::string ml_trees;
   std::string bootstrap_trees;
   std::string support_tree;
@@ -97,6 +98,7 @@ public:
   const std::string& start_tree_file() const { return outfile_names.start_tree; }
   const std::string& best_tree_file() const { return outfile_names.best_tree; }
   const std::string& best_model_file() const { return outfile_names.best_model; }
+  const std::string& partition_trees_file() const { return outfile_names.partition_trees; }
   const std::string& ml_trees_file() const { return outfile_names.ml_trees; }
   const std::string& bootstrap_trees_file() const { return outfile_names.bootstrap_trees; }
   const std::string& support_tree_file() const { return outfile_names.support_tree; }

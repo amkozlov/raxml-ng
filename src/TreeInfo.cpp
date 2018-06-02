@@ -28,6 +28,8 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
   _brlen_min = opts.brlen_min;
   _brlen_max = opts.brlen_max;
   _brlen_opt_method = opts.brlen_opt_method;
+  _partition_contributions.resize(parted_msa.part_count());
+  double total_weight = 0;
 
   _pll_treeinfo = pllmod_treeinfo_create(pll_utree_graph_clone(&tree.pll_utree_root()),
                                          tree.num_tips(),
@@ -48,14 +50,17 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
   for (size_t p = 0; p < parted_msa.part_count(); ++p)
   {
     const PartitionInfo& pinfo = parted_msa.part_info(p);
+    const auto& weights = site_weights.empty() ? pinfo.msa().weights() : site_weights.at(p);
     int params_to_optimize = opts.optimize_model ? pinfo.model().params_to_optimize() : 0;
     params_to_optimize |= optimize_branches;
+
+    _partition_contributions[p] = std::accumulate(weights.begin(), weights.end(), 0);
+    total_weight += _partition_contributions[p];
 
     PartitionAssignment::const_iterator part_range = part_assign.find(p);
     if (part_range != part_assign.end())
     {
       /* create and init PLL partition structure */
-      const auto& weights = site_weights.empty() ? pinfo.msa().weights() : site_weights.at(p);
       pll_partition_t * partition = create_pll_partition(opts, pinfo, tip_msa_idmap,
                                                          *part_range, weights);
 
@@ -72,6 +77,14 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
         libpll_check_error("ERROR adding treeinfo partition");
       }
 
+      // set per-partition branch lengths
+      if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED && !tree.partition_brlens().empty())
+      {
+        assert(_pll_treeinfo->branch_lengths[p]);
+        memcpy(_pll_treeinfo->branch_lengths[p], tree.partition_brlens(p).data(),
+               tree.num_branches() * sizeof(double));
+      }
+
       if (part_range->master())
         _parts_master.insert(p);
     }
@@ -82,6 +95,10 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
       _pll_treeinfo->params_to_optimize[p] = params_to_optimize;
     }
   }
+
+  // finalize partition contribution computation
+  for (auto& c: _partition_contributions)
+    c /= total_weight;
 }
 
 TreeInfo::~TreeInfo ()
@@ -101,7 +118,51 @@ TreeInfo::~TreeInfo ()
 
 Tree TreeInfo::tree() const
 {
-  return _pll_treeinfo ? Tree(_pll_treeinfo->tip_count, *_pll_treeinfo->root) : Tree();
+  if (!_pll_treeinfo)
+    return Tree();
+
+  Tree tree(*_pll_treeinfo->tree);
+
+  if (_pll_treeinfo->brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED)
+  {
+    // set per-partition branch lengths
+    for (unsigned int i = 0; i < _pll_treeinfo->partition_count; ++i)
+    {
+      assert(_pll_treeinfo->branch_lengths[i]);
+      doubleVector brlens(_pll_treeinfo->branch_lengths[i],
+                          _pll_treeinfo->branch_lengths[i] + tree.num_branches());
+      tree.add_partition_brlens(std::move(brlens));
+    }
+
+    // compute a weighted average of per-partition brlens
+    tree.apply_avg_brlens(_partition_contributions);
+  }
+
+  return tree;
+}
+
+Tree TreeInfo::tree(size_t partition_id) const
+{
+  if (!_pll_treeinfo)
+    return Tree();
+
+  if (partition_id >= _pll_treeinfo->partition_count)
+    throw out_of_range("Partition ID out of range");
+
+  PllUTreeUniquePtr pll_utree(pllmod_treeinfo_get_partition_tree(_pll_treeinfo, partition_id));
+
+  if (!pll_utree)
+  {
+    assert(pll_errno);
+    libpll_check_error("treeinfo: cannot get partition tree");
+  }
+
+  return Tree(pll_utree);
+}
+
+void TreeInfo::tree(const Tree& tree)
+{
+  _pll_treeinfo->root = pll_utree_graph_clone(&tree.pll_utree_root());
 }
 
 double TreeInfo::loglh(bool incremental)
@@ -132,24 +193,15 @@ double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor
 
   if (_pll_treeinfo->params_to_optimize[0] & PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE)
   {
-    new_loglh = -1 * pllmod_opt_optimize_branch_lengths_local_multi(_pll_treeinfo->partitions,
-                                                                    _pll_treeinfo->partition_count,
-                                                                    _pll_treeinfo->root,
-                                                                    _pll_treeinfo->param_indices,
-                                                                    _pll_treeinfo->deriv_precomp,
-                                                                    _pll_treeinfo->branch_lengths,
-                                                                    _pll_treeinfo->brlen_scalers,
-                                                                    _brlen_min,
-                                                                    _brlen_max,
-                                                                    lh_epsilon,
-                                                                    brlen_smooth_factor * RAXML_BRLEN_SMOOTHINGS,
-                                                                    -1,  /* radius */
-                                                                    1,    /* keep_update */
-                                                                    _brlen_opt_method,
-                                                                    _pll_treeinfo->brlen_linkage,
-                                                                    _pll_treeinfo->parallel_context,
-                                                                    _pll_treeinfo->parallel_reduce_cb
-                                                                    );
+    int max_iters = brlen_smooth_factor * RAXML_BRLEN_SMOOTHINGS;
+    new_loglh = -1 * pllmod_algo_opt_brlen_treeinfo(_pll_treeinfo,
+                                                    _brlen_min,
+                                                    _brlen_max,
+                                                    lh_epsilon,
+                                                    max_iters,
+                                                    _brlen_opt_method,
+                                                    PLLMOD_OPT_BRLEN_OPTIMIZE_ALL
+                                                    );
 
     LOG_DEBUG << "\t - after brlen: logLH = " << new_loglh << endl;
 

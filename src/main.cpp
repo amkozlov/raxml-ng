@@ -1177,6 +1177,20 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
       LOG_INFO << "Best ML tree saved to: " << sysutil_realpath(opts.best_tree_file()) << endl;
     }
 
+    if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED && !opts.partition_trees_file().empty())
+    {
+      NewickStream nw_result(opts.partition_trees_file());
+
+      for (size_t p = 0; p < instance.parted_msa.part_count(); ++p)
+      {
+        best_tree.apply_partition_brlens(p);
+        nw_result << best_tree;
+      }
+
+      LOG_INFO << "Best per-partition ML trees saved to: " <<
+          sysutil_realpath(opts.partition_trees_file()) << endl;
+    }
+
     if (opts.command == Command::all)
     {
       assert(instance.bs_tree);

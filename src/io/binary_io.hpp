@@ -201,6 +201,12 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const MSA& m);
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, MSA& m);
 
 /**
+ * TreeTopology I/O
+ */
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const TreeTopology& t);
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, TreeTopology& t);
+
+/**
  * TreeCollection I/O
  */
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const TreeCollection& c);

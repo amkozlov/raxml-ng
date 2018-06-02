@@ -365,10 +365,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         else if (strcasecmp(optarg, "linked") == 0)
           opts.brlen_linkage = PLLMOD_COMMON_BRLEN_LINKED;
         else if (strcasecmp(optarg, "unlinked") == 0)
-        {
           opts.brlen_linkage = PLLMOD_COMMON_BRLEN_UNLINKED;
-          throw OptionException("Unlinked branch lengths not supported yet!");
-        }
         else
           throw InvalidOptionValueException("Unknown branch linkage mode: " + string(optarg));
         break;

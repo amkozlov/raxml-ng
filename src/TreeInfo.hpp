@@ -38,8 +38,8 @@ public:
   const pll_unode_t& pll_utree_root() const { assert(_pll_treeinfo); return *_pll_treeinfo->root; }
 
   Tree tree() const;
-  void tree(const Tree& tree)
-  { _pll_treeinfo->root = pll_utree_graph_clone(&tree.pll_utree_root()); }
+  Tree tree(size_t partition_id) const;
+  void tree(const Tree& tree);
 
   /* in parallel mode, partition can be share among multiple threads and TreeInfo objects;
    * this method returns list of partition IDs for which this thread is designated as "master"
@@ -65,6 +65,7 @@ private:
   int _brlen_opt_method;
   double _brlen_min;
   double _brlen_max;
+  doubleVector _partition_contributions;
 
   void init(const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
             const IDVector& tip_msa_idmap, const PartitionAssignment& part_assign,

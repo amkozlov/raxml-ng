@@ -6,7 +6,7 @@
 using namespace std;
 
 Tree::Tree (const Tree& other) : BasicTree(other._num_tips),
-    _pll_utree(other.pll_utree_copy())
+    _pll_utree(other.pll_utree_copy()), _partition_brlens(other._partition_brlens)
 {
 }
 
@@ -14,6 +14,7 @@ Tree::Tree (Tree&& other) : BasicTree(other._num_tips), _pll_utree(other._pll_ut
 {
   other._num_tips = 0;
   swap(_pll_utree_tips, other._pll_utree_tips);
+  swap(_partition_brlens, other._partition_brlens);
 }
 
 Tree& Tree::operator=(const Tree& other)
@@ -23,6 +24,7 @@ Tree& Tree::operator=(const Tree& other)
     _pll_utree.reset(other.pll_utree_copy());
     _num_tips = other._num_tips;
     _pll_utree_tips.clear();
+    _partition_brlens = other._partition_brlens;
   }
 
   return *this;
@@ -35,10 +37,12 @@ Tree& Tree::operator=(Tree&& other)
     _num_tips = 0;
     _pll_utree_tips.clear();
     _pll_utree.release();
+    _partition_brlens.clear();
 
     swap(_num_tips, other._num_tips);
     swap(_pll_utree, other._pll_utree);
     swap(_pll_utree_tips, other._pll_utree_tips);
+    swap(_partition_brlens, other._partition_brlens);
   }
 
   return *this;
@@ -297,23 +301,30 @@ TreeTopology Tree::topology() const
 {
   TreeTopology topol;
 
+  topol.edges.resize(num_branches());
+
+  size_t branches = 0;
   for (auto n: subnodes())
   {
     if (n->node_index < n->back->node_index)
-      topol.emplace_back(n->node_index, n->back->node_index, n->length);
+    {
+      topol.edges.at(n->pmatrix_index) = TreeBranch(n->node_index, n->back->node_index, n->length);
+      branches++;
+    }
   }
+  topol.brlens = _partition_brlens;
 
-//  for (auto& branch: topol)
+//  for (auto& branch: topol.edges)
 //    printf("%u %u %lf\n", branch.left_node_id, branch.right_node_id, branch.length);
 
-  assert(topol.size() == num_branches());
+  assert(branches == num_branches());
 
   return topol;
 }
 
 void Tree::topology(const TreeTopology& topol)
 {
-  if (topol.size() != num_branches())
+  if (topol.edges.size() != num_branches())
     throw runtime_error("Incompatible topology!");
 
   auto allnodes = subnodes();
@@ -325,12 +336,66 @@ void Tree::topology(const TreeTopology& topol)
     pllmod_utree_connect_nodes(left_node, right_node, branch.length);
 
     // important: make sure all branches have distinct pmatrix indices!
-    left_node->pmatrix_index = right_node->pmatrix_index = pmatrix_index++;
+    left_node->pmatrix_index = right_node->pmatrix_index = pmatrix_index;
+
+    pmatrix_index++;
 //    printf("%u %u %lf %d  (%u - %u) \n", branch.left_node_id, branch.right_node_id,
 //           branch.length, left_node->pmatrix_index, left_node->clv_index, right_node->clv_index);
   }
 
+  _partition_brlens = topol.brlens;
+
   assert(pmatrix_index == num_branches());
+}
+
+const doubleVector& Tree::partition_brlens(size_t partition_idx) const
+{
+  return _partition_brlens.at(partition_idx);
+}
+
+void Tree::partition_brlens(size_t partition_idx, const doubleVector& brlens)
+{
+  _partition_brlens.at(partition_idx) = brlens;
+}
+
+void Tree::partition_brlens(size_t partition_idx, doubleVector&& brlens)
+{
+  _partition_brlens.at(partition_idx) = brlens;
+}
+
+void Tree::add_partition_brlens(doubleVector&& brlens)
+{
+  _partition_brlens.push_back(brlens);
+}
+
+void Tree::apply_partition_brlens(size_t partition_idx)
+{
+  if (partition_idx >= _partition_brlens.size())
+    throw out_of_range("Partition ID out of range");
+
+  const auto brlens = _partition_brlens.at(partition_idx);
+  for (auto n: subnodes())
+  {
+    n->length = brlens[n->pmatrix_index];
+  }
+}
+
+void Tree::apply_avg_brlens(const doubleVector& partition_contributions)
+{
+  assert(!_partition_brlens.empty() && partition_contributions.size() == _partition_brlens.size());
+
+  const auto allnodes = subnodes();
+
+  for (auto n: allnodes)
+    n->length = 0;
+
+  for (size_t p = 0; p < _partition_brlens.size(); ++p)
+  {
+    const auto brlens = _partition_brlens[p];
+    const auto w = partition_contributions[p];
+    for (auto n: allnodes)
+      n->length += brlens[n->pmatrix_index] * w;
+  }
 }
 
 void Tree::reroot(const NameList& outgroup_taxa, bool add_root_node)
