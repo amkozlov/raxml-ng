@@ -213,14 +213,12 @@ double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor
   if (_pll_treeinfo->brlen_linkage == PLLMOD_COMMON_BRLEN_SCALED &&
       _pll_treeinfo->partition_count > 1)
   {
-    new_loglh = -1 * pllmod_algo_opt_onedim_treeinfo(_pll_treeinfo,
-                                                    PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER,
-                                                    RAXML_BRLEN_SCALER_MIN,
-                                                    RAXML_BRLEN_SCALER_MAX,
-                                                    RAXML_PARAM_EPSILON);
-
-    /* normalize scalers and scale the branches accordingly */
-    pllmod_treeinfo_normalize_brlen_scalers(_pll_treeinfo);
+    new_loglh = -1 * pllmod_algo_opt_brlen_scalers_treeinfo(_pll_treeinfo,
+                                                            RAXML_BRLEN_SCALER_MIN,
+                                                            RAXML_BRLEN_SCALER_MAX,
+                                                            _brlen_min,
+                                                            _brlen_max,
+                                                            RAXML_PARAM_EPSILON);
 
     LOG_DEBUG << "\t - after brlen scalers: logLH = " << new_loglh << endl;
 
