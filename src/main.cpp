@@ -473,7 +473,8 @@ void load_msa(RaxmlInstance& instance)
 
   LOG_INFO << endl;
 
-  if (!instance.opts.use_prob_msa && !instance.opts.binary_msa_file().empty())
+  if (ParallelContext::master_rank() &&
+      !instance.opts.use_prob_msa && !instance.opts.binary_msa_file().empty())
   {
     auto binary_msa_fname = instance.opts.binary_msa_file();
     if (sysutil_file_exists(binary_msa_fname) && !opts.redo_mode &&
