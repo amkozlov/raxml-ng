@@ -145,6 +145,7 @@ public:
   typedef container_type::value_type value_type;
 
   size_t size() const { return  _trees.size(); }
+  bool empty() const { return  _trees.empty(); }
   const_iterator best() const;
   value_type::first_type best_score() const { return best()->first; }
   const value_type::second_type& best_topology() const { return best()->second; }

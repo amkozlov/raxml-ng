@@ -28,6 +28,7 @@ enum class Command
   bootstrap,
   all,
   support,
+  bsconverge,
   terrace,
   check,
   parse,
@@ -71,6 +72,14 @@ enum class AscBiasCorrection
   lewis = PLL_ATTRIB_AB_LEWIS,
   felsenstein = PLL_ATTRIB_AB_FELSENSTEIN,
   stamatakis = PLL_ATTRIB_AB_STAMATAKIS,
+};
+
+enum class BootstopCriterion
+{
+  none = 0,
+  autoMRE,
+  autoMR,
+  autoFC
 };
 
 const std::string ParamValueNames[] = {"undefined", "equal", "user", "model", "empirical", "ML"};

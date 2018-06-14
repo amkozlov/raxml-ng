@@ -31,7 +31,9 @@ public:
   spr_cutoff(1.0),
   brlen_linkage(PLLMOD_COMMON_BRLEN_SCALED), brlen_opt_method(PLLMOD_OPT_BLO_NEWTON_FAST),
   brlen_min(RAXML_BRLEN_MIN), brlen_max(RAXML_BRLEN_MAX),
-  num_searches(1), num_bootstraps(100), terrace_maxsize(100),
+  num_searches(1), terrace_maxsize(100),
+  num_bootstraps(100), bootstop_criterion(BootstopCriterion::none), bootstop_cutoff(0.03),
+  bootstop_interval(RAXML_BOOTSTOP_INTERVAL), bootstop_permutations(RAXML_BOOTSTOP_PERMUTES),
   precision(RAXML_DEFAULT_PRECISION),
   tree_file(""), constraint_tree_file(""), msa_file(""), model_file(""), outfile_prefix(""),
   num_threads(1), num_ranks(1), simd_arch(PLL_ATTRIB_ARCH_CPU)
@@ -70,8 +72,13 @@ public:
   double brlen_max;
 
   unsigned int num_searches;
-  unsigned int num_bootstraps;
   unsigned long long terrace_maxsize;
+
+  unsigned int num_bootstraps;
+  BootstopCriterion bootstop_criterion;
+  double bootstop_cutoff;
+  unsigned int bootstop_interval;
+  unsigned int bootstop_permutations;
 
   unsigned int precision;
   NameList outgroup_taxa;

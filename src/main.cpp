@@ -36,6 +36,7 @@
 #include "ParallelContext.hpp"
 #include "LoadBalancer.hpp"
 #include "bootstrap/BootstrapGenerator.hpp"
+#include "bootstrap/BootstopCheck.hpp"
 #include "autotune/ResourceEstimator.hpp"
 
 #ifdef _RAXML_TERRAPHAST
@@ -56,6 +57,9 @@ struct RaxmlInstance
   PartitionAssignmentList proc_part_assign;
   unique_ptr<LoadBalancer> load_balancer;
   unique_ptr<BootstrapTree> bs_tree;
+
+  // bootstopping convergence test, only autoMRE is supported for now
+  unique_ptr<BootstopCheckMRE> bootstop_checker;
 
   // mapping taxon name -> tip_id/clv_id in the tree
   NameIdMap tip_id_map;
@@ -974,9 +978,150 @@ void postprocess_tree(const Options& opts, Tree& tree)
   // TODO: regraft previously removed duplicate seqs etc.
 }
 
-void draw_bootstrap_support(const Options& opts)
+void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree, const TreeCollection& bs_trees)
 {
+  reroot_tree_with_outgroup(instance.opts, ref_tree, false);
+
+  instance.bs_tree.reset(new BootstrapTree(ref_tree));
+
+  Tree tree = ref_tree;
+  for (auto bs: bs_trees)
+  {
+    tree.topology(bs.second);
+    instance.bs_tree->add_bootstrap_tree(tree);
+  }
+  instance.bs_tree->calc_support();
+}
+
+bool check_bootstop(const RaxmlInstance& instance, TreeCollection& bs_trees, bool print = false)
+{
+  if (!instance.bootstop_checker)
+    return false;
+
+  const auto& opts       = instance.opts;
+  auto& bootstop_checker = instance.bootstop_checker;
+
+  if (!bootstop_checker->max_bs_trees())
+    bootstop_checker->max_bs_trees(bs_trees.size());
+
+  if (print)
+  {
+    LOG_INFO << "Performing bootstrap convergence assessment using autoMRE criterion"
+             << endl << endl;
+
+    // # Trees     Avg WRF in %    # Perms: wrf <= 2.00 %
+    LOG_INFO << " # trees       "
+             << " avg WRF      "
+             << " avg WRF in %      "
+             << " # perms: wrf <= " << setprecision(2) << opts.bootstop_cutoff * 100 << " %    "
+             << " converged?  " << endl;
+  }
+
+  assert(!instance.random_tree.empty());
+
+  Tree bs_tree = instance.random_tree;
+  size_t bs_num = 0;
+  bool converged = false;
+  for (auto it: bs_trees)
+  {
+    bs_tree.topology(it.second);
+
+    bootstop_checker->add_bootstrap_tree(bs_tree);
+
+    bs_num++;
+
+    if (bs_num % opts.bootstop_interval == 0 || bs_num == bs_trees.size())
+    {
+      converged = bootstop_checker->converged(rand());
+
+      if (print)
+      {
+        LOG_INFO << setw(8) << bs_num << " "
+                 << setw(14) << setprecision(3) << bootstop_checker->avg_wrf() << "   "
+                 << setw(16) << setprecision(3) << bootstop_checker->avg_pct() << "   "
+                 << setw(26) << bootstop_checker->num_better() << "        "
+                 << (converged ? "YES" : "NO") << endl;
+      }
+
+      if (converged)
+        break;
+    }
+  }
+
+  if (print)
+  {
+    LOG_INFO << "Bootstopping test " << (converged ? "converged" : "did not converge")
+             << " after " <<  bootstop_checker->num_bs_trees() << " trees" << endl << endl;
+  }
+
+  return converged;
+}
+
+TreeCollection read_bootstrap_trees(const RaxmlInstance& instance, Tree& ref_tree)
+{
+  NameIdMap ref_tip_ids;
+  const auto& opts = instance.opts;
+ NewickStream boots(opts.bootstrap_trees_file(), std::ios::in);
+  TreeCollection bs_trees;
+  unsigned int bs_num = 0;
+
+  LOG_INFO << "Reading bootstrap trees from file: " << opts.bootstrap_trees_file() << endl;
+
+  while (boots.peek() != EOF)
+  {
+    Tree tree;
+    boots >> tree;
+
+    if (bs_trees.empty())
+    {
+      if (ref_tree.empty())
+        ref_tree = tree;
+      ref_tip_ids = ref_tree.tip_ids();
+    }
+
+    try
+    {
+      tree.reset_tip_ids(ref_tip_ids);
+    }
+    catch (out_of_range& e)
+    {
+      throw runtime_error("Bootstrap tree #" + to_string(bs_num+1) +
+                          " contains incompatible taxon name(s)!");
+    }
+    catch (invalid_argument& e)
+    {
+      throw runtime_error("Bootstrap tree #" + to_string(bs_num+1) +
+                          " has wrong number of tips: " + to_string(tree.num_tips()));
+    }
+    bs_trees.push_back(0, tree);
+    bs_num++;
+  }
+
+  LOG_INFO << "Bootstrap trees found: " << bs_trees.size() << endl << endl;
+
+  if (bs_trees.size() < 2)
+  {
+    throw runtime_error("You must provide a file with multiple bootstrap trees!");
+  }
+
+  return bs_trees;
+}
+
+void command_bootstop(RaxmlInstance& instance)
+{
+  auto bs_trees = read_bootstrap_trees(instance, instance.random_tree);
+
+  check_bootstop(instance, bs_trees, true);
+}
+
+void command_support(RaxmlInstance& instance)
+{
+  const auto& opts = instance.opts;
+
   LOG_INFO << "Reading reference tree from file: " << opts.tree_file << endl;
+
+  if (!sysutil_file_exists(opts.tree_file))
+    throw runtime_error("File not found: " + opts.tree_file);
 
   Tree ref_tree;
   NewickStream refs(opts.tree_file, std::ios::in);
@@ -986,72 +1131,11 @@ void draw_bootstrap_support(const Options& opts)
 
   auto ref_tip_ids = ref_tree.tip_ids();
 
-  reroot_tree_with_outgroup(opts, ref_tree, false);
+  /* read all bootstrap trees from a Newick file */
+  auto bs_trees = read_bootstrap_trees(instance, instance.random_tree);
 
-  BootstrapTree sup_tree(ref_tree);
-
-  LOG_INFO << "Reading bootstrap trees from file: " << opts.bootstrap_trees_file() << endl;
-
-  NewickStream boots(opts.bootstrap_trees_file(), std::ios::in);
-  unsigned int bs_num = 0;
-  while (boots.peek() != EOF)
-  {
-    Tree bs_tree;
-    boots >> bs_tree;
-    try
-    {
-      bs_tree.reset_tip_ids(ref_tip_ids);
-    }
-    catch (out_of_range& e)
-    {
-      throw runtime_error("Bootstrap tree #" + to_string(bs_num+1) +
-                          " is not compatible with the reference tree!");
-    }
-    catch (invalid_argument& e)
-    {
-      throw runtime_error("Bootstrap tree #" + to_string(bs_num+1) +
-                          " has wrong number of tips: " + to_string(bs_tree.num_tips()));
-    }
-    sup_tree.add_bootstrap_tree(bs_tree);
-    bs_num++;
-  }
-
-  LOG_INFO << "Bootstrap trees found: " << bs_num << endl << endl;
-
-  if (bs_num < 2)
-  {
-    throw runtime_error("You must provide a file with multiple bootstrap trees!");
-  }
-
-  sup_tree.calc_support();
-
-  reroot_tree_with_outgroup(opts, sup_tree, true);
-
-  if (!opts.support_tree_file().empty())
-  {
-    NewickStream sups(opts.support_tree_file(), std::ios::out);
-    sups << sup_tree;
-
-    LOG_INFO << "Best ML tree with bootstrap support values saved to: " <<
-        sysutil_realpath(opts.support_tree_file()) << endl << endl;
-  }
-}
-
-void draw_bootstrap_support(RaxmlInstance& instance, const Checkpoint& checkp)
-{
-  Tree tree = checkp.tree;
-  tree.topology(checkp.ml_trees.best_topology());
-
-  reroot_tree_with_outgroup(instance.opts, tree, false);
-
-  instance.bs_tree.reset(new BootstrapTree(tree));
-
-  for (auto bs: checkp.bs_trees)
-  {
-    tree.topology(bs.second);
-    instance.bs_tree->add_bootstrap_tree(tree);
-  }
-  instance.bs_tree->calc_support();
+  draw_bootstrap_support(instance, ref_tree, bs_trees);
+  check_bootstop(instance, bs_trees, true);
 }
 
 void check_terrace(const RaxmlInstance& instance, const Tree& tree)
@@ -1124,15 +1208,19 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
 {
   auto const& opts = instance.opts;
 
-  auto model_log_lvl = instance.parted_msa.part_count() > 1 ? LogLevel::verbose : LogLevel::info;
-
-  RAXML_LOG(model_log_lvl) << "\nOptimized model parameters:" << endl;
-
-  for (size_t p = 0; p < instance.parted_msa.part_count(); ++p)
+  if (opts.command == Command::search || opts.command == Command::all ||
+      opts.command == Command::evaluate || opts.command == Command::bootstrap)
   {
-    RAXML_LOG(model_log_lvl) << "\n   Partition " << p << ": " <<
-        instance.parted_msa.part_info(p).name().c_str() << endl;
-    RAXML_LOG(model_log_lvl) << checkp.models.at(p);
+    auto model_log_lvl = instance.parted_msa.part_count() > 1 ? LogLevel::verbose : LogLevel::info;
+
+    RAXML_LOG(model_log_lvl) << "\nOptimized model parameters:" << endl;
+
+    for (size_t p = 0; p < instance.parted_msa.part_count(); ++p)
+    {
+      RAXML_LOG(model_log_lvl) << "\n   Partition " << p << ": " <<
+          instance.parted_msa.part_info(p).name().c_str() << endl;
+      RAXML_LOG(model_log_lvl) << checkp.models.at(p);
+    }
   }
 
   if (opts.command == Command::evaluate)
@@ -1191,21 +1279,21 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
       LOG_INFO << "Best per-partition ML trees saved to: " <<
           sysutil_realpath(opts.partition_trees_file()) << endl;
     }
+  }
 
-    if (opts.command == Command::all)
+  if (opts.command == Command::all || opts.command == Command::support)
+  {
+    assert(instance.bs_tree);
+
+    postprocess_tree(instance.opts, *instance.bs_tree);
+
+    if (!opts.support_tree_file().empty())
     {
-      assert(instance.bs_tree);
+      NewickStream nw(opts.support_tree_file(), std::ios::out);
+      nw << *instance.bs_tree;
 
-      postprocess_tree(instance.opts, *instance.bs_tree);
-
-      if (!opts.support_tree_file().empty())
-      {
-        NewickStream nw(opts.support_tree_file(), std::ios::out);
-        nw << *instance.bs_tree;
-
-        LOG_INFO << "Best ML tree with bootstrap support values saved to: " <<
-            sysutil_realpath(opts.support_tree_file()) << endl;
-      }
+      LOG_INFO << "Best ML tree with bootstrap support values saved to: " <<
+          sysutil_realpath(opts.support_tree_file()) << endl;
     }
   }
 
@@ -1547,18 +1635,19 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   if (ParallelContext::master_rank())
   {
     if (opts.command == Command::all)
-      draw_bootstrap_support(instance, cm.checkpoint());
+    {
+      auto& checkp = cm.checkpoint();
+      Tree tree = checkp.tree;
+      tree.topology(checkp.ml_trees.best_topology());
+
+      draw_bootstrap_support(instance, tree, checkp.bs_trees);
+    }
 
     assert(cm.checkpoint().models.size() == instance.parted_msa.part_count());
     for (size_t p = 0; p < instance.parted_msa.part_count(); ++p)
     {
       instance.parted_msa.model(p, cm.checkpoint().models.at(p));
     }
-
-    print_final_output(instance, cm.checkpoint());
-
-    /* analysis finished successfully, remove checkpoint file */
-    cm.remove();
   }
 }
 
@@ -1621,6 +1710,7 @@ int internal_main(int argc, char** argv, void* comm)
         return clean_exit(EXIT_FAILURE);
       }
       break;
+    case Command::bsconverge:
     default:
       break;
   }
@@ -1653,6 +1743,22 @@ int internal_main(int argc, char** argv, void* comm)
           "       Please use random starting trees instead.");
     }
 
+    /* init bootstopping */
+    switch (opts.bootstop_criterion)
+    {
+      case BootstopCriterion::autoMRE:
+        instance.bootstop_checker.reset(new BootstopCheckMRE(opts.num_bootstraps,
+                                                             opts.bootstop_cutoff,
+                                                             opts.bootstop_permutations));
+        break;
+      case BootstopCriterion::none:
+        break;
+      default:
+        throw runtime_error("Only autoMRE bootstopping criterion is supported for now, sorry!");
+    }
+
+    CheckpointManager cm(opts.checkp_file());
+
     switch (opts.command)
     {
       case Command::evaluate:
@@ -1675,7 +1781,6 @@ int internal_main(int argc, char** argv, void* comm)
         /* init load balancer */
         instance.load_balancer.reset(new KassianLoadBalancer());
 
-        CheckpointManager cm(opts.checkp_file());
         ParallelContext::init_pthreads(opts, std::bind(thread_main,
                                                        std::ref(instance),
                                                        std::ref(cm)));
@@ -1684,7 +1789,10 @@ int internal_main(int argc, char** argv, void* comm)
         break;
       }
       case Command::support:
-        draw_bootstrap_support(opts);
+        command_support(instance);
+        break;
+      case Command::bsconverge:
+        command_bootstop(instance);
         break;
 #ifdef _RAXML_TERRAPHAST
       case Command::terrace:
@@ -1738,6 +1846,15 @@ int internal_main(int argc, char** argv, void* comm)
       default:
         LOG_ERROR << "Unknown command!" << endl;
         retval = EXIT_FAILURE;
+    }
+
+    /* finalize */
+    if (ParallelContext::master_rank())
+    {
+      print_final_output(instance, cm.checkpoint());
+
+      /* analysis finished successfully, remove checkpoint file */
+      cm.remove();
     }
   }
   catch(exception& e)

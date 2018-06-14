@@ -145,11 +145,17 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     case Command::support:
       stream << "Compute bipartition support";
       break;
+    case Command::bsconverge:
+      stream << "A posteriori bootstrap convergence test";
+      break;
     case Command::terrace:
       stream << "Count/enumerate trees on a phylogenetic terrace";
       break;
     case Command::check:
       stream << "Alignment validation";
+      break;
+    case Command::parse:
+      stream << "Alignment parsing and compression";
       break;
     case Command::start:
       stream << "Starting tree generation";
@@ -179,6 +185,33 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     }
   }
   stream << endl;
+
+  if (opts.command == Command::bootstrap || opts.command == Command::all)
+  {
+    stream << "  bootstrap replicates: ";
+    if (opts.bootstop_criterion == BootstopCriterion::none)
+      stream << opts.num_bootstraps;
+    else
+    {
+      stream << "max: " << opts.num_bootstraps << " + bootstopping (";
+      switch(opts.bootstop_criterion)
+      {
+        case BootstopCriterion::autoFC:
+          stream << "autoFC";
+          break;
+        case BootstopCriterion::autoMR:
+          stream << "autoMR";
+          break;
+        case BootstopCriterion::autoMRE:
+          stream << "autoMRE";
+          break;
+        default:
+          assert(0);
+      }
+      stream << ", cutoff: " << opts.bootstop_cutoff << ")";
+    }
+    stream << endl;
+  }
 
   if (!opts.constraint_tree_file.empty())
     stream << "  topological constraint: " << opts.constraint_tree_file << endl;

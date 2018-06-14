@@ -63,6 +63,9 @@ static struct option long_options[] =
   {"precision",          required_argument, 0, 0 },  /*  42 */
   {"outgroup",           required_argument, 0, 0 },  /*  43 */
 
+  {"bs-cutoff",          required_argument, 0, 0 },  /*  44 */
+  {"bsconverge",         no_argument,       0, 0 },  /*  45 */
+
   { 0, 0, 0, 0 }
 };
 
@@ -112,18 +115,29 @@ void CommandLineParser::check_options(Options &opts)
         "Please choose whether you want to generate parsimony or random starting trees!");
   }
 
+  if (opts.command == Command::support || opts.command == Command::bsconverge)
+  {
+    if (opts.outfile_names.bootstrap_trees.empty())
+    {
+      throw OptionException("You must specify a Newick file with replicate trees, e.g., "
+          "--bs-trees bootstrap.nw");
+    }
+  }
+
   if (opts.command == Command::support)
   {
     assert(!opts.tree_file.empty());
 
     if (opts.outfile_prefix.empty())
       opts.outfile_prefix = opts.tree_file;
+  }
 
-    if (opts.outfile_names.bootstrap_trees.empty())
-    {
-      throw OptionException("You must specify a Newick file with replicate trees, e.g., "
-          "--bs-trees bootstrap.nw");
-    }
+  if (opts.command == Command::bsconverge)
+  {
+    assert(!opts.outfile_names.bootstrap_trees.empty());
+
+    if (opts.outfile_prefix.empty())
+      opts.outfile_prefix = opts.outfile_names.bootstrap_trees;
   }
 
   if (opts.simd_arch > sysutil_simd_autodetect())
@@ -207,6 +221,12 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* default: autodetect best SPR radius */
   opts.spr_radius = -1;
   opts.spr_cutoff = 1.0;
+
+  /* bootstopping */
+  opts.bootstop_criterion = BootstopCriterion::none;
+  opts.bootstop_cutoff = RAXML_BOOTSTOP_CUTOFF;
+  opts.bootstop_interval = RAXML_BOOTSTOP_INTERVAL;
+  opts.bootstop_permutations = RAXML_BOOTSTOP_PERMUTES;
 
   /* default: linked branch lengths */
   opts.brlen_linkage = PLLMOD_COMMON_BRLEN_LINKED;
@@ -492,6 +512,14 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         {
           opts.outfile_names.bootstrap_trees = optarg;
         }
+        else if (strncasecmp(optarg, "autoMRE", 7) == 0)
+        {
+          string optstr = optarg;
+          std::transform(optstr.begin(), optstr.end(), optstr.begin(), ::tolower);
+          opts.bootstop_criterion = BootstopCriterion::autoMRE;
+          if (sscanf(optstr.c_str(), "automre{%u}", &opts.num_bootstraps) != 1)
+            opts.num_bootstraps = 1000;
+        }
         else if (sscanf(optarg, "%u", &opts.num_bootstraps) != 1 || opts.num_bootstraps == 0)
         {
           throw InvalidOptionValueException("Invalid number of num_bootstraps: " + string(optarg) +
@@ -562,15 +590,19 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       case 36: /* min brlen */
         if(sscanf(optarg, "%lf", &opts.brlen_min) != 1 || opts.brlen_min <= 0.)
+        {
           throw InvalidOptionValueException("Invalid minimum branch length value: " +
                                             string(optarg) +
                                             ", please provide a positive real number.");
+        }
         break;
       case 37: /* max brlen */
         if(sscanf(optarg, "%lf", &opts.brlen_max) != 1 || opts.brlen_max <= 0.)
+        {
           throw InvalidOptionValueException("Invalid maximum branch length value: " +
                                             string(optarg) +
                                             ", please provide a positive real number.");
+        }
         break;
       case 38: /* constraint tree */
         opts.constraint_tree_file = optarg;
@@ -602,6 +634,26 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         {
           throw InvalidOptionValueException("Invalid outgroup: %s " + string(optarg));
         }
+        break;
+      case 44: /* bootstopping cutoff */
+        if(sscanf(optarg, "%lf", &opts.bootstop_cutoff) == 1 &&
+           opts.bootstop_cutoff >= 0. && opts.bootstop_cutoff <= 1.0)
+        {
+          if (opts.bootstop_criterion == BootstopCriterion::none)
+            opts.bootstop_criterion = BootstopCriterion::autoMRE;
+        }
+        else
+        {
+          throw InvalidOptionValueException("Invalid bootstopping cutoff value: " +
+                                            string(optarg) +
+                                            ", please provide a number between 0.0 and 1.0.");
+        }
+        break;
+      case 45: /* bootstrap convergence test */
+        opts.command = Command::bsconverge;
+        num_commands++;
+        if (opts.bootstop_criterion == BootstopCriterion::none)
+          opts.bootstop_criterion = BootstopCriterion::autoMRE;
         break;
       default:
         throw  OptionException("Internal error in option parsing");
@@ -649,6 +701,7 @@ void CommandLineParser::print_help()
             "  --all                                      all-in-one (ML search + bootstrapping).\n"
             "  --support                                  compute bipartition support for a given reference tree (e.g., best ML tree)\n"
             "                                             and a set of replicate trees (e.g., from a bootstrap analysis)\n"
+            "  --bsconverge                               test for bootstrapping convergence using autoMRE criterion\n"
 #ifdef _RAXML_TERRAPHAST
             "  --terrace                                  check whether a tree lies on a phylogenetic terrace \n"
 #endif
@@ -699,7 +752,9 @@ void CommandLineParser::print_help()
             "\n"
             "Bootstrapping options:\n"
             "  --bs-trees     VALUE                       number of bootstraps replicates (default: 100)\n"
-            "  --bs-trees     FILE                        Newick file containing set of bootstrap replicate trees (with --support)\n";
+            "  --bs-trees     autoMRE                     use MRE-based bootstrap convergence criterion\n"
+            "  --bs-trees     FILE                        Newick file containing set of bootstrap replicate trees (with --support)\n"
+            "  --bs-cutoff    VALUE                       cutoff threshold for the MRE-based bootstopping criteria (default: 0.03)\n";
 
   cout << "\n"
             "EXAMPLES:\n"
