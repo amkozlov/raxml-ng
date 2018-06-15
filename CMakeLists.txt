@@ -3,7 +3,7 @@ cmake_minimum_required (VERSION 2.8.10 FATAL_ERROR)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES  ON)
 
-set(USE_LIBPLL_CMAKE OFF CACHE BOOL "Use CMake to build libpll and pll-modules")
+set(USE_LIBPLL_CMAKE ON CACHE BOOL "Use CMake to build libpll and pll-modules")
 set(BUILD_AS_LIBRARY OFF CACHE BOOL "Build RAxML-NG as shared library (instead of stand-alone executable)")
 
 set (USE_PTHREADS ON CACHE BOOL "Enable multi-threading support (PTHREADS)")
@@ -18,7 +18,7 @@ set (ENABLE_PLLMOD_SIMD OFF CACHE BOOL "Enable SIMD instructions in pll-modules 
 # build a static binary
 set(STATIC_BUILD OFF CACHE BOOL "Build static binary")
 
-set(USE_TERRAPHAST OFF CACHE BOOL "Use phylogentic terraces library (terraphast) ")
+set(USE_TERRAPHAST ON CACHE BOOL "Use phylogentic terraces library (terraphast) ")
 set(USE_GMP OFF CACHE BOOL "Use Gnu Muliple precision (GMP) library ")
 
 set(ENABLE_PTHREADS ${USE_PTHREADS})
@@ -35,6 +35,12 @@ endif()
 
 #set(CMAKE_CXX_STANDARD 14)
 #set(CMAKE_CXX_EXTENSIONS OFF)
+
+# set these flags globally for all subprojects (libpll etc.)
+set (CMAKE_CXX_FLAGS_DEBUG    "-O3 -g" CACHE INTERNAL "")
+set (CMAKE_CXX_FLAGS_RELEASE  "-O3"    CACHE INTERNAL "")
+set (CMAKE_C_FLAGS_DEBUG    "-O3 -g" CACHE INTERNAL "")
+set (CMAKE_C_FLAGS_RELEASE  "-O3"    CACHE INTERNAL "")
 
 project (raxml-ng C CXX)
 
@@ -65,17 +71,18 @@ endif()
 set (raxml-ng_VERSION_MAJOR 0)
 set (raxml-ng_VERSION_MINOR 6)
 
-set (CMAKE_BUILD_TYPE DEBUG)
+#set (CMAKE_BUILD_TYPE DEBUG)
 #set (CMAKE_BUILD_TYPE RELEASE)
 # set (CMAKE_VERBOSE_MAKEFILE ON)
+
+if (NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE "RELEASE")
+endif()
 
 message (STATUS "Building ${CMAKE_BUILD_TYPE}")
 
 set (WARN_FLAGS               "-Wall -Wextra")
 set (CMAKE_CXX_FLAGS          "-std=c++11 ${WARN_FLAGS}")
-
-set (CMAKE_CXX_FLAGS_DEBUG    "-g")
-set (CMAKE_CXX_FLAGS_RELEASE  "-O3 -DNDEBUG")
 
 if (ENABLE_GMP)
 #find_package(GMP REQUIRED)
