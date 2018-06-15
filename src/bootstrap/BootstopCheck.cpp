@@ -216,15 +216,17 @@ void BootstopCheckMRE::mre(splitEntryVector& splits_all, const uintVector& suppo
   );
 
   splits_cons.clear();
+  splits_cons.reserve(max_splits);
   for (auto e: splits_all)
   {
     bool compatible = true;
 
     if (support[e->bip_number] <= mr_support_cuttoff)
     {
-      for (auto ce: splits_cons)
+      for (auto ce = splits_cons.rbegin(); ce != splits_cons.rend(); ce++)
       {
-        if (!pllmod_utree_compatible_splits(ce->bit_vector, e->bit_vector, split_len, tip_count))
+        if (!pllmod_utree_compatible_splits((*ce)->bit_vector, e->bit_vector,
+                                            split_len, tip_count))
         {
           compatible = false;
           break;
