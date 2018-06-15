@@ -993,7 +993,8 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree, const TreeC
   instance.bs_tree->calc_support();
 }
 
-bool check_bootstop(const RaxmlInstance& instance, TreeCollection& bs_trees, bool print = false)
+bool check_bootstop(const RaxmlInstance& instance, const TreeCollection& bs_trees,
+                    bool print = false)
 {
   if (!instance.bootstop_checker)
     return false;
@@ -1476,6 +1477,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
   size_t bs_num = cm.checkpoint().bs_trees.size();
   auto bs_start_tree = instance.bs_start_trees.cbegin();
   use_ckp_tree = use_ckp_tree && cm.checkpoint().search_state.step != CheckpointStep::start;
+  bool bs_converged = false;
   for (const auto& bs: instance.bs_reps)
   {
     ++bs_num;
@@ -1526,6 +1528,24 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
     cm.save_bs_tree();
     cm.reset_search_state();
     ++bs_start_tree;
+
+    /* check bootstrapping convergence */
+    if (instance.bootstop_checker && ParallelContext::master_thread())
+    {
+      instance.bootstop_checker->add_bootstrap_tree(cm.checkpoint().tree);
+
+      if (bs_num % opts.bootstop_interval == 0 || bs_num == opts.num_bootstraps)
+      {
+        bs_converged = instance.bootstop_checker->converged(rand());
+      }
+    }
+    ParallelContext::thread_broadcast(0, &bs_converged, sizeof(bool));
+    if (bs_converged)
+    {
+      LOG_INFO_TS << "Bootstrapping converged after " << bs_num << " replicates." << endl;
+      bs_start_tree = instance.bs_start_trees.cend();
+      break;
+    }
   }
 
   assert(bs_start_tree == instance.bs_start_trees.cend());
