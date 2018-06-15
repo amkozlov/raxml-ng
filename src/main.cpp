@@ -1354,23 +1354,19 @@ void print_resources(const RaxmlInstance& instance)
   StaticResourceEstimator resEstimator(instance.parted_msa, instance.opts);
   auto res = resEstimator.estimate();
 
-  LOG_DEBUG << "* Per-taxon CLV size (elements)                 : "
+  LOG_VERB << "* Per-taxon CLV size (elements)                : "
       << res.taxon_clv_size << endl;
-  LOG_INFO << "* Estimated memory requirements : " <<
+  LOG_INFO << "* Estimated memory requirements                : " <<
       (size_t) (((float) res.total_mem_size) / (1024 * 1024) + 1) << " MB" << endl << endl;
-  LOG_INFO << "* Recommended number of threads / MPI processes " << endl
-      <<      "       for a single run (minimum response time) : "
-      << res.num_threads_response
-      << endl
-      <<      "      for batch processing (maximum throughput) : "
-      << res.num_threads_throughput
-      << endl
-//      <<      "                                       balanced : " <<
-//      res.num_threads_balanced
-      << endl;
+  LOG_INFO << "* Recommended number of threads / MPI processes: "
+           << res.num_threads_balanced << endl;
+  LOG_VERB << "* Maximum     number of threads / MPI processes: "
+           << res.num_threads_response << endl;
+  LOG_VERB << "* Minimum     number of threads / MPI processes: "
+           << res.num_threads_throughput << endl;
 
   LOG_INFO << endl << "Please note that numbers given above are rough estimates only. " << endl <<
-      "Actual memory consumption and parallel performance on your system can differ!"
+      "Actual memory consumption and parallel performance on your system may differ!"
       << endl << endl;
 }
 

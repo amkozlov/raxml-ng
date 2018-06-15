@@ -37,6 +37,19 @@ StaticResourceEstimator::StaticResourceEstimator(const PartitionedMSA& parted_ms
 
 }
 
+size_t StaticResourceEstimator::estimate_cores(size_t taxon_clv_size, size_t elems_per_core)
+{
+  size_t naive_cores = PLL_MAX(round(((double) taxon_clv_size) / elems_per_core), 1.);
+
+  /* correct for edge cases: too few/too many cores -> TODO: make it less adhoc! */
+  if (naive_cores <= 8)
+    elems_per_core /= 4. - log2(naive_cores);
+  else
+    elems_per_core *= log2(naive_cores) - 2.;
+
+  return PLL_MAX(round(((double)taxon_clv_size) / elems_per_core), 1.);
+}
+
 void StaticResourceEstimator::compute_estimates(ResEstimates& res)
 {
   size_t mem_size = 0;
@@ -46,7 +59,7 @@ void StaticResourceEstimator::compute_estimates(ResEstimates& res)
 
   res.total_mem_size = mem_size;
   res.taxon_clv_size = _taxon_clv_size;
-  res.num_threads_response = PLL_MAX(_taxon_clv_size / 4000, 1);
-  res.num_threads_throughput = PLL_MAX(_taxon_clv_size / 80000, 1);
-  res.num_threads_balanced = PLL_MAX(_taxon_clv_size / 16000, 1);
+  res.num_threads_response = estimate_cores(_taxon_clv_size, 4000);
+  res.num_threads_throughput = estimate_cores(_taxon_clv_size, 80000);
+  res.num_threads_balanced = estimate_cores(_taxon_clv_size, 16000);
 }
