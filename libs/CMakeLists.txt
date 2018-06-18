@@ -40,6 +40,7 @@ if(USE_TERRAPHAST)
   set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/terraphast/cmake)
 
   set(TERRAPHAST_USE_GMP OFF CACHE BOOL "terraphast: Use GMP")
+  set(TERRAPHAST_USE_THREADS OFF CACHE BOOL "terraphast: Use multi-threading")
   set(TERRAPHAST_BUILD_CLIB OFF CACHE BOOL "terraphast: Build the C library")
   set(TERRAPHAST_BUILD_APPS OFF CACHE BOOL "terraphast: Build the tools")
   set(TERRAPHAST_BUILD_TESTS OFF CACHE BOOL "terraphast: Build the tests")
