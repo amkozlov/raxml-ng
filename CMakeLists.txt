@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 2.8.10 FATAL_ERROR)
+cmake_minimum_required (VERSION 3.0.2 FATAL_ERROR)
 
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES  ON)
@@ -24,7 +24,7 @@ set(USE_GMP OFF CACHE BOOL "Use Gnu Muliple precision (GMP) library ")
 set(ENABLE_PTHREADS ${USE_PTHREADS})
 
 if(USE_TERRAPHAST)
-  set(GCC_MIN_VERSION "5.0")
+  set(GCC_MIN_VERSION "5.4")
   set(CLANG_MIN_VERSION "3.8")
   set(ENABLE_GMP ${USE_GMP})
 else()
