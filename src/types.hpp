@@ -92,6 +92,7 @@ typedef std::pair<size_t,std::string> IdNamePair;
 typedef std::vector<IdNamePair> IdNameVector;
 typedef std::unordered_map<size_t,std::string> IdNameMap;
 typedef std::unordered_map<std::string,size_t> NameIdMap;
+typedef std::unordered_map<std::string,std::string> NameMap;
 typedef std::set<size_t> IDSet;
 typedef std::vector<size_t> IDVector;
 typedef std::map<StartingTree,size_t> StartingTreeMap;

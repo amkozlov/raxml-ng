@@ -138,5 +138,27 @@ RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const Partitioned
   return stream;
 }
 
+RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const PartitionedMSAView& parted_msa)
+{
+  stream.reset();
+  size_t offset = 0;
+  for (size_t p = 0; p < parted_msa.part_count(); ++p)
+  {
+    auto model_str = parted_msa.part_model(p).to_string(stream.print_model_params(),
+                                                        stream.precision());
+    auto part_name = parted_msa.part_name(p);
+    auto part_len = parted_msa.part_length(p);
+
+    stream << model_str << ", "
+           << part_name << " = "
+           << (offset+1) << "-" << (offset+part_len)
+           << std::endl;
+    offset += part_len;
+  }
+  assert(offset == parted_msa.total_length());
+
+  return stream;
+}
+
 
 

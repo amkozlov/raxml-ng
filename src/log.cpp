@@ -51,6 +51,11 @@ void Logging::log_level(LogLevel level)
   _log_level = level;
 }
 
+LogLevel Logging::log_level() const
+{
+  return _log_level;
+}
+
 void Logging::precision(unsigned int prec, LogElement elem)
 {
   switch(elem)

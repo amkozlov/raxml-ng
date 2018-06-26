@@ -6,6 +6,7 @@
 #include "../Tree.hpp"
 #include "../bootstrap/BootstrapTree.hpp"
 #include "../bootstrap/BootstrapGenerator.hpp"
+#include "../PartitionedMSAView.hpp"
 
 class NewickStream : public std::fstream
 {
@@ -104,6 +105,7 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format);
 
 PhylipStream& operator<<(PhylipStream& stream, const MSA& msa);
 PhylipStream& operator<<(PhylipStream& stream, const PartitionedMSA& msa);
+PhylipStream& operator<<(PhylipStream& stream, const PartitionedMSAView& msa);
 PhylipStream& operator<<(PhylipStream& stream, const BootstrapMSA& bs_msa);
 
 RBAStream& operator<<(RBAStream& stream, const PartitionedMSA& part_msa);
@@ -114,6 +116,7 @@ RaxmlPartitionStream& operator>>(RaxmlPartitionStream& stream, PartitionedMSA& p
 
 RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const PartitionInfo& part_info);
 RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const PartitionedMSA& parted_msa);
+RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const PartitionedMSAView& parted_msa);
 
 std::string to_newick_string_rooted(const Tree& tree, double root_brlen = 0.0);
 
