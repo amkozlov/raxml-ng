@@ -4,7 +4,7 @@
 #include "common.h"
 #include "Tree.hpp"
 #include "Options.hpp"
-#include "PartitionAssignment.hpp"
+#include "loadbalance/PartitionAssignment.hpp"
 
 struct spr_round_params
 {

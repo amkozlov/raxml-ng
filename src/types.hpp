@@ -82,6 +82,13 @@ enum class BootstopCriterion
   autoFC
 };
 
+enum class LoadBalancing
+{
+  naive = 0,
+  kassian,
+  benoit
+};
+
 const std::string ParamValueNames[] = {"undefined", "equal", "user", "model", "empirical", "ML"};
 
 typedef std::vector<double> doubleVector;

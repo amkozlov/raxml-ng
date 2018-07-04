@@ -65,6 +65,7 @@ static struct option long_options[] =
 
   {"bs-cutoff",          required_argument, 0, 0 },  /*  44 */
   {"bsconverge",         no_argument,       0, 0 },  /*  45 */
+  {"extra",              required_argument, 0, 0 },  /*  46 */
 
   { 0, 0, 0, 0 }
 };
@@ -245,6 +246,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   // autodetect CPU instruction set and use respective SIMD kernels
   opts.simd_arch = sysutil_simd_autodetect();
+  opts.load_balance_method = LoadBalancing::benoit;
 
   opts.num_searches = 0;
 
@@ -654,6 +656,22 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         num_commands++;
         if (opts.bootstop_criterion == BootstopCriterion::none)
           opts.bootstop_criterion = BootstopCriterion::autoMRE;
+        break;
+      case 46: /* extra options */
+        {
+          auto extra_opts = split_string(optarg, ',');
+          for (auto& eopt: extra_opts)
+          {
+            if (eopt == "lb-naive")
+              opts.load_balance_method = LoadBalancing::naive;
+            else if (eopt == "lb-kassian")
+              opts.load_balance_method = LoadBalancing::kassian;
+            else if (eopt == "lb-benoit")
+              opts.load_balance_method = LoadBalancing::benoit;
+            else
+              throw InvalidOptionValueException("Unknown extra option: " + string(optarg));
+          }
+        }
         break;
       default:
         throw  OptionException("Internal error in option parsing");

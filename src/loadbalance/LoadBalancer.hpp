@@ -35,4 +35,12 @@ protected:
                                                       size_t num_procs);
 };
 
+class BenoitLoadBalancer : public LoadBalancer
+{
+protected:
+  virtual PartitionAssignmentList compute_assignments(const PartitionAssignment& part_sizes,
+                                                      size_t num_procs);
+};
+
+
 #endif /* RAXML_LOADBALANCER_HPP_ */

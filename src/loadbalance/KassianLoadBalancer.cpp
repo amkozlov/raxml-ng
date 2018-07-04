@@ -7,63 +7,6 @@
 
 using namespace std;
 
-LoadBalancer::LoadBalancer ()
-{
-  // TODO Auto-generated constructor stub
-
-}
-
-LoadBalancer::~LoadBalancer ()
-{
-  // TODO Auto-generated destructor stub
-}
-
-PartitionAssignmentList LoadBalancer::get_all_assignments(const PartitionAssignment& part_sizes,
-                                                          size_t num_procs)
-{
-  if (num_procs == 1)
-    return PartitionAssignmentList(1, part_sizes);
-  else
-    return compute_assignments(part_sizes, num_procs);
-}
-
-PartitionAssignment LoadBalancer::get_proc_assignments(const PartitionAssignment& part_sizes,
-                                                       size_t num_procs, size_t proc_id)
-{
-  if (proc_id >= num_procs)
-    throw std::out_of_range("Process ID out of range");
-
-  if (num_procs == 1)
-    return part_sizes;
-  else
-    return compute_assignments(part_sizes, num_procs).at(proc_id);
-}
-
-PartitionAssignmentList SimpleLoadBalancer::compute_assignments(const PartitionAssignment& part_sizes,
-                                                                    size_t num_procs)
-{
-  PartitionAssignmentList part_assign(num_procs);
-
-  size_t proc_id = 0;
-  for (auto& proc_assign: part_assign)
-  {
-    for (auto const& full_range: part_sizes)
-    {
-      const size_t total_sites = full_range.length;
-      const size_t proc_sites = total_sites / num_procs;
-      auto part_id = full_range.part_id;
-      auto start = full_range.start + proc_id * proc_sites;
-      auto length = (proc_id == num_procs-1) ? total_sites - start : proc_sites;
-      proc_assign.assign_sites(part_id, start, length);
-    }
-    ++proc_id;
-  }
-
-  assert(proc_id == part_assign.size());
-
-  return part_assign;
-}
-
 PartitionAssignmentList KassianLoadBalancer::compute_assignments(const PartitionAssignment& part_sizes,
                                                                  size_t num_procs)
 {
@@ -91,7 +34,6 @@ PartitionAssignmentList KassianLoadBalancer::compute_assignments(const Partition
   size_t full_bins = 0;
   size_t current_bin = 0;
 
-//  vector<size_t> weights(num_procs, 0);
   vector<bool> full(num_procs, false);
 
   // Assign partitions in a cyclic manner to bins until one is too big
@@ -99,14 +41,15 @@ PartitionAssignmentList KassianLoadBalancer::compute_assignments(const Partition
   {
     const PartitionRange *partition = sorted_partitions[curr_part];
     current_bin = curr_part % bins.size();
-    if (partition->length + bins[current_bin].weight() > max_sites)
+    if (partition->length + bins[current_bin].length() > max_sites)
     {
       // the partition exceeds the current bin's size, go to the next step of the algo
       break;
     }
     // add the partition !
-    bins[current_bin].assign_sites(partition->part_id, 0, partition->length);
-    if (bins[current_bin].weight() == max_sites)
+    bins[current_bin].assign_sites(partition->part_id, 0, partition->length,
+                                   partition->per_site_weight);
+    if (bins[current_bin].length() == max_sites)
     {
       // one more bin is exactly full
       if (++full_bins == target_full_bins)
@@ -124,7 +67,7 @@ PartitionAssignmentList KassianLoadBalancer::compute_assignments(const Partition
   stack<PartitionAssignment *> qhigh;
   for (unsigned int i = 0; i < bins.size(); ++i)
   {
-    if (bins[i].weight() >= max_sites)
+    if (bins[i].length() >= max_sites)
     {
       full[i] = true;
     }
@@ -143,24 +86,26 @@ PartitionAssignmentList KassianLoadBalancer::compute_assignments(const Partition
   {
     const PartitionRange *partition = sorted_partitions[curr_part];
     // try to dequeue a process from Qhigh and to fill it
-    if (qhigh.size() && (qhigh.top()->weight() + remaining >= max_sites))
+    if (qhigh.size() && (qhigh.top()->length() + remaining >= max_sites))
     {
       PartitionAssignment * bin = qhigh.top();
       qhigh.pop();
-      size_t toassign = max_sites - bin->weight();
-      bin->assign_sites(partition->part_id, partition->length - remaining, toassign);
+      size_t toassign = max_sites - bin->length();
+      bin->assign_sites(partition->part_id, partition->length - remaining, toassign,
+                        partition->per_site_weight);
       assert(remaining >= toassign);
       remaining -= toassign;
       if (++full_bins == target_full_bins) {
         max_sites--;
       }
     }
-    else if ((qlow->top()->weight() + remaining >= max_sites))
+    else if ((qlow->top()->length() + remaining >= max_sites))
     { // same with qlow
       PartitionAssignment * bin = qlow->top();
       qlow->pop();
-      size_t toassign = max_sites - bin->weight();
-      bin->assign_sites(partition->part_id, partition->length - remaining, toassign);
+      size_t toassign = max_sites - bin->length();
+      bin->assign_sites(partition->part_id, partition->length - remaining, toassign,
+                        partition->per_site_weight);
       assert(remaining >= toassign);
       remaining -= toassign;
       if (++full_bins == target_full_bins) {
@@ -171,7 +116,8 @@ PartitionAssignmentList KassianLoadBalancer::compute_assignments(const Partition
     {
       PartitionAssignment * bin = qlow->top();
       qlow->pop();
-      bin->assign_sites(partition->part_id, partition->length - remaining, remaining);
+      bin->assign_sites(partition->part_id, partition->length - remaining, remaining,
+                        partition->per_site_weight);
       remaining = 0;
       qhigh.push(bin);
     }

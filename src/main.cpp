@@ -35,7 +35,7 @@
 #include "io/file_io.hpp"
 #include "io/binary_io.hpp"
 #include "ParallelContext.hpp"
-#include "LoadBalancer.hpp"
+#include "loadbalance/LoadBalancer.hpp"
 #include "bootstrap/BootstrapGenerator.hpp"
 #include "bootstrap/BootstopCheck.hpp"
 #include "autotune/ResourceEstimator.hpp"
@@ -935,7 +935,7 @@ void balance_load(RaxmlInstance& instance)
   size_t i = 0;
   for (auto const& pinfo: instance.parted_msa->part_list())
   {
-    part_sizes.assign_sites(i, 0, pinfo.msa().length());
+    part_sizes.assign_sites(i, 0, pinfo.msa().length(), pinfo.model().clv_entry_size());
     ++i;
   }
 
@@ -975,7 +975,8 @@ void balance_load(RaxmlInstance& instance, WeightVectorList part_site_weights)
     LOG_DEBUG << "Partition #" << i << ": " << comp_pos_map[i].size() << endl;
 
     /* add compressed partition length to the */
-    part_sizes.assign_sites(i, 0, comp_pos_map[i].size());
+    part_sizes.assign_sites(i, 0, comp_pos_map[i].size(),
+                            instance.parted_msa->model(i).clv_entry_size());
     ++i;
   }
 
@@ -1879,7 +1880,20 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::all:
       {
         /* init load balancer */
-        instance.load_balancer.reset(new KassianLoadBalancer());
+        switch(opts.load_balance_method)
+        {
+          case LoadBalancing::naive:
+            instance.load_balancer.reset(new SimpleLoadBalancer());
+            break;
+          case LoadBalancing::kassian:
+            instance.load_balancer.reset(new KassianLoadBalancer());
+            break;
+          case LoadBalancing::benoit:
+            instance.load_balancer.reset(new BenoitLoadBalancer());
+            break;
+          default:
+            assert(0);
+        }
 
         ParallelContext::init_pthreads(opts, std::bind(thread_main,
                                                        std::ref(instance),
