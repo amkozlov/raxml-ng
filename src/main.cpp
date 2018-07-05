@@ -688,6 +688,35 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
   return tree;
 }
 
+void load_start_trees(RaxmlInstance& instance, CheckpointManager& cm)
+{
+  const auto& ckp = cm.checkpoint();
+
+  NewickStream ts(instance.opts.start_tree_file(), std::ios::in);
+  size_t i = 0;
+  while (ts.peek() != EOF)
+  {
+    Tree tree;
+    ts >> tree;
+    i++;
+
+    if (i > ckp.ml_trees.size())
+    {
+      prepare_tree(instance, tree);
+      instance.start_trees.emplace_back(tree);
+    }
+  }
+  if (instance.opts.start_trees.count(StartingTree::user) > 0)
+  {
+    // in case of user startitng trees, we do not know num_searches
+    // until we read trees from the file. that's why we update num_searches here.
+    assert(i >= instance.opts.num_searches);
+    instance.opts.num_searches = i;
+  }
+  else
+    assert(i == instance.opts.num_searches);
+}
+
 void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
 {
   /* init checkpoint and set to the manager */
@@ -711,29 +740,7 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
     if (sysutil_file_exists(instance.opts.start_tree_file()) &&
         instance.opts.constraint_tree_file.empty())
     {
-      NewickStream ts(instance.opts.start_tree_file(), std::ios::in);
-      size_t i = 0;
-      while (ts.peek() != EOF)
-      {
-        Tree tree;
-        ts >> tree;
-        i++;
-
-        if (i > ckp.ml_trees.size())
-        {
-          prepare_tree(instance, tree);
-          instance.start_trees.emplace_back(tree);
-        }
-      }
-      if (instance.opts.start_trees.count(StartingTree::user) > 0)
-      {
-        // in case of user startitng trees, we do not know num_searches
-        // until we read trees from the file. that's why we update num_searches here.
-        assert(i >= instance.opts.num_searches);
-        instance.opts.num_searches = i;
-      }
-      else
-        assert(i == instance.opts.num_searches);
+      load_start_trees(instance, cm);
     }
 
     LOG_INFO_TS << "NOTE: Resuming execution from checkpoint " <<
@@ -1699,8 +1706,22 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   /* load checkpoint */
   load_checkpoint(instance, cm);
 
-  /* load/create starting tree */
-  build_start_trees(instance, cm.checkpoint().ml_trees.size());
+  /* load/create starting tree if not already loaded from checkpoint */
+  if (cm.checkpoint().ml_trees.size() + instance.start_trees.size() < instance.opts.num_searches)
+  {
+    if (ParallelContext::master_rank() || !instance.opts.constraint_tree_file.empty())
+    {
+      /* only master MPI rank generates starting trees (doesn't work with constrainted search) */
+      build_start_trees(instance, cm.checkpoint().ml_trees.size());
+      ParallelContext::mpi_barrier();
+    }
+    else
+    {
+      /* non-master ranks load starting trees from a file */
+      ParallelContext::mpi_barrier();
+      load_start_trees(instance, cm);
+    }
+  }
 
   LOG_VERB << endl << "Initial model parameters:" << endl;
   for (size_t p = 0; p < parted_msa.part_count(); ++p)
