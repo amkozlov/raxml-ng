@@ -481,6 +481,32 @@ void check_tree(const PartitionedMSA& msa, const Tree& tree)
 
 void check_options(RaxmlInstance& instance)
 {
+  /* check that we have enough patterns per thread */
+  if (ParallelContext::master_rank() && ParallelContext::num_procs() > 1)
+  {
+    StaticResourceEstimator resEstimator(*instance.parted_msa, instance.opts);
+    auto res = resEstimator.estimate();
+    if (ParallelContext::num_procs() > res.num_threads_response)
+    {
+      LOG_WARN << endl;
+      LOG_WARN << "WARNING: You might be using too many threads (" << ParallelContext::num_procs()
+               <<  ") for your alignment with " << instance.parted_msa->total_sites()
+               << " unique patterns." << endl;
+      LOG_WARN << "NOTE:    For the optimal throughput, please consider using fewer threads " << endl;
+      LOG_WARN << "NOTE:    and parallelize across starting trees/bootstrap replicates." << endl;
+      LOG_WARN << "NOTE:    As a general rule-of-thumb, please assign at least 200-1000 "
+          "alignment patterns per thread." << endl << endl;
+
+      if (ParallelContext::num_procs() > 2 * res.num_threads_response)
+      {
+        throw runtime_error("Too few patterns per thread! "
+                            "RAxML-NG will terminate now to avoid wasting resources.\n"
+                            "NOTE:  Please reduce the number of threads (see guidelines above).\n"
+                            "NOTE:  This check can be disabled with the '--force' option.");
+      }
+    }
+  }
+
   if (instance.parted_msa->taxon_count() > RAXML_RATESCALERS_TAXA &&
       !instance.opts.use_rate_scalers)
   {
@@ -1685,41 +1711,6 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   /* run load balancing algorithm */
   balance_load(instance);
-
-  /* check that we have enough patterns per thread */
-  if (ParallelContext::master_rank() && ParallelContext::num_procs() > 1)
-  {
-    PartitionAssignmentStats stats(instance.proc_part_assign);
-
-    const size_t soft_limit = 600;
-    const size_t hard_limit = 150;
-
-    // TODO: adapt for mixed alignments (e.g., DNA + AA partitions)
-    auto states = parted_msa.part_info(0).model().num_states();
-    for (const auto& p: parted_msa.part_list())
-      states = std::max(states, p.model().num_states());
-
-    const size_t norm_thread_pats = stats.min_thread_sites * (((double) states) / 4.) *
-        (ParallelContext::num_threads() < 8 ? 3 : 1);
-    if (norm_thread_pats < soft_limit)
-    {
-      size_t opt_threads = trunc(stats.total_sites / (soft_limit*2)) + 1;
-      LOG_WARN << endl;
-      LOG_WARN << "WARNING: You are probably using too many threads (" << ParallelContext::num_threads() <<
-          ") for your alignment with " << stats.total_sites << " unique patterns." << endl;
-      LOG_WARN << "NOTE:    For the optimal throughput, please consider using " << opt_threads <<
-          " threads ('--threads " << opt_threads << "' option)" << endl;
-      LOG_WARN << "NOTE:    and parallelize across starting trees/bootstrap replicates." << endl;
-      LOG_WARN << "NOTE:    As a general rule-of-thumb, please assign at least 200-1000 "
-          "alignment patterns per thread." << endl;
-
-      if (norm_thread_pats < hard_limit && !instance.opts.force_mode)
-        throw runtime_error("Too few patterns per thread! "
-                            "RAxML-NG will terminate now to avoid wasting resources.\n"
-                            "NOTE:  Please reduce the number of threads (see guidelines above).\n"
-                            "NOTE:  This check can be disabled with the '--force' option.");
-    }
-  }
 
   // TEMP WORKAROUND: here we reset random seed once again to make sure that BS replicates
   // are not affected by the number of ML search starting trees that has been generated before
