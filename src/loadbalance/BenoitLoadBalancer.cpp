@@ -2,6 +2,7 @@
 #include <stack>
 #include <algorithm>
 #include <stdexcept>
+#include <cmath>
 
 #include "LoadBalancer.hpp"
 
