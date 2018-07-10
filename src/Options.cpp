@@ -277,14 +277,18 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   if (opts.num_ranks > 1 && opts.num_threads > 1)
   {
     stream << "hybrid MPI+PTHREADS (" << opts.num_ranks <<  " ranks x " <<
-        opts.num_threads <<  " threads)" << endl;
+        opts.num_threads <<  " threads)";
   }
   else if (opts.num_ranks > 1)
-    stream <<  "MPI (" << opts.num_ranks << " ranks)" << endl;
+    stream <<  "MPI (" << opts.num_ranks << " ranks)";
   else if (opts.num_threads > 1)
-    stream << "PTHREADS (" << opts.num_threads << " threads)" << endl;
+    stream << "PTHREADS (" << opts.num_threads << " threads)" ;
   else
-    stream << "NONE/sequential" << endl;
+    stream << "NONE/sequential";
+
+  if (opts.num_threads > 1 && opts.thread_pinning)
+    stream << ", thread pinning: ON";
+  stream << endl;
 
   stream << endl;
 

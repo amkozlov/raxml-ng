@@ -240,6 +240,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 #else
   opts.num_threads = 1;
 #endif
+  opts.thread_pinning = false;
 
   opts.model_file = "";
   opts.tree_file = "";
@@ -668,6 +669,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.load_balance_method = LoadBalancing::kassian;
             else if (eopt == "lb-benoit")
               opts.load_balance_method = LoadBalancing::benoit;
+            else if (eopt == "thread-pin")
+              opts.thread_pinning = true;
             else
               throw InvalidOptionValueException("Unknown extra option: " + string(optarg));
           }
