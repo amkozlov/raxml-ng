@@ -36,7 +36,7 @@ public:
   bootstop_interval(RAXML_BOOTSTOP_INTERVAL), bootstop_permutations(RAXML_BOOTSTOP_PERMUTES),
   precision(RAXML_DEFAULT_PRECISION),
   tree_file(""), constraint_tree_file(""), msa_file(""), model_file(""), outfile_prefix(""),
-  num_threads(1), num_ranks(1), simd_arch(PLL_ATTRIB_ARCH_CPU),
+  num_threads(1), num_ranks(1), simd_arch(PLL_ATTRIB_ARCH_CPU), thread_pinning(false),
   load_balance_method(LoadBalancing::benoit)
   {};
 
@@ -96,6 +96,7 @@ public:
   unsigned int num_threads;             /* number of threads */
   unsigned int num_ranks;               /* number of MPI ranks */
   unsigned int simd_arch;               /* vector instruction set */
+  bool thread_pinning;                     /* pin threads to cores */
   LoadBalancing load_balance_method;
 
   std::string simd_arch_name() const;
