@@ -1194,6 +1194,8 @@ TreeCollection read_bootstrap_trees(const RaxmlInstance& instance, Tree& ref_tre
       ref_tip_ids = ref_tree.tip_ids();
     }
 
+    assert(!ref_tip_ids.empty());
+
     try
     {
       tree.reset_tip_ids(ref_tip_ids);
@@ -1244,10 +1246,8 @@ void command_support(RaxmlInstance& instance)
 
   LOG_INFO << "Reference tree size: " << to_string(ref_tree.num_tips()) << endl << endl;
 
-  auto ref_tip_ids = ref_tree.tip_ids();
-
   /* read all bootstrap trees from a Newick file */
-  auto bs_trees = read_bootstrap_trees(instance, instance.random_tree);
+  auto bs_trees = read_bootstrap_trees(instance, ref_tree);
 
   draw_bootstrap_support(instance, ref_tree, bs_trees);
   check_bootstop(instance, bs_trees, true);
