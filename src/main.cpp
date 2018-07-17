@@ -481,6 +481,33 @@ void check_tree(const PartitionedMSA& msa, const Tree& tree)
 
 void check_options(RaxmlInstance& instance)
 {
+  const auto& opts = instance.opts;
+
+  /* check that all outgroup taxa are present in the alignment */
+  if (!opts.outgroup_taxa.empty())
+  {
+    NameList missing_taxa;
+    for (const auto& ot: opts.outgroup_taxa)
+    {
+      if (!instance.parted_msa->taxon_id_map().count(ot))
+        missing_taxa.push_back(ot);
+    }
+
+    if (!missing_taxa.empty())
+    {
+      LOG_ERROR << "ERROR: Following taxa were specified as an outgroup "
+                                                     "but are missing from the alignment:" << endl;
+      for (const auto& mt: missing_taxa)
+        LOG_ERROR << mt << endl;
+      LOG_ERROR << endl;
+      throw runtime_error("Outgroup taxon not found.");
+    }
+  }
+
+  /* following "soft" checks will be ignored in the --force mode */
+  if (opts.force_mode)
+    return;
+
   /* check that we have enough patterns per thread */
   if (ParallelContext::master_rank() && ParallelContext::num_procs() > 1)
   {
@@ -1685,8 +1712,7 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   load_constraint(instance);
 
-  if (!opts.force_mode)
-    check_options(instance);
+  check_options(instance);
 
   // temp workaround: since MSA pattern compression calls rand(), it will change all random
   // numbers generated afterwards. so just reset seed to the initial value to ensure that
