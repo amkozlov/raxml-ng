@@ -1450,7 +1450,7 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
       RaxmlPartitionStream model_stream(opts.best_model_file(), true);
       model_stream.print_model_params(true);
       model_stream << fixed << setprecision(logger().precision(LogElement::model));
-      model_stream << instance.parted_msa;
+      model_stream << parted_msa;
 
       LOG_INFO << "Optimized model saved to: " << sysutil_realpath(opts.best_model_file()) << endl;
     }
