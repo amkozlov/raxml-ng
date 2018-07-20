@@ -765,6 +765,7 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
     // read start trees from file to avoid re-generation
     // NOTE: doesn't work for constrained tree search
     if (sysutil_file_exists(instance.opts.start_tree_file()) &&
+        instance.opts.num_searches > 0 &&
         instance.opts.constraint_tree_file.empty())
     {
       load_start_trees(instance, cm);
@@ -1704,6 +1705,7 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
       RBAStream::rba_file(instance.opts.binary_msa_file(), true))
   {
     instance.opts.msa_file = instance.opts.binary_msa_file();
+    instance.opts.msa_format = FileFormat::binary;
   }
 
   load_parted_msa(instance);
