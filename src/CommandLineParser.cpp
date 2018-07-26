@@ -240,7 +240,12 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 #else
   opts.num_threads = 1;
 #endif
+
+#if defined(_RAXML_MPI)
+  opts.thread_pinning = ParallelContext::ranks_per_node() == 1 ? true : false;
+#else
   opts.thread_pinning = false;
+#endif
 
   opts.model_file = "";
   opts.tree_file = "";
@@ -671,6 +676,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.load_balance_method = LoadBalancing::benoit;
             else if (eopt == "thread-pin")
               opts.thread_pinning = true;
+            else if (eopt == "thread-nopin")
+              opts.thread_pinning = false;
             else
               throw InvalidOptionValueException("Unknown extra option: " + string(optarg));
           }

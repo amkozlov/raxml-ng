@@ -1737,7 +1737,8 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   /* load/create starting tree if not already loaded from checkpoint */
   if (cm.checkpoint().ml_trees.size() + instance.start_trees.size() < instance.opts.num_searches)
   {
-    if (ParallelContext::master_rank() || !instance.opts.constraint_tree_file.empty())
+    if (ParallelContext::master_rank() || !instance.opts.constraint_tree_file.empty() ||
+        instance.opts.start_tree_file().empty())
     {
       /* only master MPI rank generates starting trees (doesn't work with constrainted search) */
       build_start_trees(instance, cm.checkpoint().ml_trees.size());

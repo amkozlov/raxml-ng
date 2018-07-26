@@ -286,8 +286,8 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   else
     stream << "NONE/sequential";
 
-  if (opts.num_threads > 1 && opts.thread_pinning)
-    stream << ", thread pinning: ON";
+  if (opts.num_threads > 1)
+    stream << ", thread pinning: " << (opts.thread_pinning ? "ON" : "OFF");
   stream << endl;
 
   stream << endl;

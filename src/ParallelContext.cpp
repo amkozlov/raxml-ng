@@ -9,6 +9,7 @@ using namespace std;
 
 size_t ParallelContext::_num_threads = 1;
 size_t ParallelContext::_num_ranks = 1;
+size_t ParallelContext::_num_nodes = 1;
 size_t ParallelContext::_rank_id = 0;
 thread_local size_t ParallelContext::_thread_id = 0;
 std::vector<ThreadType> ParallelContext::_threads;
@@ -21,11 +22,14 @@ MPI_Comm ParallelContext::_comm = MPI_COMM_WORLD;
 bool ParallelContext::_owns_comm = true;
 #endif
 
+
 void ParallelContext::init_mpi(int argc, char * argv[], void * comm)
 {
 #ifdef _RAXML_MPI
   {
     int tmp;
+
+    _parallel_buf.reserve(PARALLEL_BUF_SIZE);
 
     if (comm)
     {
@@ -45,6 +49,9 @@ void ParallelContext::init_mpi(int argc, char * argv[], void * comm)
     MPI_Comm_size(_comm, &tmp);
     _num_ranks = (size_t) tmp;
 //    printf("size: %lu, rank: %lu\n", _num_ranks, _rank_id);
+
+    detect_num_nodes();
+//    printf("nodes: %lu\n", _num_nodes);
   }
 #else
   RAXML_UNUSED(argc);
@@ -84,7 +91,7 @@ void ParallelContext::init_pthreads(const Options& opts, const std::function<voi
 
 #ifdef _RAXML_PTHREADS
   /* Launch threads */
-  if (opts.thread_pinning)
+  if (opts.thread_pinning && _num_threads > 1)
     pin_thread(0, pthread_self());
   for (size_t i = 1; i < _num_threads; ++i)
   {
@@ -93,6 +100,51 @@ void ParallelContext::init_pthreads(const Options& opts, const std::function<voi
     if (opts.thread_pinning)
       pin_thread(i, _threads.back().native_handle());
   }
+#endif
+}
+
+void ParallelContext::detect_num_nodes()
+{
+#ifdef _RAXML_MPI
+  if (_num_ranks > 1)
+  {
+    int len;
+    char name[MPI_MAX_PROCESSOR_NAME];
+    unordered_set<string> node_names;
+
+    MPI_Get_processor_name(name, &len);
+
+//    printf("\n hostname: %s,  len; %d\n", name, len);
+
+    node_names.insert(name);
+
+    /* send callback -> work rank: send host name to master */
+    auto worker_cb = [name,len](void * buf, size_t buf_size) -> int
+        {
+          assert((size_t) len < buf_size);
+          memcpy(buf, name, (len+1) * sizeof(char));
+          return len;
+        };
+
+    /* receive callback -> master rank: collect host names */
+    auto master_cb = [&node_names](void * buf, size_t buf_size)
+       {
+        node_names.insert((char*) buf);
+        RAXML_UNUSED(buf_size);
+       };
+
+    ParallelContext::mpi_gather_custom(worker_cb, master_cb);
+
+    /* number of nodes = number of unique hostnames */
+    _num_nodes = node_names.size();
+
+    /* broadcast number of nodes from master */
+    MPI_Bcast(&_num_nodes, sizeof(size_t), MPI_BYTE, 0, _comm);
+  }
+  else
+    _num_nodes = 1;
+#else
+  _num_nodes = 1;
 #endif
 }
 

@@ -39,6 +39,8 @@ public:
   static size_t num_procs() { return _num_ranks * _num_threads; }
   static size_t num_threads() { return _num_threads; }
   static size_t num_ranks() { return _num_ranks; }
+  static size_t num_nodes() { return _num_nodes; }
+  static size_t ranks_per_node() { return _num_ranks / _num_nodes; }
 
   static void parallel_reduce_cb(void * context, double * data, size_t size, int op);
   static void thread_reduce(double * data, size_t size, int op);
@@ -76,6 +78,7 @@ private:
   static std::vector<ThreadType> _threads;
   static size_t _num_threads;
   static size_t _num_ranks;
+  static size_t _num_nodes;
   static std::vector<char> _parallel_buf;
   static std::unordered_map<ThreadIDType, ParallelContext> _thread_ctx_map;
   static MutexType mtx;
@@ -90,6 +93,7 @@ private:
 
   static void start_thread(size_t thread_id, const std::function<void()>& thread_main);
   static void parallel_reduce(double * data, size_t size, int op);
+  static void detect_num_nodes();
 };
 
 #endif /* RAXML_PARALLELCONTEXT_HPP_ */
