@@ -1,6 +1,6 @@
 # RAxML Next Generation
 
-[![DOI](https://zenodo.org/badge/75947982.svg)](https://zenodo.org/badge/latestdoi/75947982) [![License](https://img.shields.io/badge/license-AGPL-blue.svg)](http://www.gnu.org/licenses/agpl-3.0.en.html)
+[![Build Status](https://www.travis-ci.org/amkozlov/raxml-ng.svg?branch=master)](https://www.travis-ci.org/amkozlov/raxml-ng) [![DOI](https://zenodo.org/badge/75947982.svg)](https://zenodo.org/badge/latestdoi/75947982) [![License](https://img.shields.io/badge/license-AGPL-blue.svg)](http://www.gnu.org/licenses/agpl-3.0.en.html)
 
 ## Introduction
 
