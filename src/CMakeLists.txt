@@ -38,7 +38,7 @@ endif()
 
 if (USE_LIBPLL_CMAKE)
   target_include_directories(raxml_module PRIVATE ${PLLMOD_EXPORTED_INCLUDE_PATH})
-  set(LIBPLL_LIBS  ${PLLMODULES_LIBRARIES} ${LIBPLL_LIBRARIES})
+  set(LIBPLL_LIBS  ${PLLMODULES_LIBRARIES} ${PLL_LIBRARIES})
 else()
   set(LIBPLL_LIBS ${RAXML_LOCALDEPS_DIR}/lib/libpll_algorithm.a
                   ${RAXML_LOCALDEPS_DIR}/lib/libpll_binary.a
