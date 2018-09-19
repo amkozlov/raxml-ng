@@ -1575,7 +1575,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
         // check if we have anything to ooptimize
         LOG_INFO_TS << "Tree #" << start_tree_num <<
             ", initial LogLikelihood: " << FMT_LH(treeinfo->loglh()) << endl;
-        if (opts.optimize_brlen || opts.optimize_brlen)
+        if (opts.optimize_brlen || opts.optimize_model)
         {
           LOG_PROGR << endl;
           optimizer.evaluate(*treeinfo, cm);
