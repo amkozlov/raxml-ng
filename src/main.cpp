@@ -1286,7 +1286,7 @@ void check_terrace(const RaxmlInstance& instance, const Tree& tree)
 #ifdef _RAXML_TERRAPHAST
   const auto& parted_msa = *instance.parted_msa;
 
-  if (parted_msa.part_count() > 1)
+  if (parted_msa.part_count() > 1 && instance.opts.brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED)
   {
     try
     {
@@ -1965,6 +1965,7 @@ int internal_main(int argc, char** argv, void* comm)
 #endif
       case Command::check:
         opts.use_pattern_compression = false;
+        /* fall through */
       case Command::parse:
       {
         load_parted_msa(instance);
