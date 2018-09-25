@@ -834,6 +834,11 @@ void load_constraint(RaxmlInstance& instance)
       assert(free_tip_id == instance.tip_id_map.size());
       assert(instance.tip_id_map.size() == parted_msa.taxon_count());
     }
+    else if (cons_tree.binary() && !instance.opts.force_mode)
+    {
+      throw runtime_error("You provided a comprehensive, fully-resolved tree as a topological constraint.\n"
+          "Since this is almost certainly not what you intended, RAxML-NG will now exit...");
+    }
 
     /* make sure tip indices are consistent between MSA and pll_tree */
     cons_tree.reset_tip_ids(instance.tip_id_map);

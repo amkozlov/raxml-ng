@@ -53,6 +53,7 @@ public:
   virtual ~BasicTree() {}
 
   bool empty() const { return _num_tips == 0; };
+  virtual bool binary() const { return true; };
   virtual size_t num_tips() const { return _num_tips; };
   virtual size_t num_inner() const { return _num_tips - 2; };
   virtual size_t num_nodes() const { return num_tips() + num_inner(); };
@@ -122,6 +123,7 @@ public:
   void insert_tips_random(const NameList& tip_names, unsigned int random_seed = 0);
 
 public:
+  bool binary() const;
   size_t num_inner() const;
   size_t num_branches() const;
 

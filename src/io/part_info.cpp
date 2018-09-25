@@ -32,6 +32,7 @@ RaxmlPartitionStream& operator>>(RaxmlPartitionStream& stream, PartitionInfo& pa
         /* handle Windows line breaks (\r\n) */
         if (stream.peek() == '\n')
           stream.get();
+        /* fall through */
       case '\n':
       case EOF:
         if (!model_set)

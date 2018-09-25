@@ -62,6 +62,11 @@ size_t Tree::num_branches() const
   return _pll_utree ? _pll_utree->edge_count : BasicTree::num_branches();
 }
 
+bool Tree::binary() const
+{
+  return _pll_utree ? _pll_utree->binary : BasicTree::binary();
+}
+
 Tree Tree::buildRandom(size_t num_tips, const char * const* tip_labels,
                        unsigned int random_seed)
 {

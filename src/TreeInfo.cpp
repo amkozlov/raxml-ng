@@ -378,7 +378,11 @@ double TreeInfo::spr_round(spr_round_params& params)
 void TreeInfo::set_topology_constraint(const Tree& cons_tree)
 {
   if (!cons_tree.empty())
-    pllmod_treeinfo_set_constraint_tree(_pll_treeinfo, &cons_tree.pll_utree());
+  {
+    int retval = pllmod_treeinfo_set_constraint_tree(_pll_treeinfo, &cons_tree.pll_utree());
+    if (!retval)
+      libpll_check_error("ERROR: Cannot set topological constraint");
+  }
 }
 
 void assign(PartitionedMSA& parted_msa, const TreeInfo& treeinfo)
