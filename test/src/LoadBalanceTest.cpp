@@ -1,6 +1,7 @@
 #include "RaxmlTest.hpp"
 
 #include "src/loadbalance/LoadBalancer.hpp"
+#include "src/io/file_io.hpp"
 
 using namespace std;
 
@@ -52,8 +53,12 @@ static void check_assignment_kassian(const PartitionAssignment& part_sizes,
 
   check_common(part_sizes, pa_list);
 
-  EXPECT_LE(stats.max_thread_parts - stats.min_thread_parts, 1);
-  EXPECT_LE(stats.max_thread_sites - stats.min_thread_sites, 1);
+  auto opt_thread_sites = ((double) stats.total_sites) / stats.num_cores;
+  auto opt_thread_parts = ((double) stats.total_parts) / stats.num_cores;
+
+  EXPECT_LE(stats.max_thread_parts, opt_thread_parts + 1);
+  EXPECT_LE(stats.max_thread_sites, ceil(opt_thread_sites));
+  EXPECT_GE(stats.min_thread_sites, floor(opt_thread_sites));
 }
 
 static void check_assignment_benoit(const PartitionAssignment& part_sizes,
@@ -74,6 +79,7 @@ static void check_assignment_benoit(const PartitionAssignment& part_sizes,
 
   auto stats = PartitionAssignmentStats(pa_list);
   auto opt_thread_weight = stats.total_weight / stats.num_cores;
+  auto opt_thread_parts = ((double) stats.total_parts) / stats.num_cores;
 
 //  std::cout << "threads: " << num_proc << ", " << stats << std::endl;
 
@@ -81,7 +87,7 @@ static void check_assignment_benoit(const PartitionAssignment& part_sizes,
 //    std::cout << pa_list;
 
   EXPECT_GT(stats.min_thread_parts, 0);
-  EXPECT_LE(stats.max_thread_parts - stats.min_thread_parts, 1);
+  EXPECT_LE(stats.max_thread_parts, opt_thread_parts + 1);
   EXPECT_GT(stats.min_thread_sites, 0);
   EXPECT_GT(stats.min_thread_weight, 0.);
   EXPECT_LE(stats.max_thread_weight, opt_thread_weight + max_site_weight);

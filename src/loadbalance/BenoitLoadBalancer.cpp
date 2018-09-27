@@ -15,6 +15,7 @@ struct BalancerState
   vector<const PartitionRange*> sorted_partitions;
   PartitionAssignmentList bins;
   double opt_bin_weight;
+  double min_bin_weight;
   double max_bin_weight;
   double rest_over_weight;
   size_t curr_part;
@@ -50,6 +51,7 @@ static void init(BalancerState& s, const PartitionAssignment& part_sizes, size_t
   // Compute the optimum number of sites per bin
   s.opt_bin_weight = total_weight / s.num_procs;
   s.max_bin_weight = s.opt_bin_weight + max_site_weight;
+  s.min_bin_weight = s.opt_bin_weight - max_site_weight;
   s.rest_over_weight = 0.8 * s.opt_bin_weight;
 
   s.curr_part = 0; // index in sorted_partitons (AND NOT IN _partitions)
@@ -87,7 +89,7 @@ static void fill_queues(BalancerState& s)
     PartitionAssignment * bin = &s.bins[i];
 
     // do not add bins which are already full
-    if (bin->weight() >= s.opt_bin_weight)
+    if (bin->weight() >= s.min_bin_weight)
       continue;
 
     if (i < s.current_bin)
@@ -97,9 +99,22 @@ static void fill_queues(BalancerState& s)
   }
 }
 
-static bool can_fill_bin(BalancerState& s,  stack<PartitionAssignment *>& q, double add_weight)
+static bool can_fill_bin(BalancerState& s,  stack<PartitionAssignment *>& q, double add_weight,
+    double per_site_weight)
 {
-  return q.size() && (q.top()->weight() + add_weight >= s.opt_bin_weight);
+  if (!q.size())
+    return false;
+  else
+  {
+    // here check that:
+    // 1) remaining partition weight (add_weight) is enough to fill up the bin (free_capacity)
+    //    AND
+    // 2) we can assign at least 1 site to the bin (exceeding its optimal weight if
+    //    there is still rest_over_weight left)
+    auto free_capacity = s.opt_bin_weight - q.top()->weight();
+    return (add_weight >= free_capacity) &&
+        (per_site_weight < free_capacity || s.rest_over_weight > 0);
+  }
 }
 
 static void fill_bin(BalancerState& s,  stack<PartitionAssignment *>& q)
@@ -155,11 +170,11 @@ static void kassian_phase2(BalancerState& s)
     double remaining_weight = s.remaining * partition->per_site_weight;
 
     assert(s.remaining > 0);
-    if (can_fill_bin(s, *qhigh, remaining_weight))
+    if (can_fill_bin(s, *qhigh, remaining_weight, partition->per_site_weight))
     {
       fill_bin(s, *qhigh);
     }
-    else if (can_fill_bin(s, *qlow, remaining_weight))
+    else if (can_fill_bin(s, *qlow, remaining_weight, partition->per_site_weight))
     {
       fill_bin(s, *qlow);
     }
@@ -173,7 +188,7 @@ static void kassian_phase2(BalancerState& s)
                         partition->per_site_weight);
       s.remaining = 0;
 
-      if (bin->weight() < s.opt_bin_weight)
+      if (bin->weight() < s.min_bin_weight)
       {
         qhigh->push(bin);
       }
