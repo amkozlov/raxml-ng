@@ -57,7 +57,5 @@ script:
   - cd
   - git clone https://gitlab.com/testiphy/testiphy.git
   - cd testiphy
-# Temporary disable WAG and LG tests due to problems with AA freqs
-  - rm tests/likelihood/aa/{lg,wag}/2/raxml-ng-command.txt  
   - which raxml-ng
   - ./testiphy raxml-ng
