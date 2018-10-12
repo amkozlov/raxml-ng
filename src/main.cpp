@@ -40,6 +40,7 @@
 #include "bootstrap/BootstopCheck.hpp"
 #include "bootstrap/TransferBootstrapTree.hpp"
 #include "autotune/ResourceEstimator.hpp"
+#include "ICScoreCalculator.hpp"
 
 #ifdef _RAXML_TERRAPHAST
 #include "terraces/TerraceWrapper.hpp"
@@ -387,6 +388,25 @@ bool check_msa(RaxmlInstance& instance)
   return msa_valid;
 }
 
+size_t total_free_params(const RaxmlInstance& instance)
+{
+  const auto& parted_msa = *instance.parted_msa;
+  size_t free_params = parted_msa.total_free_model_params();
+  size_t num_parts = parted_msa.part_count();
+  auto tree = BasicTree(parted_msa.taxon_count());
+  auto num_branches = tree.num_branches();
+  auto brlen_linkage = instance.opts.brlen_linkage;
+
+  if (brlen_linkage == PLLMOD_COMMON_BRLEN_LINKED)
+    free_params += num_branches;
+  else if (brlen_linkage == PLLMOD_COMMON_BRLEN_SCALED)
+    free_params += num_branches + num_parts - 1;
+  else if (brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED)
+    free_params += num_branches * num_parts;
+
+  return free_params;
+}
+
 void check_models(const RaxmlInstance& instance)
 {
   for (const auto& pinfo: instance.parted_msa->part_list())
@@ -447,6 +467,14 @@ void check_models(const RaxmlInstance& instance)
       }
     }
 
+    if (model.num_submodels() > 1 &&
+        (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::ML ||
+         model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::ML))
+    {
+      throw runtime_error("Invalid model " + model.to_string(false) + " in partition " + pinfo.name() + ":\n"
+                          "Mixture models with ML estimates of rates/frequencies are not supported yet!");
+    }
+
     // check partitions which contain invariant sites and have ascertainment bias enabled
     if (model.ascbias_type() != AscBiasCorrection::none && stats.inv_count > 0)
     {
@@ -455,6 +483,21 @@ void check_models(const RaxmlInstance& instance)
                            to_string(stats.inv_count) + " invariant sites.\n"
                           "This is not allowed! Please either remove invariant sites or "
                           "disable ascertainment bias correction.");
+    }
+  }
+
+
+  /* Check for extreme cases of overfitting (K >= n) */
+  {
+    size_t free_params = total_free_params(instance);
+    size_t sample_size = instance.parted_msa->total_sites();
+    if (free_params >= sample_size)
+    {
+      throw runtime_error("Number of free parameters (K=" + to_string(free_params) +
+                          ") is larger than alignment size (n=" + to_string(sample_size) + ").\n" +
+                          "       This might lead to overfitting and compromise tree inference results!\n" +
+                          "       Please consider revising your partitioning scheme, conducting formal model selection\n"+
+                          "       and/or using linked/scaled branch lengths across partitions.");
     }
   }
 }
@@ -1395,6 +1438,30 @@ void save_ml_trees(const Options& opts, const Checkpoint& checkp)
   }
 }
 
+void print_ic_scores(const RaxmlInstance& instance, double loglh)
+{
+  const auto& parted_msa = *instance.parted_msa;
+
+  size_t free_params = total_free_params(instance);
+  size_t sample_size = parted_msa.total_sites();
+
+  ICScoreCalculator ic_calc(free_params, sample_size);
+  auto ic_scores = ic_calc.all(loglh);
+
+  LOG_INFO << "AIC score: " << ic_scores[InformationCriterion::aic] << " / ";
+  LOG_INFO << "AICc score: " << ic_scores[InformationCriterion::aicc] << " / ";
+  LOG_INFO << "BIC score: " << ic_scores[InformationCriterion::bic] << endl;
+  LOG_INFO << "Free parameters (model + branch lengths): " << free_params << endl << endl;
+
+  if (free_params >= sample_size)
+  {
+    LOG_WARN << "WARNING: Number of free parameters (K=" << free_params << ") "
+             << "is larger than alignment size (n=" << sample_size << ").\n"
+             << "         This might lead to overfitting and compromise tree inference results!\n"
+            << endl << endl;
+  }
+}
+
 void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
 {
   auto const& opts = instance.opts;
@@ -1415,6 +1482,17 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
     }
   }
 
+  if (opts.command == Command::search || opts.command == Command::all ||
+      opts.command == Command::evaluate)
+  {
+    auto best = checkp.ml_trees.best();
+    auto best_loglh = best->first;
+
+    LOG_INFO << "\nFinal LogLikelihood: " << FMT_LH(best_loglh) << endl << endl;
+
+    print_ic_scores(instance, best_loglh);
+  }
+
   if (opts.command == Command::evaluate)
   {
     if (!opts.ml_trees_file().empty())
@@ -1428,8 +1506,6 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
   if (opts.command == Command::search || opts.command == Command::all)
   {
     auto best = checkp.ml_trees.best();
-
-    LOG_INFO << "\nFinal LogLikelihood: " << FMT_LH(best->first) << endl << endl;
 
     Tree best_tree = checkp.tree;
 
@@ -1628,7 +1704,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
       Optimizer optimizer(opts);
       if (opts.command == Command::evaluate)
       {
-        // check if we have anything to ooptimize
+        // check if we have anything to optimize
         LOG_INFO_TS << "Tree #" << start_tree_num <<
             ", initial LogLikelihood: " << FMT_LH(treeinfo->loglh()) << endl;
         if (opts.optimize_brlen || opts.optimize_model)
@@ -1639,6 +1715,14 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
           LOG_INFO_TS << "Tree #" << start_tree_num <<
               ", final logLikelihood: " << FMT_LH(cm.checkpoint().loglh()) << endl;
           LOG_PROGR << endl;
+        }
+        else
+        {
+          if (ParallelContext::master_thread())
+          {
+            cm.search_state().loglh = treeinfo->loglh();
+            cm.update_and_write(*treeinfo);
+          }
         }
       }
       else

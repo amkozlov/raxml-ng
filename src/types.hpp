@@ -95,6 +95,14 @@ enum class BranchSupportMetric
   tbe
 };
 
+enum class InformationCriterion
+{
+  aic = 0,
+  aicc,
+  bic
+};
+
+
 const std::string ParamValueNames[] = {"undefined", "equal", "user", "model", "empirical", "ML"};
 
 typedef std::vector<double> doubleVector;

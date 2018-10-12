@@ -28,6 +28,8 @@ public:
   size_t total_patterns() const;
   size_t total_length() const;
 
+  size_t total_free_model_params() const;
+
   /* given in elements (NOT in bytes) */
   size_t taxon_clv_size() const;
 

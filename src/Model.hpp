@@ -131,12 +131,15 @@ public:
   int params_to_optimize() const;
   const ParamModeMap& param_mode() const { return _param_mode; }
   ParamValue param_mode(int param) const { return _param_mode.at(param); };
+  bool param_estimated(int param) const;
 
   AscBiasCorrection ascbias_type() const { return _ascbias_type; }
   const WeightVector& ascbias_weights() const { return _ascbias_weights; }
 
   /* per alignment site, given in elements (NOT in bytes) */
   size_t clv_entry_size() const { return _num_states * _num_ratecats; }
+
+  unsigned int  num_free_params() const;
 
   /* setters */
   void alpha(double value) { _alpha = value; };

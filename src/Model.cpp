@@ -898,6 +898,55 @@ int Model::params_to_optimize() const
   return params_to_optimize;
 }
 
+bool Model::param_estimated(int param) const
+{
+  return (_param_mode.at(param) == ParamValue::ML) || (_param_mode.at(param) == ParamValue::empirical);
+}
+
+unsigned int Model::num_free_params() const
+{
+  unsigned int  free_params = 0;
+
+  if (param_estimated(PLLMOD_OPT_PARAM_FREQUENCIES))
+  {
+    assert(num_submodels() == 1 || param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) != ParamValue::ML);
+    free_params += _num_states - 1;
+  }
+
+  if (param_mode(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::empirical)
+  {
+    free_params += submodel(0).num_rates() - 1;
+  }
+  else if (param_mode(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::ML)
+  {
+    assert(num_submodels() == 1);
+    free_params += submodel(0).num_uniq_rates() - 1;
+  }
+
+  if (param_estimated(PLLMOD_OPT_PARAM_PINV))
+    free_params += 1;
+
+  if (_num_ratecats > 1)
+  {
+    switch(_rate_het)
+    {
+    case PLLMOD_UTIL_MIXTYPE_GAMMA:
+      if (param_estimated(PLLMOD_OPT_PARAM_ALPHA))
+        free_params += 1;
+      break;
+    case PLLMOD_UTIL_MIXTYPE_FREE:
+      if (param_estimated(PLLMOD_OPT_PARAM_FREE_RATES))
+        free_params += _num_ratecats - 1;
+      if (param_estimated(PLLMOD_OPT_PARAM_RATE_WEIGHTS))
+        free_params += _num_ratecats - 1;
+      break;
+    }
+  }
+
+  return free_params;
+}
+
+
 void assign(Model& model, const pll_partition_t * partition)
 {
   if (model.num_states() == partition->states &&
