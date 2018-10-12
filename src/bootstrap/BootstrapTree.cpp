@@ -4,12 +4,31 @@
 
 using namespace std;
 
+char * support_fmt_pct(double support)
+{
+  char *str;
+  int size_alloced = asprintf(&str, "%u", (unsigned int) round(support * 100.));
+
+  return size_alloced >= 0 ? str : NULL;
+}
+
+char * support_fmt_prop(double support)
+{
+  const unsigned int precision = logger().precision(LogElement::brlen);
+
+  char * str;
+  int size_alloced = asprintf(&str, "%.*lf", precision, support);
+
+  return size_alloced >= 0 ? str : NULL;
+}
+
+
 BootstrapTree::BootstrapTree (const Tree& tree) : Tree(tree), _num_bs_trees(0)
 {
   _pll_splits_hash = nullptr;
   _node_split_map.resize(num_splits());
 
-  add_splits_to_hashtable(pll_utree_root(), true);
+  add_ref_splits_to_hashtable(pll_utree_root());
 }
 
 BootstrapTree::~BootstrapTree ()
@@ -22,42 +41,56 @@ void BootstrapTree::add_bootstrap_tree(const Tree& tree)
   if (tree.num_tips() != _num_tips)
     throw runtime_error("Incompatible tree!");
 
-  add_splits_to_hashtable(tree.pll_utree_root(), false);
+  add_boot_splits_to_hashtable(tree.pll_utree_root());
   _num_bs_trees++;
+  LOG_DEBUG_TS << "Added bootstrap trees: " << _num_bs_trees << endl;
+}
+
+void BootstrapTree::add_boot_splits_to_hashtable(const pll_unode_t& root)
+{
+  add_splits_to_hashtable(root, false);
+}
+
+void BootstrapTree::add_ref_splits_to_hashtable(const pll_unode_t& root)
+{
+  add_splits_to_hashtable(root, true);
 }
 
 void BootstrapTree::add_splits_to_hashtable(const pll_unode_t& root, bool ref_tree)
 {
   pll_unode_t ** node_split_map = ref_tree ? _node_split_map.data() : nullptr;
   int update_only = ref_tree ? 0 : 1;
+  doubleVector support(num_splits(), ref_tree ? 0. : 1.);
 
-  pll_split_t * ref_splits = pllmod_utree_split_create((pll_unode_t*) &root,
+  PllSplitSharedPtr splits(pllmod_utree_split_create((pll_unode_t*) &root,
                                                        _num_tips,
-                                                       node_split_map);
+                                                       node_split_map),
+                           pllmod_utree_split_destroy);
+
+  if (ref_tree)
+    _ref_splits = splits;
 
   _pll_splits_hash = pllmod_utree_split_hashtable_insert(_pll_splits_hash,
-                                                         ref_splits,
+                                                         splits.get(),
                                                          _num_tips,
                                                          num_splits(),
-                                                         nullptr,
+                                                         support.data(),
                                                          update_only);
-
-  pllmod_utree_split_destroy(ref_splits);
 }
 
-void BootstrapTree::calc_support()
+void BootstrapTree::calc_support(bool support_in_pct)
 {
-  vector<unsigned char> support(_pll_splits_hash->entry_count);
+  vector<double> support(_pll_splits_hash->entry_count);
 
   for (unsigned int i = 0; i < _pll_splits_hash->table_size; ++i)
   {
     bitv_hash_entry_t * e =  _pll_splits_hash->table[i];
     while (e != NULL)
     {
-      assert(e->support-1 <= _num_bs_trees);
+      assert(e->support <= _num_bs_trees);
 
-//      printf("split %d, support %d\n", e->bip_number, e->support);
-      support[e->bip_number] = (unsigned char) round((e->support - 1) * 100 / _num_bs_trees);
+//      printf("split %d, support %lf\n", e->bip_number, e->support);
+      support[e->bip_number] = e->support / _num_bs_trees;
       e = e->next;
     }
   }
@@ -67,30 +100,6 @@ void BootstrapTree::calc_support()
 //    printf("node_id %d, split_id %d\n", i, _node_split_map[i]);
 //  printf("\n\n");
 
-  for (size_t i = 0; i < _node_split_map.size(); ++i)
-  {
-    auto node = _node_split_map[i];
-
-    /* this has to be an inner node! */
-    assert(node->next);
-
-    assert(support[i] <= 100);
-
-    node->label = node->next->label = node->next->next->label =
-        strdup(std::to_string(support[i]).c_str());
-  }
-
-  // set support value for the root branch to both adjacent nodes
-  auto root = _pll_utree->vroot;
-  if (!root->label && root->back->next)
-  {
-    assert(root->back->label);
-    root->label = root->next->label = root->next->next->label = strdup(root->back->label);
-  }
-  else if (!root->back->label && root->next)
-  {
-    assert(root->label);
-    root->back->label = root->back->next->label = root->back->next->next->label =
-        strdup(root->label);
-  }
+  pllmod_utree_draw_support(_pll_utree.get(), support.data(), _node_split_map.data(),
+      support_in_pct ? support_fmt_pct : support_fmt_prop);
 }

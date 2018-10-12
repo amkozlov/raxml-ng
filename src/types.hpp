@@ -89,6 +89,12 @@ enum class LoadBalancing
   benoit
 };
 
+enum class BranchSupportMetric
+{
+  fbp = 0,
+  tbe
+};
+
 const std::string ParamValueNames[] = {"undefined", "equal", "user", "model", "empirical", "ML"};
 
 typedef std::vector<double> doubleVector;

@@ -28,8 +28,25 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.ml_trees, "mlTrees");
   set_default_outfile(outfile_names.bootstrap_trees, "bootstraps");
   set_default_outfile(outfile_names.support_tree, "support");
+  set_default_outfile(outfile_names.fbp_support_tree, "supportFBP");
+  set_default_outfile(outfile_names.tbe_support_tree, "supportTBE");
   set_default_outfile(outfile_names.terrace, "terrace");
   set_default_outfile(outfile_names.binary_msa, "rba");
+}
+
+const std::string& Options::support_tree_file(BranchSupportMetric bsm) const
+{
+  if (bs_metrics.size() < 2)
+    return outfile_names.support_tree;
+  else
+  {
+    if (bsm == BranchSupportMetric::fbp)
+      return outfile_names.fbp_support_tree;
+    else if (bsm == BranchSupportMetric::tbe)
+      return outfile_names.tbe_support_tree;
+    else
+      return outfile_names.support_tree;
+  }
 }
 
 bool Options::result_files_exist() const
@@ -162,6 +179,27 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       break;
     default:
       break;
+  }
+
+  if (opts.command == Command::all || opts.command == Command::support)
+  {
+    stream << " (";
+    for (auto it = opts.bs_metrics.cbegin(); it != opts.bs_metrics.cend(); ++it)
+    {
+      if (it != opts.bs_metrics.cbegin())
+        stream << " + ";
+
+      switch (*it)
+      {
+        case BranchSupportMetric::fbp:
+          stream << "Felsenstein Bootstrap";
+          break;
+        case BranchSupportMetric::tbe:
+          stream << "Transfer Bootstrap";
+          break;
+      }
+    }
+    stream << ")";
   }
   stream << endl;
 

@@ -15,6 +15,8 @@ struct OutputFileNames
   std::string ml_trees;
   std::string bootstrap_trees;
   std::string support_tree;
+  std::string tbe_support_tree;
+  std::string fbp_support_tree;
   std::string terrace;
   std::string binary_msa;
 };
@@ -76,6 +78,7 @@ public:
   unsigned long long terrace_maxsize;
 
   unsigned int num_bootstraps;
+  std::vector<BranchSupportMetric> bs_metrics;
   BootstopCriterion bootstop_criterion;
   double bootstop_cutoff;
   unsigned int bootstop_interval;
@@ -111,7 +114,7 @@ public:
   const std::string& partition_trees_file() const { return outfile_names.partition_trees; }
   const std::string& ml_trees_file() const { return outfile_names.ml_trees; }
   const std::string& bootstrap_trees_file() const { return outfile_names.bootstrap_trees; }
-  const std::string& support_tree_file() const { return outfile_names.support_tree; }
+  const std::string& support_tree_file(BranchSupportMetric bsm = BranchSupportMetric::fbp) const;
   const std::string& terrace_file() const { return outfile_names.terrace; }
   const std::string& binary_msa_file() const { return outfile_names.binary_msa; }
 

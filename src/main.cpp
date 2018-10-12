@@ -38,6 +38,7 @@
 #include "loadbalance/LoadBalancer.hpp"
 #include "bootstrap/BootstrapGenerator.hpp"
 #include "bootstrap/BootstopCheck.hpp"
+#include "bootstrap/TransferBootstrapTree.hpp"
 #include "autotune/ResourceEstimator.hpp"
 
 #ifdef _RAXML_TERRAPHAST
@@ -57,7 +58,7 @@ struct RaxmlInstance
   TreeList bs_start_trees;
   PartitionAssignmentList proc_part_assign;
   unique_ptr<LoadBalancer> load_balancer;
-  unique_ptr<BootstrapTree> bs_tree;
+  map<BranchSupportMetric, shared_ptr<BootstrapTree> > support_trees;
 
   // bootstopping convergence test, only autoMRE is supported for now
   unique_ptr<BootstopCheckMRE> bootstop_checker;
@@ -1129,15 +1130,34 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree, const TreeC
 {
   reroot_tree_with_outgroup(instance.opts, ref_tree, false);
 
-  instance.bs_tree.reset(new BootstrapTree(ref_tree));
-
-  Tree tree = ref_tree;
-  for (auto bs: bs_trees)
+  for (auto metric: instance.opts.bs_metrics)
   {
-    tree.topology(bs.second);
-    instance.bs_tree->add_bootstrap_tree(tree);
+      shared_ptr<BootstrapTree> sup_tree;
+      bool support_in_pct = false;
+
+      if (metric == BranchSupportMetric::fbp)
+      {
+        sup_tree = make_shared<BootstrapTree>(ref_tree);
+        support_in_pct = true;
+      }
+      else if (metric == BranchSupportMetric::tbe)
+      {
+        sup_tree = make_shared<TransferBootstrapTree>(ref_tree);
+        support_in_pct = false;
+      }
+      else
+        assert(0);
+
+      Tree tree = ref_tree;
+      for (auto bs: bs_trees)
+      {
+        tree.topology(bs.second);
+        sup_tree->add_bootstrap_tree(tree);
+      }
+      sup_tree->calc_support(support_in_pct);
+
+      instance.support_trees[metric] = sup_tree;
   }
-  instance.bs_tree->calc_support();
 }
 
 bool check_bootstop(const RaxmlInstance& instance, const TreeCollection& bs_trees,
@@ -1434,17 +1454,27 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
 
   if (opts.command == Command::all || opts.command == Command::support)
   {
-    assert(instance.bs_tree);
+    assert(!instance.support_trees.empty());
 
-    postprocess_tree(instance.opts, *instance.bs_tree);
-
-    if (!opts.support_tree_file().empty())
+    for (const auto& it: instance.support_trees)
     {
-      NewickStream nw(opts.support_tree_file(), std::ios::out);
-      nw << *instance.bs_tree;
+      postprocess_tree(instance.opts, *it.second);
 
-      LOG_INFO << "Best ML tree with bootstrap support values saved to: " <<
-          sysutil_realpath(opts.support_tree_file()) << endl;
+      auto sup_file = opts.support_tree_file(it.first);
+      if (!sup_file.empty())
+      {
+        NewickStream nw(sup_file, std::ios::out);
+        nw << *it.second;
+
+        std::string metric_name = "";
+        if (it.first == BranchSupportMetric::fbp)
+          metric_name = "Felsenstein bootstrap (FBP)";
+        else if (it.first == BranchSupportMetric::tbe)
+          metric_name = "Transfer bootstrap (TBE)";
+
+        LOG_INFO << "Best ML tree with " << metric_name << " support values saved to: " <<
+            sysutil_realpath(sup_file) << endl;
+      }
     }
   }
 

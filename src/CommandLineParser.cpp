@@ -66,6 +66,7 @@ static struct option long_options[] =
   {"bs-cutoff",          required_argument, 0, 0 },  /*  44 */
   {"bsconverge",         no_argument,       0, 0 },  /*  45 */
   {"extra",              required_argument, 0, 0 },  /*  46 */
+  {"bs-metric",          required_argument, 0, 0 },  /*  47 */
 
   { 0, 0, 0, 0 }
 };
@@ -223,7 +224,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.spr_radius = -1;
   opts.spr_cutoff = 1.0;
 
-  /* bootstopping */
+  /* bootstrapping / bootstopping */
+  opts.bs_metrics.push_back(BranchSupportMetric::fbp);
   opts.bootstop_criterion = BootstopCriterion::none;
   opts.bootstop_cutoff = RAXML_BOOTSTOP_CUTOFF;
   opts.bootstop_interval = RAXML_BOOTSTOP_INTERVAL;
@@ -683,6 +685,29 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           }
         }
         break;
+
+      case 47: /* branch support metric */
+        {
+          opts.bs_metrics.clear();
+          auto methods = split_string(optarg, ',');
+          for (const auto& m: methods)
+          {
+            if (strncasecmp(m.c_str(), "fbp", 3) == 0)
+            {
+              opts.bs_metrics.push_back(BranchSupportMetric::fbp);
+            }
+            else if (strncasecmp(m.c_str(), "tbe", 3) == 0)
+            {
+              opts.bs_metrics.push_back(BranchSupportMetric::tbe);
+            }
+            else
+            {
+              throw InvalidOptionValueException("Unknown branch support metric: " + string(optarg));
+            }
+          }
+        }
+        break;
+
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -782,7 +807,8 @@ void CommandLineParser::print_help()
             "  --bs-trees     VALUE                       number of bootstraps replicates (default: 100)\n"
             "  --bs-trees     autoMRE                     use MRE-based bootstrap convergence criterion\n"
             "  --bs-trees     FILE                        Newick file containing set of bootstrap replicate trees (with --support)\n"
-            "  --bs-cutoff    VALUE                       cutoff threshold for the MRE-based bootstopping criteria (default: 0.03)\n";
+            "  --bs-cutoff    VALUE                       cutoff threshold for the MRE-based bootstopping criteria (default: 0.03)\n"
+            "  --bs-metric    fbp | tbe                   branch support metric: fbp = Felsenstein bootstrap (default), tbe = transfer distance\n";
 
   cout << "\n"
             "EXAMPLES:\n"
