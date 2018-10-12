@@ -426,6 +426,27 @@ void check_models(const RaxmlInstance& instance)
       }
     }
 
+    // check for user-defined state frequencies which do not sum up to one
+    if (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::user)
+    {
+      const auto& freqs = model.base_freqs(0);
+      double sum = 0.;
+      for (unsigned int i = 0; i < freqs.size(); ++i)
+        sum += freqs[i];
+
+      if (fabs(sum - 1.0) > 0.01)
+      {
+        LOG_ERROR << "\nBase frequencies: ";
+        for (unsigned int j = 0; j < freqs.size(); ++j)
+          LOG_ERROR << freqs[j] <<  " ";
+        LOG_ERROR << endl;
+
+        throw runtime_error("User-specified stationary base frequencies"
+                            " in partition " + pinfo.name() + " do not sum up to 1.0!\n"
+                            "Please provide normalized frequencies.");
+      }
+    }
+
     // check partitions which contain invariant sites and have ascertainment bias enabled
     if (model.ascbias_type() != AscBiasCorrection::none && stats.inv_count > 0)
     {

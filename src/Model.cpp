@@ -496,12 +496,10 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
                            std::to_string(_num_states) + "\n");
                 }
 
-                double sum = 0.;
                 bool invalid = false;
                 for (auto v: user_freqs)
                 {
                   invalid |= (v <= 0. || v >= 1.);
-                  sum += v;
                 }
 
                 if (invalid)
@@ -509,10 +507,6 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
                   throw runtime_error("Invalid base frequencies specified! "
                       "Frequencies must be positive numbers between 0. and 1.");
                 }
-
-                // normalize freqs
-                for (auto& f: user_freqs)
-                  f /= sum;
 
                 for (auto& m: _submodels)
                   m.base_freqs(user_freqs);
