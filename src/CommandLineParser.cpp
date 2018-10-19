@@ -198,17 +198,17 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   /* compress alignment patterns by default */
   opts.use_pattern_compression = true;
-  /* use tip-inner case optimization by default */
-  opts.use_tip_inner = true;
+
+  /* do not use tip-inner case optimization by default */
+  opts.use_tip_inner = false;
+  /* use site repeats */
+  opts.use_repeats = true;
 
   /* do not use per-rate-category CLV scalers */
   opts.use_rate_scalers = false;
 
   /* use probabilistic MSA _if available_ (e.g. CATG file was provided) */
   opts.use_prob_msa = true;
-
-  /* do not use site repeats */
-  opts.use_repeats = false;
 
   /* optimize model and branch lengths */
   opts.optimize_model = true;
@@ -376,6 +376,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.use_prob_msa = true;
           opts.use_pattern_compression = false;
           opts.use_tip_inner = false;
+          opts.use_repeats = false;
         }
         else
           opts.use_prob_msa = false;
@@ -387,6 +388,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
       case 13: /* disable tip-inner optimization */
         opts.use_tip_inner = !optarg || (strcasecmp(optarg, "off") != 0);
+        if (opts.use_tip_inner)
+          opts.use_repeats = false;
         break;
 
       case 14: /* branch length linkage mode */
@@ -781,7 +784,7 @@ void CommandLineParser::print_help()
             "  --seed         VALUE                       seed for pseudo-random number generator (default: current time)\n"
             "  --pat-comp     on | off                    alignment pattern compression (default: ON)\n"
             "  --tip-inner    on | off                    tip-inner case optimization (default: ON)\n"
-            "  --site-repeats on | off                    use site repeats optimization, 10%-60% faster than tip-inner (default: OFF)\n"
+            "  --site-repeats on | off                    use site repeats optimization, 10%-60% faster than tip-inner (default: ON)\n"
             "  --threads      VALUE                       number of parallel threads to use (default: 2).\n"
             "  --simd         none | sse3 | avx | avx2    vector instruction set to use (default: auto-detect).\n"
             "  --rate-scalers on | off                    use individual CLV scalers for each rate category (default: OFF)\n"

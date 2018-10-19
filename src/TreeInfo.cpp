@@ -572,7 +572,8 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
 
   if (opts.use_repeats)
   {
-     attrs |= PLL_ATTRIB_SITE_REPEATS;
+    assert(!(opts.use_prob_msa));
+    attrs |= PLL_ATTRIB_SITE_REPEATS;
   }
   else if (opts.use_tip_inner)
   {
