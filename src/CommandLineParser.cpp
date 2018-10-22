@@ -562,6 +562,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 31: /* terrace */
 #ifdef _RAXML_TERRAPHAST
         opts.command = Command::terrace;
+        opts.brlen_linkage = PLLMOD_COMMON_BRLEN_UNLINKED;
         num_commands++;
 #else
         throw  OptionException("Unsupported command: --terrace.\n"
