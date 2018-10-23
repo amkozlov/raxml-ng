@@ -16,11 +16,11 @@ Documentation: [github wiki](https://github.com/amkozlov/raxml-ng/wiki)
 ## Installation instructions
 
 * For most desktop Unix/Linux and macOS systems, the easiest way to install RAxML-NG is by using the pre-compiled binary:  
-[**Download 64-bit Linux binary**](https://github.com/amkozlov/raxml-ng/releases/download/0.6.0/raxml-ng_v0.6.0_linux_x86_64.zip)  
-[**Download 64-bit OSX/macOS binary**](https://github.com/amkozlov/raxml-ng/releases/download/0.6.0/raxml-ng_v0.6.0_macos_x86_64.zip)
+[**Download 64-bit Linux binary**](https://github.com/amkozlov/raxml-ng/releases/download/0.7.0/raxml-ng_v0.7.0_linux_x86_64.zip)  
+[**Download 64-bit OSX/macOS binary**](https://github.com/amkozlov/raxml-ng/releases/download/0.7.0/raxml-ng_v0.7.0_macos_x86_64.zip)
 
-* For clusters/supercomputers (i.e., if you want to use MPI), please use the following installation package which contains pre-built *libpll*. You will need `GCC 5.4+` and `CMake 3.0.2+` in order to compile RAxML-NG for your system.  
-[**Download RAxML-NG-MPI for Linux**](https://github.com/amkozlov/raxml-ng/releases/download/0.6.0/raxml-ng_v0.6.0_linux_x86_64_MPI.zip)
+* For clusters/supercomputers (i.e., if you want to use MPI), please use the following installation package which contains pre-built *libpll*. You will need `GCC 6.4+` and `CMake 3.0.2+` in order to compile RAxML-NG for your system.  
+[**Download RAxML-NG-MPI for Linux**](https://github.com/amkozlov/raxml-ng/releases/download/0.7.0/raxml-ng_v0.7.0_linux_x86_64_MPI.zip)
 
 * Binaries for Windows will become available later on
 
@@ -106,7 +106,7 @@ When using RAxML-NG, please cite [this preprint](https://www.biorxiv.org/content
 
 Alexey M. Kozlov, Diego Darriba, Tom&aacute;&scaron; Flouri, Benoit Morel, and Alexandros Stamatakis (2018)
 **RAxML-NG: A fast, scalable, and user-friendly tool for maximum likelihood phylogenetic inference.** 
-*bioarxiv.* 
+*bioRxiv.* 
 doi:[10.1101/447110](https://doi.org/10.1101/447110)
 
 ## The team
