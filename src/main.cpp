@@ -1313,6 +1313,14 @@ TreeCollection read_bootstrap_trees(const RaxmlInstance& instance, Tree& ref_tre
 
     assert(!ref_tip_ids.empty());
 
+    if (!tree.binary())
+    {
+      LOG_DEBUG << "REF #branches: " << ref_tree.num_branches()
+                << ", BS #branches: " << tree.num_branches() << endl;
+      throw runtime_error("Bootstrap tree #" + to_string(bs_num+1) +
+                          " contains multifurcations!");
+    }
+
     try
     {
       tree.reset_tip_ids(ref_tip_ids);
