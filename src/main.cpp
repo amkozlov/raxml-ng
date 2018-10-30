@@ -488,6 +488,7 @@ void check_models(const RaxmlInstance& instance)
 
 
   /* Check for extreme cases of overfitting (K >= n) */
+  if (instance.parted_msa->part_count() > 1)
   {
     size_t free_params = total_free_params(instance);
     size_t sample_size = instance.parted_msa->total_sites();
@@ -496,8 +497,9 @@ void check_models(const RaxmlInstance& instance)
       throw runtime_error("Number of free parameters (K=" + to_string(free_params) +
                           ") is larger than alignment size (n=" + to_string(sample_size) + ").\n" +
                           "       This might lead to overfitting and compromise tree inference results!\n" +
-                          "       Please consider revising your partitioning scheme, conducting formal model selection\n"+
-                          "       and/or using linked/scaled branch lengths across partitions.");
+                          "       Please consider revising your partitioning scheme, conducting formal model selection\n" +
+                          "       and/or using linked/scaled branch lengths across partitions.\n" +
+                          "NOTE:  You can disable this check by adding the --force option.\n");
     }
   }
 }
@@ -582,8 +584,11 @@ void check_options(RaxmlInstance& instance)
     {
       LOG_WARN << endl;
       LOG_WARN << "WARNING: You might be using too many threads (" << ParallelContext::num_procs()
-               <<  ") for your alignment with " << instance.parted_msa->total_sites()
-               << " unique patterns." << endl;
+               <<  ") for your alignment with "
+               << (opts.use_pattern_compression ?
+                      to_string(instance.parted_msa->total_patterns()) + " unique patterns." :
+                      to_string(instance.parted_msa->total_sites()) + " alignment sites.")
+               << endl;
       LOG_WARN << "NOTE:    For the optimal throughput, please consider using fewer threads " << endl;
       LOG_WARN << "NOTE:    and parallelize across starting trees/bootstrap replicates." << endl;
       LOG_WARN << "NOTE:    As a general rule-of-thumb, please assign at least 200-1000 "
