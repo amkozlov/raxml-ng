@@ -32,6 +32,7 @@ RaxmlPartitionStream& operator>>(RaxmlPartitionStream& stream, PartitionInfo& pa
         /* handle Windows line breaks (\r\n) */
         if (stream.peek() == '\n')
           stream.get();
+        /* fall through */
       case '\n':
       case EOF:
         if (!model_set)
@@ -122,7 +123,7 @@ RaxmlPartitionStream& operator>>(RaxmlPartitionStream& stream, PartitionedMSA& p
 
 RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const PartitionInfo& part_info)
 {
-  stream << part_info.model().to_string(stream.print_model_params()) << ", ";
+  stream << part_info.model().to_string(stream.print_model_params(), stream.precision()) << ", ";
   stream << part_info.name() << " = ";
   stream.put_range(part_info);
   stream << std::endl;
@@ -134,6 +135,28 @@ RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const Partitioned
   stream.reset();
   for (const auto& pinfo: parted_msa.part_list())
     stream << pinfo;
+
+  return stream;
+}
+
+RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const PartitionedMSAView& parted_msa)
+{
+  stream.reset();
+  size_t offset = 0;
+  for (size_t p = 0; p < parted_msa.part_count(); ++p)
+  {
+    auto model_str = parted_msa.part_model(p).to_string(stream.print_model_params(),
+                                                        stream.precision());
+    auto part_name = parted_msa.part_name(p);
+    auto part_len = parted_msa.part_length(p);
+
+    stream << model_str << ", "
+           << part_name << " = "
+           << (offset+1) << "-" << (offset+part_len)
+           << std::endl;
+    offset += part_len;
+  }
+  assert(offset == parted_msa.total_length());
 
   return stream;
 }

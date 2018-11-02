@@ -1,9 +1,9 @@
-cmake_minimum_required (VERSION 2.8.10 FATAL_ERROR)
+cmake_minimum_required (VERSION 3.0.2 FATAL_ERROR)
 
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES  ON)
 
-set(USE_LIBPLL_CMAKE OFF CACHE BOOL "Use CMake to build libpll and pll-modules")
+set(USE_LIBPLL_CMAKE ON CACHE BOOL "Use CMake to build libpll and pll-modules")
 set(BUILD_AS_LIBRARY OFF CACHE BOOL "Build RAxML-NG as shared library (instead of stand-alone executable)")
 
 set (USE_PTHREADS ON CACHE BOOL "Enable multi-threading support (PTHREADS)")
@@ -18,24 +18,29 @@ set (ENABLE_PLLMOD_SIMD OFF CACHE BOOL "Enable SIMD instructions in pll-modules 
 # build a static binary
 set(STATIC_BUILD OFF CACHE BOOL "Build static binary")
 
-set(USE_TERRAPHAST OFF CACHE BOOL "Use phylogentic terraces library (terraphast) ")
+set(USE_TERRAPHAST ON CACHE BOOL "Use phylogentic terraces library (terraphast) ")
 set(USE_GMP OFF CACHE BOOL "Use Gnu Muliple precision (GMP) library ")
 
 set(ENABLE_PTHREADS ${USE_PTHREADS})
 
 if(USE_TERRAPHAST)
-  message (WARNING "Terraphast library support is not available in this release, and it has been disabled.")
-  set(USE_TERRAPHAST OFF)
-endif()
-
-if(USE_TERRAPHAST)
-  set(ENABLE_GMP ON)
-else()
+  set(GCC_MIN_VERSION "5.4")
+  set(CLANG_MIN_VERSION "3.8")
   set(ENABLE_GMP ${USE_GMP})
+else()
+  set(GCC_MIN_VERSION "4.8")
+  set(CLANG_MIN_VERSION "3.8")
+  set(ENABLE_GMP OFF)
 endif()
 
 #set(CMAKE_CXX_STANDARD 14)
 #set(CMAKE_CXX_EXTENSIONS OFF)
+
+# set these flags globally for all subprojects (libpll etc.)
+set (CMAKE_CXX_FLAGS_DEBUG    "-O3 -g" CACHE INTERNAL "")
+set (CMAKE_CXX_FLAGS_RELEASE  "-O3"    CACHE INTERNAL "")
+set (CMAKE_C_FLAGS_DEBUG    "-O3 -g" CACHE INTERNAL "")
+set (CMAKE_C_FLAGS_RELEASE  "-O3"    CACHE INTERNAL "")
 
 project (raxml-ng C CXX)
 
@@ -49,34 +54,35 @@ else()
 endif()
 
 #check for minimum compiler versions
-message(STATUS "Compier: ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION} => ${CMAKE_CXX_COMPILER}")
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  set(RAXML_COMPILER_TARGET_VERSION "4.8")
-  if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS RAXML_COMPILER_TARGET_VERSION)
-    message (FATAL_ERROR "${CMAKE_CXX_COMPILER_ID} compiler too old! Minimum required: ${RAXML_COMPILER_TARGET_VERSION}")
-  endif()
+  set(RAXML_COMPILER_TARGET_VERSION ${GCC_MIN_VERSION})
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  set(RAXML_COMPILER_TARGET_VERSION "3.8")
-  if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS RAXML_COMPILER_TARGET_VERSION)
-    message (FATAL_ERROR "${CMAKE_CXX_COMPILER_ID} compiler too old! Minimum required: ${RAXML_COMPILER_TARGET_VERSION}")
-  endif()
+  set(RAXML_COMPILER_TARGET_VERSION ${CLANG_MIN_VERSION})
 endif()
+
+
+if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS RAXML_COMPILER_TARGET_VERSION)
+  message (FATAL_ERROR "${CMAKE_CXX_COMPILER_ID} compiler too old! Minimum required: ${RAXML_COMPILER_TARGET_VERSION}")
+endif()
+
 
 set (raxml-ng_VERSION_MAJOR 0)
 set (raxml-ng_VERSION_MINOR 6)
 
-set (CMAKE_BUILD_TYPE DEBUG)
+#set (CMAKE_BUILD_TYPE DEBUG)
 #set (CMAKE_BUILD_TYPE RELEASE)
 # set (CMAKE_VERBOSE_MAKEFILE ON)
+
+if (NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE "RELEASE")
+endif()
 
 message (STATUS "Building ${CMAKE_BUILD_TYPE}")
 
 set (WARN_FLAGS               "-Wall -Wextra")
 set (CMAKE_CXX_FLAGS          "-std=c++11 ${WARN_FLAGS}")
-
-set (CMAKE_CXX_FLAGS_DEBUG    "-g")
-set (CMAKE_CXX_FLAGS_RELEASE  "-O3 -DNDEBUG")
 
 if (ENABLE_GMP)
 #find_package(GMP REQUIRED)

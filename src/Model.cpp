@@ -439,7 +439,8 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
       case 'B':
         try
         {
-          switch (toupper(ss.get()))
+          int mode = ss.peek() == '{' ? 'U' : toupper(ss.get());
+          switch (mode)
           {
             case EOF:
             case '\0':
@@ -466,7 +467,8 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
       case 'F':
         try
         {
-          switch (toupper(ss.get()))
+          int mode = ss.peek() == '{' ? 'U' : toupper(ss.get());
+          switch (mode)
           {
             case EOF:
             case '\0':
@@ -496,12 +498,10 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
                            std::to_string(_num_states) + "\n");
                 }
 
-                double sum = 0.;
                 bool invalid = false;
                 for (auto v: user_freqs)
                 {
                   invalid |= (v <= 0. || v >= 1.);
-                  sum += v;
                 }
 
                 if (invalid)
@@ -509,10 +509,6 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
                   throw runtime_error("Invalid base frequencies specified! "
                       "Frequencies must be positive numbers between 0. and 1.");
                 }
-
-                // normalize freqs
-                for (auto& f: user_freqs)
-                  f /= sum;
 
                 for (auto& m: _submodels)
                   m.base_freqs(user_freqs);
@@ -534,7 +530,8 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
       case 'I':
         try
         {
-          switch (toupper(ss.get()))
+          int mode = ss.peek() == '{' ? 'U' : toupper(ss.get());
+          switch (mode)
           {
             case EOF:
             case '\0':
@@ -813,7 +810,7 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
   }
 }
 
-std::string Model::to_string(bool print_params) const
+std::string Model::to_string(bool print_params, unsigned int precision) const
 {
   ostringstream model_string;
   model_string << name();
@@ -824,6 +821,9 @@ std::string Model::to_string(bool print_params) const
     for (auto& entry: out_param_mode)
       entry.second = (entry.second == ParamValue::ML) ? ParamValue::user : entry.second;
   }
+
+  if (precision)
+    model_string << fixed << setprecision(precision);
 
   if (out_param_mode.at(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::user)
     print_param(model_string, submodel(0).uniq_subst_rates());
@@ -938,6 +938,55 @@ int Model::params_to_optimize() const
   return params_to_optimize;
 }
 
+bool Model::param_estimated(int param) const
+{
+  return (_param_mode.at(param) == ParamValue::ML) || (_param_mode.at(param) == ParamValue::empirical);
+}
+
+unsigned int Model::num_free_params() const
+{
+  unsigned int  free_params = 0;
+
+  if (param_estimated(PLLMOD_OPT_PARAM_FREQUENCIES))
+  {
+    assert(num_submodels() == 1 || param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) != ParamValue::ML);
+    free_params += _num_states - 1;
+  }
+
+  if (param_mode(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::empirical)
+  {
+    free_params += submodel(0).num_rates() - 1;
+  }
+  else if (param_mode(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::ML)
+  {
+    assert(num_submodels() == 1);
+    free_params += submodel(0).num_uniq_rates() - 1;
+  }
+
+  if (param_estimated(PLLMOD_OPT_PARAM_PINV))
+    free_params += 1;
+
+  if (_num_ratecats > 1)
+  {
+    switch(_rate_het)
+    {
+    case PLLMOD_UTIL_MIXTYPE_GAMMA:
+      if (param_estimated(PLLMOD_OPT_PARAM_ALPHA))
+        free_params += 1;
+      break;
+    case PLLMOD_UTIL_MIXTYPE_FREE:
+      if (param_estimated(PLLMOD_OPT_PARAM_FREE_RATES))
+        free_params += _num_ratecats - 1;
+      if (param_estimated(PLLMOD_OPT_PARAM_RATE_WEIGHTS))
+        free_params += _num_ratecats - 1;
+      break;
+    }
+  }
+
+  return free_params;
+}
+
+
 void assign(Model& model, const pll_partition_t * partition)
 {
   if (model.num_states() == partition->states &&
@@ -1011,8 +1060,10 @@ static string get_ratehet_mode_str(const Model& m)
 LogStream& operator<<(LogStream& stream, const Model& m)
 {
   if (m.param_mode(PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER) != ParamValue::undefined)
+  {
     stream << "   Speed ("  << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER))
-             << "): " << m.brlen_scaler() << endl;
+             << "): " << FMT_MOD(m.brlen_scaler()) << endl;
+  }
 
   if (m.error_model())
   {
@@ -1027,37 +1078,44 @@ LogStream& operator<<(LogStream& stream, const Model& m)
     stream << " (" << m.num_ratecats() << " cats, " <<
         (m.gamma_mode() == PLL_GAMMA_RATES_MEDIAN ? "median" : "mean") << ")";
     if (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_GAMMA)
-      stream << ",  alpha: " << setprecision(6) << m.alpha() << " ("  << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_ALPHA))
-                 << ")";
+      stream << ",  alpha: " << FMT_MOD(m.alpha()) << " ("
+             << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_ALPHA)) << ")";
     stream << ",  weights&rates: ";
     for (size_t i = 0; i < m.num_ratecats(); ++i)
-      stream << "(" << m.ratecat_weights()[i] << "," << m.ratecat_rates()[i] << ") ";
+    {
+      stream << "(" << FMT_MOD(m.ratecat_weights()[i]) << ","
+             << FMT_MOD(m.ratecat_rates()[i]) << ") ";
+    }
   }
   stream << endl;
 
   if (m.param_mode(PLLMOD_OPT_PARAM_PINV) != ParamValue::undefined)
-    stream << "   P-inv (" << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_PINV)) << "): " <<
-               m.pinv() << endl;
+  {
+    stream << "   P-inv (" << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_PINV)) << "): "
+           << FMT_MOD(m.pinv()) << endl;
+  }
 
-  stream << "   Base frequencies (" << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES)) << "): ";
+  stream << "   Base frequencies ("
+         << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES)) << "): ";
   for (size_t i = 0; i < m.num_submodels(); ++i)
   {
     if (m.num_submodels() > 1)
       stream << "\nM" << i << ": ";
 
     for (size_t j = 0; j < m.base_freqs(i).size(); ++j)
-      stream << setprecision(6) << m.base_freqs(i)[j] << " ";
+      stream << FMT_MOD(m.base_freqs(i)[j]) << " ";
   }
   stream << endl;
 
-  stream << "   Substitution rates (" << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES)) << "): ";
+  stream << "   Substitution rates ("
+         << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES)) << "): ";
   for (size_t i = 0; i < m.num_submodels(); ++i)
   {
     if (m.num_submodels() > 1)
       stream << "\nM " << i << ": ";
 
     for (size_t j = 0; j < m.subst_rates(i).size(); ++j)
-      stream << m.subst_rates(i)[j] << " ";
+      stream << FMT_MOD(m.subst_rates(i)[j]) << " ";
   }
   stream << endl;
 

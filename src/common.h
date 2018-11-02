@@ -3,17 +3,10 @@
 
 #include <unistd.h>
 
-#include <string>
 #include <iostream>
 #include <iomanip>
 #include <sstream>
-#include <vector>
-#include <array>
-#include <set>
-#include <unordered_map>
-#include <unordered_set>
 #include <stdexcept>
-#include <random>
 
 extern "C" {
 //#include <libpll/pll.h>
@@ -68,12 +61,6 @@ extern "C" {
 
 /* used to supress compiler warnings about unused args */
 #define RAXML_UNUSED(expr) PLLMOD_UNUSED(expr)
-
-// cpu features
-#define RAXML_CPU_SSE3  (1<<0)
-#define RAXML_CPU_AVX   (1<<1)
-#define RAXML_CPU_FMA3  (1<<2)
-#define RAXML_CPU_AVX2  (1<<3)
 
 /* system utils */
 void sysutil_fatal(const char * format, ...);

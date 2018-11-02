@@ -1,0 +1,61 @@
+sudo: required
+cache: apt
+language: cpp
+
+matrix:
+  include:
+    - os: linux
+      dist: trusty
+      env: CXX_COMPILER=g++-6
+      addons:
+        apt:
+          sources:
+          - ubuntu-toolchain-r-test
+          packages:
+          - g++-6
+          - pandoc
+    - os: linux
+      dist: trusty
+      env: CXX_COMPILER=g++-7
+      addons:
+        apt:
+          sources:
+          - ubuntu-toolchain-r-test
+          packages:
+          - g++-7
+          - pandoc
+    - os: linux
+      dist: trusty
+      compiler: clang++
+      addons:
+        apt:
+          sources:
+          - ubuntu-toolchain-r-test
+          packages:
+          - g++-7
+          - pandoc
+    - os: osx
+      osx_image: xcode9.2
+    - os: osx
+      osx_image: xcode8.3
+
+before_install:
+  - echo "PATH = $PATH"
+  - echo "HOME = $HOME"
+  # We need to re-export CC and CXX here, because travis exports CXX=g++ or clang++ AFTER we set CXX.
+  - if [ -n "${C_COMPILER}" ]; then export CC="${C_COMPILER}"; fi
+  - if [ -n "${CXX_COMPILER}" ]; then export CXX="${CXX_COMPILER}"; fi
+
+script:
+  - PATH=$(pwd)/bin/:$PATH
+  - echo "PATH = $PATH"
+  - mkdir build
+  - cd build
+  - cmake ..
+  - make
+# Run testiphy test suite
+  - cd
+  - git clone https://gitlab.com/testiphy/testiphy.git
+  - cd testiphy
+  - which raxml-ng
+  - ./testiphy raxml-ng

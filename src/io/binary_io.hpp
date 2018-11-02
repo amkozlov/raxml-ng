@@ -120,6 +120,16 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const std::vector<T>& v
   return stream;
 }
 
+template<typename T1, typename T2>
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const std::unordered_map<T1,T2>& map)
+{
+  stream << map.size();
+  for (auto const& e: map)
+    stream << e.first << e.second;
+
+  return stream;
+}
+
 /**
  *  Reading
  */
@@ -148,6 +158,25 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::vector<T>& vec)
   return stream;
 }
 
+template<typename T1, typename T2>
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::unordered_map<T1,T2>& map)
+{
+  size_t map_size;
+  stream >> map_size;
+
+  map.clear();
+
+  T1 key;
+  T2 val;
+  for (size_t i = 0; i < map_size; ++i)
+  {
+    stream >> key >> val;
+    map.emplace(key, val);
+  }
+
+  return stream;
+}
+
 /**
  * Model I/O
  */
@@ -170,6 +199,12 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, PartitionStats& ps);
  */
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const MSA& m);
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, MSA& m);
+
+/**
+ * TreeTopology I/O
+ */
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const TreeTopology& t);
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, TreeTopology& t);
 
 /**
  * TreeCollection I/O

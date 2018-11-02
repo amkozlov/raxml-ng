@@ -38,10 +38,10 @@ struct Checkpoint
 {
   Checkpoint() : version(CKP_VERSION), elapsed_seconds(0.), search_state(), tree(), models() {}
 
-  Checkpoint(const Checkpoint& other) = delete;
-  Checkpoint& operator=(const Checkpoint& other) = delete;
-  Checkpoint(Checkpoint&& other) = default;
-  Checkpoint& operator=(Checkpoint&& other) = default;
+  Checkpoint(const Checkpoint&) = delete;
+  Checkpoint& operator=(const Checkpoint&) = delete;
+  Checkpoint(Checkpoint&&) = default;
+  Checkpoint& operator=(Checkpoint&&) = default;
 
   int version;
 

@@ -4,8 +4,8 @@
 using namespace std;
 
 const uint64_t RBA_MAGIC       = *(reinterpret_cast<const uint64_t*>("RBAF\x13\x12\x17\x0A"));
-const uint32_t RBA_VERSION     = 1;
-const uint32_t RBA_MIN_VERSION = 1;
+const uint32_t RBA_VERSION     = 2;
+const uint32_t RBA_MIN_VERSION = 2;
 
 struct RBAHeader
 {
@@ -26,14 +26,19 @@ struct RBAHeader
       {}
 };
 
-bool RBAStream::rba_file(const std::string& fname)
+bool RBAStream::rba_file(const std::string& fname, bool check_version)
 {
   BinaryFileStream bos(fname, std::ios::in);
   RBAHeader header;
 
   bos >> header;
 
-  return header.valid();
+  bool valid = header.valid();
+
+  if (check_version)
+    valid = valid && header.supported();
+
+  return valid;
 }
 
 RBAStream& operator<<(RBAStream& stream, const PartitionedMSA& part_msa)

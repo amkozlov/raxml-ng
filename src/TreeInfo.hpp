@@ -4,7 +4,7 @@
 #include "common.h"
 #include "Tree.hpp"
 #include "Options.hpp"
-#include "PartitionAssignment.hpp"
+#include "loadbalance/PartitionAssignment.hpp"
 
 struct spr_round_params
 {
@@ -27,9 +27,10 @@ class TreeInfo
 {
 public:
   TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
-            const PartitionAssignment& part_assign);
+            const IDVector& tip_msa_idmap, const PartitionAssignment& part_assign);
   TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
-            const PartitionAssignment& part_assign, const std::vector<uintVector>& site_weights);
+            const IDVector& tip_msa_idmap, const PartitionAssignment& part_assign,
+            const std::vector<uintVector>& site_weights);
   virtual
   ~TreeInfo ();
 
@@ -37,8 +38,8 @@ public:
   const pll_unode_t& pll_utree_root() const { assert(_pll_treeinfo); return *_pll_treeinfo->root; }
 
   Tree tree() const;
-  void tree(const Tree& tree)
-  { _pll_treeinfo->root = pll_utree_graph_clone(&tree.pll_utree_root()); }
+  Tree tree(size_t partition_id) const;
+  void tree(const Tree& tree);
 
   /* in parallel mode, partition can be share among multiple threads and TreeInfo objects;
    * this method returns list of partition IDs for which this thread is designated as "master"
@@ -46,6 +47,8 @@ public:
   const IDSet& parts_master() const { return _parts_master; }
 
   void model(size_t partition_id, const Model& model);
+
+  void set_topology_constraint(const Tree& cons_tree);
 
   double loglh(bool incremental = false);
   double optimize_params(int params_to_optimize, double lh_epsilon);
@@ -62,11 +65,13 @@ private:
   int _brlen_opt_method;
   double _brlen_min;
   double _brlen_max;
+  doubleVector _partition_contributions;
 
   PartitionedMSA _local_part_msa;
 
   void init(const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
-            const PartitionAssignment& part_assign, const std::vector<uintVector>& site_weights);
+            const IDVector& tip_msa_idmap, const PartitionAssignment& part_assign,
+            const std::vector<uintVector>& site_weights);
 };
 
 void assign(PartitionedMSA& parted_msa, const TreeInfo& treeinfo);
@@ -74,7 +79,7 @@ void assign(Model& model, const TreeInfo& treeinfo, size_t partition_id);
 
 
 pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& pinfo,
+                                      const IDVector& tip_msa_idmap,
                                       const PartitionRange& part_region, const uintVector& weights);
-
 
 #endif /* RAXML_TREEINFO_HPP_ */

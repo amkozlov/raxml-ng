@@ -7,6 +7,19 @@ char * newick_name_cb(const pll_unode_t * node)
   return node->label ? strdup(node->label) : strdup("");
 }
 
+char * newick_print_cb(const pll_unode_t * node)
+{
+  // that's ugly, but cannot find a better solution so far...
+  const unsigned int precision = logger().precision(LogElement::brlen);
+
+  char * newick;
+  if (asprintf(&newick, "%s:%.*lf",
+           node->label ? node->label : "" , precision, node->length) < 0)
+    return NULL;
+
+  return newick;
+}
+
 std::string to_newick_string_rooted(const Tree& tree, double root_brlen)
 {
   char * newick_str = pll_utree_export_newick_rooted(&tree.pll_utree_root(),
@@ -18,15 +31,23 @@ std::string to_newick_string_rooted(const Tree& tree, double root_brlen)
 
 NewickStream& operator<<(NewickStream& stream, const pll_unode_t& root)
 {
-  char * newick_str = pll_utree_export_newick(&root, nullptr);
-  stream << newick_str << std::endl;
-  free(newick_str);
+  char * newick_str = pll_utree_export_newick(&root, newick_print_cb);
+  if (newick_str)
+  {
+    stream << newick_str << std::endl;
+    free(newick_str);
+  }
+  else
+  {
+    assert(pll_errno);
+    libpll_check_error("Failed to generate Newick");
+  }
   return stream;
 }
 
 NewickStream& operator<<(NewickStream& stream, const pll_utree_t& tree)
 {
-  stream << *get_pll_utree_root(&tree);
+  stream << *tree.vroot;
   return stream;
 }
 
@@ -40,30 +61,25 @@ NewickStream& operator>>(NewickStream& stream, Tree& tree)
 {
   string newick_str;
 
-  std::getline(stream, newick_str);
+  std::getline(stream, newick_str, ';');
 
-  pll_utree_t * utree;
-  pll_rtree_t * rtree;
+  // discard any trailing spaces, newlines etc.
+  stream >> std::ws;
 
-  if (!(utree = pll_utree_parse_newick_string(newick_str.c_str())))
+  if (!newick_str.empty())
   {
-    if (!(rtree = pll_rtree_parse_newick_string(newick_str.c_str())))
-    {
-      throw runtime_error("ERROR reading tree file: " + string(pll_errmsg));
-    }
-    else
-    {
-  //    LOG_INFO << "NOTE: You provided a rooted tree; it will be automatically unrooted." << endl;
-      utree = pll_rtree_unroot(rtree);
+    newick_str += ";";
 
-      /* optional step if using default PLL clv/pmatrix index assignments */
-      pll_utree_reset_template_indices(get_pll_utree_root(utree), utree->tip_count);
-    }
+    pll_utree_t * utree = pll_utree_parse_newick_string_unroot(newick_str.c_str());
+
+    libpll_check_error("ERROR reading tree file");
+
+    assert(utree);
+
+    tree = Tree(*utree);
+
+    pll_utree_destroy(utree, nullptr);
   }
-
-  tree = Tree(*utree);
-
-  pll_utree_destroy(utree, nullptr);
 
   return stream;
 }

@@ -4,8 +4,6 @@
 #include "common.h"
 #include "PartitionedMSA.hpp"
 
-pll_unode_t* get_pll_utree_root(const pll_utree_t* tree);
-
 // seems to be the only way to have custom deleter for unique_ptr
 // without having to specify it every time during object creation
 namespace std
@@ -27,7 +25,23 @@ struct TreeBranch
   double length;
 };
 
-typedef std::vector<TreeBranch> TreeTopology;
+struct TreeTopology
+{
+  typedef std::vector<TreeBranch> edge_container;
+  typedef typename edge_container::iterator        iterator;
+  typedef typename edge_container::const_iterator  const_iterator;
+
+  //Iterator Compatibility
+  iterator begin() { return edges.begin(); }
+  iterator end() { return edges.end(); }
+  const_iterator begin() const { return edges.cbegin(); }
+  const_iterator end() const { return edges.cend(); }
+  const_iterator cbegin() { return edges.cbegin(); }
+  const_iterator cend() { return edges.cend(); }
+
+  edge_container edges;
+  std::vector<doubleVector> brlens;
+};
 
 typedef std::unique_ptr<pll_utree_t> PllUTreeUniquePtr;
 typedef std::vector<pll_unode_t*> PllNodeVector;
@@ -36,14 +50,16 @@ class BasicTree
 {
 public:
   BasicTree(size_t num_tips) : _num_tips(num_tips) {}
+  virtual ~BasicTree() {}
 
   bool empty() const { return _num_tips == 0; };
-  size_t num_tips() const { return _num_tips; };
-  size_t num_inner() const { return _num_tips - 2; };
-  size_t num_nodes() const { return _num_tips + _num_tips - 2; };
-  size_t num_subnodes() const { return _num_tips + num_inner() * 3; };
-  size_t num_branches() const { return _num_tips + _num_tips - 3; };
-  size_t num_splits() const { return _num_tips - 3; };
+  virtual bool binary() const { return true; };
+  virtual size_t num_tips() const { return _num_tips; };
+  virtual size_t num_inner() const { return _num_tips - 2; };
+  virtual size_t num_nodes() const { return num_tips() + num_inner(); };
+  virtual size_t num_subnodes() const { return num_branches() * 2; };
+  virtual size_t num_branches() const { return _num_tips + _num_tips - 3; };
+  virtual size_t num_splits() const { return num_branches() - _num_tips; };
 
 protected:
   size_t _num_tips;
@@ -70,8 +86,10 @@ public:
 
   virtual ~Tree();
 
-  static Tree buildRandom(size_t num_tips, const char * const* tip_labels);
-  static Tree buildRandom(const NameList& taxon_names);
+  static Tree buildRandom(size_t num_tips, const char * const* tip_labels, unsigned int random_seed);
+  static Tree buildRandom(const NameList& taxon_names, unsigned int random_seed);
+  static Tree buildRandomConstrained(const NameList& taxon_names, unsigned int random_seed,
+                                     const Tree& constrained_tree);
   static Tree buildParsimony(const PartitionedMSA& parted_msa, unsigned int random_seed,
                              unsigned int attributes, unsigned int * score = nullptr);
   static Tree loadFromFile(const std::string& file_name);
@@ -82,19 +100,36 @@ public:
   TreeTopology topology() const;
   void topology(const TreeTopology& topol);
 
+  const std::vector<doubleVector>& partition_brlens() const { return _partition_brlens; }
+  const doubleVector& partition_brlens(size_t partition_idx) const;
+  void partition_brlens(size_t partition_idx, const doubleVector& brlens);
+  void partition_brlens(size_t partition_idx, doubleVector&& brlens);
+  void add_partition_brlens(doubleVector&& brlens);
+
   // TODO: use move semantics to transfer ownership?
   pll_utree_t * pll_utree_copy() const { return pll_utree_clone(_pll_utree.get()); }
   const pll_utree_t& pll_utree() const { return *_pll_utree; }
 
-  // TODO: store root explicitly
-  const pll_unode_t& pll_utree_root() const { return *get_pll_utree_root(_pll_utree.get()); }
+  const pll_unode_t& pll_utree_root() const { return *_pll_utree->vroot; }
+  bool empty() const { return _num_tips == 0; }
 
   void fix_missing_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
   void reset_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
+  void apply_partition_brlens(size_t partition_idx);
+  void apply_avg_brlens(const doubleVector& partition_contributions);
+
   void reset_tip_ids(const NameIdMap& label_id_map);
+  void reroot(const NameList& outgroup_taxa, bool add_root_node = false);
+  void insert_tips_random(const NameList& tip_names, unsigned int random_seed = 0);
+
+public:
+  bool binary() const;
+  size_t num_inner() const;
+  size_t num_branches() const;
 
 protected:
   PllUTreeUniquePtr _pll_utree;
+  std::vector<doubleVector> _partition_brlens;
 
   mutable PllNodeVector _pll_utree_tips;
 
@@ -112,6 +147,7 @@ public:
   typedef container_type::value_type value_type;
 
   size_t size() const { return  _trees.size(); }
+  bool empty() const { return  _trees.empty(); }
   const_iterator best() const;
   value_type::first_type best_score() const { return best()->first; }
   const value_type::second_type& best_topology() const { return best()->second; }

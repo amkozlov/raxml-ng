@@ -1,2 +1,2 @@
-#define RAXML_VERSION "0.6.0 BETA (CellPHY branch)"
-#define RAXML_DATE "23.03.2018"
+#define RAXML_VERSION "0.7.0git BETA (CellPHY branch)"
+#define RAXML_DATE "02.11.2018"

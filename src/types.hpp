@@ -1,6 +1,16 @@
 #ifndef RAXML_TYPES_HPP_
 #define RAXML_TYPES_HPP_
 
+#include <string>
+#include <vector>
+#include <array>
+#include <set>
+#include <map>
+#include <unordered_map>
+#include <unordered_set>
+#include <random>
+
+
 enum class StartingTree
 {
   random,
@@ -18,9 +28,11 @@ enum class Command
   bootstrap,
   all,
   support,
+  bsconverge,
   terrace,
   check,
-  parse
+  parse,
+  start
 };
 
 enum class FileFormat
@@ -62,6 +74,35 @@ enum class AscBiasCorrection
   stamatakis = PLL_ATTRIB_AB_STAMATAKIS,
 };
 
+enum class BootstopCriterion
+{
+  none = 0,
+  autoMRE,
+  autoMR,
+  autoFC
+};
+
+enum class LoadBalancing
+{
+  naive = 0,
+  kassian,
+  benoit
+};
+
+enum class BranchSupportMetric
+{
+  fbp = 0,
+  tbe
+};
+
+enum class InformationCriterion
+{
+  aic = 0,
+  aicc,
+  bic
+};
+
+
 const std::string ParamValueNames[] = {"undefined", "equal", "user", "model", "empirical", "ML"};
 
 typedef std::vector<double> doubleVector;
@@ -73,7 +114,10 @@ typedef std::pair<size_t,std::string> IdNamePair;
 typedef std::vector<IdNamePair> IdNameVector;
 typedef std::unordered_map<size_t,std::string> IdNameMap;
 typedef std::unordered_map<std::string,size_t> NameIdMap;
+typedef std::unordered_map<std::string,std::string> NameMap;
 typedef std::set<size_t> IDSet;
+typedef std::vector<size_t> IDVector;
+typedef std::map<StartingTree,size_t> StartingTreeMap;
 
 typedef unsigned int WeightType;
 typedef std::vector<WeightType> WeightVector;
@@ -104,19 +148,23 @@ public:
   {
   }
 
-  virtual const char* what() const noexcept { return message().c_str(); }
+  virtual const char* what() const noexcept
+  { return message().c_str(); }
 
-  virtual const std::string message() const { return _message; };
+  virtual const std::string& message() const
+  { update_message(); return _message; };
 
 protected:
-  std::string _message;
+  mutable std::string _message;
+
+  virtual void update_message() const { };
 
   template<typename ... Args>
   std::string format_message(const std::string& fmt, Args ... args) const
   {
     size_t size = std::snprintf(nullptr, 0, fmt.c_str(), args ...) + 1;
     std::string msg;
-    msg.reserve(size);
+    msg.resize(size);
     std::snprintf(&msg[0], size, fmt.c_str(), args ...);
     return msg;
   }

@@ -13,17 +13,20 @@ struct PartitionStats
   size_t pattern_count;
   size_t inv_count;
   double gap_prop;
+  IDVector gap_seqs;
   doubleVector emp_base_freqs;
   doubleVector emp_subst_rates;
 
   double inv_prop() const { return site_count > 0 ? ((double) inv_count) / site_count : 0.;  };
   bool empty() const { return site_count == 0; }
+  size_t gap_seq_count() const { return gap_seqs.size(); }
 
-  PartitionStats() : site_count(0), pattern_count(0), inv_count(0), gap_prop(0.),
+  PartitionStats() : site_count(0), pattern_count(0), inv_count(0), gap_prop(0.), gap_seqs(),
       emp_base_freqs(), emp_subst_rates() {}
 
   PartitionStats(const PartitionStats& other) : site_count(other.site_count),
-      pattern_count(other.pattern_count), inv_count(other.inv_count), gap_prop(other.gap_prop),
+      pattern_count(other.pattern_count), inv_count(other.inv_count),
+      gap_prop(other.gap_prop), gap_seqs(other.gap_seqs),
       emp_base_freqs(other.emp_base_freqs), emp_subst_rates(other.emp_subst_rates) {}
 };
 
@@ -64,6 +67,9 @@ public:
   MSA& msa() { return _msa; };
   const PartitionStats& stats() const;
   pllmod_msa_stats_t * compute_stats(unsigned long stats_mask) const;
+
+  /* given in elements (NOT in bytes) */
+  size_t taxon_clv_size() const { return _msa.num_patterns() * _model.clv_entry_size(); }
 
   // setters
   void msa(MSA&& msa) { _msa = std::move(msa); };
@@ -109,10 +115,10 @@ public:
 
   void pinfo2(const PartitionInfo& pinfo2) { part2_name = pinfo2.name(); }
 
-  virtual const std::string message() const
+  virtual void update_message() const
   {
-    return format_message("Alignment site %u assigned to multiple partitions: \"%s\" and \"%s\"!",
-                          _site, part1_name.c_str(), part2_name.c_str());
+    _message = format_message("Alignment site %u assigned to multiple partitions: "
+        "\"%s\" and \"%s\"!", _site, part1_name.c_str(), part2_name.c_str());
   };
 
 private:
@@ -132,10 +138,16 @@ public:
 
   void add_unassigned_site(size_t site) { _unassigned_sites.push_back(site); }
 
-  virtual const std::string message() const
+  virtual void update_message() const
   {
-    return format_message("Found %u site(s) which are not assigned to any partition.\n"
-        "Please fix your data!", _unassigned_sites.size());
+    std::stringstream ss;
+    ss << "Found " << _unassigned_sites.size() <<
+        " alignment site(s) which are not assigned to any partition:" << std::endl;
+    for (auto s: _unassigned_sites)
+      ss << s << " ";
+
+    ss << std::endl << "Please fix your data!";
+    _message = ss.str();
   };
 
 private:

@@ -16,6 +16,15 @@ enum class LogLevel
   debug
 };
 
+enum class LogElement
+{
+  all = 0,
+  loglh,
+  model,
+  brlen
+};
+
+
 struct TimeStamp
 {
   TimeStamp();
@@ -51,12 +60,16 @@ class Logging
 public:
   static Logging& instance();
 
-  LogStream& logstream(LogLevel level);
+  void log_level(LogLevel level);
   LogLevel log_level() const;
+
+  LogStream& logstream(LogLevel level);
 
   void set_log_filename(const std::string& fname, std::ios_base::openmode mode = std::ios::out);
   void add_log_stream(std::ostream* stream);
-  void set_log_level(LogLevel level);
+
+  void precision(unsigned int prec, LogElement elem = LogElement::all);
+  unsigned int precision(LogElement elem) const;
 
   /* singleton: remove copy/move constructors and assignment ops */
   Logging(const Logging& other) = delete;
@@ -71,6 +84,10 @@ private:
   std::ofstream _logfile;
   LogStream _empty_stream;
   LogStream _full_stream;
+
+  unsigned int _precision_loglh;
+  unsigned int _precision_model;
+  unsigned int _precision_brlen;
 };
 
 Logging& logger();
@@ -89,7 +106,9 @@ Logging& logger();
 #define LOG_DEBUG_TS LOG_DEBUG << "[" << TimeStamp() << "] "
 #define LOG_PROGRESS(loglh) LOG_PROGR << ProgressInfo(loglh)
 
-#define FMT_LH(loglh) setprecision(6) << loglh
+#define FMT_LH(lh) setprecision(logger().precision(LogElement::loglh)) << lh
+#define FMT_MOD(p) setprecision(logger().precision(LogElement::model)) << p
+#define FMT_BL(bl) setprecision(logger().precision(LogElement::brlen)) << bl
 #define FMT_PREC3(val) setprecision(3) << val
 
 template <class T>

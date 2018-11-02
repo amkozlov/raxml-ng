@@ -51,10 +51,7 @@ std::vector<unsigned int> PartitionedMSA::get_site_part_assignment()
   for (size_t i = 0; i < full_len; ++i)
   {
     if (!spa[i])
-    {
-      LOG_INFO << "ERROR: Alignment site " << i+1 << " is not assigned to any partition!" << endl;
       e_unassinged.add_unassigned_site(i+1);
-    }
   }
 
   if (e_unassinged.count() > 0)
@@ -137,6 +134,30 @@ size_t PartitionedMSA::total_patterns() const
   }
 
   return sum;
+}
+
+size_t PartitionedMSA::total_free_model_params() const
+{
+  size_t sum = 0;
+
+  for (const auto& pinfo: _part_list)
+  {
+    sum += pinfo.model().num_free_params();
+  }
+
+  return sum;
+}
+
+size_t PartitionedMSA::taxon_clv_size() const
+{
+  size_t clv_size = 0;
+
+  for (const auto& pinfo: _part_list)
+  {
+    clv_size += pinfo.taxon_clv_size();
+  }
+
+  return clv_size;
 }
 
 void PartitionedMSA::set_model_empirical_params()

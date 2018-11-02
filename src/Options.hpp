@@ -11,9 +11,12 @@ struct OutputFileNames
   std::string start_tree;
   std::string best_tree;
   std::string best_model;
+  std::string partition_trees;
   std::string ml_trees;
   std::string bootstrap_trees;
   std::string support_tree;
+  std::string tbe_support_tree;
+  std::string fbp_support_tree;
   std::string terrace;
   std::string binary_msa;
 };
@@ -24,15 +27,19 @@ public:
   Options() : cmdline(""), command(Command::none), use_tip_inner(true),
   use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false), use_repeats(true),
   optimize_model(true), optimize_brlen(true), redo_mode(false), force_mode(false),
-  log_level(LogLevel::progress),
+  nofiles_mode(false),  log_level(LogLevel::progress),
   msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
-  random_seed(0), start_tree(StartingTree::random), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
+  random_seed(0), start_trees(), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
   spr_cutoff(1.0),
   brlen_linkage(PLLMOD_COMMON_BRLEN_SCALED), brlen_opt_method(PLLMOD_OPT_BLO_NEWTON_FAST),
   brlen_min(RAXML_BRLEN_MIN), brlen_max(RAXML_BRLEN_MAX),
-  num_searches(1), num_bootstraps(100), terrace_maxsize(100),
-  tree_file(""), msa_file(""), model_file(""), outfile_prefix(""),
-  num_threads(1), num_ranks(1), simd_arch(PLL_ATTRIB_ARCH_CPU)
+  num_searches(1), terrace_maxsize(100),
+  num_bootstraps(100), bootstop_criterion(BootstopCriterion::none), bootstop_cutoff(0.03),
+  bootstop_interval(RAXML_BOOTSTOP_INTERVAL), bootstop_permutations(RAXML_BOOTSTOP_PERMUTES),
+  precision(RAXML_DEFAULT_PRECISION),
+  tree_file(""), constraint_tree_file(""), msa_file(""), model_file(""), outfile_prefix(""),
+  num_threads(1), num_ranks(1), simd_arch(PLL_ATTRIB_ARCH_CPU), thread_pinning(false),
+  load_balance_method(LoadBalancing::benoit)
   {};
 
   ~Options() = default;
@@ -52,12 +59,13 @@ public:
 
   bool redo_mode;
   bool force_mode;
+  bool nofiles_mode;
 
   LogLevel log_level;
   FileFormat msa_format;
   DataType data_type;
   long random_seed;
-  StartingTree start_tree;
+  StartingTreeMap start_trees;
   double lh_epsilon;
   int spr_radius;
   double spr_cutoff;
@@ -67,20 +75,32 @@ public:
   double brlen_max;
 
   unsigned int num_searches;
-  unsigned int num_bootstraps;
   unsigned long long terrace_maxsize;
+
+  unsigned int num_bootstraps;
+  std::vector<BranchSupportMetric> bs_metrics;
+  BootstopCriterion bootstop_criterion;
+  double bootstop_cutoff;
+  unsigned int bootstop_interval;
+  unsigned int bootstop_permutations;
+
+  unsigned int precision;
+  NameList outgroup_taxa;
 
   /* I/O */
   std::string tree_file;
+  std::string constraint_tree_file;
   std::string msa_file;
   std::string model_file;     /* could be also model string */
   std::string outfile_prefix;
   OutputFileNames outfile_names;
 
   /* parallelization stuff */
-  unsigned int num_threads;     /* number of threads */
-  unsigned int num_ranks;       /* number of MPI ranks */
-  unsigned int simd_arch;       /* vector instruction set */
+  unsigned int num_threads;             /* number of threads */
+  unsigned int num_ranks;               /* number of MPI ranks */
+  unsigned int simd_arch;               /* vector instruction set */
+  bool thread_pinning;                     /* pin threads to cores */
+  LoadBalancing load_balance_method;
 
   std::string simd_arch_name() const;
 
@@ -91,9 +111,10 @@ public:
   const std::string& start_tree_file() const { return outfile_names.start_tree; }
   const std::string& best_tree_file() const { return outfile_names.best_tree; }
   const std::string& best_model_file() const { return outfile_names.best_model; }
+  const std::string& partition_trees_file() const { return outfile_names.partition_trees; }
   const std::string& ml_trees_file() const { return outfile_names.ml_trees; }
   const std::string& bootstrap_trees_file() const { return outfile_names.bootstrap_trees; }
-  const std::string& support_tree_file() const { return outfile_names.support_tree; }
+  const std::string& support_tree_file(BranchSupportMetric bsm = BranchSupportMetric::fbp) const;
   const std::string& terrace_file() const { return outfile_names.terrace; }
   const std::string& binary_msa_file() const { return outfile_names.binary_msa; }
 

@@ -1,11 +1,12 @@
 #include <algorithm>
 
 #include "Tree.hpp"
+#include "io/file_io.hpp"
 
 using namespace std;
 
 Tree::Tree (const Tree& other) : BasicTree(other._num_tips),
-    _pll_utree(other.pll_utree_copy())
+    _pll_utree(other.pll_utree_copy()), _partition_brlens(other._partition_brlens)
 {
 }
 
@@ -13,6 +14,7 @@ Tree::Tree (Tree&& other) : BasicTree(other._num_tips), _pll_utree(other._pll_ut
 {
   other._num_tips = 0;
   swap(_pll_utree_tips, other._pll_utree_tips);
+  swap(_partition_brlens, other._partition_brlens);
 }
 
 Tree& Tree::operator=(const Tree& other)
@@ -22,6 +24,7 @@ Tree& Tree::operator=(const Tree& other)
     _pll_utree.reset(other.pll_utree_copy());
     _num_tips = other._num_tips;
     _pll_utree_tips.clear();
+    _partition_brlens = other._partition_brlens;
   }
 
   return *this;
@@ -34,10 +37,12 @@ Tree& Tree::operator=(Tree&& other)
     _num_tips = 0;
     _pll_utree_tips.clear();
     _pll_utree.release();
+    _partition_brlens.clear();
 
     swap(_num_tips, other._num_tips);
     swap(_pll_utree, other._pll_utree);
     swap(_pll_utree_tips, other._pll_utree_tips);
+    swap(_partition_brlens, other._partition_brlens);
   }
 
   return *this;
@@ -47,9 +52,25 @@ Tree::~Tree ()
 {
 }
 
-Tree Tree::buildRandom(size_t num_tips, const char * const* tip_labels)
+size_t Tree::num_inner() const
 {
-  PllUTreeUniquePtr pll_utree(pllmod_utree_create_random(num_tips, tip_labels));
+  return _pll_utree ? _pll_utree->inner_count : BasicTree::num_inner();
+}
+
+size_t Tree::num_branches() const
+{
+  return _pll_utree ? _pll_utree->edge_count : BasicTree::num_branches();
+}
+
+bool Tree::binary() const
+{
+  return _pll_utree ? _pll_utree->binary : BasicTree::binary();
+}
+
+Tree Tree::buildRandom(size_t num_tips, const char * const* tip_labels,
+                       unsigned int random_seed)
+{
+  PllUTreeUniquePtr pll_utree(pllmod_utree_create_random(num_tips, tip_labels, random_seed));
 
   libpll_check_error("ERROR building random tree");
   assert(pll_utree);
@@ -57,14 +78,54 @@ Tree Tree::buildRandom(size_t num_tips, const char * const* tip_labels)
   return Tree(pll_utree);
 }
 
-Tree Tree::buildRandom(const NameList& taxon_names)
+Tree Tree::buildRandom(const NameList& taxon_names, unsigned int random_seed)
 {
   std::vector<const char*> tip_labels(taxon_names.size(), nullptr);
   for (size_t i = 0; i < taxon_names.size(); ++i)
     tip_labels[i] = taxon_names[i].data();
 
-  return Tree::buildRandom(taxon_names.size(), (const char * const*) tip_labels.data());
+  return Tree::buildRandom(taxon_names.size(), (const char * const*) tip_labels.data(),
+                           random_seed);
 }
+
+Tree Tree::buildRandomConstrained(const NameList& taxon_names, unsigned int random_seed,
+                                  const Tree& constrained_tree)
+{
+  PllUTreeUniquePtr pll_utree(pllmod_utree_resolve_multi(&constrained_tree.pll_utree(),
+                                                         random_seed, nullptr));
+
+  if (!pll_utree)
+  {
+    assert(pll_errno);
+    libpll_check_error("ERROR in building a randomized constrained tree");
+  }
+
+  Tree tree(pll_utree);
+
+  if (taxon_names.size() > tree.num_tips())
+  {
+    // constraint tree is not comprehensive -> add free taxa
+    auto free_tip_count = taxon_names.size() - tree.num_tips();
+    auto cons_tips = tree.tip_ids();
+    NameList free_tips;
+    free_tips.reserve(free_tip_count);
+
+    for (const auto& t: taxon_names)
+    {
+      if (!cons_tips.count(t))
+        free_tips.push_back(t);
+    }
+
+    assert(free_tips.size() == free_tip_count);
+
+    tree.insert_tips_random(free_tips, random_seed);
+  }
+
+//  pll_utree_check_integrity(&tree.pll_utree());
+
+  return tree;
+}
+
 
 Tree Tree::buildParsimony(const PartitionedMSA& parted_msa, unsigned int random_seed,
                            unsigned int attributes, unsigned int * score)
@@ -130,32 +191,12 @@ Tree Tree::buildParsimony(const PartitionedMSA& parted_msa, unsigned int random_
 
 Tree Tree::loadFromFile(const std::string& file_name)
 {
-  pll_utree_t * utree;
-  pll_rtree_t * rtree;
-  const char* fname = file_name.c_str();
+  Tree tree;
+  NewickStream ns(file_name, std::ios::in);
 
-  if (!(rtree = pll_rtree_parse_newick(fname)))
-  {
-    utree = pll_utree_parse_newick(fname);
-    if (!utree)
-    {
-      libpll_check_error("ERROR reading tree file");
-    }
-  }
-  else
-  {
-//    LOG_INFO << "NOTE: You provided a rooted tree; it will be automatically unrooted." << endl;
-    utree = pll_rtree_unroot(rtree);
+  ns >> tree;
 
-    /* optional step if using default PLL clv/pmatrix index assignments */
-    pll_utree_reset_template_indices(get_pll_utree_root(utree), utree->tip_count);
-
-    libpll_check_error("ERROR unrooting the tree");
-  }
-
-  assert(utree);
-
-  return Tree(PllUTreeUniquePtr(utree));
+  return tree;
 }
 
 PllNodeVector const& Tree::tip_nodes() const
@@ -192,10 +233,31 @@ NameIdMap Tree::tip_ids() const
   return result;
 }
 
+void Tree::insert_tips_random(const NameList& tip_names, unsigned int random_seed)
+{
+  _pll_utree_tips.clear();
+
+  std::vector<const char*> tip_labels(tip_names.size(), nullptr);
+  for (size_t i = 0; i < tip_names.size(); ++i)
+    tip_labels[i] = tip_names[i].data();
+
+  int retval = pllmod_utree_extend_random(_pll_utree.get(),
+                                          tip_labels.size(),
+                                          (const char * const*) tip_labels.data(),
+                                          random_seed);
+
+  if (retval)
+    _num_tips = _pll_utree->tip_count;
+  else
+  {
+    assert(pll_errno);
+    libpll_check_error("ERROR in randomized tree extension");
+  }
+}
 
 void Tree::reset_tip_ids(const NameIdMap& label_id_map)
 {
-  if (label_id_map.size() != _num_tips)
+  if (label_id_map.size() < _num_tips)
     throw invalid_argument("Invalid map size");
 
   for (auto& node: tip_nodes())
@@ -226,13 +288,14 @@ PllNodeVector Tree::subnodes() const
 
     for (size_t i = 0; i < _pll_utree->tip_count + _pll_utree->inner_count; ++i)
     {
-      auto node = _pll_utree->nodes[i];
-      subnodes[node->node_index] = node;
-      if (node->next)
+      auto start = _pll_utree->nodes[i];
+      auto node = start;
+      do
       {
-        subnodes[node->next->node_index] = node->next;
-        subnodes[node->next->next->node_index] = node->next->next;
+        subnodes[node->node_index] = node;
+        node = node->next;
       }
+      while (node && node != start);
     }
   }
 
@@ -243,23 +306,30 @@ TreeTopology Tree::topology() const
 {
   TreeTopology topol;
 
+  topol.edges.resize(num_branches());
+
+  size_t branches = 0;
   for (auto n: subnodes())
   {
     if (n->node_index < n->back->node_index)
-      topol.emplace_back(n->node_index, n->back->node_index, n->length);
+    {
+      topol.edges.at(n->pmatrix_index) = TreeBranch(n->node_index, n->back->node_index, n->length);
+      branches++;
+    }
   }
+  topol.brlens = _partition_brlens;
 
-//  for (auto& branch: topol)
+//  for (auto& branch: topol.edges)
 //    printf("%u %u %lf\n", branch.left_node_id, branch.right_node_id, branch.length);
 
-  assert(topol.size() == num_branches());
+  assert(branches == num_branches());
 
   return topol;
 }
 
 void Tree::topology(const TreeTopology& topol)
 {
-  if (topol.size() != num_branches())
+  if (topol.edges.size() != num_branches())
     throw runtime_error("Incompatible topology!");
 
   auto allnodes = subnodes();
@@ -271,11 +341,89 @@ void Tree::topology(const TreeTopology& topol)
     pllmod_utree_connect_nodes(left_node, right_node, branch.length);
 
     // important: make sure all branches have distinct pmatrix indices!
-    left_node->pmatrix_index = right_node->pmatrix_index = pmatrix_index++;
-//    printf("%u %u %lf %d\n", branch.left_node_id, branch.right_node_id, branch.length, left_node->pmatrix_index);
+    left_node->pmatrix_index = right_node->pmatrix_index = pmatrix_index;
+
+    pmatrix_index++;
+//    printf("%u %u %lf %d  (%u - %u) \n", branch.left_node_id, branch.right_node_id,
+//           branch.length, left_node->pmatrix_index, left_node->clv_index, right_node->clv_index);
   }
 
+  _partition_brlens = topol.brlens;
+
   assert(pmatrix_index == num_branches());
+}
+
+const doubleVector& Tree::partition_brlens(size_t partition_idx) const
+{
+  return _partition_brlens.at(partition_idx);
+}
+
+void Tree::partition_brlens(size_t partition_idx, const doubleVector& brlens)
+{
+  _partition_brlens.at(partition_idx) = brlens;
+}
+
+void Tree::partition_brlens(size_t partition_idx, doubleVector&& brlens)
+{
+  _partition_brlens.at(partition_idx) = brlens;
+}
+
+void Tree::add_partition_brlens(doubleVector&& brlens)
+{
+  _partition_brlens.push_back(brlens);
+}
+
+void Tree::apply_partition_brlens(size_t partition_idx)
+{
+  if (partition_idx >= _partition_brlens.size())
+    throw out_of_range("Partition ID out of range");
+
+  const auto brlens = _partition_brlens.at(partition_idx);
+  for (auto n: subnodes())
+  {
+    n->length = brlens[n->pmatrix_index];
+  }
+}
+
+void Tree::apply_avg_brlens(const doubleVector& partition_contributions)
+{
+  assert(!_partition_brlens.empty() && partition_contributions.size() == _partition_brlens.size());
+
+  const auto allnodes = subnodes();
+
+  for (auto n: allnodes)
+    n->length = 0;
+
+  for (size_t p = 0; p < _partition_brlens.size(); ++p)
+  {
+    const auto brlens = _partition_brlens[p];
+    const auto w = partition_contributions[p];
+    for (auto n: allnodes)
+      n->length += brlens[n->pmatrix_index] * w;
+  }
+}
+
+void Tree::reroot(const NameList& outgroup_taxa, bool add_root_node)
+{
+  // collect tip node indices
+  NameIdMap name_id_map;
+  for (auto const& node: tip_nodes())
+    name_id_map.emplace(string(node->label), node->node_index);
+
+  // find tip ids for outgroup taxa
+  uintVector tip_ids;
+  for (const auto& label: outgroup_taxa)
+  {
+    const auto tip_id = name_id_map.at(label);
+    tip_ids.push_back(tip_id);
+  }
+
+  // re-root tree with the outgroup
+  int res = pllmod_utree_outgroup_root(_pll_utree.get(), tip_ids.data(), tip_ids.size(),
+                                       add_root_node);
+
+  if (!res)
+    libpll_check_error("Unable to reroot tree");
 }
 
 TreeCollection::const_iterator TreeCollection::best() const
@@ -294,9 +442,4 @@ void TreeCollection::push_back(double score, const Tree& tree)
 void TreeCollection::push_back(double score, TreeTopology&& topol)
 {
   _trees.emplace_back(score, topol);
-}
-
-pll_unode_t* get_pll_utree_root(const pll_utree_t* tree)
-{
-  return tree->nodes[tree->tip_count + tree->inner_count - 1];
 }

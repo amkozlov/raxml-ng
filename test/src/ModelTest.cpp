@@ -17,6 +17,7 @@ TEST(ModelTest, defaults)
   EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_FIXED);
   EXPECT_EQ(model.num_ratecats(), 1);
   EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_FREQUENCIES);
+  EXPECT_EQ(model.num_free_params(), 8);
 }
 
 TEST(ModelTest, GTR)
@@ -32,6 +33,7 @@ TEST(ModelTest, GTR)
   EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_GAMMA);
   EXPECT_EQ(model.num_ratecats(), 4);
   EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_ALPHA);
+  EXPECT_EQ(model.num_free_params(), 9);
 }
 
 TEST(ModelTest, GTR_R_user)
@@ -41,6 +43,9 @@ TEST(ModelTest, GTR_R_user)
 
   // tests
   EXPECT_EQ(model.to_string(), "GTR{0.2/1/2/4/7/1}+FC+R3");
+  EXPECT_EQ(model.to_string(false, 2), "GTR{0.20/1.00/2.00/4.00/7.00/1.00}+FC+R3");
+  EXPECT_EQ(model.to_string(true, 3),
+            "GTR{0.200/1.000/2.000/4.000/7.000/1.000}+FC+R3{0.189/0.712/2.099}{0.333/0.333/0.333}");
   EXPECT_EQ(model.data_type(), DataType::dna);
   EXPECT_EQ(model.name(), "GTR");
   EXPECT_EQ(model.num_states(), 4);
@@ -48,6 +53,7 @@ TEST(ModelTest, GTR_R_user)
   EXPECT_EQ(model.num_ratecats(), 3);
   EXPECT_EQ(model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES), ParamValue::user);
   EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_RATE_WEIGHTS | PLLMOD_OPT_PARAM_FREE_RATES);
+  EXPECT_EQ(model.num_free_params(), 7);
 }
 
 
@@ -65,6 +71,7 @@ TEST(ModelTest, JCI_user)
   EXPECT_EQ(model.num_ratecats(), 4);
   EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_ALPHA);
   EXPECT_EQ(model.pinv(), 0.7);
+  EXPECT_EQ(model.num_free_params(), 1);
 }
 
 TEST(ModelTest, JCFG_user)
@@ -83,6 +90,7 @@ TEST(ModelTest, JCFG_user)
   EXPECT_EQ(model.param_mode(PLLMOD_OPT_PARAM_ALPHA), ParamValue::user);
   EXPECT_EQ(model.params_to_optimize(), 0);
   EXPECT_EQ(model.alpha(), 2.5);
+  EXPECT_EQ(model.num_free_params(), 3);
 }
 
 TEST(ModelTest, HKY_user_freqs)
@@ -104,6 +112,7 @@ TEST(ModelTest, HKY_user_freqs)
   EXPECT_EQ(model.base_freqs(0)[1], 0.299);
   EXPECT_EQ(model.base_freqs(0)[2], 0.201);
   EXPECT_EQ(model.base_freqs(0)[3], 0.4);
+  EXPECT_EQ(model.num_free_params(), 1);
 }
 
 TEST(ModelTest, HKY_user_rates)
@@ -128,6 +137,7 @@ TEST(ModelTest, HKY_user_rates)
   EXPECT_EQ(model.subst_rates(0)[3], 1.0);
   EXPECT_EQ(model.subst_rates(0)[4], 2.424);
   EXPECT_EQ(model.subst_rates(0)[5], 1.0);
+  EXPECT_EQ(model.num_free_params(), 3);
 }
 
 TEST(ModelTest, LGFI)
@@ -158,6 +168,7 @@ TEST(ModelTest, LG4X)
   EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_FREE);
   EXPECT_EQ(model.num_ratecats(), 4);
   EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_FREE_RATES | PLLMOD_OPT_PARAM_RATE_WEIGHTS);
+  EXPECT_EQ(model.num_free_params(), 6);
 }
 
 TEST(ModelTest, LG_R4_user)
@@ -185,6 +196,7 @@ TEST(ModelTest, LG_R4_user)
   EXPECT_EQ(model.ratecat_rates()[1], 0.8);
   EXPECT_EQ(model.ratecat_rates()[2], 1.2);
   EXPECT_EQ(model.ratecat_rates()[3], 1.6);
+  EXPECT_EQ(model.num_free_params(), 0);
 }
 
 TEST(ModelTest, aliases)
@@ -200,13 +212,17 @@ TEST(ModelTest, aliases)
   EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_GAMMA);
   EXPECT_EQ(model.num_ratecats(), 4);
   EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_ALPHA);
+  EXPECT_EQ(model.num_free_params(), 3);
 
   model = Model(DataType::autodetect, "TrN");
   EXPECT_EQ(model.name(), "TN93");
-  model = Model(DataType::autodetect, "TPM1");
+  EXPECT_EQ(model.num_free_params(), 5);
+  model = Model(DataType::autodetect, "TPM1+FE");
   EXPECT_EQ(model.name(), "K81");
+  EXPECT_EQ(model.num_free_params(), 2);
   model = Model(DataType::autodetect, "TPM1uf");
   EXPECT_EQ(model.name(), "K81uf");
+  EXPECT_EQ(model.num_free_params(), 5);
 }
 
 TEST(ModelTest, multistate)
@@ -223,11 +239,12 @@ TEST(ModelTest, multistate)
   EXPECT_EQ(4, model.num_ratecats());
   EXPECT_EQ(PLLMOD_OPT_PARAM_ALPHA, model.params_to_optimize());
   EXPECT_NE(nullptr, model.charmap());
+  EXPECT_EQ(model.num_free_params(), 1);
 
   model = Model(DataType::autodetect, "MULTI53_GTR");
   EXPECT_EQ(DataType::multistate, model.data_type());
   EXPECT_EQ(53, model.num_states());
   EXPECT_EQ(PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_FREQUENCIES,
             model.params_to_optimize());
-
+  EXPECT_EQ(model.num_free_params(), (53*(53-1) / 2 - 1) + (53-1));
 }

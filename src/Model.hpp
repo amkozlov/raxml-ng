@@ -98,10 +98,12 @@ private:
 class Model
 {
 public:
+  typedef std::unordered_map<int,ParamValue> ParamModeMap;
+
   Model (DataType data_type = DataType::autodetect, const std::string &model_string = "GTR");
   Model (const std::string &model_string) : Model(DataType::autodetect, model_string) {};
 
-  Model(const Model& other) = default;
+  Model(const Model&) = default;
 
   /* getters */
   DataType data_type() const { return _data_type; };
@@ -126,14 +128,21 @@ public:
   const doubleVector& base_freqs(unsigned int i) const { return _submodels.at(i).base_freqs(); };
   const doubleVector& subst_rates(unsigned int i) const { return _submodels.at(i).subst_rates(); };
 
-  std::string to_string(bool print_params = false) const;
+  std::string to_string(bool print_params = false, unsigned int precision = 0) const;
   int params_to_optimize() const;
+  const ParamModeMap& param_mode() const { return _param_mode; }
   ParamValue param_mode(int param) const { return _param_mode.at(param); };
+  bool param_estimated(int param) const;
 
   AscBiasCorrection ascbias_type() const { return _ascbias_type; }
   const WeightVector& ascbias_weights() const { return _ascbias_weights; }
 
   const std::shared_ptr<ErrorModel>& error_model() const { return _error_model; };
+
+  /* per alignment site, given in elements (NOT in bytes) */
+  size_t clv_entry_size() const { return _num_states * _num_ratecats; }
+
+  unsigned int  num_free_params() const;
 
   /* setters */
   void alpha(double value) { _alpha = value; };
@@ -147,6 +156,7 @@ public:
   void ratecat_weights(doubleVector const& value) { _ratecat_weights = value; };
 
   void error_model_params(const doubleVector &param_vals) { _error_model->params(param_vals); };
+  void param_mode(int param, ParamValue mode) { _param_mode[param] = mode; };
   void set_param_mode_default(int param, ParamValue mode)
   {
     if (param_mode(param) == ParamValue::undefined)
@@ -179,7 +189,7 @@ private:
 
   std::vector<SubstitutionModel> _submodels;
 
-  std::unordered_map<int,ParamValue> _param_mode;
+  ParamModeMap _param_mode;
 
 //  std::unique_ptr<ErrorModel> _error_model;
   std::shared_ptr<ErrorModel> _error_model;

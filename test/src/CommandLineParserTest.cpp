@@ -89,7 +89,8 @@ TEST(CommandLineParserTest, search_complex1)
   parse_options(cmd, parser, options, false);
   EXPECT_EQ(Command::search, options.command);
   EXPECT_EQ("data.fa", options.msa_file);
-  EXPECT_EQ(StartingTree::user, options.start_tree);
+  EXPECT_EQ(1, options.start_trees.size());
+  EXPECT_EQ(1, options.start_trees.count(StartingTree::user));
   EXPECT_EQ("start.tre", options.tree_file);
   EXPECT_EQ("JC69", options.model_file);
   EXPECT_EQ(4, options.num_threads);
@@ -107,12 +108,53 @@ TEST(CommandLineParserTest, search_complex2)
       "--prefix myRun --prob-msa ON --brlen linked --spr-radius 10 --spr-cutoff 0.5";
   parse_options(cmd, parser, options, false);
   EXPECT_EQ(Command::search, options.command);
-  EXPECT_EQ(StartingTree::random, options.start_tree);
+  EXPECT_EQ(1, options.start_trees.size());
+  EXPECT_EQ(1, options.start_trees.count(StartingTree::random));
   EXPECT_EQ("myRun", options.outfile_prefix);
   EXPECT_TRUE(options.use_prob_msa);
   EXPECT_EQ(PLLMOD_COMMON_BRLEN_LINKED, options.brlen_linkage);
   EXPECT_EQ(10, options.spr_radius);
   EXPECT_DOUBLE_EQ(0.5, options.spr_cutoff);
+}
+
+TEST(CommandLineParserTest, all_default)
+{
+  // buildup
+  CommandLineParser parser;
+  Options options;
+
+  // fancy search command
+  string cmd = "raxml-ng --all --msa data.fa --model part.txt ";
+  parse_options(cmd, parser, options, false);
+  EXPECT_EQ(Command::all, options.command);
+  EXPECT_EQ(2, options.start_trees.size());
+  EXPECT_EQ(10, options.start_trees.at(StartingTree::random));
+  EXPECT_EQ(10, options.start_trees.at(StartingTree::parsimony));
+  EXPECT_EQ(20, options.num_searches);
+  EXPECT_EQ(100, options.num_bootstraps);
+  EXPECT_EQ(PLLMOD_COMMON_BRLEN_LINKED, options.brlen_linkage);
+}
+
+TEST(CommandLineParserTest, all_complex)
+{
+  // buildup
+  CommandLineParser parser;
+  Options options;
+
+  // fancy search command
+  string cmd = "raxml-ng --all --msa data.fa --model part.txt --tree rand{30},pars{20},my.tree "
+      "--bs-trees 1000 --prefix myBS";
+  parse_options(cmd, parser, options, false);
+  EXPECT_EQ(Command::all, options.command);
+  EXPECT_EQ("my.tree", options.tree_file);
+  EXPECT_EQ(3, options.start_trees.size());
+  EXPECT_EQ(30, options.start_trees.at(StartingTree::random));
+  EXPECT_EQ(20, options.start_trees.at(StartingTree::parsimony));
+  EXPECT_EQ(1, options.start_trees.at(StartingTree::user));
+  EXPECT_EQ(51, options.num_searches);
+  EXPECT_EQ(1000, options.num_bootstraps);
+  EXPECT_EQ("myBS", options.outfile_prefix);
+  EXPECT_EQ(PLLMOD_COMMON_BRLEN_LINKED, options.brlen_linkage);
 }
 
 TEST(CommandLineParserTest, eval_wrong)

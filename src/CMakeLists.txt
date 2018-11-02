@@ -1,6 +1,8 @@
 file(GLOB RAXML_SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp 
                         ${PROJECT_SOURCE_DIR}/src/io/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/bootstrap/*.cpp
+                        ${PROJECT_SOURCE_DIR}/src/autotune/*.cpp
+                        ${PROJECT_SOURCE_DIR}/src/loadbalance/*.cpp
                         )
 
 if(USE_TERRAPHAST)
@@ -36,14 +38,7 @@ endif()
 
 if (USE_LIBPLL_CMAKE)
   target_include_directories(raxml_module PRIVATE ${PLLMOD_EXPORTED_INCLUDE_PATH})
-  set(LIBPLL_LIBS  pllmodalgorithm_static
-                   pllmodbinary_static
-                   pllmodmsa_static
-                   pllmodoptimize_static
-                   pllmodtree_static
-                   pllmodutil_static
-                   pll_static
-                   )
+  set(LIBPLL_LIBS  ${PLLMODULES_LIBRARIES} ${PLL_LIBRARIES})
 else()
   set(LIBPLL_LIBS ${RAXML_LOCALDEPS_DIR}/lib/libpll_algorithm.a
                   ${RAXML_LOCALDEPS_DIR}/lib/libpll_binary.a
@@ -54,6 +49,7 @@ else()
                   ${RAXML_LOCALDEPS_DIR}/lib/libpll.a
                   )
 endif()
+
 
 set(RAXML_LIBS ${LIBPLL_LIBS} m)
 
@@ -68,7 +64,7 @@ set(RAXML_LIBS ${RAXML_LIBS} PARENT_SCOPE)
 
 target_link_libraries(raxml_module ${RAXML_LIBS})
 
-if (BUILD_AS_LIBRARY)
+if (BUILD_AS_LIBRARY AND NOT APPLE)
   target_link_libraries(raxml_module gcc_s gcc)
 endif()
 

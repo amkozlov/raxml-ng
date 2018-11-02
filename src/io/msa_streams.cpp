@@ -92,23 +92,30 @@ PhylipStream& operator<<(PhylipStream& stream, const MSA& msa)
   return stream;
 }
 
-PhylipStream& operator<<(PhylipStream& stream, const PartitionedMSA& msa)
+PhylipStream& operator<<(PhylipStream& stream, const PartitionedMSAView& msa)
 {
   ofstream fs(stream.fname());
 
-  auto taxa = msa.full_msa().size();
+  auto taxa = msa.taxon_count();
   auto sites = msa.total_length();
   fs << taxa << " " << sites << endl;
 
   for (size_t i = 0; i < taxa; ++i)
   {
-    fs << msa.full_msa().label(i) << " ";
-    for (const auto& p: msa.part_list())
+    fs << msa.taxon_name(i) << " ";
+    for (size_t p = 0; p < msa.part_count(); ++p)
     {
-      fs << p.msa().at(i);
+      fs << msa.part_sequence(i, p);
     }
     fs << endl;
   }
+
+  return stream;
+}
+
+PhylipStream& operator<<(PhylipStream& stream, const PartitionedMSA& msa)
+{
+  PartitionedMSAView msa_view(msa);
 
   return stream;
 }

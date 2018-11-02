@@ -1,6 +1,6 @@
 # RAxML Next Generation
 
-[![DOI](https://zenodo.org/badge/75947982.svg)](https://zenodo.org/badge/latestdoi/75947982) [![License](https://img.shields.io/badge/license-AGPL-blue.svg)](http://www.gnu.org/licenses/agpl-3.0.en.html)
+[![Build Status](https://www.travis-ci.org/amkozlov/raxml-ng.svg?branch=master)](https://www.travis-ci.org/amkozlov/raxml-ng) [![DOI](https://zenodo.org/badge/75947982.svg)](https://zenodo.org/badge/latestdoi/75947982) [![License](https://img.shields.io/badge/license-AGPL-blue.svg)](http://www.gnu.org/licenses/agpl-3.0.en.html)
 
 ## Introduction
 
@@ -16,11 +16,11 @@ Documentation: [github wiki](https://github.com/amkozlov/raxml-ng/wiki)
 ## Installation instructions
 
 * For most desktop Unix/Linux and macOS systems, the easiest way to install RAxML-NG is by using the pre-compiled binary:  
-[**Download 64-bit Linux binary**](https://github.com/amkozlov/raxml-ng/releases/download/0.5.1/raxml-ng_v0.5.1b_linux_x86_64.zip)  
-[**Download 64-bit OSX/macOS binary**](https://github.com/amkozlov/raxml-ng/releases/download/0.5.1/raxml-ng_v0.5.1b_macos_x86_64.zip)
+[**Download 64-bit Linux binary**](https://github.com/amkozlov/raxml-ng/releases/download/0.7.0/raxml-ng_v0.7.0_linux_x86_64.zip)  
+[**Download 64-bit OSX/macOS binary**](https://github.com/amkozlov/raxml-ng/releases/download/0.7.0/raxml-ng_v0.7.0_macos_x86_64.zip)
 
-* For clusters/supercomputers (i.e., if you want to use MPI), please use the following installation package which contains pre-built *libpll*. You will need `GCC 4.8+` and `CMake 2.8+` in order to compile RAxML-NG for your system.  
-[**Download RAxML-NG-MPI for Linux**](https://github.com/amkozlov/raxml-ng/releases/download/0.5.1/raxml-ng_v0.5.1b_linux_x86_64_MPI.zip)
+* For clusters/supercomputers (i.e., if you want to use MPI), please use the following installation package which contains pre-built *libpll*. You will need `GCC 6.4+` and `CMake 3.0.2+` in order to compile RAxML-NG for your system.  
+[**Download RAxML-NG-MPI for Linux**](https://github.com/amkozlov/raxml-ng/releases/download/0.7.0/raxml-ng_v0.7.0_linux_x86_64_MPI.zip)
 
 * Binaries for Windows will become available later on
 
@@ -28,10 +28,10 @@ Documentation: [github wiki](https://github.com/amkozlov/raxml-ng/wiki)
 
 1. **Install the dependecies.** On Ubuntu (and other Debian-based systems), you can simply run:
 ```
-sudo apt-get install autotools-dev autoconf libtool flex bison libgmp3-dev
+sudo apt-get install flex bison libgmp3-dev
 ```
 For other systems, please make sure you have following packages/libraries installed:  
-[`autoconf`](https://www.gnu.org/software/autoconf/autoconf.html) [`automake`](https://www.gnu.org/software/automake/) [`libtool`](https://www.gnu.org/software/libtool/) [`GNU Bison`](http://www.gnu.org/software/bison/) [`Flex`](http://flex.sourceforge.net/) [`GMP`](https://gmplib.org/)
+[`GNU Bison`](http://www.gnu.org/software/bison/) [`Flex`](http://flex.sourceforge.net/) [`GMP`](https://gmplib.org/)
 
 2. **Build RAxML-NG.**
 
@@ -102,7 +102,12 @@ If still in doubt, please feel free to post to the [RAxML google group](https://
 
 The code is currently licensed under the GNU Affero General Public License version 3.
 
-Pending the publication, you can cite this code as [DOI:10.5281/zenodo.593079](https://doi.org/10.5281/zenodo.593079)
+When using RAxML-NG, please cite [this preprint](https://www.biorxiv.org/content/early/2018/10/18/447110):
+
+Alexey M. Kozlov, Diego Darriba, Tom&aacute;&scaron; Flouri, Benoit Morel, and Alexandros Stamatakis (2018)
+**RAxML-NG: A fast, scalable, and user-friendly tool for maximum likelihood phylogenetic inference.** 
+*bioRxiv.* 
+doi:[10.1101/447110](https://doi.org/10.1101/447110)
 
 ## The team
 

@@ -1,46 +1,27 @@
 #include "TerraceWrapper.hpp"
 
 #include "../PartitionedMSA.hpp"
+#include "../io/file_io.hpp"
 
 #include <terraces/errors.hpp>
+#include <terraces/rooting.hpp>
 
 using namespace terraces;
 
-LogStream& operator<<(LogStream& s, const terraces::bitmatrix& bm)
+LogStream& operator<<(LogStream& s,
+                      const std::pair<const terraces::bitmatrix&, const terraces::name_map&> nbm)
 {
-
+  auto bm = nbm.first;
+  auto names = nbm.second;
+  s << bm.rows() << " " << bm.cols() << std::endl;
   for (auto row = terraces::index{}; row < bm.rows(); ++row)
   {
     for (auto col = terraces::index{}; col < bm.cols(); ++col)
       s << bm.get(row, col) << " ";
-    s << std::endl;
+    s << names.at(row) <<  std::endl;
   }
 
   return s;
-}
-
-terraces::index find_root(const terraces::bitmatrix& bm)
-{
-  terraces::index root = terraces::none;
-  for (auto row = terraces::index{}; row < bm.rows(); ++row)
-  {
-    auto all_known = true;
-    for (auto col = terraces::index{}; col < bm.cols(); ++col)
-    {
-      if (!bm.get(row, col))
-      {
-        all_known = false;
-        break;
-      }
-    }
-    if (all_known)
-    {
-      root = row;
-      break;
-    }
-  }
-
-  return root;
 }
 
 void set(terraces::bitmatrix& bm, bool val)
@@ -57,53 +38,65 @@ void set(terraces::bitmatrix& bm, terraces::index_map indices, bool val)
       bm.set(it.second, col, val);
 }
 
-TerraceWrapper::TerraceWrapper (const PartitionedMSA& parted_msa, const std::string& nwk_string) :
-    bm_(parted_msa.full_msa().size() * 2 - 1, parted_msa.part_count())
+TerraceWrapper::TerraceWrapper (const PartitionedMSA& parted_msa, const Tree& tree) :
+    _bm(parted_msa.taxon_count(), parted_msa.part_count())
 {
-  auto tree = parse_nwk(nwk_string);
+  /* init index<->name maps */
+  _names.resize(parted_msa.taxon_count());
+  for (size_t i = 0; i < parted_msa.taxon_count(); ++i)
+  {
+    auto label = parted_msa.taxon_names().at(i);
+    _indices[label] = i;
+    _names[i] = label;
+  }
 
   /* init partition presence/absence matrix */
-  assert(bm_.rows() == tree.tree.size());
-  set(bm_, tree.indices, true);
-  for (size_t p = 0; p < bm_.cols(); ++p)
+  set(_bm, true);
+  for (size_t p = 0; p < _bm.cols(); ++p)
   {
     auto& pinfo = parted_msa.part_info(p);
-    for (size_t i = 0; i < pinfo.stats()->gap_seqs_count; ++i)
+    for (size_t i = 0; i < pinfo.stats().gap_seq_count(); ++i)
     {
-      auto seq_id = pinfo.stats()->gap_seqs[i];
-      auto label = parted_msa.full_msa().label(seq_id);
-      auto row = tree.indices[label];
-      bm_.set(row, p, false);
+      auto seq_id = pinfo.stats().gap_seqs[i];
+      _bm.set(seq_id, p, false);
     }
   }
 
-  LOG_DEBUG << bm_ << std::endl;
+  LOG_DEBUG << std::endl << "Binary matrix:" << std::endl
+            << std::make_pair(std::cref(_bm), std::cref(_names)) << std::endl;
 
-  auto root_index = find_root(bm_);
+  auto newick_str = to_newick_string_rooted(tree);
+  LOG_DEBUG << "Tree: " << newick_str << std::endl << std::endl;
 
-  if (root_index == terraces::none)
-    throw terraces::no_usable_root_error("Cannot find any taxon with data in all partitions!");
-
-  LOG_DEBUG << "root:" << root_index << ": ";
-  LOG_DEBUG << tree.names.at(root_index) <<  std::endl;
+  auto terra_tree = parse_nwk(newick_str, _indices);
 
   LOG_DEBUG << "Names:" << std::endl;
-  for (auto n: tree.names)
+  for (auto n: _names)
     LOG_DEBUG << n << std::endl;
   LOG_DEBUG << std::endl;
 
-  names_ = tree.names;
-  reroot_inplace(tree.tree, root_index);
-  supertree_ = prepare_constraints(tree.tree, bm_, tree.names, root_index);
+//  reroot_at_taxon_inplace(terra_tree, root_index);
+  _supertree = create_supertree_data(terra_tree, _bm);
 }
 
 std::uint64_t TerraceWrapper::terrace_size()
 {
-  return count_terrace(supertree_);
+  return count_terrace(_supertree);
+}
+
+void TerraceWrapper::print_terrace_newick(std::ostream& output)
+{
+  auto result = terraces::print_terrace(_supertree, _names, output);
+  RAXML_UNUSED(result);
+}
+
+void TerraceWrapper::print_terrace_compressed(std::ostream& output)
+{
+  auto result = terraces::print_terrace_compressed(_supertree, _names, output);
+  RAXML_UNUSED(result);
 }
 
 void TerraceWrapper::print_terrace(std::ostream& output)
 {
-  auto result = terraces::print_terrace(supertree_, names_, output);
+  return print_terrace_compressed(output);
 }
-

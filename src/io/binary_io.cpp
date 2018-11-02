@@ -66,6 +66,7 @@ static bool save_modparam(const Model& m, ModelBinaryFmt fmt, unsigned int param
   switch (pmode)
   {
     case ParamValue::model:
+    case ParamValue::equal:
     case ParamValue::undefined:
       return false;
     case ParamValue::user:
@@ -92,6 +93,8 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, std::tuple<const Model&
   {
     auto s = m.to_string(false);
     stream << s;
+
+    stream << m.param_mode();
   }
 
   if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER))
@@ -179,6 +182,10 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::tuple<Model&, Mode
     std::string s = stream.get<std::string>();
 //    printf("\n%s\n", s.c_str());
     m = Model(DataType::autodetect, s);
+
+    auto param_mode_map = stream.get<Model::ParamModeMap>();
+    for (auto e: param_mode_map)
+      m.param_mode(e.first, e.second);
   }
 
   if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER))
@@ -210,6 +217,22 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::tuple<Model&, Mode
     if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_SUBST_RATES))
       m.subst_rates(i, stream.get<doubleVector>());
   }
+
+  return stream;
+}
+
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const TreeTopology& t)
+{
+  stream << t.edges;
+  stream << t.brlens;
+
+  return stream;
+}
+
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, TreeTopology& t)
+{
+  stream >> t.edges;
+  stream >> t.brlens;
 
   return stream;
 }
