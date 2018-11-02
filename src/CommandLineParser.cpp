@@ -793,7 +793,7 @@ void CommandLineParser::print_help()
             "\n"
             "Model options:\n"
             "  --model        <name>+G[n]+<Freqs> | FILE  model specification OR partition file (default: GTR+G4)\n"
-            "  --brlen        linked | scaled | unlinked  branch length linkage between partitions (default: scaled)\n"
+            "  --brlen        linked | scaled | unlinked  branch length linkage between partitions (default: linked)\n"
             "  --blmin        VALUE                       minimum branch length (default: 1e-6)\n"
             "  --blmax        VALUE                       maximum branch length (default: 100)\n"
             "  --blopt        nr_fast    | nr_safe        branch length optimization method (default: nr_fast)\n"
