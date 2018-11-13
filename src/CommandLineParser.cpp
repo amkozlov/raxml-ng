@@ -68,6 +68,8 @@ static struct option long_options[] =
   {"extra",              required_argument, 0, 0 },  /*  46 */
   {"bs-metric",          required_argument, 0, 0 },  /*  47 */
 
+  {"search1",            no_argument, 0, 0 },        /*  48 */
+
   { 0, 0, 0, 0 }
 };
 
@@ -162,17 +164,12 @@ void CommandLineParser::compute_num_searches(Options &opts)
   {
     if (opts.start_trees.empty())
     {
-      if (opts.command == Command::all)
-      {
-        opts.start_trees[StartingTree::random] = 10;
-        opts.start_trees[StartingTree::parsimony] = 10;
-      }
-      else
-        opts.start_trees[StartingTree::random] = 1;
+      opts.start_trees[StartingTree::random] = 10;
+      opts.start_trees[StartingTree::parsimony] = 10;
     }
     else
     {
-      auto def_tree_count = (opts.command == Command::all) ? 20 : 1;
+      auto def_tree_count = 10;
       for (auto& it: opts.start_trees)
       {
         if (it.first == StartingTree::user)
@@ -713,6 +710,12 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         }
         break;
 
+      case 48: /* search from a single starting tree */
+        opts.command = Command::search;
+        opts.start_trees.clear();
+        opts.start_trees[StartingTree::random] = 1;
+        num_commands++;
+        break;
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -737,7 +740,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* set default log output level  */
   if (!log_level_set)
   {
-    opts.log_level = (opts.num_searches > 1 || opts.num_bootstraps > 1) ?
+    opts.log_level = (opts.num_searches > 20 || opts.num_bootstraps > 1) ?
         LogLevel::info : LogLevel::progress;
   }
 
@@ -769,8 +772,8 @@ void CommandLineParser::print_help()
             "  --loglh                                    compute the likelihood of a fixed tree (no model/brlen optimization)\n"
             "\n"
             "Input and output options:\n"
-            "  --tree         FILE | rand{N} | pars{N}    starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
-            "                                             N = number of trees (default: 20 in 'all-in-one' mode, 1 otherwise)\n"
+            "  --tree            rand{N} | pars{N} | FILE starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
+            "                                             N = number of trees (default: rand{10},pars{10})\n"
             "  --msa             FILE                     alignment file\n"
             "  --msa-format      VALUE                    alignment file format: FASTA, PHYLIP, CATG or AUTO-detect (default)\n"
             "  --data-type       VALUE                    data type: DNA, AA, BIN(ary) or AUTO-detect (default)\n"
@@ -817,8 +820,8 @@ void CommandLineParser::print_help()
 
   cout << "\n"
             "EXAMPLES:\n"
-            "  1. Perform single tree inference on DNA alignment \n"
-            "     (random starting tree, general time-reversible model, ML estimate of substitution rates and\n"
+            "  1. Perform tree inference on DNA alignment \n"
+            "     (10 random + 10 parsimony starting trees, general time-reversible model, ML estimate of substitution rates and\n"
             "      nucleotide frequencies, discrete GAMMA model of rate heterogeneity with 4 categories):\n"
             "\n"
             "     ./raxml-ng --msa testDNA.fa --model GTR+G\n"
