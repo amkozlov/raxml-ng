@@ -144,10 +144,15 @@ void init_part_info(RaxmlInstance& instance)
   else if (sysutil_file_exists(opts.model_file))
   {
     // read partition definitions from file
-    RaxmlPartitionStream partfile(opts.model_file, ios::in);
-    partfile >> parted_msa;
-
-//    DBG("partitions found: %d\n", useropt->part_count);
+    try
+    {
+      RaxmlPartitionStream partfile(opts.model_file, ios::in);
+      partfile >> parted_msa;
+    }
+    catch(exception& e)
+    {
+      throw runtime_error("Failed to read partition file:\n" + string(e.what()));
+    }
   }
   else if (!opts.model_file.empty())
   {
@@ -156,6 +161,8 @@ void init_part_info(RaxmlInstance& instance)
   }
   else
     throw runtime_error("Please specify an evolutionary model with --model switch");
+
+  assert(parted_msa.part_count() > 0);
 
   /* make sure that linked branch length mode is set for unpartitioned alignments */
   if (parted_msa.part_count() == 1)
@@ -1298,7 +1305,7 @@ TreeCollection read_bootstrap_trees(const RaxmlInstance& instance, Tree& ref_tre
 {
   NameIdMap ref_tip_ids;
   const auto& opts = instance.opts;
- NewickStream boots(opts.bootstrap_trees_file(), std::ios::in);
+  NewickStream boots(opts.bootstrap_trees_file(), std::ios::in);
   TreeCollection bs_trees;
   unsigned int bs_num = 0;
 

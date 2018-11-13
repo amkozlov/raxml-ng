@@ -37,7 +37,16 @@ RaxmlPartitionStream& operator>>(RaxmlPartitionStream& stream, PartitionInfo& pa
       case EOF:
         if (!model_set)
         {
-          throw empty_line_exception();
+          string str = strstream.str();
+          std::remove_if(str.begin(), str.end(),
+                                   [](unsigned char x){return std::isspace(x);});
+          if (str.empty())
+            throw empty_line_exception();
+          else
+          {
+            throw partition_parser_exception("Invalid partition format: " +
+                                                        string(strstream.str()));
+          }
         }
         else
         {
@@ -117,6 +126,10 @@ RaxmlPartitionStream& operator>>(RaxmlPartitionStream& stream, PartitionedMSA& p
       throw runtime_error("Invalid partition definition in row " +
                           to_string(parted_msa.part_count() + 1) + ": " + e.what());
     }
+  }
+  if (!parted_msa.part_count())
+  {
+    throw runtime_error("Partition file is empty!");
   }
   return stream;
 }
