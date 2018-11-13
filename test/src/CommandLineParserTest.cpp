@@ -131,7 +131,8 @@ TEST(CommandLineParserTest, all_default)
   EXPECT_EQ(10, options.start_trees.at(StartingTree::random));
   EXPECT_EQ(10, options.start_trees.at(StartingTree::parsimony));
   EXPECT_EQ(20, options.num_searches);
-  EXPECT_EQ(100, options.num_bootstraps);
+  EXPECT_EQ(1000, options.num_bootstraps);
+  EXPECT_EQ(BootstopCriterion::autoMRE, options.bootstop_criterion);
   EXPECT_EQ(PLLMOD_COMMON_BRLEN_SCALED, options.brlen_linkage);
 }
 

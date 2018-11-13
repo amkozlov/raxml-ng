@@ -226,7 +226,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   /* bootstrapping / bootstopping */
   opts.bs_metrics.push_back(BranchSupportMetric::fbp);
-  opts.bootstop_criterion = BootstopCriterion::none;
+  opts.bootstop_criterion = BootstopCriterion::autoMRE;
   opts.bootstop_cutoff = RAXML_BOOTSTOP_CUTOFF;
   opts.bootstop_interval = RAXML_BOOTSTOP_INTERVAL;
   opts.bootstop_permutations = RAXML_BOOTSTOP_PERMUTES;
@@ -521,6 +521,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         num_commands++;
         break;
       case 26:  /* number of bootstrap replicates */
+        opts.bootstop_criterion = BootstopCriterion::none;
         if (sysutil_file_exists(optarg))
         {
           opts.outfile_names.bootstrap_trees = optarg;
@@ -808,8 +809,8 @@ void CommandLineParser::print_help()
             "  --spr-cutoff   VALUE | off                 relative LH cutoff for descending into subtrees (default: 1.0)\n"
             "\n"
             "Bootstrapping options:\n"
-            "  --bs-trees     VALUE                       number of bootstraps replicates (default: 100)\n"
-            "  --bs-trees     autoMRE                     use MRE-based bootstrap convergence criterion\n"
+            "  --bs-trees     VALUE                       number of bootstraps replicates\n"
+            "  --bs-trees     autoMRE{N}                  use MRE-based bootstrap convergence criterion, up to N replicates (default: 1000)\n"
             "  --bs-trees     FILE                        Newick file containing set of bootstrap replicate trees (with --support)\n"
             "  --bs-cutoff    VALUE                       cutoff threshold for the MRE-based bootstopping criteria (default: 0.03)\n"
             "  --bs-metric    fbp | tbe                   branch support metric: fbp = Felsenstein bootstrap (default), tbe = transfer distance\n";

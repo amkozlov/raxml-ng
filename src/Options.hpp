@@ -34,7 +34,7 @@ public:
   brlen_linkage(PLLMOD_COMMON_BRLEN_SCALED), brlen_opt_method(PLLMOD_OPT_BLO_NEWTON_FAST),
   brlen_min(RAXML_BRLEN_MIN), brlen_max(RAXML_BRLEN_MAX),
   num_searches(1), terrace_maxsize(100),
-  num_bootstraps(100), bootstop_criterion(BootstopCriterion::none), bootstop_cutoff(0.03),
+  num_bootstraps(1000), bootstop_criterion(BootstopCriterion::none), bootstop_cutoff(0.03),
   bootstop_interval(RAXML_BOOTSTOP_INTERVAL), bootstop_permutations(RAXML_BOOTSTOP_PERMUTES),
   precision(RAXML_DEFAULT_PRECISION),
   tree_file(""), constraint_tree_file(""), msa_file(""), model_file(""), outfile_prefix(""),
