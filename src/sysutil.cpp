@@ -282,4 +282,12 @@ const SystemTimer& global_timer()
   return systimer;
 }
 
+string sysutil_fmt_time(const time_t& t)
+{
+  std::array<char, 128> buffer;
+  const auto timeinfo = std::localtime(&t);
+  strftime(buffer.data(), sizeof(buffer), "%d-%b-%Y %H:%M:%S", timeinfo);
+  return buffer.data();
+}
+
 

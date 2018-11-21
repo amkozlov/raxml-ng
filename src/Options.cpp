@@ -168,7 +168,8 @@ string Options::simd_arch_name() const
 
 std::ostream& operator<<(std::ostream& stream, const Options& opts)
 {
-  stream << "RAxML-NG was called as follows:" << endl << endl << opts.cmdline << endl << endl;
+  stream << "RAxML-NG was called at " << sysutil_fmt_time(global_timer().start_time())
+         << " as follows:" << endl << endl << opts.cmdline << endl << endl;
 
   stream << "Analysis options:" << endl;
 

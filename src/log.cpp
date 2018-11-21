@@ -115,10 +115,7 @@ LogStream& operator<<(LogStream& logstream, std::ostream& (*pf)(std::ostream&))
 
 LogStream& operator<<(LogStream& logstream, const time_t& t)
 {
-  std::array<char, 128> buffer;
-  const auto timeinfo = std::localtime(&t);
-  strftime(buffer.data(), sizeof(buffer), "%d-%b-%Y %H:%M:%S", timeinfo);
-  logstream << buffer.data();
+  logstream << sysutil_fmt_time(t);
 
   return logstream;
 }
