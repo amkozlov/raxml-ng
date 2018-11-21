@@ -161,7 +161,7 @@ RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const Partitioned
     auto model_str = parted_msa.part_model(p).to_string(stream.print_model_params(),
                                                         stream.precision());
     auto part_name = parted_msa.part_name(p);
-    auto part_len = parted_msa.part_length(p);
+    auto part_len = parted_msa.part_sites(p);
 
     stream << model_str << ", "
            << part_name << " = "
@@ -169,7 +169,7 @@ RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const Partitioned
            << std::endl;
     offset += part_len;
   }
-  assert(offset == parted_msa.total_length());
+  assert(offset == parted_msa.total_sites());
 
   return stream;
 }

@@ -19,6 +19,7 @@ struct OutputFileNames
   std::string fbp_support_tree;
   std::string terrace;
   std::string binary_msa;
+  std::string bootstrap_msa;
 };
 
 class Options
@@ -117,6 +118,8 @@ public:
   const std::string& support_tree_file(BranchSupportMetric bsm = BranchSupportMetric::fbp) const;
   const std::string& terrace_file() const { return outfile_names.terrace; }
   const std::string& binary_msa_file() const { return outfile_names.binary_msa; }
+  std::string bootstrap_msa_file(size_t bsnum) const;
+  std::string bootstrap_partition_file() const;
 
   void set_default_outfiles();
 

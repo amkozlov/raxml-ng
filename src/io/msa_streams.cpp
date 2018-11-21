@@ -97,7 +97,7 @@ PhylipStream& operator<<(PhylipStream& stream, const PartitionedMSAView& msa)
   ofstream fs(stream.fname());
 
   auto taxa = msa.taxon_count();
-  auto sites = msa.total_length();
+  auto sites = msa.total_sites();
   fs << taxa << " " << sites << endl;
 
   for (size_t i = 0; i < taxa; ++i)
@@ -105,7 +105,7 @@ PhylipStream& operator<<(PhylipStream& stream, const PartitionedMSAView& msa)
     fs << msa.taxon_name(i) << " ";
     for (size_t p = 0; p < msa.part_count(); ++p)
     {
-      fs << msa.part_sequence(i, p);
+      fs << msa.part_sequence(i, p, true);
     }
     fs << endl;
   }

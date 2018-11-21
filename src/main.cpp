@@ -664,6 +664,11 @@ void load_msa(RaxmlInstance& instance)
   {
     LOG_VERB_TS << "Compressing alignment patterns... " << endl;
     parted_msa.compress_patterns();
+
+    // temp workaround: since MSA pattern compression calls rand(), it will change all random
+    // numbers generated afterwards. so just reset seed to the initial value to ensure that
+    // starting trees, BS replicates etc. are the same regardless whether pat.comp is ON or OFF
+    srand(opts.random_seed);
   }
 
 //  if (parted_msa.part_count() > 1)
@@ -1149,8 +1154,11 @@ void balance_load(RaxmlInstance& instance, WeightVectorList part_site_weights)
 
 void generate_bootstraps(RaxmlInstance& instance, const Checkpoint& checkp)
 {
-  if (instance.opts.command == Command::bootstrap || instance.opts.command == Command::all)
+  if (instance.opts.command == Command::bootstrap || instance.opts.command == Command::all ||
+      instance.opts.command == Command::bsmsa)
   {
+    assert(instance.parted_msa);
+
     /* generate replicate alignments */
     BootstrapGenerator bg;
     for (size_t b = 0; b < instance.opts.num_bootstraps; ++b)
@@ -1390,6 +1398,12 @@ void command_support(RaxmlInstance& instance)
   check_bootstop(instance, bs_trees, true);
 }
 
+void command_bsmsa(RaxmlInstance& instance, const Checkpoint& checkp)
+{
+  load_parted_msa(instance);
+  generate_bootstraps(instance, checkp);
+}
+
 void check_terrace(const RaxmlInstance& instance, const Tree& tree)
 {
 #ifdef _RAXML_TERRAPHAST
@@ -1627,6 +1641,46 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
       }
 
       LOG_INFO << "Bootstrap trees saved to: " << sysutil_realpath(opts.bootstrap_trees_file()) << endl;
+    }
+  }
+
+  if (opts.command == Command::bsmsa)
+  {
+    if (!opts.bootstrap_msa_file(1).empty())
+    {
+      PartitionedMSAView bs_msa_view(instance.parted_msa);
+
+      bool print_part_file = instance.parted_msa->part_count() > 1;
+
+      size_t bsnum = 0;
+      for (const auto& bsrep: instance.bs_reps)
+      {
+        bsnum++;
+        PhylipStream ps(opts.bootstrap_msa_file(bsnum));
+
+        bs_msa_view.site_weights(bsrep.site_weights);
+        ps << bs_msa_view;
+      }
+
+      LOG_INFO << "Bootstrap replicate MSAs saved to: "
+               << sysutil_realpath(opts.bootstrap_msa_file(1))
+               << "  ... " << endl
+               << "                                   "
+               << sysutil_realpath(opts.bootstrap_msa_file(opts.num_bootstraps)) << endl;
+
+      if (print_part_file)
+      {
+        RaxmlPartitionStream ps(opts.bootstrap_partition_file(), ios::out);
+
+        ps << bs_msa_view;
+
+        LOG_INFO << endl;
+        LOG_INFO << "Partition file for (all) bootstrap replicate MSAs saved to: "
+                 << sysutil_realpath(opts.bootstrap_partition_file()) << endl << endl;
+
+        LOG_INFO << "IMPORTANT: You MUST use the aforementioned adjusted partitioned file" << endl
+                 << "           when running tree searches on bootstrap replicate MSAs!" << endl;
+      }
     }
   }
 
@@ -1876,11 +1930,6 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   check_options(instance);
 
-  // temp workaround: since MSA pattern compression calls rand(), it will change all random
-  // numbers generated afterwards. so just reset seed to the initial value to ensure that
-  // starting trees, BS replicates etc. are the same regardless whether pat.comp is ON or OFF
-  srand(opts.random_seed);
-
   // we need 2 doubles for each partition AND threads to perform parallel reduction,
   // so resize the buffer accordingly
   const size_t reduce_buffer_size = std::max(1024lu, 2 * sizeof(double) *
@@ -2002,6 +2051,7 @@ int internal_main(int argc, char** argv, void* comm)
     case Command::support:
     case Command::start:
     case Command::terrace:
+    case Command::bsmsa:
       if (!opts.redo_mode && opts.result_files_exist())
       {
         LOG_ERROR << endl << "ERROR: Result files for the run with prefix `" <<
@@ -2156,6 +2206,11 @@ int internal_main(int argc, char** argv, void* comm)
         {
           LOG_INFO << "\nStarting trees have been successfully generated." << endl << endl;
         }
+        break;
+      }
+      case Command::bsmsa:
+      {
+        command_bsmsa(instance, cm.checkpoint());
         break;
       }
       case Command::none:

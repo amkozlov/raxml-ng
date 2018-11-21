@@ -69,6 +69,7 @@ static struct option long_options[] =
   {"bs-metric",          required_argument, 0, 0 },  /*  47 */
 
   {"search1",            no_argument, 0, 0 },        /*  48 */
+  {"bsmsa",              no_argument, 0, 0 },        /*  49 */
 
   { 0, 0, 0, 0 }
 };
@@ -142,6 +143,15 @@ void CommandLineParser::check_options(Options &opts)
 
     if (opts.outfile_prefix.empty())
       opts.outfile_prefix = opts.outfile_names.bootstrap_trees;
+  }
+
+  if (opts.command == Command::bsmsa)
+  {
+    if (!opts.num_bootstraps)
+    {
+      throw OptionException("You must specify the desired number of replicate MSAs, e.g., "
+          "--bs-trees 100");
+    }
   }
 
   if (opts.simd_arch > sysutil_simd_autodetect())
@@ -254,6 +264,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.load_balance_method = LoadBalancing::benoit;
 
   opts.num_searches = 0;
+  opts.num_bootstraps = 0;
 
   opts.redo_mode = false;
   opts.force_mode = false;
@@ -716,6 +727,11 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.start_trees[StartingTree::random] = 1;
         num_commands++;
         break;
+      case 49: /* generate bootstrap replicate MSAs */
+        opts.command = Command::bsmsa;
+        num_commands++;
+        break;
+
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -730,9 +746,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   check_options(opts);
 
-  if (opts.command != Command::bootstrap && opts.command != Command::all)
+  if ((opts.command == Command::bootstrap || opts.command == Command::all) &&
+      opts.num_bootstraps == 0)
   {
-    opts.num_bootstraps = 0;
+    opts.num_bootstraps = (opts.bootstop_criterion == BootstopCriterion::none) ? 100 : 1000;
   }
 
   compute_num_searches(opts);
@@ -763,6 +780,7 @@ void CommandLineParser::print_help()
             "  --support                                  compute bipartition support for a given reference tree (e.g., best ML tree)\n"
             "                                             and a set of replicate trees (e.g., from a bootstrap analysis)\n"
             "  --bsconverge                               test for bootstrapping convergence using autoMRE criterion\n"
+            "  --bsmsa                                    generate bootstrap replicate MSAs\n"
 #ifdef _RAXML_TERRAPHAST
             "  --terrace                                  check whether a tree lies on a phylogenetic terrace \n"
 #endif
