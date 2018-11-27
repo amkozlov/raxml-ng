@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 typedef uint32_t u_int32_t;
+#define posix_memalign(p, a, s) (((*(p)) = _aligned_malloc((s), (a))), *(p) ?0 :errno)
 #else
 #include <sys/time.h>
 #include <sys/resource.h>
