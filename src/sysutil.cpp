@@ -9,10 +9,15 @@
 #include <stdlib.h>
 typedef uint32_t u_int32_t;
 #define posix_memalign(p, a, s) (((*(p)) = _aligned_malloc((s), (a))), *(p) ?0 :errno)
-#else
+#elif defined __APPLE__
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/sysinfo.h>
+#else
+#include <sys/time.h>
+#include <sys/resource.h>
+#include <sys/types.h>
+#include <sys/sysctl.h>
 #endif
 
 #include <chrono>
