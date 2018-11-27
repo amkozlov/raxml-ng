@@ -1,5 +1,9 @@
 #include "file_io.hpp"
 
+#if defined __MINGW32__
+#define asprintf __mingw_asprintf
+#endif
+
 using namespace std;
 
 char * newick_name_cb(const pll_unode_t * node)
