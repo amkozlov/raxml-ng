@@ -12,12 +12,12 @@ typedef uint32_t u_int32_t;
 #elif defined __APPLE__
 #include <sys/time.h>
 #include <sys/resource.h>
-#include <sys/sysinfo.h>
+#include <sys/types.h>
+#include <sys/sysctl.h>
 #else
 #include <sys/time.h>
 #include <sys/resource.h>
-#include <sys/types.h>
-#include <sys/sysctl.h>
+#include <sys/sysinfo.h>
 #endif
 
 #include <chrono>
