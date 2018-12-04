@@ -8,6 +8,8 @@
 constexpr int CKP_VERSION = 1;
 constexpr int CKP_MIN_SUPPORTED_VERSION = 1;
 
+typedef std::unordered_map<size_t, Model> ModelMap;
+
 enum class CheckpointStep
 {
   start,
@@ -50,15 +52,16 @@ struct Checkpoint
   SearchState search_state;
 
   Tree tree;
-  std::unordered_map<size_t, Model> models;
+  ModelMap models;
+  ModelMap best_models;  /* model parameters for the best-scoring ML tree */
 
   TreeCollection ml_trees;
   TreeCollection bs_trees;
 
   double loglh() const { return search_state.loglh; }
 
-  void save_ml_tree() { ml_trees.push_back(loglh(), tree); }
-  void save_bs_tree() { bs_trees.push_back(loglh(), tree); }
+  void save_ml_tree();
+  void save_bs_tree();
 };
 
 class CheckpointManager

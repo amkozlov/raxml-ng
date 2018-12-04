@@ -1502,7 +1502,7 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
   const auto& parted_msa = *instance.parted_msa;
 
   if (opts.command == Command::search || opts.command == Command::all ||
-      opts.command == Command::evaluate || opts.command == Command::bootstrap)
+      opts.command == Command::evaluate)
   {
     auto model_log_lvl = parted_msa.part_count() > 1 ? LogLevel::verbose : LogLevel::info;
 
@@ -1512,7 +1512,7 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
     {
       RAXML_LOG(model_log_lvl) << "\n   Partition " << p << ": " <<
           parted_msa.part_info(p).name().c_str() << endl;
-      RAXML_LOG(model_log_lvl) << checkp.models.at(p);
+      RAXML_LOG(model_log_lvl) << checkp.best_models.at(p);
     }
   }
 
@@ -1994,10 +1994,12 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
       draw_bootstrap_support(instance, tree, checkp.bs_trees);
     }
 
-    assert(cm.checkpoint().models.size() == parted_msa.part_count());
+    auto ckp_models = cm.checkpoint().best_models.empty() ?
+                              cm.checkpoint().models : cm.checkpoint().best_models;
+    assert(ckp_models.size() == parted_msa.part_count());
     for (size_t p = 0; p < parted_msa.part_count(); ++p)
     {
-      parted_msa.model(p, cm.checkpoint().models.at(p));
+      parted_msa.model(p, ckp_models.at(p));
     }
   }
 }

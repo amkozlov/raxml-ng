@@ -6,6 +6,18 @@
 
 using namespace std;
 
+void Checkpoint::save_ml_tree()
+{
+  if (ml_trees.empty() || loglh() > ml_trees.best_score())
+    best_models = models;
+  ml_trees.push_back(loglh(), tree);
+}
+
+void Checkpoint::save_bs_tree()
+{
+  bs_trees.push_back(loglh(), tree);
+}
+
 void CheckpointManager::write(const std::string& ckp_fname) const
 {
   backup();
