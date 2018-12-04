@@ -1792,11 +1792,11 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
         }
         else
         {
+          double loglh = treeinfo->loglh();
           if (ParallelContext::master_thread())
-          {
-            cm.search_state().loglh = treeinfo->loglh();
-            cm.update_and_write(*treeinfo);
-          }
+            cm.search_state().loglh = loglh;
+
+          cm.update_and_write(*treeinfo);
         }
       }
       else
