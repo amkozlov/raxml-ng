@@ -141,6 +141,9 @@ void CommandLineParser::check_options(Options &opts)
   {
     assert(!opts.outfile_names.bootstrap_trees.empty());
 
+    if (opts.bootstop_criterion == BootstopCriterion::none)
+      opts.bootstop_criterion = BootstopCriterion::autoMRE;
+
     if (opts.outfile_prefix.empty())
       opts.outfile_prefix = opts.outfile_names.bootstrap_trees;
   }
