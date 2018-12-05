@@ -1505,6 +1505,7 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
       opts.command == Command::evaluate)
   {
     auto model_log_lvl = parted_msa.part_count() > 1 ? LogLevel::verbose : LogLevel::info;
+    auto ckp_models = checkp.best_models.empty() ? checkp.models : checkp.best_models;
 
     RAXML_LOG(model_log_lvl) << "\nOptimized model parameters:" << endl;
 
@@ -1512,7 +1513,7 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
     {
       RAXML_LOG(model_log_lvl) << "\n   Partition " << p << ": " <<
           parted_msa.part_info(p).name().c_str() << endl;
-      RAXML_LOG(model_log_lvl) << checkp.best_models.at(p);
+      RAXML_LOG(model_log_lvl) << ckp_models.at(p);
     }
   }
 
