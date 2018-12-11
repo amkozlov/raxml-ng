@@ -74,6 +74,31 @@ static struct option long_options[] =
   { 0, 0, 0, 0 }
 };
 
+/*
+ * A function to check if there is hyperthreading on the machine or not. Checks
+ * the CPUID of the processor, and then returns if that bit is set.
+ * See: https://en.wikipedia.org/wiki/CPUID
+ */
+bool check_ht(){
+    uint32_t level, registers[4];
+    level = 1;
+#ifdef _WIN32
+    __cpuid((int*) registers, level);
+#else
+    asm volatile
+        (
+         "cpuid": 
+         "=a" (registers[0]),
+         "=b" (registers[1]),
+         "=c" (registers[2]),
+         "=d" (registers[3])
+         :"a" (level), "c" (0)
+        );
+#endif
+    bool ht = registers[3] & (0x1 << 28); 
+    return ht;
+}
+
 static std::string get_cmdline(int argc, char** argv)
 {
   ostringstream s;
@@ -248,7 +273,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   /* use all available cores per default */
 #if defined(_RAXML_PTHREADS) && !defined(_RAXML_MPI)
-  opts.num_threads = std::max(1u, std::thread::hardware_concurrency());
+  unsigned int threads_per_core = std::max(1, 2 * check_ht());
+  opts.num_threads = std::max(1u, std::thread::hardware_concurrency()/threads_per_core);
 #else
   opts.num_threads = 1;
 #endif
