@@ -38,6 +38,7 @@ void sysutil_show_rusage();
 unsigned long sysutil_get_memused();
 unsigned long sysutil_get_memtotal();
 
+unsigned int sysutil_get_cpu_cores();
 unsigned long sysutil_get_cpu_features();
 unsigned int sysutil_simd_autodetect();
 

@@ -248,7 +248,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   /* use all available cores per default */
 #if defined(_RAXML_PTHREADS) && !defined(_RAXML_MPI)
-  opts.num_threads = std::max(1u, std::thread::hardware_concurrency());
+  opts.num_threads = std::max(1u, sysutil_get_cpu_cores());
 #else
   opts.num_threads = 1;
 #endif
@@ -810,8 +810,8 @@ void CommandLineParser::print_help()
             "  --seed         VALUE                       seed for pseudo-random number generator (default: current time)\n"
             "  --pat-comp     on | off                    alignment pattern compression (default: ON)\n"
             "  --tip-inner    on | off                    tip-inner case optimization (default: ON)\n"
-            "  --site-repeats on | off                    use site repeats optimization, 10%-60% faster than tip-inner (default: ON)\n"
-            "  --threads      VALUE                       number of parallel threads to use (default: 2).\n"
+            "  --site-repeats on | off                    use site repeats optimization, 10%-60% faster than tip-inner (default: ON)\n" <<
+            "  --threads      VALUE                       number of parallel threads to use (default: " << sysutil_get_cpu_cores() << ")\n" <<
             "  --simd         none | sse3 | avx | avx2    vector instruction set to use (default: auto-detect).\n"
             "  --rate-scalers on | off                    use individual CLV scalers for each rate category (default: OFF)\n"
             "  --force                                    disable all safety checks (please think twice!)\n"

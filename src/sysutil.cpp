@@ -1,10 +1,13 @@
+#ifndef _WIN32
 #include <cpuid.h>
+#endif
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <stdarg.h>
 #include <limits.h>
 
 #include <chrono>
+#include <thread>
 
 #include "common.h"
 
@@ -145,7 +148,28 @@ unsigned long sysutil_get_memtotal()
 
 static void get_cpuid(int32_t out[4], int32_t x)
 {
+#ifdef _WIN32
+  __cpuid(out, x);
+#else
   __cpuid_count(x, 0, out[0], out[1], out[2], out[3]);
+#endif
+}
+
+static bool ht_enabled()
+{
+  int32_t info[4];
+
+  get_cpuid(info, 1);
+
+  return (bool) (info[3] & (0x1 << 28));
+}
+
+unsigned int sysutil_get_cpu_cores()
+{
+  auto lcores = std::thread::hardware_concurrency();
+  auto threads_per_core = ht_enabled() ? 2 : 1;
+
+  return lcores / threads_per_core;
 }
 
 unsigned long sysutil_get_cpu_features()
