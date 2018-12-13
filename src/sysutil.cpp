@@ -3,6 +3,8 @@
 #endif
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <stdarg.h>
 #include <limits.h>
 
@@ -299,6 +301,18 @@ std::string sysutil_realpath(const std::string& path)
 bool sysutil_file_exists(const std::string& fname, int access_mode)
 {
   return access(fname.c_str(), access_mode) == 0;
+}
+
+bool sysutil_dir_exists(const std::string& dname)
+{
+  struct stat info;
+
+  if( stat( dname.c_str(), &info ) != 0 )
+    return false;
+  else if( info.st_mode & S_IFDIR )
+    return true;
+  else
+    return false;
 }
 
 const SystemTimer& global_timer()

@@ -2071,23 +2071,23 @@ int internal_main(int argc, char** argv, void* comm)
   }
 
   /* now get to the real stuff */
-  srand(opts.random_seed);
-  logger().log_level(instance.opts.log_level);
-  logger().precision(instance.opts.precision, LogElement::all);
-
-  /* only master process writes the log file */
-  if (ParallelContext::master() && !instance.opts.log_file().empty())
-  {
-    auto mode = !instance.opts.redo_mode && sysutil_file_exists(instance.opts.checkp_file()) ?
-        ios::app : ios::out;
-    logger().set_log_filename(opts.log_file(), mode);
-  }
-
-  print_banner();
-  LOG_INFO << opts;
-
   try
   {
+    srand(opts.random_seed);
+    logger().log_level(instance.opts.log_level);
+    logger().precision(instance.opts.precision, LogElement::all);
+
+    /* only master process writes the log file */
+    if (ParallelContext::master() && !instance.opts.log_file().empty())
+    {
+      auto mode = !instance.opts.redo_mode && sysutil_file_exists(instance.opts.checkp_file()) ?
+          ios::app : ios::out;
+      logger().set_log_filename(opts.log_file(), mode);
+    }
+
+    print_banner();
+    LOG_INFO << opts;
+
     if (!opts.constraint_tree_file.empty() &&
         (opts.start_trees.count(StartingTree::parsimony) > 0 ||
          opts.start_trees.count(StartingTree::user)))

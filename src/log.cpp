@@ -38,6 +38,11 @@ LogStream& Logging::logstream(LogLevel level)
 void Logging::set_log_filename(const std::string& fname, ios_base::openmode mode)
 {
   _logfile.open(fname, mode);
+  if (_logfile.fail())
+  {
+    throw runtime_error("Cannot open the log file for writing: " + fname +
+        "\nPlease make sure directory exists and you have write permissions for it!");
+  }
 }
 
 void Logging::add_log_stream(std::ostream* stream)
