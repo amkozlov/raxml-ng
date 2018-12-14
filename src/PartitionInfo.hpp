@@ -79,7 +79,7 @@ public:
   void range_string(const std::string& value) { _range_string = value; };
 
   // operations
-  size_t mark_partition_sites(unsigned int part_num, std::vector<unsigned int>& site_part);
+  size_t mark_partition_sites(unsigned int part_num, std::vector<unsigned int>& site_part) const;
   void compress_patterns();
   void set_model_empirical_params();
 

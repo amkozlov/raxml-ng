@@ -9,7 +9,7 @@ using namespace std;
 FastaStream& operator>>(FastaStream& stream, MSA& msa)
 {
   /* open the file */
-  auto file = pll_fasta_open(stream.fname().c_str(), pll_map_fasta);
+  auto file = pll_fasta_open(stream.fname().c_str(), pll_map_generic);
   if (!file)
     libpll_check_error("Unable to parse FASTA file");
 
@@ -72,7 +72,7 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
 
 PhylipStream& operator>>(PhylipStream& stream, MSA& msa)
 {
-  pll_phylip_t * fd = pll_phylip_open(stream.fname().c_str(), pll_map_phylip);
+  pll_phylip_t * fd = pll_phylip_open(stream.fname().c_str(), pll_map_generic);
   if (!fd)
     throw runtime_error(pll_errmsg);
 

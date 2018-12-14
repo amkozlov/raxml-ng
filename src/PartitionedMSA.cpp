@@ -25,11 +25,11 @@ void PartitionedMSA::set_taxon_names(const NameList& taxon_names)
   assert(_taxon_names.size() == taxon_names.size() && _taxon_id_map.size() == taxon_names.size());
 }
 
-std::vector<unsigned int> PartitionedMSA::get_site_part_assignment()
+uintVector PartitionedMSA::get_site_part_assignment() const
 {
   const size_t full_len = _full_msa.num_sites();
 
-  std::vector<unsigned int> spa(full_len);
+  uintVector spa(full_len);
 
   size_t p = 0;
   for (auto& pinfo: _part_list)
@@ -60,6 +60,41 @@ std::vector<unsigned int> PartitionedMSA::get_site_part_assignment()
   return spa;
 }
 
+const uintVector& PartitionedMSA::site_part_map() const
+{
+  if (_site_part_map.empty())
+    _site_part_map = get_site_part_assignment();
+
+  return _site_part_map;
+}
+
+size_t PartitionedMSA::full_msa_site(size_t index, size_t site) const
+{
+  if (part_count() == 1)
+    return site;
+  else
+  {
+    size_t cur_site = site;
+    auto index_map = site_part_map();
+
+    // TODO: this can be optimized
+    for (size_t i = 0; i < index_map.size(); ++i)
+    {
+      if (index_map[i] == index+1)
+      {
+        if (!cur_site)
+          return i;
+
+        cur_site--;
+      }
+    }
+
+    throw runtime_error("Site " + to_string(site+1) +
+                        " not found in partition " +  to_string(index+1));
+  }
+}
+
+
 void PartitionedMSA::full_msa(MSA&& msa)
 {
   _full_msa = std::move(msa);
@@ -71,11 +106,9 @@ void PartitionedMSA::split_msa()
 {
   if (part_count() > 1)
   {
-    auto site_part = get_site_part_assignment();
-
     /* split MSA into partitions */
     pll_msa_t ** part_msa_list =
-        pllmod_msa_split(_full_msa.pll_msa(), site_part.data(), part_count());
+        pllmod_msa_split(_full_msa.pll_msa(), site_part_map().data(), part_count());
 
     for (size_t p = 0; p < part_count(); ++p)
     {

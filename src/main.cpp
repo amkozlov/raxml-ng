@@ -290,6 +290,31 @@ bool check_msa(RaxmlInstance& instance)
   size_t part_num = 0;
   for (auto& pinfo: parted_msa.part_list())
   {
+    /* check for invalid MSA characters */
+    pllmod_msa_errors_t * errs = pllmod_msa_check(pinfo.msa().pll_msa(),
+                                                  pinfo.model().charmap());
+
+    if (errs)
+    {
+      if (errs->invalid_char_count > 0)
+      {
+        msa_valid = false;
+        LOG_ERROR << endl;
+        for (unsigned long c = 0; c < errs->invalid_char_count; ++c)
+        {
+          auto global_pos = parted_msa.full_msa_site(part_num, errs->invalid_char_pos[c]);
+          LOG_ERROR << "ERROR: Invalid character in sequence " <<  errs->invalid_char_seq[c]+1
+                    << " at position " <<  global_pos+1  << ": " << errs->invalid_chars[c] << endl;
+        }
+        part_num++;
+        continue;
+      }
+      pllmod_msa_destroy_errors(errs);
+    }
+    else
+      libpll_check_error("MSA check failed");
+
+
     stats_mask = PLLMOD_MSA_STATS_GAP_SEQS | PLLMOD_MSA_STATS_GAP_COLS;
 
     pllmod_msa_stats_t * stats = pinfo.compute_stats(stats_mask);

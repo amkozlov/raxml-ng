@@ -8,7 +8,7 @@ PartitionInfo::~PartitionInfo ()
 {
 }
 
-size_t PartitionInfo::mark_partition_sites(unsigned int part_num, std::vector<unsigned int>& site_part)
+size_t PartitionInfo::mark_partition_sites(unsigned int part_num, std::vector<unsigned int>& site_part) const
 {
   size_t start, end, stride;
   size_t i;
