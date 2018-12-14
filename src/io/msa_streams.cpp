@@ -11,7 +11,7 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
   /* open the file */
   auto file = pll_fasta_open(stream.fname().c_str(), pll_map_fasta);
   if (!file)
-    throw runtime_error{"Cannot open file " + stream.fname()};
+    libpll_check_error("Unable to parse FASTA file");
 
   char * sequence = NULL;
   char * header = NULL;
@@ -29,7 +29,7 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
     {
       /* first sequence, init the MSA object */
       if (sequence_length == -1 || sequence_length == 0)
-        throw runtime_error{"Unable to read MSA file"};
+        throw runtime_error{"Unable to parse FASTA file"};
 
       sites = sequence_length;
 
@@ -38,7 +38,17 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
     else
     {
       if (sequence_length != sites)
-        throw runtime_error{"MSA file does not contain equal size sequences"};
+        throw runtime_error{"FASTA file does not contain equal size sequences"};
+    }
+
+    if (!header_length)
+    {
+      throw runtime_error{"FASTA file contains empty sequence label: " + to_string(msa.size() + 1) };
+    }
+
+    if (!sequence_length)
+    {
+      throw runtime_error{"FASTA file contains empty sequence:" + string(header) };
     }
 
     /*trim trailing whitespace from the sequence label */
@@ -51,7 +61,7 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
   }
 
   if (pll_errno != PLL_ERROR_FILE_EOF)
-    throw runtime_error{"Error while reading file: " +  stream.fname()};
+    libpll_check_error("Error parsing FASTA file: " +  stream.fname() + "\n");
 
   pll_fasta_close(file);
 
@@ -77,7 +87,7 @@ PhylipStream& operator>>(PhylipStream& stream, MSA& msa)
     pll_msa_destroy(pll_msa);
   }
   else
-    throw runtime_error{"Unable to parse PHYLIP file: " +  stream.fname()};
+    libpll_check_error("Unable to parse PHYLIP file: " +  stream.fname() + "\n");
 
   return stream;
 }
@@ -340,7 +350,8 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format)
     }
   }
 
-  throw runtime_error("Error loading MSA: cannot parse any format supported by RAxML-NG!");
+  throw runtime_error("Error loading MSA: cannot parse any format supported by RAxML-NG!\n"
+      "Please re-run with --msa-format <FORMAT> and/or --log debug to get more information.");
 }
 
 
