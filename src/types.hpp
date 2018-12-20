@@ -6,6 +6,7 @@
 #include <array>
 #include <set>
 #include <map>
+#include <queue>
 #include <unordered_map>
 #include <unordered_set>
 #include <random>
@@ -29,6 +30,7 @@ enum class Command
   all,
   support,
   bsconverge,
+  bsmsa,
   terrace,
   check,
   parse,
@@ -117,6 +119,7 @@ typedef std::unordered_map<std::string,size_t> NameIdMap;
 typedef std::unordered_map<std::string,std::string> NameMap;
 typedef std::set<size_t> IDSet;
 typedef std::vector<size_t> IDVector;
+typedef std::queue<size_t> IDQueue;
 typedef std::map<StartingTree,size_t> StartingTreeMap;
 
 typedef unsigned int WeightType;

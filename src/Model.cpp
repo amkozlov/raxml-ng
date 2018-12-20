@@ -25,7 +25,12 @@ const unordered_map<DataType,const pll_state_t*,EnumClassHash>  DATATYPE_MAPS {
 
 
 // TODO move it out of here
-class parse_error {};
+class parse_error : public runtime_error
+{
+public:
+  parse_error(const std::string& msg = "") : runtime_error(msg) {};
+};
+
 static string read_option(istringstream& s)
 {
   ostringstream os;
@@ -594,35 +599,49 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
       case 'M':
         try
         {
-           std::string state_chars, gap_chars;
-           int case_sensitive = 1;
+          std::string state_chars, gap_chars;
+          int case_sensitive = 1;
+          if (tolower(ss.peek()) == 'i')
+          {
+            ss.get();
+            case_sensitive = 0;
+          }
 
-           if (tolower(ss.peek()) == 'i')
-           {
-             ss.get();
-             case_sensitive = 0;
-           }
+          if (!read_param(ss, state_chars))
+            throw parse_error();
 
-           if (!read_param(ss, state_chars))
-             throw parse_error();
+          read_param(ss, gap_chars);
 
-           read_param(ss, gap_chars);
-
-           _custom_charmap = shared_ptr<pll_state_t>(
-               pllmod_util_charmap_create(_num_states,
+          if (sysutil_file_exists(state_chars) && gap_chars.empty())
+          {
+            /* read custom character map from a file */
+            _custom_charmap = shared_ptr<pll_state_t>(
+                pllmod_util_charmap_parse(_num_states,
                                           state_chars.c_str(),
-                                          gap_chars.c_str(),
-                                          case_sensitive),
-               free);
-           if (!_custom_charmap)
-           {
-             assert(pll_errno);
-             throw parse_error();
-           }
+                                          case_sensitive,
+                                          nullptr),
+                free);
+          }
+          else
+          {
+            _custom_charmap = shared_ptr<pll_state_t>(
+                pllmod_util_charmap_create(_num_states,
+                                           state_chars.c_str(),
+                                           gap_chars.c_str(),
+                                           case_sensitive),
+                free);
+          }
+
+          if (!_custom_charmap)
+          {
+            assert(pll_errno);
+            throw parse_error(pll_errmsg);
+          }
         }
         catch(parse_error& e)
         {
-          throw runtime_error(string("Invalid character map specification: ") + s);
+          throw runtime_error(string("Invalid character map specification: ") + s +
+              (e.what() ? "\n" + string(e.what()) : ""));
         }
         break;
       case 'R':

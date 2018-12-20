@@ -73,12 +73,15 @@ void sysutil_show_rusage();
 unsigned long sysutil_get_memused();
 unsigned long sysutil_get_memtotal();
 
+unsigned int sysutil_get_cpu_cores();
 unsigned long sysutil_get_cpu_features();
 unsigned int sysutil_simd_autodetect();
 
 const SystemTimer& global_timer();
+std::string sysutil_fmt_time(const time_t& t);
 
 std::string sysutil_realpath(const std::string& path);
 bool sysutil_file_exists(const std::string& fname, int access_mode = F_OK);
+bool sysutil_dir_exists(const std::string& dname);
 
 #endif /* RAXML_COMMON_H_ */

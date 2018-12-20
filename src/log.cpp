@@ -38,6 +38,11 @@ LogStream& Logging::logstream(LogLevel level)
 void Logging::set_log_filename(const std::string& fname, ios_base::openmode mode)
 {
   _logfile.open(fname, mode);
+  if (_logfile.fail())
+  {
+    throw runtime_error("Cannot open the log file for writing: " + fname +
+        "\nPlease make sure directory exists and you have write permissions for it!");
+  }
 }
 
 void Logging::add_log_stream(std::ostream* stream)
@@ -115,10 +120,7 @@ LogStream& operator<<(LogStream& logstream, std::ostream& (*pf)(std::ostream&))
 
 LogStream& operator<<(LogStream& logstream, const time_t& t)
 {
-  std::array<char, 128> buffer;
-  const auto timeinfo = std::localtime(&t);
-  strftime(buffer.data(), sizeof(buffer), "%d-%b-%Y %H:%M:%S", timeinfo);
-  logstream << buffer.data();
+  logstream << sysutil_fmt_time(t);
 
   return logstream;
 }

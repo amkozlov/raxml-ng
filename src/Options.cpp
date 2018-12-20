@@ -32,6 +32,7 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.tbe_support_tree, "supportTBE");
   set_default_outfile(outfile_names.terrace, "terrace");
   set_default_outfile(outfile_names.binary_msa, "rba");
+  set_default_outfile(outfile_names.bootstrap_msa, "bootstrapMSA");
 }
 
 const std::string& Options::support_tree_file(BranchSupportMetric bsm) const
@@ -47,6 +48,18 @@ const std::string& Options::support_tree_file(BranchSupportMetric bsm) const
     else
       return outfile_names.support_tree;
   }
+}
+
+std::string Options::bootstrap_msa_file(size_t bsnum) const
+{
+  return outfile_names.bootstrap_msa.empty() ? "" :
+             outfile_names.bootstrap_msa + "." + to_string(bsnum) + ".phy";
+}
+
+std::string Options::bootstrap_partition_file() const
+{
+  return outfile_names.bootstrap_msa.empty() ? "" :
+             outfile_names.bootstrap_msa + ".partition";
 }
 
 bool Options::result_files_exist() const
@@ -72,6 +85,9 @@ bool Options::result_files_exist() const
       return sysutil_file_exists(terrace_file());
     case Command::start:
       return sysutil_file_exists(start_tree_file());
+    case Command::bsmsa:
+      return sysutil_file_exists(bootstrap_msa_file(1)) ||
+             sysutil_file_exists(bootstrap_partition_file());
     default:
       return false;
   }
@@ -112,6 +128,18 @@ void Options::remove_result_files() const
     if (sysutil_file_exists(start_tree_file()))
       std::remove(start_tree_file().c_str());
   }
+
+  if (command == Command::bsmsa)
+  {
+    size_t bsnum = 1;
+    while (sysutil_file_exists(bootstrap_msa_file(bsnum)))
+    {
+      std::remove(bootstrap_msa_file(bsnum).c_str());
+      bsnum++;
+    }
+    if (sysutil_file_exists(bootstrap_partition_file()))
+      std::remove(bootstrap_partition_file().c_str());
+  }
 }
 
 string Options::simd_arch_name() const
@@ -140,7 +168,8 @@ string Options::simd_arch_name() const
 
 std::ostream& operator<<(std::ostream& stream, const Options& opts)
 {
-  stream << "RAxML-NG was called as follows:" << endl << endl << opts.cmdline << endl << endl;
+  stream << "RAxML-NG was called at " << sysutil_fmt_time(global_timer().start_time())
+         << " as follows:" << endl << endl << opts.cmdline << endl << endl;
 
   stream << "Analysis options:" << endl;
 
@@ -164,6 +193,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       break;
     case Command::bsconverge:
       stream << "A posteriori bootstrap convergence test";
+      break;
+    case Command::bsmsa:
+      stream << "Generate bootstrap replicate MSAs";
       break;
     case Command::terrace:
       stream << "Count/enumerate trees on a phylogenetic terrace";
@@ -224,7 +256,8 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   }
   stream << endl;
 
-  if (opts.command == Command::bootstrap || opts.command == Command::all)
+  if (opts.command == Command::bootstrap || opts.command == Command::all ||
+      opts.command == Command::bsmsa)
   {
     stream << "  bootstrap replicates: ";
     if (opts.bootstop_criterion == BootstopCriterion::none)

@@ -9,9 +9,9 @@ using namespace std;
 FastaStream& operator>>(FastaStream& stream, MSA& msa)
 {
   /* open the file */
-  auto file = pll_fasta_open(stream.fname().c_str(), pll_map_fasta);
+  auto file = pll_fasta_open(stream.fname().c_str(), pll_map_generic);
   if (!file)
-    throw runtime_error{"Cannot open file " + stream.fname()};
+    libpll_check_error("Unable to parse FASTA file");
 
   char * sequence = NULL;
   char * header = NULL;
@@ -29,7 +29,7 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
     {
       /* first sequence, init the MSA object */
       if (sequence_length == -1 || sequence_length == 0)
-        throw runtime_error{"Unable to read MSA file"};
+        throw runtime_error{"Unable to parse FASTA file"};
 
       sites = sequence_length;
 
@@ -38,7 +38,17 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
     else
     {
       if (sequence_length != sites)
-        throw runtime_error{"MSA file does not contain equal size sequences"};
+        throw runtime_error{"FASTA file does not contain equal size sequences"};
+    }
+
+    if (!header_length)
+    {
+      throw runtime_error{"FASTA file contains empty sequence label: " + to_string(msa.size() + 1) };
+    }
+
+    if (!sequence_length)
+    {
+      throw runtime_error{"FASTA file contains empty sequence:" + string(header) };
     }
 
     /*trim trailing whitespace from the sequence label */
@@ -51,7 +61,7 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
   }
 
   if (pll_errno != PLL_ERROR_FILE_EOF)
-    throw runtime_error{"Error while reading file: " +  stream.fname()};
+    libpll_check_error("Error parsing FASTA file: " +  stream.fname() + "\n");
 
   pll_fasta_close(file);
 
@@ -62,7 +72,7 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
 
 PhylipStream& operator>>(PhylipStream& stream, MSA& msa)
 {
-  pll_phylip_t * fd = pll_phylip_open(stream.fname().c_str(), pll_map_phylip);
+  pll_phylip_t * fd = pll_phylip_open(stream.fname().c_str(), pll_map_generic);
   if (!fd)
     throw runtime_error(pll_errmsg);
 
@@ -77,7 +87,7 @@ PhylipStream& operator>>(PhylipStream& stream, MSA& msa)
     pll_msa_destroy(pll_msa);
   }
   else
-    throw runtime_error{"Unable to parse PHYLIP file: " +  stream.fname()};
+    libpll_check_error("Unable to parse PHYLIP file: " +  stream.fname() + "\n");
 
   return stream;
 }
@@ -97,7 +107,7 @@ PhylipStream& operator<<(PhylipStream& stream, const PartitionedMSAView& msa)
   ofstream fs(stream.fname());
 
   auto taxa = msa.taxon_count();
-  auto sites = msa.total_length();
+  auto sites = msa.total_sites();
   fs << taxa << " " << sites << endl;
 
   for (size_t i = 0; i < taxa; ++i)
@@ -105,7 +115,7 @@ PhylipStream& operator<<(PhylipStream& stream, const PartitionedMSAView& msa)
     fs << msa.taxon_name(i) << " ";
     for (size_t p = 0; p < msa.part_count(); ++p)
     {
-      fs << msa.part_sequence(i, p);
+      fs << msa.part_sequence(i, p, true);
     }
     fs << endl;
   }
@@ -340,7 +350,8 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format)
     }
   }
 
-  throw runtime_error("Error loading MSA: cannot parse any format supported by RAxML-NG!");
+  throw runtime_error("Error loading MSA: cannot parse any format supported by RAxML-NG!\n"
+      "Please re-run with --msa-format <FORMAT> and/or --log debug to get more information.");
 }
 
 

@@ -68,6 +68,9 @@ static struct option long_options[] =
   {"extra",              required_argument, 0, 0 },  /*  46 */
   {"bs-metric",          required_argument, 0, 0 },  /*  47 */
 
+  {"search1",            no_argument, 0, 0 },        /*  48 */
+  {"bsmsa",              no_argument, 0, 0 },        /*  49 */
+
   { 0, 0, 0, 0 }
 };
 
@@ -138,8 +141,20 @@ void CommandLineParser::check_options(Options &opts)
   {
     assert(!opts.outfile_names.bootstrap_trees.empty());
 
+    if (opts.bootstop_criterion == BootstopCriterion::none)
+      opts.bootstop_criterion = BootstopCriterion::autoMRE;
+
     if (opts.outfile_prefix.empty())
       opts.outfile_prefix = opts.outfile_names.bootstrap_trees;
+  }
+
+  if (opts.command == Command::bsmsa)
+  {
+    if (!opts.num_bootstraps)
+    {
+      throw OptionException("You must specify the desired number of replicate MSAs, e.g., "
+          "--bs-trees 100");
+    }
   }
 
   if (opts.simd_arch > sysutil_simd_autodetect())
@@ -162,17 +177,12 @@ void CommandLineParser::compute_num_searches(Options &opts)
   {
     if (opts.start_trees.empty())
     {
-      if (opts.command == Command::all)
-      {
-        opts.start_trees[StartingTree::random] = 10;
-        opts.start_trees[StartingTree::parsimony] = 10;
-      }
-      else
-        opts.start_trees[StartingTree::random] = 1;
+      opts.start_trees[StartingTree::random] = 10;
+      opts.start_trees[StartingTree::parsimony] = 10;
     }
     else
     {
-      auto def_tree_count = (opts.command == Command::all) ? 20 : 1;
+      auto def_tree_count = 10;
       for (auto& it: opts.start_trees)
       {
         if (it.first == StartingTree::user)
@@ -226,19 +236,19 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   /* bootstrapping / bootstopping */
   opts.bs_metrics.push_back(BranchSupportMetric::fbp);
-  opts.bootstop_criterion = BootstopCriterion::none;
+  opts.bootstop_criterion = BootstopCriterion::autoMRE;
   opts.bootstop_cutoff = RAXML_BOOTSTOP_CUTOFF;
   opts.bootstop_interval = RAXML_BOOTSTOP_INTERVAL;
   opts.bootstop_permutations = RAXML_BOOTSTOP_PERMUTES;
 
   /* default: linked branch lengths */
-  opts.brlen_linkage = PLLMOD_COMMON_BRLEN_LINKED;
+  opts.brlen_linkage = PLLMOD_COMMON_BRLEN_SCALED;
   opts.brlen_min = RAXML_BRLEN_MIN;
   opts.brlen_max = RAXML_BRLEN_MAX;
 
   /* use all available cores per default */
 #if defined(_RAXML_PTHREADS) && !defined(_RAXML_MPI)
-  opts.num_threads = std::max(1u, std::thread::hardware_concurrency());
+  opts.num_threads = std::max(1u, sysutil_get_cpu_cores());
 #else
   opts.num_threads = 1;
 #endif
@@ -257,6 +267,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.load_balance_method = LoadBalancing::benoit;
 
   opts.num_searches = 0;
+  opts.num_bootstraps = 0;
 
   opts.redo_mode = false;
   opts.force_mode = false;
@@ -393,7 +404,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
 
       case 14: /* branch length linkage mode */
-        if (strcasecmp(optarg, "scaled") == 0)
+        if (strcasecmp(optarg, "scaled") == 0 || strcasecmp(optarg, "proportional") == 0)
           opts.brlen_linkage = PLLMOD_COMMON_BRLEN_SCALED;
         else if (strcasecmp(optarg, "linked") == 0)
           opts.brlen_linkage = PLLMOD_COMMON_BRLEN_LINKED;
@@ -521,6 +532,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         num_commands++;
         break;
       case 26:  /* number of bootstrap replicates */
+        opts.bootstop_criterion = BootstopCriterion::none;
         if (sysutil_file_exists(optarg))
         {
           opts.outfile_names.bootstrap_trees = optarg;
@@ -712,6 +724,17 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         }
         break;
 
+      case 48: /* search from a single starting tree */
+        opts.command = Command::search;
+        opts.start_trees.clear();
+        opts.start_trees[StartingTree::random] = 1;
+        num_commands++;
+        break;
+      case 49: /* generate bootstrap replicate MSAs */
+        opts.command = Command::bsmsa;
+        num_commands++;
+        break;
+
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -726,9 +749,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   check_options(opts);
 
-  if (opts.command != Command::bootstrap && opts.command != Command::all)
+  if ((opts.command == Command::bootstrap || opts.command == Command::all) &&
+      opts.num_bootstraps == 0)
   {
-    opts.num_bootstraps = 0;
+    opts.num_bootstraps = (opts.bootstop_criterion == BootstopCriterion::none) ? 100 : 1000;
   }
 
   compute_num_searches(opts);
@@ -736,7 +760,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* set default log output level  */
   if (!log_level_set)
   {
-    opts.log_level = (opts.num_searches > 1 || opts.num_bootstraps > 1) ?
+    opts.log_level = (opts.num_searches > 20 || opts.num_bootstraps > 1) ?
         LogLevel::info : LogLevel::progress;
   }
 
@@ -759,6 +783,7 @@ void CommandLineParser::print_help()
             "  --support                                  compute bipartition support for a given reference tree (e.g., best ML tree)\n"
             "                                             and a set of replicate trees (e.g., from a bootstrap analysis)\n"
             "  --bsconverge                               test for bootstrapping convergence using autoMRE criterion\n"
+            "  --bsmsa                                    generate bootstrap replicate MSAs\n"
 #ifdef _RAXML_TERRAPHAST
             "  --terrace                                  check whether a tree lies on a phylogenetic terrace \n"
 #endif
@@ -768,8 +793,8 @@ void CommandLineParser::print_help()
             "  --loglh                                    compute the likelihood of a fixed tree (no model/brlen optimization)\n"
             "\n"
             "Input and output options:\n"
-            "  --tree         FILE | rand{N} | pars{N}    starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
-            "                                             N = number of trees (default: 20 in 'all-in-one' mode, 1 otherwise)\n"
+            "  --tree            rand{N} | pars{N} | FILE starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
+            "                                             N = number of trees (default: rand{10},pars{10})\n"
             "  --msa             FILE                     alignment file\n"
             "  --msa-format      VALUE                    alignment file format: FASTA, PHYLIP, CATG or AUTO-detect (default)\n"
             "  --data-type       VALUE                    data type: DNA, AA, BIN(ary) or AUTO-detect (default)\n"
@@ -785,15 +810,15 @@ void CommandLineParser::print_help()
             "  --seed         VALUE                       seed for pseudo-random number generator (default: current time)\n"
             "  --pat-comp     on | off                    alignment pattern compression (default: ON)\n"
             "  --tip-inner    on | off                    tip-inner case optimization (default: ON)\n"
-            "  --site-repeats on | off                    use site repeats optimization, 10%-60% faster than tip-inner (default: ON)\n"
-            "  --threads      VALUE                       number of parallel threads to use (default: 2).\n"
+            "  --site-repeats on | off                    use site repeats optimization, 10%-60% faster than tip-inner (default: ON)\n" <<
+            "  --threads      VALUE                       number of parallel threads to use (default: " << sysutil_get_cpu_cores() << ")\n" <<
             "  --simd         none | sse3 | avx | avx2    vector instruction set to use (default: auto-detect).\n"
             "  --rate-scalers on | off                    use individual CLV scalers for each rate category (default: OFF)\n"
             "  --force                                    disable all safety checks (please think twice!)\n"
             "\n"
             "Model options:\n"
             "  --model        <name>+G[n]+<Freqs> | FILE  model specification OR partition file (default: GTR+G4)\n"
-            "  --brlen        linked | scaled | unlinked  branch length linkage between partitions (default: linked)\n"
+            "  --brlen        linked | scaled | unlinked  branch length linkage between partitions (default: scaled)\n"
             "  --blmin        VALUE                       minimum branch length (default: 1e-6)\n"
             "  --blmax        VALUE                       maximum branch length (default: 100)\n"
             "  --blopt        nr_fast    | nr_safe        branch length optimization method (default: nr_fast)\n"
@@ -808,16 +833,16 @@ void CommandLineParser::print_help()
             "  --spr-cutoff   VALUE | off                 relative LH cutoff for descending into subtrees (default: 1.0)\n"
             "\n"
             "Bootstrapping options:\n"
-            "  --bs-trees     VALUE                       number of bootstraps replicates (default: 100)\n"
-            "  --bs-trees     autoMRE                     use MRE-based bootstrap convergence criterion\n"
+            "  --bs-trees     VALUE                       number of bootstraps replicates\n"
+            "  --bs-trees     autoMRE{N}                  use MRE-based bootstrap convergence criterion, up to N replicates (default: 1000)\n"
             "  --bs-trees     FILE                        Newick file containing set of bootstrap replicate trees (with --support)\n"
             "  --bs-cutoff    VALUE                       cutoff threshold for the MRE-based bootstopping criteria (default: 0.03)\n"
             "  --bs-metric    fbp | tbe                   branch support metric: fbp = Felsenstein bootstrap (default), tbe = transfer distance\n";
 
   cout << "\n"
             "EXAMPLES:\n"
-            "  1. Perform single tree inference on DNA alignment \n"
-            "     (random starting tree, general time-reversible model, ML estimate of substitution rates and\n"
+            "  1. Perform tree inference on DNA alignment \n"
+            "     (10 random + 10 parsimony starting trees, general time-reversible model, ML estimate of substitution rates and\n"
             "      nucleotide frequencies, discrete GAMMA model of rate heterogeneity with 4 categories):\n"
             "\n"
             "     ./raxml-ng --msa testDNA.fa --model GTR+G\n"

@@ -144,10 +144,15 @@ void init_part_info(RaxmlInstance& instance)
   else if (sysutil_file_exists(opts.model_file))
   {
     // read partition definitions from file
-    RaxmlPartitionStream partfile(opts.model_file, ios::in);
-    partfile >> parted_msa;
-
-//    DBG("partitions found: %d\n", useropt->part_count);
+    try
+    {
+      RaxmlPartitionStream partfile(opts.model_file, ios::in);
+      partfile >> parted_msa;
+    }
+    catch(exception& e)
+    {
+      throw runtime_error("Failed to read partition file:\n" + string(e.what()));
+    }
   }
   else if (!opts.model_file.empty())
   {
@@ -156,6 +161,8 @@ void init_part_info(RaxmlInstance& instance)
   }
   else
     throw runtime_error("Please specify an evolutionary model with --model switch");
+
+  assert(parted_msa.part_count() > 0);
 
   /* make sure that linked branch length mode is set for unpartitioned alignments */
   if (parted_msa.part_count() == 1)
@@ -283,6 +290,31 @@ bool check_msa(RaxmlInstance& instance)
   size_t part_num = 0;
   for (auto& pinfo: parted_msa.part_list())
   {
+    /* check for invalid MSA characters */
+    pllmod_msa_errors_t * errs = pllmod_msa_check(pinfo.msa().pll_msa(),
+                                                  pinfo.model().charmap());
+
+    if (errs)
+    {
+      if (errs->invalid_char_count > 0)
+      {
+        msa_valid = false;
+        LOG_ERROR << endl;
+        for (unsigned long c = 0; c < errs->invalid_char_count; ++c)
+        {
+          auto global_pos = parted_msa.full_msa_site(part_num, errs->invalid_char_pos[c]);
+          LOG_ERROR << "ERROR: Invalid character in sequence " <<  errs->invalid_char_seq[c]+1
+                    << " at position " <<  global_pos+1  << ": " << errs->invalid_chars[c] << endl;
+        }
+        part_num++;
+        continue;
+      }
+      pllmod_msa_destroy_errors(errs);
+    }
+    else
+      libpll_check_error("MSA check failed");
+
+
     stats_mask = PLLMOD_MSA_STATS_GAP_SEQS | PLLMOD_MSA_STATS_GAP_COLS;
 
     pllmod_msa_stats_t * stats = pinfo.compute_stats(stats_mask);
@@ -657,6 +689,11 @@ void load_msa(RaxmlInstance& instance)
   {
     LOG_VERB_TS << "Compressing alignment patterns... " << endl;
     parted_msa.compress_patterns();
+
+    // temp workaround: since MSA pattern compression calls rand(), it will change all random
+    // numbers generated afterwards. so just reset seed to the initial value to ensure that
+    // starting trees, BS replicates etc. are the same regardless whether pat.comp is ON or OFF
+    srand(opts.random_seed);
   }
 
 //  if (parted_msa.part_count() > 1)
@@ -1142,8 +1179,11 @@ void balance_load(RaxmlInstance& instance, WeightVectorList part_site_weights)
 
 void generate_bootstraps(RaxmlInstance& instance, const Checkpoint& checkp)
 {
-  if (instance.opts.command == Command::bootstrap || instance.opts.command == Command::all)
+  if (instance.opts.command == Command::bootstrap || instance.opts.command == Command::all ||
+      instance.opts.command == Command::bsmsa)
   {
+    assert(instance.parted_msa);
+
     /* generate replicate alignments */
     BootstrapGenerator bg;
     for (size_t b = 0; b < instance.opts.num_bootstraps; ++b)
@@ -1298,7 +1338,7 @@ TreeCollection read_bootstrap_trees(const RaxmlInstance& instance, Tree& ref_tre
 {
   NameIdMap ref_tip_ids;
   const auto& opts = instance.opts;
- NewickStream boots(opts.bootstrap_trees_file(), std::ios::in);
+  NewickStream boots(opts.bootstrap_trees_file(), std::ios::in);
   TreeCollection bs_trees;
   unsigned int bs_num = 0;
 
@@ -1381,6 +1421,12 @@ void command_support(RaxmlInstance& instance)
 
   draw_bootstrap_support(instance, ref_tree, bs_trees);
   check_bootstop(instance, bs_trees, true);
+}
+
+void command_bsmsa(RaxmlInstance& instance, const Checkpoint& checkp)
+{
+  load_parted_msa(instance);
+  generate_bootstraps(instance, checkp);
 }
 
 void check_terrace(const RaxmlInstance& instance, const Tree& tree)
@@ -1481,9 +1527,10 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
   const auto& parted_msa = *instance.parted_msa;
 
   if (opts.command == Command::search || opts.command == Command::all ||
-      opts.command == Command::evaluate || opts.command == Command::bootstrap)
+      opts.command == Command::evaluate)
   {
     auto model_log_lvl = parted_msa.part_count() > 1 ? LogLevel::verbose : LogLevel::info;
+    auto ckp_models = checkp.best_models.empty() ? checkp.models : checkp.best_models;
 
     RAXML_LOG(model_log_lvl) << "\nOptimized model parameters:" << endl;
 
@@ -1491,7 +1538,7 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
     {
       RAXML_LOG(model_log_lvl) << "\n   Partition " << p << ": " <<
           parted_msa.part_info(p).name().c_str() << endl;
-      RAXML_LOG(model_log_lvl) << checkp.models.at(p);
+      RAXML_LOG(model_log_lvl) << ckp_models.at(p);
     }
   }
 
@@ -1623,6 +1670,46 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
     }
   }
 
+  if (opts.command == Command::bsmsa)
+  {
+    if (!opts.bootstrap_msa_file(1).empty())
+    {
+      PartitionedMSAView bs_msa_view(instance.parted_msa);
+
+      bool print_part_file = instance.parted_msa->part_count() > 1;
+
+      size_t bsnum = 0;
+      for (const auto& bsrep: instance.bs_reps)
+      {
+        bsnum++;
+        PhylipStream ps(opts.bootstrap_msa_file(bsnum));
+
+        bs_msa_view.site_weights(bsrep.site_weights);
+        ps << bs_msa_view;
+      }
+
+      LOG_INFO << "Bootstrap replicate MSAs saved to: "
+               << sysutil_realpath(opts.bootstrap_msa_file(1))
+               << "  ... " << endl
+               << "                                   "
+               << sysutil_realpath(opts.bootstrap_msa_file(opts.num_bootstraps)) << endl;
+
+      if (print_part_file)
+      {
+        RaxmlPartitionStream ps(opts.bootstrap_partition_file(), ios::out);
+
+        ps << bs_msa_view;
+
+        LOG_INFO << endl;
+        LOG_INFO << "Partition file for (all) bootstrap replicate MSAs saved to: "
+                 << sysutil_realpath(opts.bootstrap_partition_file()) << endl << endl;
+
+        LOG_INFO << "IMPORTANT: You MUST use the aforementioned adjusted partitioned file" << endl
+                 << "           when running tree searches on bootstrap replicate MSAs!" << endl;
+      }
+    }
+  }
+
   if (!opts.log_file().empty())
       LOG_INFO << "\nExecution log saved to: " << sysutil_realpath(opts.log_file()) << endl;
 
@@ -1731,11 +1818,11 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
         }
         else
         {
+          double loglh = treeinfo->loglh();
           if (ParallelContext::master_thread())
-          {
-            cm.search_state().loglh = treeinfo->loglh();
-            cm.update_and_write(*treeinfo);
-          }
+            cm.search_state().loglh = loglh;
+
+          cm.update_and_write(*treeinfo);
         }
       }
       else
@@ -1869,11 +1956,6 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   check_options(instance);
 
-  // temp workaround: since MSA pattern compression calls rand(), it will change all random
-  // numbers generated afterwards. so just reset seed to the initial value to ensure that
-  // starting trees, BS replicates etc. are the same regardless whether pat.comp is ON or OFF
-  srand(opts.random_seed);
-
   // we need 2 doubles for each partition AND threads to perform parallel reduction,
   // so resize the buffer accordingly
   const size_t reduce_buffer_size = std::max(1024lu, 2 * sizeof(double) *
@@ -1938,10 +2020,12 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
       draw_bootstrap_support(instance, tree, checkp.bs_trees);
     }
 
-    assert(cm.checkpoint().models.size() == parted_msa.part_count());
+    auto ckp_models = cm.checkpoint().best_models.empty() ?
+                              cm.checkpoint().models : cm.checkpoint().best_models;
+    assert(ckp_models.size() == parted_msa.part_count());
     for (size_t p = 0; p < parted_msa.part_count(); ++p)
     {
-      parted_msa.model(p, cm.checkpoint().models.at(p));
+      parted_msa.model(p, ckp_models.at(p));
     }
   }
 }
@@ -1995,6 +2079,7 @@ int internal_main(int argc, char** argv, void* comm)
     case Command::support:
     case Command::start:
     case Command::terrace:
+    case Command::bsmsa:
       if (!opts.redo_mode && opts.result_files_exist())
       {
         LOG_ERROR << endl << "ERROR: Result files for the run with prefix `" <<
@@ -2011,23 +2096,23 @@ int internal_main(int argc, char** argv, void* comm)
   }
 
   /* now get to the real stuff */
-  srand(opts.random_seed);
-  logger().log_level(instance.opts.log_level);
-  logger().precision(instance.opts.precision, LogElement::all);
-
-  /* only master process writes the log file */
-  if (ParallelContext::master() && !instance.opts.log_file().empty())
-  {
-    auto mode = !instance.opts.redo_mode && sysutil_file_exists(instance.opts.checkp_file()) ?
-        ios::app : ios::out;
-    logger().set_log_filename(opts.log_file(), mode);
-  }
-
-  print_banner();
-  LOG_INFO << opts;
-
   try
   {
+    srand(opts.random_seed);
+    logger().log_level(instance.opts.log_level);
+    logger().precision(instance.opts.precision, LogElement::all);
+
+    /* only master process writes the log file */
+    if (ParallelContext::master() && !instance.opts.log_file().empty())
+    {
+      auto mode = !instance.opts.redo_mode && sysutil_file_exists(instance.opts.checkp_file()) ?
+          ios::app : ios::out;
+      logger().set_log_filename(opts.log_file(), mode);
+    }
+
+    print_banner();
+    LOG_INFO << opts;
+
     if (!opts.constraint_tree_file.empty() &&
         (opts.start_trees.count(StartingTree::parsimony) > 0 ||
          opts.start_trees.count(StartingTree::user)))
@@ -2149,6 +2234,11 @@ int internal_main(int argc, char** argv, void* comm)
         {
           LOG_INFO << "\nStarting trees have been successfully generated." << endl << endl;
         }
+        break;
+      }
+      case Command::bsmsa:
+      {
+        command_bsmsa(instance, cm.checkpoint());
         break;
       }
       case Command::none:

@@ -1,10 +1,15 @@
+#ifndef _WIN32
 #include <cpuid.h>
+#endif
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <stdarg.h>
 #include <limits.h>
 
 #include <chrono>
+#include <thread>
 
 #include "common.h"
 
@@ -145,7 +150,28 @@ unsigned long sysutil_get_memtotal()
 
 static void get_cpuid(int32_t out[4], int32_t x)
 {
+#ifdef _WIN32
+  __cpuid(out, x);
+#else
   __cpuid_count(x, 0, out[0], out[1], out[2], out[3]);
+#endif
+}
+
+static bool ht_enabled()
+{
+  int32_t info[4];
+
+  get_cpuid(info, 1);
+
+  return (bool) (info[3] & (0x1 << 28));
+}
+
+unsigned int sysutil_get_cpu_cores()
+{
+  auto lcores = std::thread::hardware_concurrency();
+  auto threads_per_core = ht_enabled() ? 2 : 1;
+
+  return lcores / threads_per_core;
 }
 
 unsigned long sysutil_get_cpu_features()
@@ -277,9 +303,29 @@ bool sysutil_file_exists(const std::string& fname, int access_mode)
   return access(fname.c_str(), access_mode) == 0;
 }
 
+bool sysutil_dir_exists(const std::string& dname)
+{
+  struct stat info;
+
+  if( stat( dname.c_str(), &info ) != 0 )
+    return false;
+  else if( info.st_mode & S_IFDIR )
+    return true;
+  else
+    return false;
+}
+
 const SystemTimer& global_timer()
 {
   return systimer;
+}
+
+string sysutil_fmt_time(const time_t& t)
+{
+  std::array<char, 128> buffer;
+  const auto timeinfo = std::localtime(&t);
+  strftime(buffer.data(), sizeof(buffer), "%d-%b-%Y %H:%M:%S", timeinfo);
+  return buffer.data();
 }
 
 

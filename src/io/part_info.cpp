@@ -37,7 +37,16 @@ RaxmlPartitionStream& operator>>(RaxmlPartitionStream& stream, PartitionInfo& pa
       case EOF:
         if (!model_set)
         {
-          throw empty_line_exception();
+          string str = strstream.str();
+          std::remove_if(str.begin(), str.end(),
+                                   [](unsigned char x){return std::isspace(x);});
+          if (str.empty())
+            throw empty_line_exception();
+          else
+          {
+            throw partition_parser_exception("Invalid partition format: " +
+                                                        string(strstream.str()));
+          }
         }
         else
         {
@@ -118,6 +127,10 @@ RaxmlPartitionStream& operator>>(RaxmlPartitionStream& stream, PartitionedMSA& p
                           to_string(parted_msa.part_count() + 1) + ": " + e.what());
     }
   }
+  if (!parted_msa.part_count())
+  {
+    throw runtime_error("Partition file is empty!");
+  }
   return stream;
 }
 
@@ -148,7 +161,7 @@ RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const Partitioned
     auto model_str = parted_msa.part_model(p).to_string(stream.print_model_params(),
                                                         stream.precision());
     auto part_name = parted_msa.part_name(p);
-    auto part_len = parted_msa.part_length(p);
+    auto part_len = parted_msa.part_sites(p);
 
     stream << model_str << ", "
            << part_name << " = "
@@ -156,7 +169,7 @@ RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const Partitioned
            << std::endl;
     offset += part_len;
   }
-  assert(offset == parted_msa.total_length());
+  assert(offset == parted_msa.total_sites());
 
   return stream;
 }
