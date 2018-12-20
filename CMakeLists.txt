@@ -9,7 +9,9 @@ set(BUILD_AS_LIBRARY OFF CACHE BOOL "Build RAxML-NG as shared library (instead o
 
 set (USE_PTHREADS ON CACHE BOOL "Enable multi-threading support (PTHREADS)")
 set (USE_MPI OFF CACHE BOOL "Enable MPI support")
-set (USE_VCF OFF)
+set (USE_VCF OFF CACHE BOOL "Enable VCF support")
+
+set(HTSLIB_DIR "" CACHE STRING "Path to htslib")
 
 # set both following options to OFF to build a portable binary 
 # (don't worry, libpll will still have full SIMD support!)
@@ -70,7 +72,7 @@ endif()
 
 
 set (raxml-ng_VERSION_MAJOR 0)
-set (raxml-ng_VERSION_MINOR 6)
+set (raxml-ng_VERSION_MINOR 7)
 
 #set (CMAKE_BUILD_TYPE DEBUG)
 #set (CMAKE_BUILD_TYPE RELEASE)
@@ -124,6 +126,10 @@ endif()
 
 if(USE_TERRAPHAST)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_RAXML_TERRAPHAST")
+endif()
+
+if(USE_VCF)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_RAXML_VCF")
 endif()
 
 message(STATUS "Using flags: ${CMAKE_CXX_FLAGS}")

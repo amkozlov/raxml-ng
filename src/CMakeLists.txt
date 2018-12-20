@@ -57,11 +57,19 @@ if(USE_TERRAPHAST)
   set(RAXML_LIBS ${RAXML_LOCALDEPS_DIR}/lib/libterraces.a ${RAXML_LIBS})
 endif()
 
+if(USE_VCF)
+  set(RAXML_LIBS ${HTSLIB_DIR}/lib/libhts.a z ${RAXML_LIBS})
+  set(RAXML_INCLUDES ${HTSLIB_DIR}/include ${RAXML_INCLUDES})
+endif()
+
 # export to the parent dir to use in GTest makefile
+set(RAXML_INCLUDES ${RAXML_INCLUDES} PARENT_SCOPE)
 set(RAXML_LIBS ${RAXML_LIBS} PARENT_SCOPE)
 
 #message(STATUS "Libs: ${RAXML_LIBS}")
+message(STATUS "Includes: ${RAXML_INCLUDES}")
 
+target_include_directories(raxml_module PRIVATE ${RAXML_INCLUDES})
 target_link_libraries(raxml_module ${RAXML_LIBS})
 
 if (BUILD_AS_LIBRARY AND NOT APPLE)

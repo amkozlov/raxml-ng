@@ -3,6 +3,12 @@
 
 #include <fstream>
 
+#ifdef _RAXML_VCF
+#include <htslib/hts.h>
+#include <htslib/vcf.h>
+#endif
+
+
 #include "../Tree.hpp"
 #include "../bootstrap/BootstrapTree.hpp"
 #include "../bootstrap/BootstrapGenerator.hpp"
@@ -50,6 +56,13 @@ class CATGStream : public MSAFileStream
 public:
   CATGStream(const std::string& fname) : MSAFileStream(fname) {}
 };
+
+class VCFStream : public MSAFileStream
+{
+public:
+  VCFStream(const std::string& fname) : MSAFileStream(fname) {}
+};
+
 
 class RBAStream : public MSAFileStream
 {
@@ -101,6 +114,7 @@ NewickStream& operator<<(NewickStream& stream, const BootstrapTree& tree);
 PhylipStream& operator>>(PhylipStream& stream, MSA& msa);
 FastaStream& operator>>(FastaStream& stream, MSA& msa);
 CATGStream& operator>>(CATGStream& stream, MSA& msa);
+VCFStream& operator>>(VCFStream& stream, MSA& msa);
 MSA msa_load_from_file(const std::string &filename, const FileFormat format);
 
 PhylipStream& operator<<(PhylipStream& stream, const MSA& msa);

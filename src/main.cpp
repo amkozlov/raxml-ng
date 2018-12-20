@@ -664,6 +664,7 @@ void load_msa(RaxmlInstance& instance)
   {
     instance.opts.use_pattern_compression = false;
     instance.opts.use_tip_inner = false;
+    instance.opts.use_repeats = false;
 
     if (parted_msa.part_count() > 1)
       throw runtime_error("Partitioned probabilistic alignments are not supported yet, sorry...");

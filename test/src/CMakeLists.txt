@@ -19,6 +19,8 @@ set (EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/test/bin)
 
 add_executable        (raxml_test_module ${RAXML_TEST_SOURCES})
 
+target_include_directories (raxml_test_module PRIVATE ${RAXML_INCLUDES})
+
 target_link_libraries (raxml_test_module ${RAXML_LIBS})
 
 if(GMP_FOUND)

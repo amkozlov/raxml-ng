@@ -133,7 +133,6 @@ void GenotypeErrorModel::compute_state_probs(unsigned int state,
   // TODO: move it out of here
   unsigned int undef_state = (unsigned int) (pow(2, _states)) - 1;
 
-//  double sum_freqs = 0.;
   double sum_lh = 0.;
 
   for (size_t k = 0; k < _states; ++k)
@@ -161,7 +160,6 @@ void GenotypeErrorModel::compute_state_probs(unsigned int state,
           else
             clvp[k] = (1. - _dropout_rate) * _seq_error_rate * one_6;
         }
-//        sum_freqs += _freqs[k];
       }
       else if (HOMO(state_id))
         clvp[k] = one_6 * _seq_error_rate * _dropout_rate;
@@ -172,6 +170,7 @@ void GenotypeErrorModel::compute_state_probs(unsigned int state,
     }
   }
 
+//  printf("sumlh: %lf\n", sum_lh);
 //  if (state != undef_state)
 //  {
 //    for (size_t k = 0; k < _states; ++k)

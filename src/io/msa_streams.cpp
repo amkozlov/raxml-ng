@@ -276,6 +276,187 @@ CATGStream& operator>>(CATGStream& stream, MSA& msa)
   return stream;
 }
 
+VCFStream& operator>>(VCFStream& stream, MSA& msa)
+{
+#ifndef _RAXML_VCF
+  throw runtime_error("RAxML-NG was build without VCF support");
+#else
+  const auto fname = stream.fname().c_str();
+  htsFile *fp    = hts_open(fname, "rb");
+
+  if (!fp)
+    throw runtime_error("Cannot open VCF file: " + stream.fname());
+
+  const htsFormat *fmt = hts_get_format(fp);
+
+  if (fmt->category != variant_data)
+    throw runtime_error("Invalid VCF file type");
+
+  bcf_hdr_t *hdr = bcf_hdr_read(fp);
+  bcf1_t *rec    = bcf_init1();
+
+  size_t taxa_count = bcf_hdr_nsamples(hdr);
+
+  // This is an ugly workaround, but there seems to be no better way to get
+  // the number of SNPs from the stupid VCF
+  size_t site_count = 0;
+  while (bcf_read1(fp, hdr, rec) >=0)
+    site_count++;
+  bcf_hdr_destroy(hdr);
+  hts_close(fp);
+  fp = hts_open(fname,"rb");
+  hdr = bcf_hdr_read(fp);
+
+  LOG_DEBUG << "VCF samples: " << taxa_count << ", variants: " << site_count << endl;
+
+  msa = MSA(site_count);
+
+  string dummy(site_count, '*');
+
+  /* read taxa names */
+  try
+  {
+    for (size_t i = 0; i < taxa_count; ++i)
+    {
+      string taxon_name = hdr->samples[i];
+      msa.append(dummy, taxon_name);
+      LOG_DEBUG << "VCF: sample " << i << ": " << taxon_name << endl;
+    }
+  }
+  catch (exception& e)
+  {
+    LOG_DEBUG << e.what() << endl;
+  }
+
+  // TODO hardcoded for now: diploid unphased
+  msa.states(10);
+
+  /* allocate memory */
+  char inv_charmap[PLL_ASCII_SIZE] = {0};
+  for (unsigned int i = 0; i < PLL_ASCII_SIZE; ++i)
+    if (pll_map_nt[i] && !inv_charmap[pll_map_nt[i]])
+      inv_charmap[pll_map_nt[i]] = (char)i;
+
+  //       0  1  2  3  4  5  6  7  8  9
+  // VCF: AA AC AG AT CC CG CT GG GT TT
+  // RAX: AA CC GG TT AC AG AT CG CT GT
+                                      /* AA AC AG AT CC CG CT GG GT TT */
+  static const int vcf_to_rax_map[10] = {0, 4, 5, 6, 1, 7, 8, 2, 9, 3 };
+
+  char gt_to_char[4][4];
+  for (size_t i = 0; i < 4; ++i)
+  {
+    for (size_t j = 0; j < 4; ++j)
+    {
+      gt_to_char[i][j] = inv_charmap[ (1u << i) | (1u << j)];
+    }
+  }
+
+  int gl_num = 0;
+  float * gt_pl = NULL;
+
+  size_t j = 0;
+  while ( bcf_read1(fp, hdr, rec)>=0 )
+    {
+      bcf_unpack(rec, BCF_UN_ALL);
+
+      assert(strlen(rec->d.allele[0]) == 1 && strlen(rec->d.allele[1]));
+
+      int als[4] = {'-'};
+      for (size_t i = 0; i < rec->n_allele; ++i)
+        als[i] = rec->d.allele[i][0];
+
+//      printf("alleles: %c %c %c %c\n", als[0], als[1], als[2], als[3]);
+
+      int cals[4] = {0};
+      for (size_t i = 0; i < rec->n_allele; ++i)
+        cals[i] = pll_map_nt[als[i]];
+
+//      printf("encoded alleles: %d %d %d %d\n", cals[0], cals[1], cals[2], cals[3]);
+
+      bcf_fmt_t * gt = bcf_get_fmt(hdr, rec, "GT");
+
+      assert(gt);
+
+//      bcf_fmt_t * gl = bcf_get_fmt(hdr, rec, "GL");
+      bcf_fmt_t * gl10 = bcf_get_fmt(hdr, rec, "G10");
+
+      /* assume 10 genotypes for now */
+      assert(gl10->n == 10);
+
+      if (!bcf_get_format_float(hdr, rec ,"G10", &gt_pl, &gl_num))
+        throw runtime_error("Invalid VCF file format: field GL not found");
+
+      assert(gl_num == (int) taxa_count * gl10->n);
+
+      for (size_t i = 0; i < taxa_count; ++i)
+      {
+        const int al1 = bcf_gt_allele(gt->p[i * 2]);
+        const int al2 = bcf_gt_allele(gt->p[i * 2 + 1]);
+
+        char c = '-';
+        if (al1 >= 0 && al2 >= 0)
+        {
+          auto gt1 = PLL_CTZ32(cals[al1]);
+          auto gt2 = PLL_CTZ32(cals[al2]);
+          c = gt_to_char[gt1][gt2];
+        }
+
+        msa[i][j] = c;
+
+//        if (!i)
+//          printf("als: %d %d, char: %c\n", al1, al2, c);
+
+        /* probs */
+        auto site_probs = msa.probs(i, j);
+
+        if (al1 >= 0 && al2 >= 0)
+        {
+          for (unsigned int k = 0; k < 10; ++k)
+          {
+            // TODO remap
+            auto pl = gt_pl[i * 10 + k];
+            auto s = vcf_to_rax_map[k];
+            site_probs[s] = isfinite(pl) ? exp10(pl) : 0.;
+//            site_probs[k] = isfinite(pl) ? exp10(-0.1 * pl) : 0.;
+//            if (!i)
+//              printf("prob %u: %lf / %f \n", s, site_probs[s], pl);
+          }
+        }
+        else
+        {
+          /* gap / missing data */
+          for (size_t k = 0; k < 10; ++k)
+          {
+            site_probs[k] = 1.;
+          }
+        }
+      }
+
+      j++;
+
+      if (j > site_count-1)
+        break;
+    }
+
+  assert(j == site_count);
+
+  free(gt_pl);
+  bcf_hdr_destroy(hdr);
+
+  int ret;
+  if ( (ret = hts_close(fp)) )
+  {
+      fprintf(stderr,"hts_close(%s): non-zero status %d\n", fname, ret);
+      exit(ret);
+  }
+
+//  pllmod_msa_save_phylip(msa.pll_msa(), "vcfout.phy");
+#endif
+
+  return stream;
+}
+
 MSA msa_load_from_file(const std::string &filename, const FileFormat format)
 {
   MSA msa;
@@ -325,6 +506,13 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format)
         case FileFormat::phylip:
         {
           PhylipStream s(filename, false);
+          s >> msa;
+          return msa;
+          break;
+        }
+        case FileFormat::vcf:
+        {
+          VCFStream s(filename);
           s >> msa;
           return msa;
           break;
