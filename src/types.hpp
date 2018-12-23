@@ -34,7 +34,8 @@ enum class Command
   terrace,
   check,
   parse,
-  start
+  start,
+  rfdist
 };
 
 enum class FileFormat

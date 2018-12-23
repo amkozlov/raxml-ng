@@ -1334,15 +1334,18 @@ bool check_bootstop(const RaxmlInstance& instance, const TreeCollection& bs_tree
   return converged;
 }
 
-TreeCollection read_bootstrap_trees(const RaxmlInstance& instance, Tree& ref_tree)
+TreeCollection read_newick_trees(Tree& ref_tree,
+                                 const std::string& fname, const std::string& tree_kind)
 {
   NameIdMap ref_tip_ids;
-  const auto& opts = instance.opts;
-  NewickStream boots(opts.bootstrap_trees_file(), std::ios::in);
+  NewickStream boots(fname, std::ios::in);
   TreeCollection bs_trees;
   unsigned int bs_num = 0;
 
-  LOG_INFO << "Reading bootstrap trees from file: " << opts.bootstrap_trees_file() << endl;
+  auto tree_kind_cap = tree_kind;
+  tree_kind_cap[0] = toupper(tree_kind_cap[0]);
+
+  LOG_INFO << "Reading " << tree_kind << " trees from file: " << fname << endl;
 
   while (boots.peek() != EOF)
   {
@@ -1362,7 +1365,7 @@ TreeCollection read_bootstrap_trees(const RaxmlInstance& instance, Tree& ref_tre
     {
       LOG_DEBUG << "REF #branches: " << ref_tree.num_branches()
                 << ", BS #branches: " << tree.num_branches() << endl;
-      throw runtime_error("Bootstrap tree #" + to_string(bs_num+1) +
+      throw runtime_error(tree_kind_cap + " tree #" + to_string(bs_num+1) +
                           " contains multifurcations!");
     }
 
@@ -1372,26 +1375,31 @@ TreeCollection read_bootstrap_trees(const RaxmlInstance& instance, Tree& ref_tre
     }
     catch (out_of_range& e)
     {
-      throw runtime_error("Bootstrap tree #" + to_string(bs_num+1) +
+      throw runtime_error(tree_kind_cap + " tree #" + to_string(bs_num+1) +
                           " contains incompatible taxon name(s)!");
     }
     catch (invalid_argument& e)
     {
-      throw runtime_error("Bootstrap tree #" + to_string(bs_num+1) +
+      throw runtime_error(tree_kind_cap + " tree #" + to_string(bs_num+1) +
                           " has wrong number of tips: " + to_string(tree.num_tips()));
     }
     bs_trees.push_back(0, tree);
     bs_num++;
   }
 
-  LOG_INFO << "Bootstrap trees found: " << bs_trees.size() << endl << endl;
+  LOG_INFO << tree_kind_cap << " trees found: " << bs_trees.size() << endl << endl;
 
   if (bs_trees.size() < 2)
   {
-    throw runtime_error("You must provide a file with multiple bootstrap trees!");
+    throw runtime_error("You must provide a file with multiple " + tree_kind + " trees!");
   }
 
   return bs_trees;
+}
+
+TreeCollection read_bootstrap_trees(const RaxmlInstance& instance, Tree& ref_tree)
+{
+  return read_newick_trees(ref_tree, instance.opts.bootstrap_trees_file(), "bootstrap");
 }
 
 void command_bootstop(RaxmlInstance& instance)
@@ -1421,6 +1429,97 @@ void command_support(RaxmlInstance& instance)
 
   draw_bootstrap_support(instance, ref_tree, bs_trees);
   check_bootstop(instance, bs_trees, true);
+}
+
+void command_rfdist(RaxmlInstance& instance)
+{
+  const auto& opts = instance.opts;
+
+  if (opts.start_trees.count(StartingTree::random) +
+      opts.start_trees.count(StartingTree::parsimony) > 0)
+  {
+    /* generate random/parsimony trees -> we need an MSA for this */
+    assert(!opts.msa_file.empty());
+    load_parted_msa(instance);
+    build_start_trees(instance, 0);
+  }
+  else
+  {
+    /* load trees from Newick file(s) */
+    // TODO process multiple files
+    auto topos = read_newick_trees(instance.random_tree, opts.tree_file, "input");
+    Tree ref_tree = instance.random_tree;
+    for (const auto& t: topos)
+    {
+      ref_tree.topology(t.second);
+      instance.start_trees.emplace_back(ref_tree);
+    }
+  }
+
+  const auto num_trees = instance.start_trees.size();
+  if (num_trees < 2)
+  {
+    throw runtime_error("Cannot compute RF distances since tree file contains fewer than 2 trees!");
+  }
+
+  double avg_rf = 0.0;
+  double avg_rrf = 0.0;
+  size_t num_uniq = 1;
+  size_t num_pairs = 0;
+  const auto& trees = instance.start_trees;
+  for (size_t i = 0; i < num_trees-1; ++i)
+  {
+    const auto& tree1 = trees.at(i);
+    pll_split_t * splits1 = pllmod_utree_split_create(&tree1.pll_utree_root(),
+                                                     tree1.num_tips(),
+                                                     nullptr);
+
+    if (!splits1)
+    {
+      libpll_check_error();
+      throw runtime_error("Unknown error when extracting splits");
+    }
+
+    bool uniq = true;
+    for (size_t j = i+1; j < num_trees; ++j)
+    {
+      const auto& tree2 = trees.at(j);
+      assert(tree2.num_tips() == tree1.num_tips());
+      pll_split_t * splits2 = pllmod_utree_split_create(&tree2.pll_utree_root(),
+                                                       tree2.num_tips(),
+                                                       nullptr);
+      if (!splits2)
+      {
+        libpll_check_error();
+        throw runtime_error("Unknown error when extracting splits");
+      }
+
+      auto rf = pllmod_utree_split_rf_distance(splits1, splits2, tree1.num_tips());
+      avg_rf += rf;
+
+      // TODO: maxrf will be different for multifurcating trees
+      auto maxrf = 2 * tree2.num_splits();
+      double rrf = ((double) rf) / maxrf;
+      avg_rrf += rrf;
+
+      uniq &= (rf > 0);
+      num_pairs++;
+
+      pllmod_utree_split_destroy(splits2);
+    }
+
+    if (uniq)
+      num_uniq++;
+
+    pllmod_utree_split_destroy(splits1);
+  }
+
+  avg_rf /= num_pairs;
+  avg_rrf /= num_pairs;
+
+  LOG_INFO << "Average absolute RF distance in this tree set: " << avg_rf << endl;
+  LOG_INFO << "Average relative RF distance in this tree set: " << avg_rrf << endl;
+  LOG_INFO << "Number of unique topologies in this tree set: " << num_uniq << endl;
 }
 
 void command_bsmsa(RaxmlInstance& instance, const Checkpoint& checkp)
@@ -2239,6 +2338,11 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::bsmsa:
       {
         command_bsmsa(instance, cm.checkpoint());
+        break;
+      }
+      case Command::rfdist:
+      {
+        command_rfdist(instance);
         break;
       }
       case Command::none:

@@ -70,6 +70,7 @@ static struct option long_options[] =
 
   {"search1",            no_argument, 0, 0 },        /*  48 */
   {"bsmsa",              no_argument, 0, 0 },        /*  49 */
+  {"rfdist",             no_argument, 0, 0 },        /*  50 */
 
   { 0, 0, 0, 0 }
 };
@@ -107,7 +108,7 @@ void CommandLineParser::check_options(Options &opts)
   }
 
   if (opts.command == Command::evaluate || opts.command == Command::support ||
-      opts.command == Command::terrace)
+      opts.command == Command::terrace || opts.command == Command::rfdist)
   {
     if (opts.tree_file.empty())
       throw OptionException("Please provide a valid Newick file as an argument of --tree option.");
@@ -735,6 +736,11 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         num_commands++;
         break;
 
+      case 50: /* compute RF distance */
+        opts.command = Command::rfdist;
+        num_commands++;
+        break;
+
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -791,6 +797,7 @@ void CommandLineParser::print_help()
             "  --parse                                    parse alignment, compress patterns and create binary MSA file\n"
             "  --start                                    generate parsimony/random starting trees and exit\n"
             "  --loglh                                    compute the likelihood of a fixed tree (no model/brlen optimization)\n"
+            "  --rfdist                                   compute pair-wise Robinson-Foulds (RF) distances between trees\n"
             "\n"
             "Input and output options:\n"
             "  --tree            rand{N} | pars{N} | FILE starting tree: rand(om), pars(imony) or user-specified (newick file)\n"

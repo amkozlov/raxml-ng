@@ -209,6 +209,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     case Command::start:
       stream << "Starting tree generation";
       break;
+    case Command::rfdist:
+      stream << "RF distance computation";
+      break;
     default:
       break;
   }
