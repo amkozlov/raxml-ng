@@ -219,6 +219,51 @@ void print_reduced_msa(const RaxmlInstance& instance, const PartitionedMSAView& 
   }
 }
 
+bool check_msa_global(const MSA& msa)
+{
+  bool msa_valid = true;
+
+  /* check taxa count */
+  if (msa.size() < 4)
+  {
+    LOG_ERROR << "\nERROR: Your alignment contains less than 4 sequences! " << endl;
+    msa_valid = false;
+  }
+
+  /* check for duplicate taxon names */
+  unsigned long stats_mask = PLLMOD_MSA_STATS_DUP_TAXA;
+
+  pllmod_msa_stats_t * stats = pllmod_msa_compute_stats(msa.pll_msa(),
+                                                        4,
+                                                        pll_map_nt, // map is not used here
+                                                        NULL,
+                                                        stats_mask);
+
+  libpll_check_error("ERROR computing MSA stats");
+  assert(stats);
+
+  if (stats->dup_taxa_pairs_count > 0)
+  {
+    LOG_ERROR << endl;
+    for (unsigned long c = 0; c < stats->dup_taxa_pairs_count; ++c)
+    {
+      auto id1 = stats->dup_taxa_pairs[c*2];
+      auto id2 = stats->dup_taxa_pairs[c*2+1];
+      LOG_ERROR << "ERROR: Sequences " << id1+1 << " and "
+                << id2+1 << " have identical name: "
+                << msa.label(id1) << endl;
+    }
+    LOG_ERROR << "\nERROR: Duplicate sequence names found: "
+              << stats->dup_taxa_pairs_count << endl;
+
+    msa_valid = false;
+  }
+
+  pllmod_msa_destroy_stats(stats);
+
+  return msa_valid;
+}
+
 bool check_msa(RaxmlInstance& instance)
 {
   LOG_VERB_TS << "Checking the alignment...\n";
@@ -226,7 +271,6 @@ bool check_msa(RaxmlInstance& instance)
   auto& parted_msa = *instance.parted_msa;
   const auto& full_msa = parted_msa.full_msa();
   const auto pll_msa = full_msa.pll_msa();
-  const auto taxon_count = parted_msa.taxon_count();
 
   bool msa_valid = true;
   bool msa_corrected = false;
@@ -236,14 +280,7 @@ bool check_msa(RaxmlInstance& instance)
   vector<pair<size_t,size_t> > dup_seqs;
   std::set<size_t> gap_seqs;
 
-  /* check taxa count */
-  if (taxon_count < 4)
-  {
-    LOG_ERROR << "\nERROR: Your alignment contains less than 4 sequences! " << endl;
-    return false;
-  }
-
-  /* check taxon names */
+  /* check taxon names for invalid characters */
   const string invalid_chars = "(),;:' \t\n";
   for (const auto& taxon: parted_msa.taxon_names())
   {
@@ -259,7 +296,8 @@ bool check_msa(RaxmlInstance& instance)
 
   msa_valid &= parted_msa_view.taxon_name_map().empty();
 
-  unsigned long stats_mask = PLLMOD_MSA_STATS_DUP_TAXA | PLLMOD_MSA_STATS_DUP_SEQS;
+  /* check for duplicate sequences */
+  unsigned long stats_mask = PLLMOD_MSA_STATS_DUP_SEQS;
 
   pllmod_msa_stats_t * stats = pllmod_msa_compute_stats(pll_msa,
                                                         4,
@@ -269,14 +307,6 @@ bool check_msa(RaxmlInstance& instance)
 
   libpll_check_error("ERROR computing MSA stats");
   assert(stats);
-
-  for (unsigned long c = 0; c < stats->dup_taxa_pairs_count; ++c)
-  {
-    dup_taxa.emplace_back(stats->dup_taxa_pairs[c*2],
-                          stats->dup_taxa_pairs[c*2+1]);
-  }
-
-  msa_valid &= dup_taxa.empty();
 
   for (unsigned long c = 0; c < stats->dup_seqs_pairs_count; ++c)
   {
@@ -389,17 +419,6 @@ bool check_msa(RaxmlInstance& instance)
   if (!instance.opts.nofiles_mode && (msa_corrected || !parted_msa_view.identity()))
   {
     print_reduced_msa(instance, parted_msa_view);
-  }
-
-  if (!dup_taxa.empty())
-  {
-    for (const auto& p: dup_seqs)
-    {
-      LOG_ERROR << "ERROR: Sequences " << p.first+1 << " and "
-                << p.second+1 << " have identical name: "
-                << parted_msa.taxon_names().at(p.first) << endl;
-    }
-    LOG_ERROR << "\nERROR: Duplicate sequence names found: " << dup_taxa.size() << endl;
   }
 
   if (!parted_msa_view.taxon_name_map().empty())
@@ -670,6 +689,9 @@ void load_msa(RaxmlInstance& instance)
   }
   else
     instance.opts.use_prob_msa = false;
+
+  if (!check_msa_global(msa))
+    throw runtime_error("Alignment check failed (see details above)!");
 
   parted_msa.full_msa(std::move(msa));
 
