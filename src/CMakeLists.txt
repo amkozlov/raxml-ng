@@ -3,6 +3,7 @@ file(GLOB RAXML_SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/bootstrap/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/autotune/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/loadbalance/*.cpp
+                        ${PROJECT_SOURCE_DIR}/src/topology/*.cpp
                         )
 
 if(USE_TERRAPHAST)

@@ -41,6 +41,7 @@
 #include "bootstrap/TransferBootstrapTree.hpp"
 #include "autotune/ResourceEstimator.hpp"
 #include "ICScoreCalculator.hpp"
+#include "topology/RFDistCalculator.hpp"
 
 #ifdef _RAXML_TERRAPHAST
 #include "terraces/TerraceWrapper.hpp"
@@ -48,7 +49,6 @@
 
 using namespace std;
 
-typedef vector<Tree> TreeList;
 struct RaxmlInstance
 {
   Options opts;
@@ -83,6 +83,8 @@ struct RaxmlInstance
 
   /* topological constraint */
   Tree constraint_tree;
+
+  unique_ptr<RFDistCalculator> dist_calculator;
 };
 
 void print_banner()
@@ -1409,7 +1411,8 @@ TreeCollection read_newick_trees(Tree& ref_tree,
     bs_num++;
   }
 
-  LOG_INFO << tree_kind_cap << " trees found: " << bs_trees.size() << endl << endl;
+  LOG_INFO << "Loaded " << bs_trees.size() << " trees with "
+           << ref_tree.num_tips() << " taxa." << endl << endl;
 
   if (bs_trees.size() < 2)
   {
@@ -1484,64 +1487,7 @@ void command_rfdist(RaxmlInstance& instance)
     throw runtime_error("Cannot compute RF distances since tree file contains fewer than 2 trees!");
   }
 
-  double avg_rf = 0.0;
-  double avg_rrf = 0.0;
-  size_t num_uniq = 1;
-  size_t num_pairs = 0;
-  const auto& trees = instance.start_trees;
-  for (size_t i = 0; i < num_trees-1; ++i)
-  {
-    const auto& tree1 = trees.at(i);
-    pll_split_t * splits1 = pllmod_utree_split_create(&tree1.pll_utree_root(),
-                                                     tree1.num_tips(),
-                                                     nullptr);
-
-    if (!splits1)
-    {
-      libpll_check_error();
-      throw runtime_error("Unknown error when extracting splits");
-    }
-
-    bool uniq = true;
-    for (size_t j = i+1; j < num_trees; ++j)
-    {
-      const auto& tree2 = trees.at(j);
-      assert(tree2.num_tips() == tree1.num_tips());
-      pll_split_t * splits2 = pllmod_utree_split_create(&tree2.pll_utree_root(),
-                                                       tree2.num_tips(),
-                                                       nullptr);
-      if (!splits2)
-      {
-        libpll_check_error();
-        throw runtime_error("Unknown error when extracting splits");
-      }
-
-      auto rf = pllmod_utree_split_rf_distance(splits1, splits2, tree1.num_tips());
-      avg_rf += rf;
-
-      // TODO: maxrf will be different for multifurcating trees
-      auto maxrf = 2 * tree2.num_splits();
-      double rrf = ((double) rf) / maxrf;
-      avg_rrf += rrf;
-
-      uniq &= (rf > 0);
-      num_pairs++;
-
-      pllmod_utree_split_destroy(splits2);
-    }
-
-    if (uniq)
-      num_uniq++;
-
-    pllmod_utree_split_destroy(splits1);
-  }
-
-  avg_rf /= num_pairs;
-  avg_rrf /= num_pairs;
-
-  LOG_INFO << "Average absolute RF distance in this tree set: " << avg_rf << endl;
-  LOG_INFO << "Average relative RF distance in this tree set: " << avg_rrf << endl;
-  LOG_INFO << "Number of unique topologies in this tree set: " << num_uniq << endl;
+  instance.dist_calculator.reset(new RFDistCalculator(instance.start_trees));
 }
 
 void command_bsmsa(RaxmlInstance& instance, const Checkpoint& checkp)
@@ -1828,6 +1774,25 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
         LOG_INFO << "IMPORTANT: You MUST use the aforementioned adjusted partitioned file" << endl
                  << "           when running tree searches on bootstrap replicate MSAs!" << endl;
       }
+    }
+  }
+
+  if (opts.command == Command::rfdist)
+  {
+    assert(instance.dist_calculator);
+
+    const auto& rfcalc = *instance.dist_calculator;
+
+    LOG_INFO << "Average absolute RF distance in this tree set: " << rfcalc.avg_rf() << endl;
+    LOG_INFO << "Average relative RF distance in this tree set: " << rfcalc.avg_rrf() << endl;
+    LOG_INFO << "Number of unique topologies in this tree set: " << rfcalc.num_uniq_trees() << endl;
+
+    if (!opts.rfdist_file().empty())
+    {
+      fstream fs(opts.rfdist_file(), ios::out);
+      fs << rfcalc;
+
+      LOG_INFO << "\nPairwise RF distances saved to: " << sysutil_realpath(opts.rfdist_file()) << endl;
     }
   }
 
@@ -2201,6 +2166,7 @@ int internal_main(int argc, char** argv, void* comm)
     case Command::start:
     case Command::terrace:
     case Command::bsmsa:
+    case Command::rfdist:
       if (!opts.redo_mode && opts.result_files_exist())
       {
         LOG_ERROR << endl << "ERROR: Result files for the run with prefix `" <<

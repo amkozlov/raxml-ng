@@ -20,6 +20,7 @@ struct OutputFileNames
   std::string terrace;
   std::string binary_msa;
   std::string bootstrap_msa;
+  std::string rfdist;
 };
 
 class Options
@@ -120,6 +121,7 @@ public:
   const std::string& binary_msa_file() const { return outfile_names.binary_msa; }
   std::string bootstrap_msa_file(size_t bsnum) const;
   std::string bootstrap_partition_file() const;
+  const std::string rfdist_file() const { return outfile_names.rfdist; }
 
   void set_default_outfiles();
 

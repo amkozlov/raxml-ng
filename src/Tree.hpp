@@ -137,6 +137,8 @@ protected:
   PllNodeVector subnodes() const;
 };
 
+typedef std::vector<Tree> TreeList;
+
 typedef std::pair<double, TreeTopology> ScoredTopology;
 
 class TreeCollection
