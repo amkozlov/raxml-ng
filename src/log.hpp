@@ -10,6 +10,7 @@ enum class LogLevel
   none = 0,
   error,
   warning,
+  result,
   info,
   progress,
   verbose,
@@ -96,11 +97,13 @@ Logging& logger();
 
 #define LOG_ERROR RAXML_LOG(LogLevel::error)
 #define LOG_WARN RAXML_LOG(LogLevel::warning)
+#define LOG_RESULT RAXML_LOG(LogLevel::result)
 #define LOG_INFO RAXML_LOG(LogLevel::info)
 #define LOG_DEBUG RAXML_LOG(LogLevel::debug)
 #define LOG_PROGR RAXML_LOG(LogLevel::progress)
 #define LOG_VERB RAXML_LOG(LogLevel::verbose)
 
+#define LOG_RESULT_TS LOG_RESULT << "[" << TimeStamp() << "] "
 #define LOG_INFO_TS LOG_INFO << "[" << TimeStamp() << "] "
 #define LOG_VERB_TS LOG_VERB << "[" << TimeStamp() << "] "
 #define LOG_DEBUG_TS LOG_DEBUG << "[" << TimeStamp() << "] "

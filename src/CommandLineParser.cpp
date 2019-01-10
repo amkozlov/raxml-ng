@@ -71,6 +71,7 @@ static struct option long_options[] =
   {"search1",            no_argument, 0, 0 },        /*  48 */
   {"bsmsa",              no_argument, 0, 0 },        /*  49 */
   {"rfdist",             no_argument, 0, 0 },        /*  50 */
+  {"rf",                 no_argument, 0, 0 },        /*  51 */
 
   { 0, 0, 0, 0 }
 };
@@ -513,6 +514,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.log_level = LogLevel::error;
         else if (strcasecmp(optarg, "warning") == 0)
           opts.log_level = LogLevel::warning;
+        else if (strcasecmp(optarg, "result") == 0)
+          opts.log_level = LogLevel::result;
         else if (strcasecmp(optarg, "info") == 0)
           opts.log_level = LogLevel::info;
         else if (strcasecmp(optarg, "progress") == 0)
@@ -646,6 +649,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.optimize_model = false;
         opts.optimize_brlen = false;
         opts.nofiles_mode = true;
+        opts.log_level = LogLevel::result;
+        log_level_set = true;
         num_commands++;
         break;
       case 42:  /* precision */
@@ -741,6 +746,14 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         num_commands++;
         break;
 
+      case 51: /* compute and print average RF distance w/o noise */
+        opts.command = Command::rfdist;
+        opts.nofiles_mode = true;
+        opts.log_level = LogLevel::result;
+        log_level_set = true;
+        num_commands++;
+        break;
+
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -796,8 +809,12 @@ void CommandLineParser::print_help()
             "  --check                                    check alignment correctness and remove empty columns/rows\n"
             "  --parse                                    parse alignment, compress patterns and create binary MSA file\n"
             "  --start                                    generate parsimony/random starting trees and exit\n"
-            "  --loglh                                    compute the likelihood of a fixed tree (no model/brlen optimization)\n"
             "  --rfdist                                   compute pair-wise Robinson-Foulds (RF) distances between trees\n"
+            "\n"
+            "Command shortcuts (mutually exclusive):\n"
+            "  --search1                                  Alias for: --search --tree rand{1}\n"
+            "  --loglh                                    Alias for: --evaluate --opt-model off --opt-branches off --nofiles --log result\n"
+            "  --rf                                       Alias for: --rfdist --nofiles --log result\n"
             "\n"
             "Input and output options:\n"
             "  --tree            rand{N} | pars{N} | FILE starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
@@ -807,7 +824,7 @@ void CommandLineParser::print_help()
             "  --data-type       VALUE                    data type: DNA, AA, BIN(ary) or AUTO-detect (default)\n"
             "  --tree-constraint FILE                     constraint tree\n"
             "  --prefix          STRING                   prefix for output files (default: MSA file name)\n"
-            "  --log             VALUE                    log verbosity: ERROR,WARNING,INFO,PROGRESS,DEBUG (default: PROGRESS)\n"
+            "  --log             VALUE                    log verbosity: ERROR,WARNING,RESULT,INFO,PROGRESS,DEBUG (default: PROGRESS)\n"
             "  --redo                                     overwrite existing result files and ignore checkpoints (default: OFF)\n"
             "  --nofiles                                  do not create any output files, print results to the terminal only\n"
             "  --precision       VALUE                    number of decimal places to print (default: 6)\n"

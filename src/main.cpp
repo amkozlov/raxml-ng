@@ -1615,7 +1615,9 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
     auto best = checkp.ml_trees.best();
     auto best_loglh = best->first;
 
-    LOG_INFO << "\nFinal LogLikelihood: " << FMT_LH(best_loglh) << endl << endl;
+    LOG_INFO << endl;
+    LOG_RESULT << "Final LogLikelihood: " << FMT_LH(best_loglh) << endl;
+    LOG_INFO << endl;
 
     print_ic_scores(instance, best_loglh);
   }
@@ -1783,9 +1785,9 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
 
     const auto& rfcalc = *instance.dist_calculator;
 
-    LOG_INFO << "Average absolute RF distance in this tree set: " << rfcalc.avg_rf() << endl;
-    LOG_INFO << "Average relative RF distance in this tree set: " << rfcalc.avg_rrf() << endl;
-    LOG_INFO << "Number of unique topologies in this tree set: " << rfcalc.num_uniq_trees() << endl;
+    LOG_RESULT << "Average absolute RF distance in this tree set: " << rfcalc.avg_rf() << endl;
+    LOG_RESULT << "Average relative RF distance in this tree set: " << rfcalc.avg_rrf() << endl;
+    LOG_RESULT << "Number of unique topologies in this tree set: "  << rfcalc.num_uniq_trees() << endl;
 
     if (!opts.rfdist_file().empty())
     {
