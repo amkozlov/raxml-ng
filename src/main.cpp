@@ -543,16 +543,25 @@ void check_models(const RaxmlInstance& instance)
   /* Check for extreme cases of overfitting (K >= n) */
   if (instance.parted_msa->part_count() > 1)
   {
+    size_t model_free_params = instance.parted_msa->total_free_model_params();
     size_t free_params = total_free_params(instance);
     size_t sample_size = instance.parted_msa->total_sites();
+    string errmsg = "Number of free parameters (K=" + to_string(free_params) +
+        ") is larger than alignment size (n=" + to_string(sample_size) + ").\n" +
+        "       This might lead to overfitting and compromise tree inference results!\n" +
+        "       Please consider revising your partitioning scheme, conducting formal model selection\n" +
+        "       and/or using linked/scaled branch lengths across partitions.\n" +
+        "NOTE:  You can disable this check by adding the --force option.\n";
+
     if (free_params >= sample_size)
     {
-      throw runtime_error("Number of free parameters (K=" + to_string(free_params) +
-                          ") is larger than alignment size (n=" + to_string(sample_size) + ").\n" +
-                          "       This might lead to overfitting and compromise tree inference results!\n" +
-                          "       Please consider revising your partitioning scheme, conducting formal model selection\n" +
-                          "       and/or using linked/scaled branch lengths across partitions.\n" +
-                          "NOTE:  You can disable this check by adding the --force option.\n");
+      if (model_free_params >= sample_size ||
+          instance.opts.brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED)
+      {
+        throw runtime_error(errmsg);
+      }
+      else
+        LOG_WARN << endl << "WARNING: " << errmsg << endl;
     }
   }
 }
