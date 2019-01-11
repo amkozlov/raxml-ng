@@ -218,7 +218,7 @@ double RFDistCalculator::rrf(size_t i, size_t j) const
 std::fstream& operator<<(std::fstream& stream, const RFDistCalculator& rfcalc)
 {
   auto num_trees = rfcalc.num_trees();
-  const string delim = " ";
+  const string delim = "\t";
   if (num_trees > 0)
   {
     stream << fixed;
