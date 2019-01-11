@@ -58,4 +58,4 @@ script:
   - git clone https://gitlab.com/testiphy/testiphy.git
   - cd testiphy
   - which raxml-ng
-  - ./testiphy raxml-ng
+#  - ./testiphy raxml-ng
