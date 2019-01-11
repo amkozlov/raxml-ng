@@ -70,7 +70,7 @@ endif()
 
 
 set (raxml-ng_VERSION_MAJOR 0)
-set (raxml-ng_VERSION_MINOR 6)
+set (raxml-ng_VERSION_MINOR 8)
 
 #set (CMAKE_BUILD_TYPE DEBUG)
 #set (CMAKE_BUILD_TYPE RELEASE)
