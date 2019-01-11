@@ -20,7 +20,7 @@ Documentation: [github wiki](https://github.com/amkozlov/raxml-ng/wiki)
 [**Download 64-bit OSX/macOS binary**](https://github.com/amkozlov/raxml-ng/releases/download/0.8.0/raxml-ng_v0.8.0_macos_x86_64.zip)
 
 * For clusters/supercomputers (i.e., if you want to use MPI), please use the following installation package which contains pre-built *libpll*. You will need `GCC 6.4+` and `CMake 3.0.2+` in order to compile RAxML-NG for your system.  
-[**Download RAxML-NG-MPI for Linux**](https://github.com/amkozlov/raxml-ng/releases/download/0.7.0/raxml-ng_v0.8.0_linux_x86_64_MPI.zip)
+[**Download RAxML-NG-MPI for Linux**](https://github.com/amkozlov/raxml-ng/releases/download/0.8.0/raxml-ng_v0.8.0_linux_x86_64_MPI.zip)
 
 * Binaries for Windows will become available later on
 
