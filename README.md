@@ -16,11 +16,11 @@ Documentation: [github wiki](https://github.com/amkozlov/raxml-ng/wiki)
 ## Installation instructions
 
 * For most desktop Unix/Linux and macOS systems, the easiest way to install RAxML-NG is by using the pre-compiled binary:  
-[**Download 64-bit Linux binary**](https://github.com/amkozlov/raxml-ng/releases/download/0.7.0/raxml-ng_v0.7.0_linux_x86_64.zip)  
-[**Download 64-bit OSX/macOS binary**](https://github.com/amkozlov/raxml-ng/releases/download/0.7.0/raxml-ng_v0.7.0_macos_x86_64.zip)
+[**Download 64-bit Linux binary**](https://github.com/amkozlov/raxml-ng/releases/download/0.8.0/raxml-ng_v0.8.0_linux_x86_64.zip)  
+[**Download 64-bit OSX/macOS binary**](https://github.com/amkozlov/raxml-ng/releases/download/0.8.0/raxml-ng_v0.8.0_macos_x86_64.zip)
 
 * For clusters/supercomputers (i.e., if you want to use MPI), please use the following installation package which contains pre-built *libpll*. You will need `GCC 6.4+` and `CMake 3.0.2+` in order to compile RAxML-NG for your system.  
-[**Download RAxML-NG-MPI for Linux**](https://github.com/amkozlov/raxml-ng/releases/download/0.7.0/raxml-ng_v0.7.0_linux_x86_64_MPI.zip)
+[**Download RAxML-NG-MPI for Linux**](https://github.com/amkozlov/raxml-ng/releases/download/0.7.0/raxml-ng_v0.8.0_linux_x86_64_MPI.zip)
 
 * Binaries for Windows will become available later on
 
@@ -67,7 +67,8 @@ make
 
 ## Documentation and Support
 
-Documentation can be found in the [github wiki](https://github.com/amkozlov/raxml-ng/wiki) (work in progress).
+Documentation can be found in the [github wiki](https://github.com/amkozlov/raxml-ng/wiki). 
+For a quick start, please check out the [hands-on tutorial](https://github.com/amkozlov/raxml-ng/wiki/Tutorial).
 
 Also please check the online help with `raxml-ng -h`.
 
