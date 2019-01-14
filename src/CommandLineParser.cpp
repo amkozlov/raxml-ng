@@ -131,7 +131,7 @@ void CommandLineParser::check_options(Options &opts)
     }
   }
 
-  if (opts.command == Command::support)
+  if (opts.command == Command::support || opts.command == Command::rfdist)
   {
     assert(!opts.tree_file.empty());
 
