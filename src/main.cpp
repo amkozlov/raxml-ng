@@ -2196,7 +2196,10 @@ int internal_main(int argc, char** argv, void* comm)
   /* now get to the real stuff */
   try
   {
+    // make sure all MPI ranks use the same random seed
+    ParallelContext::mpi_broadcast(&opts.random_seed, sizeof(long));
     srand(opts.random_seed);
+
     logger().log_level(instance.opts.log_level);
     logger().precision(instance.opts.precision, LogElement::all);
 

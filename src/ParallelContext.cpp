@@ -338,6 +338,17 @@ void ParallelContext::thread_broadcast(size_t source_id, void * data, size_t siz
   thread_barrier();
 }
 
+void ParallelContext::mpi_broadcast(void * data, size_t size)
+{
+#ifdef _RAXML_MPI
+  if (_num_ranks > 1)
+    MPI_Bcast(data, size, MPI_BYTE, 0, _comm);
+#else
+  RAXML_UNUSED(data);
+  RAXML_UNUSED(size);
+#endif
+}
+
 void ParallelContext::thread_send_master(size_t source_id, void * data, size_t size) const
 {
   /* write to buf */
