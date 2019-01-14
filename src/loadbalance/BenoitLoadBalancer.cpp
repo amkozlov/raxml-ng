@@ -217,8 +217,13 @@ BenoitLoadBalancer::compute_assignments(const PartitionAssignment& part_sizes,
   init(bs, part_sizes, num_procs);
 
   kassian_phase1(bs);
-  fill_queues(bs);
-  kassian_phase2(bs);
+
+  /* check whether all partitions have been assigned during phase 1 */
+  if (bs.curr_part < bs.num_parts)
+  {
+    fill_queues(bs);
+    kassian_phase2(bs);
+  }
 
   return bs.bins;
 }
