@@ -118,11 +118,11 @@ private:
 	 * it should be called twice, with original and inverted s1 (or s2),
 	 * to account for possible complementary split encoding.
 	 * */
-	static unsigned int split_hamming_distance_lbound(pll_split_t s1, pll_split_t s2, unsigned int split_len, unsigned int min_hdist) {
+	static unsigned int split_hamming_distance_lbound(pll_split_t s1, pll_split_t s2, unsigned int split_len, unsigned int max_interesting_dist) {
 		unsigned int hdist = 0;
 		unsigned int i;
 
-		for (i = 0; (i < split_len) && (hdist <= min_hdist); ++i) {
+		for (i = 0; (i < split_len) && (hdist <= max_interesting_dist); ++i) {
 			hdist += PLL_POPCNT32(s1[i] ^ s2[i]);
 		}
 
@@ -140,8 +140,8 @@ private:
 		return hdist;
 	}
 
-	static unsigned int distance(pll_split_t s1, pll_split_t s2, unsigned int split_len, unsigned int min_hdist, unsigned int nTax) {
-		unsigned int dist = split_hamming_distance_lbound(s1, s2, split_len, min_hdist);
+	static unsigned int distance(pll_split_t s1, pll_split_t s2, unsigned int split_len, unsigned int nTax, unsigned int max_interesting_dist) {
+		unsigned int dist = split_hamming_distance_lbound(s1, s2, split_len, max_interesting_dist);
 		return std::min(dist, nTax - dist);
 	}
 
@@ -178,15 +178,33 @@ private:
 	};
 
 	struct DistanceComparator {
-		const pll_split_t item;
+		unsigned int item;
 		unsigned int _split_len;
 		pll_split_t* _splits;
 		unsigned int _nTax;
-		DistanceComparator(pll_split_t item, unsigned int split_len, pll_split_t * splits, unsigned int nTax) :
-				item(item), _split_len(split_len), _splits(splits), _nTax(nTax) {
+		unsigned int _p;
+		const std::vector<unsigned int>& _bs_light;
+		DistanceComparator(unsigned int item, unsigned int p, unsigned int split_len, pll_split_t * splits, unsigned int nTax,
+				const std::vector<unsigned int>& bs_light) :
+				item(item), _p(p), _split_len(split_len), _splits(splits), _nTax(nTax), _bs_light(bs_light) {
 		}
 		bool operator()(const unsigned int& a, const unsigned int& b) {
-			return distance(item, _splits[a], _split_len, _nTax) < distance(item, _splits[b], _split_len, _nTax);
+			unsigned int minDistA;
+			if (_p >= _bs_light[a]) {
+				minDistA = _p - _bs_light[a];
+			} else {
+				minDistA = _bs_light[a] - _p;
+			}
+			minDistA = std::min(minDistA, _nTax - minDistA);
+
+			unsigned int distB = distance(_splits[item], _splits[b], _split_len, _nTax);
+
+			if (minDistA >= distB) {
+				return false;
+			}
+
+			unsigned int distA = distance(_splits[item], _splits[a], _split_len, _nTax);
+			return distA < distB;
 		}
 	};
 
@@ -208,7 +226,7 @@ private:
 
 			// partition around the median distance
 			std::nth_element(_items.begin() + lower + 1, _items.begin() + median, _items.begin() + upper,
-					DistanceComparator(_splits[_items[lower]], _split_len, _splits, _nTax));
+					DistanceComparator(_items[lower], _bs_light[_items[lower]], _split_len, _splits, _nTax, _bs_light));
 
 			// what was the median?
 			node->threshold = distance(_splits[_items[lower]], _splits[_items[median]], _split_len, _nTax);
@@ -233,12 +251,14 @@ private:
 		}
 		minDist = std::min(minDist, _nTax - minDist);
 
-		if (minDist >= node->threshold) { // interesting stuff happens...
+		if (minDist >= node->threshold) { // dist >= minDist >= node->threshold ---> dist >= node->threshold
 			bool distComputed = false;
 			unsigned int dist;
 
 			if (minDist < _tau) {
-				dist = distance(_splits[_items[node->index]], target, _split_len, _nTax);
+				unsigned int maxInterestingDist = node->threshold + _tau + 1;
+
+				dist = distance(_splits[_items[node->index]], target, _split_len, _nTax, maxInterestingDist);
 				distComputed = true;
 				if (dist < _tau) {
 					if (heap.size() == k)
@@ -268,8 +288,9 @@ private:
 			return;
 		}
 
-		unsigned int dist = distance(_splits[_items[node->index]], target, _split_len, _nTax);
-		//printf("dist=%g tau=%gn", dist, _tau );
+		unsigned int maxInterestingDist = node->threshold + _tau + 1;
+
+		unsigned int dist = distance(_splits[_items[node->index]], target, _split_len, _nTax, maxInterestingDist);
 
 		if (dist < _tau) {
 			if (heap.size() == k)
@@ -292,14 +313,6 @@ private:
 				search(node->right, target, k, heap, p);
 			}
 
-		} else {
-			if (dist + _tau >= node->threshold) {
-				search(node->right, target, k, heap, p);
-			}
-
-			if (dist <= node->threshold + _tau) {
-				search(node->left, target, k, heap, p);
-			}
 		}
 	}
 };
