@@ -141,7 +141,7 @@ private:
 	}
 
 	static unsigned int distance(pll_split_t s1, pll_split_t s2, unsigned int split_len, unsigned int nTax, unsigned int max_interesting_dist) {
-		max_interesting_dist = std::max(max_interesting_dist, nTax - max_interesting_dist);
+		max_interesting_dist = std::max(max_interesting_dist, nTax - max_interesting_dist); // TODO: Is this still correct??? I think yes, but needs proof...
 
 		unsigned int dist = split_hamming_distance_lbound(s1, s2, split_len, max_interesting_dist);
 		return std::min(dist, nTax - dist);
