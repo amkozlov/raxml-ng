@@ -35,17 +35,18 @@ inline std::string split_string(pll_split_t split) {
 class VpTree {
 public:
 	VpTree() :
-			_split_len(0), _splits(0), _tau(std::numeric_limits<unsigned int>::max()), _nTax(0), _root(0) {
+			_split_len(0), _splits(0), _inv_splits(0), _tau(std::numeric_limits<unsigned int>::max()), _nTax(0), _root(0) {
 	}
 
 	~VpTree() {
 		delete _root;
 	}
 
-	void create(pll_split_t * splits, size_t split_len, size_t num_splits, size_t nTax) {
+	void create(pll_split_t * splits, pll_split_t * inv_splits, size_t split_len, size_t num_splits, size_t nTax) {
 		delete _root;
 		_split_len = split_len;
 		_splits = splits;
+		_inv_splits = inv_splits;
 		_nTax = nTax;
 
 		_bs_light.resize(num_splits);
@@ -81,6 +82,7 @@ public:
 private:
 	unsigned int _split_len;
 	pll_split_t * _splits;
+	pll_split_t * _inv_splits;
 	std::vector<unsigned int> _bs_light;
 	std::vector<unsigned int> _items;
 	unsigned int _tau;
@@ -118,20 +120,16 @@ private:
 		return hdist;
 	}
 
-	static unsigned int distance(pll_split_t s1, pll_split_t s2, unsigned int split_len, unsigned int nTax,
+	static unsigned int distance(pll_split_t s1, pll_split_t s1_inv, pll_split_t s2, unsigned int split_len, unsigned int nTax,
 			unsigned int max_interesting_dist) {
-		//max_interesting_dist = std::max(max_interesting_dist, nTax - max_interesting_dist); // TODO: Is this still correct??? I think yes, but needs proof...
-
 		unsigned int dist = split_hamming_distance_lbound(s1, s2, split_len, max_interesting_dist);
 
-		if (dist <= nTax / 2) {
+		if (dist <= nTax / 2 && dist < max_interesting_dist) {
 			return dist;
-		} else {
-			return std::min(dist,
-					nTax - split_hamming_distance_lbound(s1, s2, split_len, std::max(max_interesting_dist, nTax - max_interesting_dist)));
 		}
 
-		return std::min(dist, nTax - dist);
+		unsigned int dist_inv = split_hamming_distance_lbound(s1_inv, s2, split_len, max_interesting_dist);
+		return std::min(dist, dist_inv);
 	}
 
 	static unsigned int distance(pll_split_t s1, pll_split_t s2, unsigned int split_len, unsigned int nTax) {
@@ -182,7 +180,7 @@ private:
 				if (i >= actEnd) {
 					break;
 				}
-				unsigned int actDist = distance(_splits[_items[i]], _splits[_items[median]], _split_len, _nTax, medianDistance + 1);
+				unsigned int actDist = distance(_splits[_items[i]], _inv_splits[_items[i]], _splits[_items[median]], _split_len, _nTax, medianDistance + 1);
 				if (actDist > medianDistance && i < median) { // the element is on the wrong side, move it to the end
 					unsigned int temp = _items[i];
 					_items[i] = _items[actEnd];
@@ -217,7 +215,7 @@ private:
 
 			if (minDist < _tau) {
 				unsigned int maxInterestingDist = node->threshold + _tau + 1;
-				dist = distance(_splits[_items[node->index]], target, _split_len, _nTax, maxInterestingDist);
+				dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax, maxInterestingDist);
 				distComputed = true;
 				if (dist < _tau) {
 					_tau = dist;
@@ -245,7 +243,7 @@ private:
 
 		unsigned int maxInterestingDist = node->threshold + _tau + 1;
 
-		unsigned int dist = distance(_splits[_items[node->index]], target, _split_len, _nTax, maxInterestingDist);
+		unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax, maxInterestingDist);
 
 		if (dist < _tau) {
 			_tau = dist;
