@@ -180,7 +180,23 @@ private:
 				if (i >= actEnd) {
 					break;
 				}
-				unsigned int actDist = distance(_splits[_items[i]], _inv_splits[_items[i]], _splits[_items[median]], _split_len, _nTax, medianDistance + 1);
+
+				unsigned int minDist;
+				if (_bs_light[_items[i]] >= _bs_light[_items[median]]) {
+					minDist = _bs_light[_items[i]] - _bs_light[_items[median]];
+				} else {
+					minDist = _bs_light[_items[median]] - _bs_light[_items[i]];
+				}
+				minDist = std::min(minDist, _nTax - minDist);
+
+				unsigned int actDist;
+				if (minDist > medianDistance) {
+					actDist = minDist;
+				} else {
+					actDist = distance(_splits[_items[i]], _inv_splits[_items[i]], _splits[_items[median]], _split_len, _nTax,
+							medianDistance + 1);
+				}
+
 				if (actDist > medianDistance && i < median) { // the element is on the wrong side, move it to the end
 					unsigned int temp = _items[i];
 					_items[i] = _items[actEnd];
@@ -215,7 +231,8 @@ private:
 
 			if (minDist < _tau) {
 				unsigned int maxInterestingDist = node->threshold + _tau + 1;
-				dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax, maxInterestingDist);
+				dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
+						maxInterestingDist);
 				distComputed = true;
 				if (dist < _tau) {
 					_tau = dist;
@@ -232,7 +249,9 @@ private:
 
 			if (minDist <= node->threshold + _tau) {
 				if (!distComputed) {
-					dist = distance(_splits[_items[node->index]], target, _split_len, _nTax); // do we need the dist computation here?
+					unsigned int maxInterestingDist = node->threshold + _tau + 1;
+					dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
+							maxInterestingDist); // do we need the dist computation here?
 				}
 				if (dist <= node->threshold + _tau) {
 					search(node->left, target, p);
@@ -243,7 +262,8 @@ private:
 
 		unsigned int maxInterestingDist = node->threshold + _tau + 1;
 
-		unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax, maxInterestingDist);
+		unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
+				maxInterestingDist);
 
 		if (dist < _tau) {
 			_tau = dist;
