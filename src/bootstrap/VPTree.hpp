@@ -23,6 +23,7 @@
 
 #include <bitset>
 #include <string>
+#include <cmath>
 
 #include "../common.h"
 
@@ -60,11 +61,11 @@ public:
 		_root = buildFromPoints(0, _items.size());
 	}
 
-	void search(pll_split_t target, int k, std::vector<unsigned int>* results, std::vector<double>* distances) {
+	void search(pll_split_t target, int k, std::vector<unsigned int>* results, std::vector<double>* distances, unsigned int p) {
 		std::priority_queue<HeapItem> heap;
 
 		_tau = std::numeric_limits<unsigned int>::max();
-		search(_root, target, k, heap);
+		search(_root, target, k, heap, p);
 
 		results->clear();
 		distances->clear();
@@ -83,7 +84,7 @@ public:
 		std::priority_queue<HeapItem> heap;
 
 		_tau = std::numeric_limits<unsigned int>::max();
-		search(_root, target, 1, heap);
+		search(_root, target, 1, heap, p);
 
 		return std::min(heap.top().dist, p - 1);
 
@@ -220,11 +221,54 @@ private:
 		return node;
 	}
 
-	void search(Node* node, pll_split_t target, unsigned int k, std::priority_queue<HeapItem>& heap) {
+	void search(Node* node, pll_split_t target, unsigned int k, std::priority_queue<HeapItem>& heap, unsigned int p) {
 		if (node == NULL)
 			return;
 
-		double dist = distance(_splits[_items[node->index]], target, _split_len, _nTax);
+		unsigned int minDist;
+		if (p >= _bs_light[_items[node->index]]) {
+			minDist = p - _bs_light[_items[node->index]];
+		} else {
+			minDist = _bs_light[_items[node->index]] - p;
+		}
+		minDist = std::min(minDist, _nTax - minDist);
+
+		if (minDist >= node->threshold) { // interesting stuff happens...
+			bool distComputed = false;
+			unsigned int dist;
+
+			if (minDist < _tau) {
+				dist = distance(_splits[_items[node->index]], target, _split_len, _nTax);
+				distComputed = true;
+				if (dist < _tau) {
+					if (heap.size() == k)
+						heap.pop();
+					heap.push(HeapItem(node->index, dist));
+					if (heap.size() == k)
+						_tau = heap.top().dist;
+				}
+			}
+
+			if (node->left == NULL && node->right == NULL) {
+				return;
+			}
+
+			if (minDist + _tau >= node->threshold) {
+				search(node->right, target, k, heap, p);
+			}
+
+			if (minDist <= node->threshold + _tau) {
+				if (!distComputed) {
+					dist = distance(_splits[_items[node->index]], target, _split_len, _nTax); // do we need the dist computation here?
+				}
+				if (dist <= node->threshold + _tau) {
+					search(node->left, target, k, heap, p);
+				}
+			}
+			return;
+		}
+
+		unsigned int dist = distance(_splits[_items[node->index]], target, _split_len, _nTax);
 		//printf("dist=%g tau=%gn", dist, _tau );
 
 		if (dist < _tau) {
@@ -240,21 +284,21 @@ private:
 		}
 
 		if (dist < node->threshold) {
-			if (dist - _tau <= node->threshold) {
-				search(node->left, target, k, heap);
+			if (dist <= node->threshold + _tau) {
+				search(node->left, target, k, heap, p);
 			}
 
 			if (dist + _tau >= node->threshold) {
-				search(node->right, target, k, heap);
+				search(node->right, target, k, heap, p);
 			}
 
 		} else {
 			if (dist + _tau >= node->threshold) {
-				search(node->right, target, k, heap);
+				search(node->right, target, k, heap, p);
 			}
 
-			if (dist - _tau <= node->threshold) {
-				search(node->left, target, k, heap);
+			if (dist <= node->threshold + _tau) {
+				search(node->left, target, k, heap, p);
 			}
 		}
 	}
