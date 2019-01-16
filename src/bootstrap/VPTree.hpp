@@ -120,9 +120,17 @@ private:
 
 	static unsigned int distance(pll_split_t s1, pll_split_t s2, unsigned int split_len, unsigned int nTax,
 			unsigned int max_interesting_dist) {
-		max_interesting_dist = std::max(max_interesting_dist, nTax - max_interesting_dist); // TODO: Is this still correct??? I think yes, but needs proof...
+		//max_interesting_dist = std::max(max_interesting_dist, nTax - max_interesting_dist); // TODO: Is this still correct??? I think yes, but needs proof...
 
 		unsigned int dist = split_hamming_distance_lbound(s1, s2, split_len, max_interesting_dist);
+
+		if (dist <= nTax / 2) {
+			return dist;
+		} else {
+			return std::min(dist,
+					nTax - split_hamming_distance_lbound(s1, s2, split_len, std::max(max_interesting_dist, nTax - max_interesting_dist)));
+		}
+
 		return std::min(dist, nTax - dist);
 	}
 
@@ -156,7 +164,6 @@ private:
 		node->index = lower;
 
 		if (upper - lower > 1) {
-
 			// choose an arbitrary point and move it to the start
 			unsigned int i = (int) ((double) rand() / RAND_MAX * (upper - lower - 1)) + lower;
 			std::swap(_items[lower], _items[i]);
