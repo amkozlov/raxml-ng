@@ -69,36 +69,12 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 		}
 
 		// else, we are in the search for minimum distance...
-		min_hdist = bsVPTree.search_mindist(ref_split);
-		if (min_hdist > p-1) {
-			min_hdist = p-1;
-		}
+		min_hdist = bsVPTree.search_mindist(ref_split, p - 1);
 
 		//std::cout << "minimum distance found Sarah: " << min_hdist << "\n";
 
 		assert(min_hdist > 0);
 		support[i] = 1.0 - (((double) min_hdist) / (p - 1));
-
-		/*
-
-		 for (j = 0; j < split_count; j++) {
-		 unsigned int hdist;
-
-		 // this split is too far away -> skip it
-		 if (abs(bs_light[j] - p) > min_hdist && abs(tip_count - bs_light[j] - p) > min_hdist) {
-		 continue;
-		 }
-
-		 //      unsigned int hdist = pllmod_utree_split_hamming_distance(ref_split, bs_splits[j], tip_count);
-		 hdist = utree_split_hamming_distance_lbound(ref_split, bs_splits[j], split_len, min_hdist);
-		 min_hdist = PLL_MIN(min_hdist, hdist);
-		 }
-
-		 assert(min_hdist > 0);
-
-		 support[i] = 1.0 - (((double) min_hdist) / (p - 1));
-
-		 */
 	}
 
 	pllmod_utree_split_hashtable_destroy(bs_splits_hash);

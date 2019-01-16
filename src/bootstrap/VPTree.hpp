@@ -72,13 +72,13 @@ public:
 		std::reverse(distances->begin(), distances->end());
 	}
 
-	unsigned int search_mindist(pll_split_t target) {
+	unsigned int search_mindist(pll_split_t target, unsigned int max_dist) {
 		std::priority_queue<HeapItem> heap;
 
 		_tau = std::numeric_limits<unsigned int>::max();
 		search(_root, target, 1, heap);
 
-		return heap.top().dist;
+		return std::min(heap.top().dist, max_dist);
 
 		/*size_t min_idx = 0;
 		unsigned int min = std::numeric_limits<unsigned int>::max();
@@ -138,7 +138,6 @@ private:
 
 	static unsigned int distance(pll_split_t s1, pll_split_t s2, unsigned int split_len, unsigned int nTax) {
 		unsigned int dist = split_hamming_distance(s1, s2, split_len);
-		//return dist;
 		return std::min(dist, nTax - dist);
 	}
 
