@@ -18,7 +18,7 @@ inline unsigned int bitv_length(unsigned int bit_count) {
 /* Compute Transfer Support (Lemoine et al., Nature 2018) for every split in ref_splits. Sarahs version with VP-Trees. */
 PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_splits, pll_split_t * bs_splits, unsigned int tip_count,
 		double * support) {
-	unsigned int i;
+	unsigned int i, j;
 	unsigned int split_count = tip_count - 3;
 	unsigned int split_len = bitv_length(tip_count);
 
@@ -34,21 +34,19 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 		return PLL_FAILURE;
 	}
 
-	//int * bs_light = calloc(split_count, sizeof(int));
-
-	/*if (!bs_light) {
+	int * bs_light = (int*) calloc(split_count, sizeof(int));
+	if (!bs_light) {
 		pllmod_utree_split_hashtable_destroy(bs_splits_hash);
-		pllmod_set_error(PLL_ERROR_MEM_ALLOC, "Cannot allocate memory\n");
+		//pllmod_set_error(PLL_ERROR_MEM_ALLOC, "Cannot allocate memory\n");
 		return PLL_FAILURE;
-	}*/
+	}
+	// precompute lightside size for all bootstrap splits
+	for (j = 0; j < split_count; j++) {
+		bs_light[j] = pllmod_utree_split_lightside(bs_splits[j], tip_count);
+	}
 
 	VpTree bsVPTree;
 	bsVPTree.create(bs_splits, split_len, split_count, tip_count);
-
-	/* precompute lightside size for all bootstrap splits
-	 for (j = 0; j < split_count; j++) {
-	 bs_light[j] = pllmod_utree_split_lightside(bs_splits[j], tip_count);
-	 }*/
 
 	/* iterate over all splits of the reference tree */
 	for (i = 0; i < split_count; i++) {
@@ -69,7 +67,7 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 		}
 
 		// else, we are in the search for minimum distance...
-		min_hdist = bsVPTree.search_mindist(ref_split, p - 1);
+		min_hdist = bsVPTree.search_mindist(ref_split, p);
 
 		//std::cout << "minimum distance found Sarah: " << min_hdist << "\n";
 

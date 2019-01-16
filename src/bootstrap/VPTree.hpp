@@ -34,7 +34,7 @@ inline std::string split_string(pll_split_t split) {
 class VpTree {
 public:
 	VpTree() :
-		_split_len(0), _splits(0), _tau(std::numeric_limits<unsigned int>::max()), _nTax(0), _root(0) {
+			_split_len(0), _splits(0), _tau(std::numeric_limits<unsigned int>::max()), _nTax(0), _root(0) {
 	}
 
 	~VpTree() {
@@ -46,6 +46,13 @@ public:
 		_split_len = split_len;
 		_splits = splits;
 		_nTax = nTax;
+
+		_bs_light.resize(num_splits);
+		// precompute lightside size for all bootstrap splits
+		for (unsigned int j = 0; j < num_splits; j++) {
+			_bs_light[j] = pllmod_utree_split_lightside(splits[j], nTax);
+		}
+
 		_items.resize(num_splits);
 		for (size_t i = 0; i < num_splits; ++i) {
 			_items[i] = i;
@@ -72,30 +79,31 @@ public:
 		std::reverse(distances->begin(), distances->end());
 	}
 
-	unsigned int search_mindist(pll_split_t target, unsigned int max_dist) {
+	unsigned int search_mindist(pll_split_t target, unsigned int p) {
 		std::priority_queue<HeapItem> heap;
 
 		_tau = std::numeric_limits<unsigned int>::max();
 		search(_root, target, 1, heap);
 
-		return std::min(heap.top().dist, max_dist);
+		return std::min(heap.top().dist, p - 1);
 
 		/*size_t min_idx = 0;
-		unsigned int min = std::numeric_limits<unsigned int>::max();
-		for (size_t i = 0; i < _items.size(); ++i) {
-			unsigned int dist = distance(target, _splits[i], _split_len);
-			if (dist < min) {
-				min = dist;
-				min_idx = i;
-			}
-		}
-		//std::cout << "   Sarah " << min << " for witness: " << split_string(_splits[min_idx]) << " and query: " << split_string(target) << "\n";
-		return min;*/
+		 unsigned int min = std::numeric_limits<unsigned int>::max();
+		 for (size_t i = 0; i < _items.size(); ++i) {
+		 unsigned int dist = distance(target, _splits[i], _split_len);
+		 if (dist < min) {
+		 min = dist;
+		 min_idx = i;
+		 }
+		 }
+		 //std::cout << "   Sarah " << min << " for witness: " << split_string(_splits[min_idx]) << " and query: " << split_string(target) << "\n";
+		 return min;*/
 	}
 
 private:
 	unsigned int _split_len;
 	pll_split_t * _splits;
+	std::vector<unsigned int> _bs_light;
 	std::vector<unsigned int> _items;
 	unsigned int _tau;
 	unsigned int _nTax;
@@ -121,15 +129,15 @@ private:
 	}
 
 	static unsigned int split_hamming_distance(pll_split_t s1, pll_split_t s2, unsigned int split_len) {
-			unsigned int hdist = 0;
-			unsigned int i;
+		unsigned int hdist = 0;
+		unsigned int i;
 
-			for (i = 0; (i < split_len); ++i) {
-				hdist += PLL_POPCNT32(s1[i] ^ s2[i]);
-			}
-
-			return hdist;
+		for (i = 0; (i < split_len); ++i) {
+			hdist += PLL_POPCNT32(s1[i] ^ s2[i]);
 		}
+
+		return hdist;
+	}
 
 	static unsigned int distance(pll_split_t s1, pll_split_t s2, unsigned int split_len, unsigned int min_hdist, unsigned int nTax) {
 		unsigned int dist = split_hamming_distance_lbound(s1, s2, split_len, min_hdist);
