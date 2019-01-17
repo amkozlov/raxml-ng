@@ -21,6 +21,9 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 	unsigned int i, j;
 	unsigned int split_count = tip_count - 3;
 	unsigned int split_len = bitv_length(tip_count);
+	unsigned int split_size = sizeof(pll_split_base_t) * 8;
+	unsigned int split_offset = tip_count % split_size;
+	unsigned int split_mask = split_offset ? (1 << split_offset) - 1 : ~0;
 
 	if (!ref_splits || !bs_splits || !support) {
 		//pllmod_set_error(PLL_ERROR_PARAM_INVALID, "Parameter is NULL!\n");
@@ -45,8 +48,27 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 		bs_light[j] = pllmod_utree_split_lightside(bs_splits[j], tip_count);
 	}
 
+	// precompute all inverse bootstrap splits
+	pll_split_t * inv_bs_splits = (pll_split_t *) malloc(split_count * sizeof(pll_split_t));
+	if (!inv_bs_splits) {
+		return PLL_FAILURE;
+	}
+	for (size_t i = 0; i < split_count; ++i) {
+		/* inverse the bs split */
+		pll_split_t inv_split = (pll_split_t) calloc(split_len, sizeof(pll_split_base_t));
+		if (!inv_split) {
+			return PLL_FAILURE;
+		}
+		for (size_t k = 0; k < split_len; ++k) {
+			inv_split[k] = ~bs_splits[i][k];
+		}
+		/* clear unused bits in the last array element */
+		inv_split[split_len - 1] &= split_mask;
+		inv_bs_splits[i] = inv_split;
+	}
+
 	VpTree bsVPTree;
-	bsVPTree.create(bs_splits, split_len, split_count, tip_count);
+	bsVPTree.create(bs_splits, inv_bs_splits, split_len, split_count, tip_count);
 
 	/* iterate over all splits of the reference tree */
 	for (i = 0; i < split_count; i++) {
