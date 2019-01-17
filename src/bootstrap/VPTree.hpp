@@ -163,7 +163,8 @@ private:
 
 		if (upper - lower > 1) {
 			// choose an arbitrary point and move it to the start
-			unsigned int i = (int) ((double) rand() / RAND_MAX * (upper - lower - 1)) + lower;
+			unsigned int i = upper - 1;
+			//unsigned int i = (int) ((double) rand() / RAND_MAX * (upper - lower - 1)) + lower;
 			std::swap(_items[lower], _items[i]);
 
 			unsigned int median = (upper + lower) / 2;
