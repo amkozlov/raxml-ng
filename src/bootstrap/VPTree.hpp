@@ -218,6 +218,10 @@ private:
 		if (node == NULL)
 			return;
 
+		if (_tau == 1) {
+			return;
+		}
+
 		unsigned int minDist;
 		if (p >= _bs_light[_items[node->index]]) {
 			minDist = p - _bs_light[_items[node->index]];
@@ -232,6 +236,9 @@ private:
 
 			if (minDist < _tau) {
 				unsigned int maxInterestingDist = node->threshold + _tau + 1;
+				if (node->left == NULL && node->right == NULL) {
+					maxInterestingDist = _tau;
+				}
 				dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
 						maxInterestingDist);
 				distComputed = true;
@@ -283,6 +290,25 @@ private:
 					search(node->right, target, p);
 				}
 
+			}
+			return;
+		}
+
+		if (node->right == NULL) {
+			unsigned int maxInterestingDist;
+			if (node->threshold >= _tau) {
+				maxInterestingDist = node->threshold;
+			} else {
+				maxInterestingDist = _tau;
+			}
+			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
+					maxInterestingDist);
+			if (dist < _tau) {
+				_tau = dist;
+			}
+
+			if (dist < node->threshold) {
+				search(node->left, target, p);
 			}
 			return;
 		}
