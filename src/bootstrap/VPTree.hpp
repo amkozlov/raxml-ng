@@ -306,6 +306,14 @@ private:
 					search(node->right, target, p);
 				}
 
+			} else {
+				if (dist + _tau >= node->threshold) {
+					search(node->right, target, p);
+				}
+
+				if (dist <= node->threshold + _tau) {
+					search(node->left, target, p);
+				}
 			}
 			return;
 		}
@@ -325,6 +333,14 @@ private:
 
 			if (dist < node->threshold) {
 				search(node->left, target, p);
+			} else {
+				if (dist + _tau >= node->threshold) {
+					search(node->right, target, p);
+				}
+
+				if (dist <= node->threshold + _tau) {
+					search(node->left, target, p);
+				}
 			}
 			return;
 		}
@@ -345,6 +361,14 @@ private:
 				search(node->right, target, p);
 			}
 
+		} else {
+			if (dist + _tau >= node->threshold) {
+				search(node->right, target, p);
+			}
+
+			if (dist <= node->threshold + _tau) {
+				search(node->left, target, p);
+			}
 		}
 	}
 };
