@@ -59,7 +59,9 @@ public:
 		for (size_t i = 0; i < num_splits; ++i) {
 			_items[i] = i;
 		}
-		_root = buildFromPoints(0, _items.size());
+
+		std::vector<unsigned int> dist_to_lower(_items.size());
+		_root = buildFromPoints(0, _items.size(), dist_to_lower);
 	}
 
 	unsigned int search_mindist(pll_split_t target, unsigned int p) {
@@ -190,7 +192,7 @@ private:
 		}
 	};
 
-	Node* buildFromPoints(int lower, int upper) {
+	Node* buildFromPoints(unsigned int lower, unsigned int upper, std::vector<unsigned int>& dist_to_lower) {
 		if (upper == lower) {
 			return NULL;
 		}
@@ -204,10 +206,9 @@ private:
 			//int i = (int) ((double) rand() / RAND_MAX * (upper - lower - 1)) + lower;
 			std::swap(_items[lower], _items[upper - 1]);
 
-			int median = (upper + lower) / 2;
+			unsigned int median = (upper + lower) / 2;
 
 			// precompute dist_to_lower once
-			std::vector<unsigned int> dist_to_lower(_items.size());
 			for (size_t i = lower + 1; i < upper; ++i) {
 				unsigned int dist = distance(_splits[_items[lower]], _splits[_items[i]], _split_len, _nTax);
 				dist_to_lower[_items[i]] = dist;
@@ -221,8 +222,8 @@ private:
 			node->threshold = distance(_splits[_items[lower]], _splits[_items[median]], _split_len, _nTax);
 
 			node->index = lower;
-			node->left = buildFromPoints(lower + 1, median);
-			node->right = buildFromPoints(median, upper);
+			node->left = buildFromPoints(lower + 1, median, dist_to_lower);
+			node->right = buildFromPoints(median, upper, dist_to_lower);
 		}
 
 		return node;
