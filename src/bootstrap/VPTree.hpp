@@ -248,7 +248,7 @@ private:
 				search(node->right, target, p);
 			}
 
-			if (minDist <= node->threshold + _tau) {
+			if (minDist <= node->threshold + _tau && node->left != NULL) {
 				if (!distComputed) {
 					unsigned int maxInterestingDist = node->threshold + _tau + 1;
 					dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
