@@ -182,15 +182,11 @@ private:
 	}* _root;
 
 	struct DistanceComparator {
-		const pll_split_t item;
-		unsigned int _split_len;
-		pll_split_t* _splits;
-		unsigned int _nTax;
-		DistanceComparator(pll_split_t item, unsigned int split_len, pll_split_t * splits, unsigned int nTax) :
-				item(item), _split_len(split_len), _splits(splits), _nTax(nTax) {
+		const std::vector<unsigned int>& _dist_to_lower;
+		DistanceComparator(const std::vector<unsigned int>& dist_to_lower) : _dist_to_lower(dist_to_lower) {
 		}
 		bool operator()(const unsigned int& a, const unsigned int& b) {
-			return distance(item, _splits[a], _split_len, _nTax) < distance(item, _splits[b], _split_len, _nTax);
+			return _dist_to_lower[a] < _dist_to_lower[b];
 		}
 	};
 
@@ -210,9 +206,16 @@ private:
 
 			int median = (upper + lower) / 2;
 
+			// precompute dist_to_lower once
+			std::vector<unsigned int> dist_to_lower(_items.size());
+			for (size_t i = lower + 1; i < upper; ++i) {
+				unsigned int dist = distance(_splits[_items[lower]], _splits[_items[i]], _split_len, _nTax);
+				dist_to_lower[_items[i]] = dist;
+			}
+
 			// partition around the median distance
 			std::nth_element(_items.begin() + lower + 1, _items.begin() + median, _items.begin() + upper,
-					DistanceComparator(_splits[_items[lower]], _split_len, _splits, _nTax));
+					DistanceComparator(dist_to_lower));
 
 			// what was the median?
 			node->threshold = distance(_splits[_items[lower]], _splits[_items[median]], _split_len, _nTax);
