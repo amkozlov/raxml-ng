@@ -24,6 +24,7 @@
 #include <bitset>
 #include <string>
 #include <cmath>
+#include <algorithm>
 
 #include "../common.h"
 
@@ -80,7 +81,7 @@ public:
 			std::cout << "ERROR!!! THE RESULT IS WRONG!!!\n";
 			std::cout << "_tau: " << _tau << "\n";
 			std::cout << "min: " << min << "\n";
-			std::cout << "p-1: " << p-1 << "\n";
+			std::cout << "p-1: " << p - 1 << "\n";
 		}
 
 		return std::min(_tau, p - 1);
@@ -171,6 +172,34 @@ private:
 		}
 	}* _root;
 
+	struct DistanceComparator {
+		unsigned int item;
+		unsigned int _split_len;
+		pll_split_t* _splits;
+		unsigned int _nTax;
+		unsigned int _p;
+		const std::vector<unsigned int>& _bs_light;
+		DistanceComparator(unsigned int item, unsigned int p, unsigned int split_len, pll_split_t * splits, unsigned int nTax,
+				const std::vector<unsigned int>& bs_light) :
+				item(item), _p(p), _split_len(split_len), _splits(splits), _nTax(nTax), _bs_light(bs_light) {
+		}
+		bool operator()(const unsigned int& a, const unsigned int& b) {
+			unsigned int minDistA;
+			if (_p >= _bs_light[a]) {
+				minDistA = _p - _bs_light[a];
+			} else {
+				minDistA = _bs_light[a] - _p;
+			}
+			minDistA = std::min(minDistA, _nTax - minDistA);
+			unsigned int distB = distance(_splits[item], _splits[b], _split_len, _nTax);
+			if (minDistA >= distB) {
+				return false;
+			}
+			unsigned int distA = distance(_splits[item], _splits[a], _split_len, _nTax);
+			return distA < distB;
+		}
+	};
+
 	Node* buildFromPoints(unsigned int lower, unsigned int upper) {
 		if (upper == lower) {
 			return NULL;
@@ -186,43 +215,12 @@ private:
 			std::swap(_items[lower], _items[i]);
 
 			unsigned int median = (upper + lower) / 2;
+			// partition around the median distance
+			std::nth_element(_items.begin() + lower + 1, _items.begin() + median, _items.begin() + upper,
+					DistanceComparator(_items[lower], _bs_light[_items[lower]], _split_len, _splits, _nTax, _bs_light));
+
 			// what was the median?
 			node->threshold = distance(_splits[_items[lower]], _splits[_items[median]], _split_len, _nTax);
-
-			// partition around the median distance
-			unsigned int medianDistance = node->threshold;
-			unsigned int actEnd = upper - 1;
-			for (size_t i = lower + 1; i < upper; ++i) {
-				if (i == median) {
-					continue;
-				}
-				if (i >= actEnd) {
-					break;
-				}
-
-				unsigned int minDist;
-				if (_bs_light[_items[i]] >= _bs_light[_items[median]]) {
-					minDist = _bs_light[_items[i]] - _bs_light[_items[median]];
-				} else {
-					minDist = _bs_light[_items[median]] - _bs_light[_items[i]];
-				}
-				minDist = std::min(minDist, _nTax - minDist);
-
-				unsigned int actDist;
-				if (minDist > medianDistance) {
-					actDist = minDist;
-				} else {
-					actDist = distance(_splits[_items[i]], _inv_splits[_items[i]], _splits[_items[median]], _split_len, _nTax,
-							medianDistance + 1);
-				}
-
-				if (actDist > medianDistance && i < median) { // the element is on the wrong side, move it to the end
-					unsigned int temp = _items[i];
-					_items[i] = _items[actEnd];
-					_items[actEnd] = temp;
-					actEnd--;
-				}
-			}
 
 			node->index = lower;
 			node->left = buildFromPoints(lower + 1, median);
