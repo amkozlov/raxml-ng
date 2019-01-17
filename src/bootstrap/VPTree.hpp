@@ -271,17 +271,28 @@ private:
 			return;
 		}
 
+		if (node->left == NULL) {
+			unsigned int maxInterestingDist = node->threshold;
+			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
+					maxInterestingDist);
+			if (dist < _tau) {
+				_tau = dist;
+			}
+			if (dist < node->threshold) {
+				if (dist + _tau >= node->threshold) {
+					search(node->right, target, p);
+				}
+
+			}
+			return;
+		}
+
 		unsigned int maxInterestingDist = node->threshold + _tau + 1;
 		unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
 				maxInterestingDist);
-
 		if (dist < _tau) {
 			_tau = dist;
 		}
-
-		/*if (node->left == NULL && node->right == NULL) {
-			return;
-		}*/
 
 		if (dist < node->threshold) {
 			if (dist <= node->threshold + _tau) {
