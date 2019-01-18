@@ -85,7 +85,8 @@ public:
 		 std::cout << "_tau: " << _tau << "\n";
 		 std::cout << "min: " << min << "\n";
 		 std::cout << "p-1: " << p - 1 << "\n";
-		 }*/
+		 }
+		 */
 
 		return std::min(_tau, p - 1);
 	}
@@ -240,8 +241,9 @@ private:
 			// check if we need to update _tau before continuing...
 			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax, _tau,
 					old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
-			if (dist < _tau) {
-				_tau = dist;
+			_tau = std::min(_tau, dist);
+			if (_tau == 1) {
+				return;
 			}
 		}
 
@@ -275,8 +277,9 @@ private:
 			// check if we need to update _tau before continuing...
 			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax, _tau,
 					old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
-			if (dist < _tau) {
-				_tau = dist;
+			_tau = std::min(_tau, dist);
+			if (_tau == 1) {
+				return;
 			}
 		}
 
@@ -298,8 +301,9 @@ private:
 			// check if we need to update _tau before continuing...
 			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax, _tau,
 					old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
-			if (dist < _tau) {
-				_tau = dist;
+			_tau = std::min(_tau, dist);
+			if (_tau == 1) {
+				return;
 			}
 		}
 
@@ -328,19 +332,11 @@ private:
 		minDist = std::min(minDist, _nTax - minDist);
 
 		if (node->left == NULL && node->right == NULL) { // both children are NULL, nothing left to do.
-			unsigned int old_dist_forward = 0;
-			unsigned int old_dist_reverse = 0;
-			unsigned int old_i_forward = 0;
-			unsigned int old_i_reverse = 0;
 			if (minDist < _tau) {
-				// check if we need to update _tau before continuing...
 				unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
-						_tau, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
-				if (dist < _tau) {
-					_tau = dist;
-				}
+						_tau);
+				_tau = std::min(_tau, dist);
 			}
-			return;
 		} else if (node->left == NULL) {
 			search_left_child_null(node, target, p, minDist);
 		} else if (node->right == NULL) {
