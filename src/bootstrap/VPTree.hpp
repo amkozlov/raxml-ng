@@ -192,45 +192,38 @@ private:
 	};
 
 	unsigned int findVantagePoint(unsigned int lower, unsigned int upper) {
-		static const unsigned int NUM_CANDIDATES = 30;
-		static const unsigned int NUM_SAMPLES = 10;
-		// pick NUM_CANDIDATES random candidates
-		std::unordered_set<unsigned int> candidates;
-		while (candidates.size() < upper - lower && candidates.size() < NUM_CANDIDATES) {
-			// try to randomly pick a candidate
-			unsigned int cand = (unsigned int) ((double) rand() / RAND_MAX * (upper - lower - 1)) + lower;
-			candidates.insert(cand);
-		}
-		unsigned int bestCand = upper - 1;
-		double highestVariance = 0;
-		for (unsigned int cand : candidates) {
-			std::unordered_set<unsigned int> samples;
-			while (samples.size() < upper - lower - 1 && samples.size() < NUM_SAMPLES) {
-				// try to randomly pick a sample
-				unsigned int sam = (unsigned int) ((double) rand() / RAND_MAX * (upper - lower - 1)) + lower;
-				if (sam != cand) {
-					samples.insert(sam);
+		// chose a random node
+		unsigned int cand = (unsigned int) ((double) rand() / RAND_MAX * (upper - lower - 1)) + lower;
+		// find the node that is farthest away from this node as VP point
+		unsigned int maxDist = 0;
+		unsigned int vpPoint = lower;
+
+		static const unsigned int NUM_SAMPLES = 200;
+		static const unsigned int MAX_COLLISIONS = 5;
+		std::unordered_set<unsigned int> samples;
+		unsigned int actCollisions = 0;
+		while (samples.size() < (upper - lower - 1) && samples.size() < NUM_SAMPLES) {
+			// try to randomly pick a sample
+			unsigned int sam = (unsigned int) ((double) rand() / RAND_MAX * (upper - lower - 1)) + lower;
+			if (sam != cand) {
+				if (samples.find(sam) != samples.end()) {
+					actCollisions++;
+					if (actCollisions >= MAX_COLLISIONS) {
+						break;
+					}
 				}
-			}
-			double var = 0;
-			unsigned int dist_sum = 0;
-			std::vector<int> sampleDistances;
-			sampleDistances.reserve(samples.size());
-			for (unsigned int sam : samples) {
-				int dist = distance(_splits[_items[cand]], _inv_splits[_items[cand]], _splits[_items[sam]], _nTax_div_2);
-				sampleDistances.emplace_back(dist);
-				dist_sum += dist;
-			}
-			double mean = ((double) dist_sum) / samples.size();
-			for (size_t i = 0; i < sampleDistances.size(); ++i) {
-				var += (sampleDistances[i] - mean) * (sampleDistances[i] - mean);
-			}
-			if (var > highestVariance) {
-				highestVariance = var;
-				bestCand = cand;
+				samples.insert(sam);
 			}
 		}
-		return bestCand;
+
+		for (unsigned int i : samples) {
+			unsigned int dist = distance(_splits[_items[cand]], _inv_splits[_items[cand]], _splits[_items[i]], _nTax_div_2);
+			if (dist > maxDist) {
+				maxDist = dist;
+				vpPoint = i;
+			}
+		}
+		return vpPoint;
 	}
 
 	Node* buildFromPoints(unsigned int lower, unsigned int upper, std::vector<unsigned int>& dist_to_lower) {
@@ -251,7 +244,8 @@ private:
 		} else if (upper > lower + 1) {
 			// choose an arbitrary point and move it to the start
 			// unsigned int vp = (int) ((double) rand() / RAND_MAX * (upper - lower - 1)) + lower;
-			unsigned int vp = upper - 1;
+			//unsigned int vp = upper - 1;
+			unsigned int vp = findVantagePoint(lower, upper);
 			//unsigned int vp = findVantagePoint(lower, upper);
 			std::swap(_items[lower], _items[vp]);
 
