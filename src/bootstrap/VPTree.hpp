@@ -37,7 +37,7 @@ static const unsigned int BUCKET_SIZE = 100;
 class VpTree {
 public:
 	VpTree() :
-			_split_len(0), _splits(0), _inv_splits(0), _tau(std::numeric_limits<unsigned int>::max()), _nTax(0), _root(0) {
+			_split_len(0), _splits(0), _inv_splits(0), _tau(std::numeric_limits<unsigned int>::max()), _nTax(0), _nTax_div_2(0), _root(0) {
 	}
 
 	~VpTree() {
@@ -50,6 +50,7 @@ public:
 		_splits = splits;
 		_inv_splits = inv_splits;
 		_nTax = nTax;
+		_nTax_div_2 = _nTax / 2;
 
 		_bs_light.resize(num_splits);
 		// precompute lightside size for all bootstrap splits
@@ -67,10 +68,9 @@ public:
 	}
 
 	unsigned int search_mindist(pll_split_t target, unsigned int p) {
-		_tau = p-1;
+		_tau = p - 1;
 		search(_root, target, p);
-
-/*
+		/*
 		 // check if the result is correct
 		 size_t min_idx = 0;
 		 unsigned int min = p - 1;
@@ -86,7 +86,8 @@ public:
 		 std::cout << "_tau: " << _tau << "\n";
 		 std::cout << "min: " << min << "\n";
 		 std::cout << "p-1: " << p - 1 << "\n";
-		 }*/
+		 }
+		 */
 		return _tau;
 	}
 
@@ -98,6 +99,7 @@ private:
 	std::vector<unsigned int> _items;
 	unsigned int _tau;
 	unsigned int _nTax;
+	unsigned int _nTax_div_2;
 
 	/* This function computes a lower bound of Hamming distance between splits:
 	 * the computation terminates as soon as current distance values exceeds min_hdist.
@@ -108,62 +110,62 @@ private:
 	 * it should be called twice, with original and inverted s1 (or s2),
 	 * to account for possible complementary split encoding.
 	 * */
-	static unsigned int split_hamming_distance_lbound(pll_split_t s1, pll_split_t s2, unsigned int split_len, unsigned int min_hdist) {
+	unsigned int split_hamming_distance_lbound(pll_split_t s1, pll_split_t s2, unsigned int min_hdist) {
 		unsigned int hdist = 0;
 		unsigned int i;
 
-		for (i = 0; (i < split_len) && (hdist <= min_hdist); ++i) {
+		for (i = 0; (i < _split_len) && (hdist <= min_hdist); ++i) {
 			hdist += PLL_POPCNT32(s1[i] ^ s2[i]);
 		}
 
 		return hdist;
 	}
 
-	static void split_hamming_distance_lbound(pll_split_t s1, pll_split_t s2, unsigned int split_len, unsigned int min_hdist,
+	void split_hamming_distance_lbound(pll_split_t s1, pll_split_t s2, unsigned int min_hdist,
 			unsigned int& hdist, unsigned int& i) {
-		for (; (i < split_len) && (hdist <= min_hdist); ++i) {
+		for (; (i < _split_len) && (hdist <= min_hdist); ++i) {
 			hdist += PLL_POPCNT32(s1[i] ^ s2[i]);
 		}
 	}
 
-	static unsigned int split_hamming_distance(pll_split_t s1, pll_split_t s2, unsigned int split_len) {
+	unsigned int split_hamming_distance(pll_split_t s1, pll_split_t s2) {
 		unsigned int hdist = 0;
 		unsigned int i;
 
-		for (i = 0; (i < split_len); ++i) {
+		for (i = 0; (i < _split_len); ++i) {
 			hdist += PLL_POPCNT32(s1[i] ^ s2[i]);
 		}
 
 		return hdist;
 	}
 
-	static unsigned int distance(pll_split_t s1, pll_split_t s1_inv, pll_split_t s2, unsigned int split_len, unsigned int nTax,
+	unsigned int distance(pll_split_t s1, pll_split_t s1_inv, pll_split_t s2,
 			unsigned int max_interesting_distance) {
-		unsigned int dist = split_hamming_distance_lbound(s1, s2, split_len, max_interesting_distance);
-		if (dist <= nTax / 2 && dist < max_interesting_distance) {
+		unsigned int dist = split_hamming_distance_lbound(s1, s2, max_interesting_distance);
+		if (dist <= _nTax_div_2 && dist < max_interesting_distance) {
 			return dist;
 		}
-		unsigned int dist_inv = split_hamming_distance_lbound(s1_inv, s2, split_len, max_interesting_distance);
+		unsigned int dist_inv = split_hamming_distance_lbound(s1_inv, s2, max_interesting_distance);
 		return std::min(dist, dist_inv);
 	}
 
-	static unsigned int distance(pll_split_t s1, pll_split_t s1_inv, pll_split_t s2, unsigned int split_len, unsigned int nTax,
+	unsigned int distance(pll_split_t s1, pll_split_t s1_inv, pll_split_t s2,
 			unsigned int max_interesting_distance, unsigned int &old_dist_forward, unsigned int& old_dist_reverse,
 			unsigned int& old_i_forward, unsigned int& old_i_reverse, unsigned int minDist) {
 		if (minDist > max_interesting_distance || std::min(old_dist_forward, old_dist_reverse) > max_interesting_distance) {
 			return max_interesting_distance + 1;
 		}
-		split_hamming_distance_lbound(s1, s2, split_len, max_interesting_distance, old_dist_forward, old_i_forward);
-		if (old_dist_forward <= nTax / 2 && old_dist_forward < max_interesting_distance) {
+		split_hamming_distance_lbound(s1, s2, max_interesting_distance, old_dist_forward, old_i_forward);
+		if (old_dist_forward <= _nTax_div_2 && old_dist_forward < max_interesting_distance) {
 			return old_dist_forward;
 		}
-		split_hamming_distance_lbound(s1_inv, s2, split_len, max_interesting_distance, old_dist_reverse, old_i_reverse);
+		split_hamming_distance_lbound(s1_inv, s2, max_interesting_distance, old_dist_reverse, old_i_reverse);
 		return std::min(old_dist_forward, old_dist_reverse);
 	}
 
-	static unsigned int distance(pll_split_t s1, pll_split_t s2, unsigned int split_len, unsigned int nTax) {
-		unsigned int dist = split_hamming_distance(s1, s2, split_len);
-		return std::min(dist, nTax - dist);
+	unsigned int distance(pll_split_t s1, pll_split_t s2) {
+		unsigned int dist = split_hamming_distance(s1, s2);
+		return std::min(dist, _nTax - dist);
 	}
 
 	struct Node {
@@ -215,30 +217,10 @@ private:
 
 			unsigned int median = (upper + lower) / 2;
 
-			unsigned int maxInterestingDistance = _nTax / 2;
-
 			// precompute dist_to_lower once
 			for (size_t i = lower + 1; i < upper; ++i) {
-				/*unsigned int dist = distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _split_len, _nTax,
-				 _nTax / 2);*/
-
-				/*
-				unsigned int minDist;
-				if (_bs_light[_items[lower]] >= _bs_light[_items[node->index]]) {
-					minDist = _bs_light[_items[lower]] - _bs_light[_items[node->index]];
-				} else {
-					minDist = _bs_light[_items[node->index]] - _bs_light[_items[lower]];
-				}
-				unsigned int dist;
-				if (minDist > maxInterestingDistance) {
-					dist = maxInterestingDistance + 1;
-				} else {
-					dist = distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _split_len, _nTax,
-							maxInterestingDistance);
-				}
-				*/
-				unsigned int dist = distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _split_len, _nTax,
-											maxInterestingDistance);
+				unsigned int dist = distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]],
+						_nTax_div_2);
 
 				dist_to_lower[_items[i]] = dist;
 			}
@@ -248,11 +230,7 @@ private:
 					DistanceComparator(dist_to_lower));
 
 			// what was the median?
-
-			node->threshold = maxInterestingDistance;
-
-			node->threshold = distance(_splits[_items[lower]], _splits[_items[median]], _split_len, _nTax);
-
+			node->threshold = distance(_splits[_items[lower]], _splits[_items[median]]);
 			/*std::cout << "Median distance was: " << node->threshold << " " << "nTax/2 is: " << _nTax / 2 << " nItems is: " << upper - lower
 			 << "\n";*/
 
@@ -271,7 +249,7 @@ private:
 		unsigned int old_i_reverse = 0;
 		if (minDist < _tau) {
 			// check if we need to update _tau before continuing...
-			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax, _tau,
+			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _tau,
 					old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
 			_tau = std::min(_tau, dist);
 			if (_tau == 1) {
@@ -283,7 +261,7 @@ private:
 		if (minDist + _tau >= node->threshold) {
 			search(node->right, target, p);
 		} else {
-			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
+			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target,
 					node->threshold - _tau, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
 			if (dist + _tau >= node->threshold) {
 				search(node->right, target, p);
@@ -292,7 +270,7 @@ private:
 
 		// checks for left node
 		if (minDist <= node->threshold + _tau) {
-			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
+			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target,
 					node->threshold + _tau, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
 			if (dist <= node->threshold + _tau) {
 				search(node->left, target, p);
@@ -307,7 +285,7 @@ private:
 		unsigned int old_i_reverse = 0;
 		if (minDist < _tau) {
 			// check if we need to update _tau before continuing...
-			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax, _tau,
+			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _tau,
 					old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
 			_tau = std::min(_tau, dist);
 			if (_tau == 1) {
@@ -316,7 +294,7 @@ private:
 		}
 
 		if (minDist <= node->threshold + _tau) {
-			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
+			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target,
 					node->threshold + _tau, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
 			if (dist <= node->threshold + _tau) {
 				search(node->left, target, p);
@@ -331,7 +309,7 @@ private:
 		unsigned int old_i_reverse = 0;
 		if (minDist < _tau) {
 			// check if we need to update _tau before continuing...
-			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax, _tau,
+			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _tau,
 					old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
 			_tau = std::min(_tau, dist);
 			if (_tau == 1) {
@@ -342,7 +320,7 @@ private:
 		if (minDist + _tau >= node->threshold) {
 			search(node->right, target, p);
 		} else {
-			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
+			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target,
 					node->threshold - _tau, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
 			//printf("dist=%g tau=%gn", dist, _tau );
 			if (dist + _tau >= node->threshold) {
@@ -353,7 +331,7 @@ private:
 
 	void search_both_children_null(Node* node, pll_split_t target, unsigned int p, unsigned int minDist) {
 		if (minDist < _tau) {
-			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax, _tau);
+			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _tau);
 			_tau = std::min(_tau, dist);
 			if (_tau == 1) {
 				return;
@@ -367,8 +345,7 @@ private:
 				actMinDist = _bs_light[_items[node->bucketEntries[i]]] - p;
 			}
 			if (actMinDist < _tau) {
-				unsigned int dist = distance(_splits[_items[node->bucketEntries[i]]], _inv_splits[_items[node->bucketEntries[i]]], target,
-						_split_len, _nTax, _tau);
+				unsigned int dist = distance(_splits[_items[node->bucketEntries[i]]], _inv_splits[_items[node->bucketEntries[i]]], target, _tau);
 				_tau = std::min(_tau, dist);
 				if (_tau == 1) {
 					return;
