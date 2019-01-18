@@ -32,7 +32,7 @@ inline std::string split_string(pll_split_t split) {
 	return binary;
 }
 
-static const unsigned int BUCKET_SIZE = 400;
+static const unsigned int BUCKET_SIZE = 200;
 
 class VpTree {
 public:
@@ -72,23 +72,23 @@ public:
 		search(_root, target, p);
 
 		/*
-		// check if the result is correct
-		size_t min_idx = 0;
-		unsigned int min = std::numeric_limits<unsigned int>::max();
-		for (size_t i = 0; i < _items.size(); ++i) {
-			unsigned int dist = distance(target, _splits[i], _split_len, _nTax);
-			if (dist < min) {
-				min = dist;
-				min_idx = i;
-			}
-		}
-		if (_tau != min) {
-			std::cout << "ERROR!!! THE RESULT IS WRONG!!!\n";
-			std::cout << "_tau: " << _tau << "\n";
-			std::cout << "min: " << min << "\n";
-			std::cout << "p-1: " << p - 1 << "\n";
-		}
-		*/
+		 // check if the result is correct
+		 size_t min_idx = 0;
+		 unsigned int min = std::numeric_limits<unsigned int>::max();
+		 for (size_t i = 0; i < _items.size(); ++i) {
+		 unsigned int dist = distance(target, _splits[i], _split_len, _nTax);
+		 if (dist < min) {
+		 min = dist;
+		 min_idx = i;
+		 }
+		 }
+		 if (_tau != min) {
+		 std::cout << "ERROR!!! THE RESULT IS WRONG!!!\n";
+		 std::cout << "_tau: " << _tau << "\n";
+		 std::cout << "min: " << min << "\n";
+		 std::cout << "p-1: " << p - 1 << "\n";
+		 }
+		 */
 
 		return std::min(_tau, p - 1);
 	}
@@ -218,12 +218,30 @@ private:
 
 			unsigned int median = (upper + lower) / 2;
 
+			unsigned int maxInterestingDistance = _nTax / 2;
+
 			// precompute dist_to_lower once
 			for (size_t i = lower + 1; i < upper; ++i) {
 				/*unsigned int dist = distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _split_len, _nTax,
-						_nTax / 2);*/
+				 _nTax / 2);*/
+
+				/*
+				unsigned int minDist;
+				if (_bs_light[_items[lower]] >= _bs_light[_items[node->index]]) {
+					minDist = _bs_light[_items[lower]] - _bs_light[_items[node->index]];
+				} else {
+					minDist = _bs_light[_items[node->index]] - _bs_light[_items[lower]];
+				}
+				unsigned int dist;
+				if (minDist > maxInterestingDistance) {
+					dist = maxInterestingDistance + 1;
+				} else {
+					dist = distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _split_len, _nTax,
+							maxInterestingDistance);
+				}
+				*/
 				unsigned int dist = distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _split_len, _nTax,
-										_nTax / 2);
+											maxInterestingDistance);
 
 				dist_to_lower[_items[i]] = dist;
 			}
@@ -233,6 +251,9 @@ private:
 					DistanceComparator(dist_to_lower));
 
 			// what was the median?
+
+			node->threshold = maxInterestingDistance;
+
 			node->threshold = distance(_splits[_items[lower]], _splits[_items[median]], _split_len, _nTax);
 
 			/*std::cout << "Median distance was: " << node->threshold << " " << "nTax/2 is: " << _nTax / 2 << " nItems is: " << upper - lower
