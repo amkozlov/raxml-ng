@@ -39,7 +39,7 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 		return PLL_FAILURE;
 	}
 
-	auto start = std::chrono::high_resolution_clock::now();
+	//auto start = std::chrono::high_resolution_clock::now();
 
 	int * bs_light = (int*) calloc(split_count, sizeof(int));
 	if (!bs_light) {
@@ -72,8 +72,8 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 	VpTree bsVPTree;
 	bsVPTree.create(bs_splits, inv_bs_splits, split_len, split_count, tip_count);
 
-	auto mid = std::chrono::high_resolution_clock::now();
-	std::cout << "Runtime VP-Tree construction: " << std::chrono::duration_cast<std::chrono::microseconds>(mid - start).count() << std::endl;
+	//auto mid = std::chrono::high_resolution_clock::now();
+	//std::cout << "Runtime VP-Tree construction: " << std::chrono::duration_cast<std::chrono::microseconds>(mid - start).count() << std::endl;
 
 	/* iterate over all splits of the reference tree */
 	for (i = 0; i < split_count; i++) {
@@ -102,8 +102,8 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 		support[i] = 1.0 - (((double) min_hdist) / (p - 1));
 	}
 
-	auto end = std::chrono::high_resolution_clock::now();
-	std::cout << "Runtime VP-Tree queries: " << std::chrono::duration_cast<std::chrono::microseconds>(end - mid).count() << std::endl;
+	//auto end = std::chrono::high_resolution_clock::now();
+	//std::cout << "Runtime VP-Tree queries: " << std::chrono::duration_cast<std::chrono::microseconds>(end - mid).count() << std::endl;
 
 	pllmod_utree_split_hashtable_destroy(bs_splits_hash);
 	free(bs_light);

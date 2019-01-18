@@ -32,7 +32,7 @@ inline std::string split_string(pll_split_t split) {
 	return binary;
 }
 
-static const unsigned int BUCKET_SIZE = 200;
+static const unsigned int BUCKET_SIZE = 100;
 
 class VpTree {
 public:
@@ -67,15 +67,13 @@ public:
 	}
 
 	unsigned int search_mindist(pll_split_t target, unsigned int p) {
-
-		//_tau = std::numeric_limits<unsigned int>::max();
 		_tau = p-1;
 		search(_root, target, p);
 
 /*
 		 // check if the result is correct
 		 size_t min_idx = 0;
-		 unsigned int min = std::numeric_limits<unsigned int>::max();
+		 unsigned int min = p - 1;
 		 for (size_t i = 0; i < _items.size(); ++i) {
 		 unsigned int dist = distance(target, _splits[i], _split_len, _nTax);
 		 if (dist < min) {
@@ -83,15 +81,13 @@ public:
 		 min_idx = i;
 		 }
 		 }
-		 if (_tau != std::min(min, p - 1)) {
+		 if (_tau != min) {
 		 std::cout << "ERROR!!! THE RESULT IS WRONG!!!\n";
 		 std::cout << "_tau: " << _tau << "\n";
 		 std::cout << "min: " << min << "\n";
 		 std::cout << "p-1: " << p - 1 << "\n";
 		 }*/
-
-
-		return std::min(_tau, p - 1);
+		return _tau;
 	}
 
 private:
