@@ -111,38 +111,33 @@ private:
 	 * it should be called twice, with original and inverted s1 (or s2),
 	 * to account for possible complementary split encoding.
 	 * */
-	unsigned int split_hamming_distance_lbound(pll_split_t s1, pll_split_t s2, unsigned int min_hdist) {
+	inline unsigned int split_hamming_distance_lbound(pll_split_t s1, pll_split_t s2, unsigned int min_hdist) {
 		unsigned int hdist = 0;
 		unsigned int i;
-
 		for (i = 0; (i < _split_len) && (hdist <= min_hdist); ++i) {
 			hdist += PLL_POPCNT32(s1[i] ^ s2[i]);
 		}
-
 		return hdist;
 	}
 
-	void split_hamming_distance_lbound(pll_split_t s1, pll_split_t s2, unsigned int min_hdist,
+	inline void split_hamming_distance_lbound(pll_split_t s1, pll_split_t s2, unsigned int min_hdist,
 			unsigned int& hdist, unsigned int& i) {
 		for (; (i < _split_len) && (hdist <= min_hdist); ++i) {
 			hdist += PLL_POPCNT32(s1[i] ^ s2[i]);
 		}
 	}
 
-	unsigned int split_hamming_distance(pll_split_t s1, pll_split_t s2) {
+	inline unsigned int split_hamming_distance(pll_split_t s1, pll_split_t s2) {
 		unsigned int hdist = 0;
 		unsigned int i;
-
 		for (i = 0; (i < _split_len); ++i) {
 			hdist += PLL_POPCNT32(s1[i] ^ s2[i]);
 		}
-
 		return hdist;
 	}
 
-	unsigned int distance(pll_split_t s1, pll_split_t s1_inv, pll_split_t s2,
+	inline unsigned int distance(pll_split_t s1, pll_split_t s1_inv, pll_split_t s2,
 			unsigned int max_interesting_distance) {
-		//assert(max_interesting_distance <= _nTax_div_2);
 		unsigned int dist = split_hamming_distance_lbound(s1, s2, max_interesting_distance);
 		if (dist < max_interesting_distance) {
 			return dist;
@@ -151,10 +146,9 @@ private:
 		return std::min(dist, dist_inv);
 	}
 
-	unsigned int distance(pll_split_t s1, pll_split_t s1_inv, pll_split_t s2,
+	inline unsigned int distance(pll_split_t s1, pll_split_t s1_inv, pll_split_t s2,
 			unsigned int max_interesting_distance, unsigned int &old_dist_forward, unsigned int& old_dist_reverse,
 			unsigned int& old_i_forward, unsigned int& old_i_reverse, unsigned int minDist) {
-		//assert(max_interesting_distance <= _nTax_div_2);
 		if (minDist > max_interesting_distance || std::min(old_dist_forward, old_dist_reverse) > max_interesting_distance) {
 			return max_interesting_distance + 1;
 		}
@@ -166,7 +160,7 @@ private:
 		return std::min(old_dist_forward, old_dist_reverse);
 	}
 
-	unsigned int distance(pll_split_t s1, pll_split_t s2) {
+	inline unsigned int distance(pll_split_t s1, pll_split_t s2) {
 		unsigned int dist = split_hamming_distance(s1, s2);
 		return std::min(dist, _nTax - dist);
 	}
