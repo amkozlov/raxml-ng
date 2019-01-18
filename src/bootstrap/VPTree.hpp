@@ -14,18 +14,18 @@
 
 // Adapted from http://stevehanov.ca/blog/index.php?id=130 by Sarah.
 
-#include <stdlib.h>
+#include <bits/move.h>
+#include <stddef.h>
 #include <algorithm>
-#include <vector>
-#include <stdio.h>
-#include <queue>
-#include <limits>
-
 #include <bitset>
+#include <iostream>
+#include <iterator>
+#include <limits>
 #include <string>
-#include <cmath>
+#include <vector>
 
-#include "../common.h"
+#include "../../build/localdeps/include/libpll/pll.h"
+#include "../../build/localdeps/include/libpll/pll_tree.h"
 
 inline std::string split_string(pll_split_t split) {
 	std::string binary = std::bitset<20>(*split).to_string();
@@ -85,8 +85,7 @@ public:
 		 std::cout << "_tau: " << _tau << "\n";
 		 std::cout << "min: " << min << "\n";
 		 std::cout << "p-1: " << p - 1 << "\n";
-		 }
-		 */
+		 }*/
 
 		return std::min(_tau, p - 1);
 	}
@@ -151,6 +150,8 @@ private:
 	static unsigned int distance(pll_split_t s1, pll_split_t s1_inv, pll_split_t s2, unsigned int split_len, unsigned int nTax,
 			unsigned int max_interesting_distance, unsigned int &old_dist_forward, unsigned int& old_dist_reverse,
 			unsigned int& old_i_forward, unsigned int& old_i_reverse, unsigned int minDist) {
+		//max_interesting_distance++; // TODO: Why does this line make the code incorrect???
+
 		if (minDist > max_interesting_distance || std::min(old_dist_forward, old_dist_reverse) > max_interesting_distance) {
 			return max_interesting_distance + 1;
 		}
@@ -244,53 +245,21 @@ private:
 			}
 		}
 
-		if (minDist >= node->threshold) { // interesting stuff happens...
-			if (node->right == NULL) {
-				if (minDist <= node->threshold + _tau) {
-					unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
-							node->threshold + 1 + _tau, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
-					if (dist <= node->threshold + _tau) {
-						search(node->left, target, p);
-					}
-				}
-			} else if (node->left == NULL) {
-				if (minDist + _tau >= node->threshold) {
-					search(node->right, target, p);
-				}
-			} else {
-				if (minDist + _tau >= node->threshold) {
-					search(node->right, target, p);
-				}
-
-				if (minDist <= node->threshold + _tau) {
-					unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
-							node->threshold + 1 + _tau, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
-					if (dist <= node->threshold + _tau) {
-						search(node->left, target, p);
-					}
-				}
+		// checks for right node
+		if (minDist + _tau >= node->threshold) {
+			search(node->right, target, p);
+		} else {
+			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
+					node->threshold - _tau, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
+			if (dist + _tau >= node->threshold) {
+				search(node->right, target, p);
 			}
-			return;
 		}
 
-		unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
-				node->threshold + 1 + _tau, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
-		//printf("dist=%g tau=%gn", dist, _tau );
-
-		if (dist < node->threshold) {
-			if (dist <= node->threshold + _tau) {
-				search(node->left, target, p);
-			}
-
-			if (dist + _tau >= node->threshold) {
-				search(node->right, target, p);
-			}
-
-		} else {
-			if (dist + _tau >= node->threshold) {
-				search(node->right, target, p);
-			}
-
+		// checks for left node
+		if (minDist <= node->threshold + _tau) {
+			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
+					node->threshold + _tau, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
 			if (dist <= node->threshold + _tau) {
 				search(node->left, target, p);
 			}
@@ -310,35 +279,14 @@ private:
 				_tau = dist;
 			}
 		}
-		if (minDist >= node->threshold) { // interesting stuff happens...
-			if (node->right == NULL) {
-				if (minDist <= node->threshold + _tau) {
-					unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
-							node->threshold + 1 + _tau, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
-					if (dist <= node->threshold + _tau) {
-						search(node->left, target, p);
-					}
-				}
-			} else {
 
-				if (minDist <= node->threshold + _tau) {
-					unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
-							node->threshold + 1 + _tau, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
-					if (dist <= node->threshold + _tau) {
-						search(node->left, target, p);
-					}
-				}
+		if (minDist <= node->threshold + _tau) {
+			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
+					node->threshold + _tau, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
+			if (dist <= node->threshold + _tau) {
+				search(node->left, target, p);
 			}
-			return;
 		}
-
-		unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
-				node->threshold + 1 + _tau, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
-		//printf("dist=%g tau=%gn", dist, _tau );
-		if (dist <= node->threshold + _tau) {
-			search(node->left, target, p);
-		}
-
 	}
 
 	void search_left_child_null(Node* node, pll_split_t target, unsigned int p, unsigned int minDist) {
@@ -355,19 +303,11 @@ private:
 			}
 		}
 
-		if (minDist >= node->threshold) { // this also means dist >= node->threshold
-			if (_tau > node->threshold) {
-				search(node->right, target, p);
-			} else {
-				unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
-						node->threshold + 1 - _tau, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
-				if (dist + _tau >= node->threshold) {
-					search(node->right, target, p);
-				}
-			}
+		if (minDist + _tau >= node->threshold) {
+			search(node->right, target, p);
 		} else {
 			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
-					node->threshold + 1 + _tau, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
+					node->threshold - _tau, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
 			//printf("dist=%g tau=%gn", dist, _tau );
 			if (dist + _tau >= node->threshold) {
 				search(node->right, target, p);
