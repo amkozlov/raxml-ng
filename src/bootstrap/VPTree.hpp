@@ -220,8 +220,11 @@ private:
 
 			// precompute dist_to_lower once
 			for (size_t i = lower + 1; i < upper; ++i) {
+				/*unsigned int dist = distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _split_len, _nTax,
+						_nTax / 2);*/
 				unsigned int dist = distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _split_len, _nTax,
-						_nTax / 2);
+										_nTax / 2);
+
 				dist_to_lower[_items[i]] = dist;
 			}
 
