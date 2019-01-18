@@ -68,10 +68,11 @@ public:
 
 	unsigned int search_mindist(pll_split_t target, unsigned int p) {
 
-		_tau = std::numeric_limits<unsigned int>::max();
+		//_tau = std::numeric_limits<unsigned int>::max();
+		_tau = p-1;
 		search(_root, target, p);
 
-		/*
+/*
 		 // check if the result is correct
 		 size_t min_idx = 0;
 		 unsigned int min = std::numeric_limits<unsigned int>::max();
@@ -82,13 +83,13 @@ public:
 		 min_idx = i;
 		 }
 		 }
-		 if (_tau != min) {
+		 if (_tau != std::min(min, p - 1)) {
 		 std::cout << "ERROR!!! THE RESULT IS WRONG!!!\n";
 		 std::cout << "_tau: " << _tau << "\n";
 		 std::cout << "min: " << min << "\n";
 		 std::cout << "p-1: " << p - 1 << "\n";
-		 }
-		 */
+		 }*/
+
 
 		return std::min(_tau, p - 1);
 	}
