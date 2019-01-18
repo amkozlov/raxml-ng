@@ -85,6 +85,8 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 			continue;
 		}
 
+		unsigned int min_hdist = p - 1;
+
 		if (pllmod_utree_split_hashtable_lookup(bs_splits_hash, ref_split, tip_count)) {
 			/* found identical split in a bootstrap tree -> assign full support */
 			support[i] = 1.0;
