@@ -8,6 +8,8 @@
 #include "TransferBootstrapComputer.hpp"
 #include "VPTree.hpp"
 
+#include <chrono>
+
 inline unsigned int bitv_length(unsigned int bit_count) {
 	unsigned int split_size = sizeof(pll_split_base_t) * 8;
 	unsigned int split_offset = bit_count % split_size;
@@ -37,6 +39,8 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 		return PLL_FAILURE;
 	}
 
+	//auto start = std::chrono::high_resolution_clock::now();
+
 	int * bs_light = (int*) calloc(split_count, sizeof(int));
 	if (!bs_light) {
 		pllmod_utree_split_hashtable_destroy(bs_splits_hash);
@@ -47,7 +51,6 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 	for (j = 0; j < split_count; j++) {
 		bs_light[j] = pllmod_utree_split_lightside(bs_splits[j], tip_count);
 	}
-
 	// precompute all inverse bootstrap splits
 	pll_split_t * inv_bs_splits = (pll_split_t *) malloc(split_count * sizeof(pll_split_t));
 	if (!inv_bs_splits) {
@@ -66,9 +69,11 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 		inv_split[split_len - 1] &= split_mask;
 		inv_bs_splits[i] = inv_split;
 	}
-
 	VpTree bsVPTree;
 	bsVPTree.create(bs_splits, inv_bs_splits, split_len, split_count, tip_count);
+
+	//auto mid = std::chrono::high_resolution_clock::now();
+	//std::cout << "Runtime VP-Tree construction: " << std::chrono::duration_cast<std::chrono::microseconds>(mid - start).count() << std::endl;
 
 	/* iterate over all splits of the reference tree */
 	for (i = 0; i < split_count; i++) {
@@ -87,7 +92,7 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 		}
 
 		// else, we are in the search for minimum distance...
-		unsigned int min_hdist = bsVPTree.search_mindist(ref_split, p);
+		min_hdist = bsVPTree.search_mindist(ref_split, p);
 
 		//std::cout << "minimum distance found Sarah: " << min_hdist << "\n";
 
@@ -95,8 +100,12 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 		support[i] = 1.0 - (((double) min_hdist) / (p - 1));
 	}
 
+	//auto end = std::chrono::high_resolution_clock::now();
+	//std::cout << "Runtime VP-Tree queries: " << std::chrono::duration_cast<std::chrono::microseconds>(end - mid).count() << std::endl;
+
 	pllmod_utree_split_hashtable_destroy(bs_splits_hash);
-	//free(bs_light);
+	free(bs_light);
+	free(inv_bs_splits);
 
 	return PLL_SUCCESS;
 }
