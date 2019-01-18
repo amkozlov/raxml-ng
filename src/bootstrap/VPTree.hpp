@@ -69,6 +69,7 @@ public:
 
 	unsigned int search_mindist(pll_split_t target, unsigned int p) {
 		_tau = p - 1;
+		//std::cout << "tau start: " << _tau << " ; n/2: " << _nTax_div_2 << "\n";
 		search(_root, target, p);
 		/*
 		 // check if the result is correct
@@ -141,8 +142,9 @@ private:
 
 	unsigned int distance(pll_split_t s1, pll_split_t s1_inv, pll_split_t s2,
 			unsigned int max_interesting_distance) {
+		//assert(max_interesting_distance <= _nTax_div_2);
 		unsigned int dist = split_hamming_distance_lbound(s1, s2, max_interesting_distance);
-		if (dist <= _nTax_div_2 && dist < max_interesting_distance) {
+		if (dist < max_interesting_distance) {
 			return dist;
 		}
 		unsigned int dist_inv = split_hamming_distance_lbound(s1_inv, s2, max_interesting_distance);
@@ -152,11 +154,12 @@ private:
 	unsigned int distance(pll_split_t s1, pll_split_t s1_inv, pll_split_t s2,
 			unsigned int max_interesting_distance, unsigned int &old_dist_forward, unsigned int& old_dist_reverse,
 			unsigned int& old_i_forward, unsigned int& old_i_reverse, unsigned int minDist) {
+		//assert(max_interesting_distance <= _nTax_div_2);
 		if (minDist > max_interesting_distance || std::min(old_dist_forward, old_dist_reverse) > max_interesting_distance) {
 			return max_interesting_distance + 1;
 		}
 		split_hamming_distance_lbound(s1, s2, max_interesting_distance, old_dist_forward, old_i_forward);
-		if (old_dist_forward <= _nTax_div_2 && old_dist_forward < max_interesting_distance) {
+		if (old_dist_forward < max_interesting_distance) {
 			return old_dist_forward;
 		}
 		split_hamming_distance_lbound(s1_inv, s2, max_interesting_distance, old_dist_reverse, old_i_reverse);
@@ -268,11 +271,12 @@ private:
 			}
 		}
 
+		unsigned int node_threshold_plus_tau_capped = std::min(node->threshold + _tau, _nTax_div_2);
 		// checks for left node
-		if (minDist <= node->threshold + _tau) {
+		if (minDist <= node_threshold_plus_tau_capped) {
 			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target,
-					node->threshold + _tau, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
-			if (dist <= node->threshold + _tau) {
+					node_threshold_plus_tau_capped, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
+			if (dist <= node_threshold_plus_tau_capped) {
 				search(node->left, target, p);
 			}
 		}
@@ -293,10 +297,11 @@ private:
 			}
 		}
 
-		if (minDist <= node->threshold + _tau) {
+		unsigned int node_threshold_plus_tau_capped = std::min(node->threshold + _tau, _nTax_div_2);
+		if (minDist <= node_threshold_plus_tau_capped) {
 			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target,
-					node->threshold + _tau, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
-			if (dist <= node->threshold + _tau) {
+					node_threshold_plus_tau_capped, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
+			if (dist <= node_threshold_plus_tau_capped) {
 				search(node->left, target, p);
 			}
 		}
