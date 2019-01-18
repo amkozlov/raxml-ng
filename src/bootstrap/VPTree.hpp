@@ -32,6 +32,8 @@ inline std::string split_string(pll_split_t split) {
 	return binary;
 }
 
+static const unsigned int BUCKET_SIZE = 400;
+
 class VpTree {
 public:
 	VpTree() :
@@ -70,23 +72,23 @@ public:
 		search(_root, target, p);
 
 		/*
-		 // check if the result is correct
-		 size_t min_idx = 0;
-		 unsigned int min = std::numeric_limits<unsigned int>::max();
-		 for (size_t i = 0; i < _items.size(); ++i) {
-		 unsigned int dist = distance(target, _splits[i], _split_len, _nTax);
-		 if (dist < min) {
-		 min = dist;
-		 min_idx = i;
-		 }
-		 }
-		 if (_tau != min) {
-		 std::cout << "ERROR!!! THE RESULT IS WRONG!!!\n";
-		 std::cout << "_tau: " << _tau << "\n";
-		 std::cout << "min: " << min << "\n";
-		 std::cout << "p-1: " << p - 1 << "\n";
-		 }
-		 */
+		// check if the result is correct
+		size_t min_idx = 0;
+		unsigned int min = std::numeric_limits<unsigned int>::max();
+		for (size_t i = 0; i < _items.size(); ++i) {
+			unsigned int dist = distance(target, _splits[i], _split_len, _nTax);
+			if (dist < min) {
+				min = dist;
+				min_idx = i;
+			}
+		}
+		if (_tau != min) {
+			std::cout << "ERROR!!! THE RESULT IS WRONG!!!\n";
+			std::cout << "_tau: " << _tau << "\n";
+			std::cout << "min: " << min << "\n";
+			std::cout << "p-1: " << p - 1 << "\n";
+		}
+		*/
 
 		return std::min(_tau, p - 1);
 	}
@@ -151,8 +153,6 @@ private:
 	static unsigned int distance(pll_split_t s1, pll_split_t s1_inv, pll_split_t s2, unsigned int split_len, unsigned int nTax,
 			unsigned int max_interesting_distance, unsigned int &old_dist_forward, unsigned int& old_dist_reverse,
 			unsigned int& old_i_forward, unsigned int& old_i_reverse, unsigned int minDist) {
-		//max_interesting_distance++; // TODO: Why does this line make the code incorrect???
-
 		if (minDist > max_interesting_distance || std::min(old_dist_forward, old_dist_reverse) > max_interesting_distance) {
 			return max_interesting_distance + 1;
 		}
@@ -171,6 +171,7 @@ private:
 
 	struct Node {
 		int index;
+		std::vector<unsigned int> bucketEntries;
 		unsigned int threshold;
 		Node* left;
 		Node* right;
@@ -203,8 +204,14 @@ private:
 		Node* node = new Node();
 		node->index = lower;
 
-		if (upper > lower + 1) {
-
+		if (upper - lower <= BUCKET_SIZE) {
+			node->bucketEntries.reserve(BUCKET_SIZE - 1);
+			// just add all these elements to the node's bucket.
+			node->index = lower;
+			for (size_t i = lower + 1; i < upper; ++i) {
+				node->bucketEntries.push_back(i);
+			}
+		} else if (upper > lower + 1) {
 			// choose an arbitrary point and move it to the start
 			//int i = (int) ((double) rand() / RAND_MAX * (upper - lower - 1)) + lower;
 			std::swap(_items[lower], _items[upper - 1]);
@@ -213,7 +220,8 @@ private:
 
 			// precompute dist_to_lower once
 			for (size_t i = lower + 1; i < upper; ++i) {
-				unsigned int dist = distance(_splits[_items[lower]], _splits[_items[i]], _split_len, _nTax);
+				unsigned int dist = distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _split_len, _nTax,
+						_nTax / 2);
 				dist_to_lower[_items[i]] = dist;
 			}
 
@@ -223,6 +231,9 @@ private:
 
 			// what was the median?
 			node->threshold = distance(_splits[_items[lower]], _splits[_items[median]], _split_len, _nTax);
+
+			/*std::cout << "Median distance was: " << node->threshold << " " << "nTax/2 is: " << _nTax / 2 << " nItems is: " << upper - lower
+			 << "\n";*/
 
 			node->index = lower;
 			node->left = buildFromPoints(lower + 1, median, dist_to_lower);
@@ -319,6 +330,32 @@ private:
 		}
 	}
 
+	void search_both_children_null(Node* node, pll_split_t target, unsigned int p, unsigned int minDist) {
+		if (minDist < _tau) {
+			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax, _tau);
+			_tau = std::min(_tau, dist);
+			if (_tau == 1) {
+				return;
+			}
+		}
+		for (size_t i = 0; i < node->bucketEntries.size(); ++i) {
+			unsigned int actMinDist;
+			if (p >= _bs_light[_items[node->bucketEntries[i]]]) {
+				actMinDist = p - _bs_light[_items[node->bucketEntries[i]]];
+			} else {
+				actMinDist = _bs_light[_items[node->bucketEntries[i]]] - p;
+			}
+			if (actMinDist < _tau) {
+				unsigned int dist = distance(_splits[_items[node->bucketEntries[i]]], _inv_splits[_items[node->bucketEntries[i]]], target,
+						_split_len, _nTax, _tau);
+				_tau = std::min(_tau, dist);
+				if (_tau == 1) {
+					return;
+				}
+			}
+		}
+	}
+
 	void search(Node* node, pll_split_t target, unsigned int p) {
 		if (node == NULL || _tau == 1) {
 			return;
@@ -329,14 +366,10 @@ private:
 		} else {
 			minDist = _bs_light[_items[node->index]] - p;
 		}
-		minDist = std::min(minDist, _nTax - minDist);
+		//minDist = std::min(minDist, _nTax - minDist);
 
-		if (node->left == NULL && node->right == NULL) { // both children are NULL, nothing left to do.
-			if (minDist < _tau) {
-				unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _split_len, _nTax,
-						_tau);
-				_tau = std::min(_tau, dist);
-			}
+		if (node->left == NULL && node->right == NULL) { // both children are NULL, nothing left to do. We just search the entire bucket...
+			search_both_children_null(node, target, p, minDist);
 		} else if (node->left == NULL) {
 			search_left_child_null(node, target, p, minDist);
 		} else if (node->right == NULL) {
