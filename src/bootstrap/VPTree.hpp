@@ -120,8 +120,8 @@ private:
 		return hdist;
 	}
 
-	inline void split_hamming_distance_lbound(pll_split_t s1, pll_split_t s2, unsigned int min_hdist,
-			unsigned int& hdist, unsigned int& i) {
+	inline void split_hamming_distance_lbound(pll_split_t s1, pll_split_t s2, unsigned int min_hdist, unsigned int& hdist,
+			unsigned int& i) {
 		for (; (i < _split_len) && (hdist <= min_hdist); ++i) {
 			hdist += PLL_POPCNT32(s1[i] ^ s2[i]);
 		}
@@ -136,8 +136,7 @@ private:
 		return hdist;
 	}
 
-	inline unsigned int distance(pll_split_t s1, pll_split_t s1_inv, pll_split_t s2,
-			unsigned int max_interesting_distance) {
+	inline unsigned int distance(pll_split_t s1, pll_split_t s1_inv, pll_split_t s2, unsigned int max_interesting_distance) {
 		unsigned int dist = split_hamming_distance_lbound(s1, s2, max_interesting_distance);
 		if (dist < max_interesting_distance) {
 			return dist;
@@ -146,9 +145,9 @@ private:
 		return std::min(dist, dist_inv);
 	}
 
-	inline unsigned int distance(pll_split_t s1, pll_split_t s1_inv, pll_split_t s2,
-			unsigned int max_interesting_distance, unsigned int &old_dist_forward, unsigned int& old_dist_reverse,
-			unsigned int& old_i_forward, unsigned int& old_i_reverse, unsigned int minDist) {
+	inline unsigned int distance(pll_split_t s1, pll_split_t s1_inv, pll_split_t s2, unsigned int max_interesting_distance,
+			unsigned int &old_dist_forward, unsigned int& old_dist_reverse, unsigned int& old_i_forward, unsigned int& old_i_reverse,
+			unsigned int minDist) {
 		if (minDist > max_interesting_distance || std::min(old_dist_forward, old_dist_reverse) > max_interesting_distance) {
 			return max_interesting_distance + 1;
 		}
@@ -192,6 +191,48 @@ private:
 		}
 	};
 
+	unsigned int findVantagePoint(unsigned int lower, unsigned int upper) {
+		static const unsigned int NUM_CANDIDATES = 30;
+		static const unsigned int NUM_SAMPLES = 10;
+		// pick NUM_CANDIDATES random candidates
+		std::unordered_set<unsigned int> candidates;
+		while (candidates.size() < upper - lower && candidates.size() < NUM_CANDIDATES) {
+			// try to randomly pick a candidate
+			unsigned int cand = (unsigned int) ((double) rand() / RAND_MAX * (upper - lower - 1)) + lower;
+			candidates.insert(cand);
+		}
+		unsigned int bestCand = upper - 1;
+		double highestVariance = 0;
+		for (unsigned int cand : candidates) {
+			std::unordered_set<unsigned int> samples;
+			while (samples.size() < upper - lower - 1 && samples.size() < NUM_SAMPLES) {
+				// try to randomly pick a sample
+				unsigned int sam = (unsigned int) ((double) rand() / RAND_MAX * (upper - lower - 1)) + lower;
+				if (sam != cand) {
+					samples.insert(sam);
+				}
+			}
+			double var = 0;
+			unsigned int dist_sum = 0;
+			std::vector<int> sampleDistances;
+			sampleDistances.reserve(samples.size());
+			for (unsigned int sam : samples) {
+				int dist = distance(_splits[_items[cand]], _inv_splits[_items[cand]], _splits[_items[sam]], _nTax_div_2);
+				sampleDistances.emplace_back(dist);
+				dist_sum += dist;
+			}
+			double mean = ((double) dist_sum) / samples.size();
+			for (size_t i = 0; i < sampleDistances.size(); ++i) {
+				var += (sampleDistances[i] - mean) * (sampleDistances[i] - mean);
+			}
+			if (var > highestVariance) {
+				highestVariance = var;
+				bestCand = cand;
+			}
+		}
+		return bestCand;
+	}
+
 	Node* buildFromPoints(unsigned int lower, unsigned int upper, std::vector<unsigned int>& dist_to_lower) {
 		if (upper == lower) {
 			return NULL;
@@ -209,16 +250,16 @@ private:
 			}
 		} else if (upper > lower + 1) {
 			// choose an arbitrary point and move it to the start
-			//int i = (int) ((double) rand() / RAND_MAX * (upper - lower - 1)) + lower;
-			std::swap(_items[lower], _items[upper - 1]);
+			// unsigned int vp = (int) ((double) rand() / RAND_MAX * (upper - lower - 1)) + lower;
+			unsigned int vp = upper - 1;
+			//unsigned int vp = findVantagePoint(lower, upper);
+			std::swap(_items[lower], _items[vp]);
 
 			unsigned int median = (upper + lower) / 2;
 
 			// precompute dist_to_lower once
 			for (size_t i = lower + 1; i < upper; ++i) {
-				unsigned int dist = distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]],
-						_nTax_div_2);
-
+				unsigned int dist = distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2);
 				dist_to_lower[_items[i]] = dist;
 			}
 
@@ -245,28 +286,25 @@ private:
 		unsigned int old_i_forward = 0;
 		unsigned int old_i_reverse = 0;
 		if (minDist < _tau) {
-			// check if we need to update _tau before continuing...
-			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _tau,
-					old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
+			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _tau, old_dist_forward,
+					old_dist_reverse, old_i_forward, old_i_reverse, minDist);
 			_tau = std::min(_tau, dist);
 			if (_tau == 1) {
 				return;
 			}
 		}
-
 		// checks for right node
 		if (minDist + _tau >= node->threshold) {
 			search(node->right, target, p);
 		} else {
-			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target,
-					node->threshold - _tau, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
+			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, node->threshold - _tau,
+					old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
 			if (dist + _tau >= node->threshold) {
 				search(node->right, target, p);
 			}
 		}
-
-		unsigned int node_threshold_plus_tau_capped = std::min(node->threshold + _tau, _nTax_div_2);
 		// checks for left node
+		unsigned int node_threshold_plus_tau_capped = std::min(node->threshold + _tau, _nTax_div_2);
 		if (minDist <= node_threshold_plus_tau_capped) {
 			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target,
 					node_threshold_plus_tau_capped, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
@@ -282,15 +320,13 @@ private:
 		unsigned int old_i_forward = 0;
 		unsigned int old_i_reverse = 0;
 		if (minDist < _tau) {
-			// check if we need to update _tau before continuing...
-			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _tau,
-					old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
+			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _tau, old_dist_forward,
+					old_dist_reverse, old_i_forward, old_i_reverse, minDist);
 			_tau = std::min(_tau, dist);
 			if (_tau == 1) {
 				return;
 			}
 		}
-
 		unsigned int node_threshold_plus_tau_capped = std::min(node->threshold + _tau, _nTax_div_2);
 		if (minDist <= node_threshold_plus_tau_capped) {
 			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target,
@@ -307,21 +343,18 @@ private:
 		unsigned int old_i_forward = 0;
 		unsigned int old_i_reverse = 0;
 		if (minDist < _tau) {
-			// check if we need to update _tau before continuing...
-			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _tau,
-					old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
+			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, _tau, old_dist_forward,
+					old_dist_reverse, old_i_forward, old_i_reverse, minDist);
 			_tau = std::min(_tau, dist);
 			if (_tau == 1) {
 				return;
 			}
 		}
-
 		if (minDist + _tau >= node->threshold) {
 			search(node->right, target, p);
 		} else {
-			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target,
-					node->threshold - _tau, old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
-			//printf("dist=%g tau=%gn", dist, _tau );
+			unsigned int dist = distance(_splits[_items[node->index]], _inv_splits[_items[node->index]], target, node->threshold - _tau,
+					old_dist_forward, old_dist_reverse, old_i_forward, old_i_reverse, minDist);
 			if (dist + _tau >= node->threshold) {
 				search(node->right, target, p);
 			}
@@ -344,7 +377,8 @@ private:
 				actMinDist = _bs_light[_items[node->bucketEntries[i]]] - p;
 			}
 			if (actMinDist < _tau) {
-				unsigned int dist = distance(_splits[_items[node->bucketEntries[i]]], _inv_splits[_items[node->bucketEntries[i]]], target, _tau);
+				unsigned int dist = distance(_splits[_items[node->bucketEntries[i]]], _inv_splits[_items[node->bucketEntries[i]]], target,
+						_tau);
 				_tau = std::min(_tau, dist);
 				if (_tau == 1) {
 					return;
@@ -363,8 +397,6 @@ private:
 		} else {
 			minDist = _bs_light[_items[node->index]] - p;
 		}
-		//minDist = std::min(minDist, _nTax - minDist);
-
 		if (node->left == NULL && node->right == NULL) { // both children are NULL, nothing left to do. We just search the entire bucket...
 			search_both_children_null(node, target, p, minDist);
 		} else if (node->left == NULL) {
