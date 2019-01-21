@@ -65,25 +65,27 @@ public:
 		_tau = p - 1;
 		//std::cout << "tau start: " << _tau << " ; n/2: " << _nTax_div_2 << "\n";
 		std::vector<unsigned int> searchPath(LOOK_BACK + 1);
-		search(_root, target, p, 1, searchPath);
-		/*
-		 // check if the result is correct
-		 size_t min_idx = 0;
-		 unsigned int min = p - 1;
-		 for (size_t i = 0; i < _items.size(); ++i) {
-		 unsigned int dist = distance(target, _splits[i], _split_len, _nTax);
-		 if (dist < min) {
-		 min = dist;
-		 min_idx = i;
-		 }
-		 }
-		 if (_tau != min) {
-		 std::cout << "ERROR!!! THE RESULT IS WRONG!!!\n";
-		 std::cout << "_tau: " << _tau << "\n";
-		 std::cout << "min: " << min << "\n";
-		 std::cout << "p-1: " << p - 1 << "\n";
-		 }
-		 */
+		//search(_root, target, p, 1, searchPath);
+		search_dumb(_root, target, p, 1, searchPath);
+
+		// check if the result is correct
+		size_t min_idx = 0;
+		unsigned int min = p - 1;
+		for (size_t i = 0; i < _items.size(); ++i) {
+			unsigned int dist = distance(target, _splits[i]);
+			if (dist < min) {
+				min = dist;
+				min_idx = i;
+			}
+		}
+		if (_tau != min) {
+			std::cout << "ERROR!!! THE RESULT IS WRONG!!!\n";
+			std::cout << "_tau: " << _tau << "\n";
+			std::cout << "min: " << min << "\n";
+			std::cout << "p-1: " << p - 1 << "\n";
+			throw std::runtime_error("Stopping now");
+		}
+
 		return _tau;
 	}
 
@@ -336,6 +338,32 @@ private:
 			node->right2 = buildFromPoints(median2_2, upperSS2, dist_to_lower, level);
 		}
 		return node;
+	}
+
+	void search_dumb(Node* node, pll_split_t target, unsigned int p, unsigned int level, std::vector<unsigned int>& searchPath) {
+		//std::cout << "search called\n";
+		if (node == NULL || _tau == 1) {
+			return;
+		}
+		unsigned int dVP1 = distance(_splits[node->indexVP1], _inv_splits[node->indexVP1], target, _nTax_div_2);
+		unsigned int dVP2 = distance(_splits[node->indexVP2], _inv_splits[node->indexVP2], target, _nTax_div_2);
+		_tau = std::min(_tau, dVP1);
+		_tau = std::min(_tau, dVP2);
+		if (!node->leafData.empty()) { // current node is a leaf node
+			for (size_t i = 0; i < node->leafData.size(); ++i) {
+				unsigned int dist = distance(_splits[node->leafData[i].index], _inv_splits[node->leafData[i].index], target, _tau);
+				_tau = std::min(_tau, dist);
+			}
+		} else { // current node is an internal node
+			if (dVP1 <= _tau + node->m1) {
+				search_dumb(node->left1, target, p, level + 2, searchPath);
+				search_dumb(node->left2, target, p, level + 2, searchPath);
+			}
+			if (dVP2 + _tau >= node->m1) {
+				search_dumb(node->right1, target, p, level + 2, searchPath);
+				search_dumb(node->right2, target, p, level + 2, searchPath);
+			}
+		}
 	}
 
 	void search(Node* node, pll_split_t target, unsigned int p, unsigned int level, std::vector<unsigned int>& searchPath) {
