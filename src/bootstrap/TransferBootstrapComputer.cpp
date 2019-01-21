@@ -7,6 +7,7 @@
 
 #include "TransferBootstrapComputer.hpp"
 #include "VPTree.hpp"
+#include "MVPTree.hpp"
 
 #include <chrono>
 
@@ -69,7 +70,7 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 		inv_split[split_len - 1] &= split_mask;
 		inv_bs_splits[i] = inv_split;
 	}
-	VpTree bsVPTree;
+	MvpTree bsVPTree;
 	bsVPTree.create(bs_splits, inv_bs_splits, split_len, split_count, tip_count);
 
 	//auto mid = std::chrono::high_resolution_clock::now();
