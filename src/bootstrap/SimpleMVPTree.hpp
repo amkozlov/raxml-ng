@@ -35,7 +35,7 @@ inline std::string split_string(pll_split_t split) {
 
 class SimpleMvpTree {
 public:
-	static const unsigned int NUM_VANTAGE_POINTS = 10;
+	static const unsigned int NUM_VANTAGE_POINTS = 7;
 
 	SimpleMvpTree() :
 			_split_len(0), _splits(0), _inv_splits(0), _tau(std::numeric_limits<unsigned int>::max()), _nTax(0), _nTax_div_2(0), _root(NULL) {
@@ -299,12 +299,10 @@ private:
 			for (size_t j = lower + i + 1; j < upper; ++j) {
 				unsigned int dist = distance(_splits[_items[j]], _inv_splits[_items[j]], _splits[_items[lower + i]], _nTax_div_2);
 				_distToVP[_items[j]][i] = dist;
-
 				// look at the minimum distance from vantage points so far
 				for (size_t k = 1; k < i; ++k) {
 					dist = std::min(dist, _distToVP[_items[j]][k]);
 				}
-
 				if (dist > maxDist) {
 					maxDist = dist;
 					maxDistIdx = _items[j];
