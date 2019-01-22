@@ -336,22 +336,23 @@ private:
 			}
 			std::cout << "\n";
 
-			// select second vantage point from SS2 and move it to lower + 1.
+			// select second vantage point from SS2 and move it to median.
 			unsigned int vp2 = (int) ((double) rand() / RAND_MAX * (upper - median - 1)) + median;
-			std::swap(_items[lower + 1], _items[vp2]); // here is the problem. The item that has been at lower + 1 which belonged to SS1 has now been moved to SS2.
-			node->indexVP2 = _items[lower + 1];
+			std::swap(_items[median], _items[vp2]);
+			node->indexVP2 = _items[median];
 			std::cout << "VP2 is: " << split_string(_splits[node->indexVP2]) << "\n";
 			// calculate distances to second vantage point, reusing the array from before.
-			for (size_t i = lower + 2; i < upper; ++i) {
-				unsigned int dist = distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]], _nTax_div_2);
+			for (size_t i = lower + 1; i < upper; ++i) {
+				if (i == median) continue;
+				unsigned int dist = distance(_splits[_items[median]], _inv_splits[_items[median]], _splits[_items[i]], _nTax_div_2);
 				dist_to_lower[_items[i]] = dist;
 				if (level < LOOK_BACK) {
 					_path[_items[i]][level + 1] = dist;
 				}
 			}
-			// now SS1 = [lower + 2, median) and SS2 = [median, upper).
+			// now SS1 = [lower + 1, median) and SS2 = [median + 1, upper).
 
-			unsigned int lowerSS1 = lower + 2;
+			unsigned int lowerSS1 = lower + 1;
 			unsigned int upperSS1 = median;
 			unsigned int median2_1 = (upperSS1 + lowerSS1) / 2;
 			// partition SS1 around the median distance
@@ -359,7 +360,7 @@ private:
 					DistanceComparator(dist_to_lower));
 			node->m2_1 = dist_to_lower[_items[median2_1]];
 
-			unsigned int lowerSS2 = median;
+			unsigned int lowerSS2 = median + 1;
 			unsigned int upperSS2 = upper;
 			unsigned int median2_2 = (upperSS2 + lowerSS2) / 2;
 			// partition SS2 around the median distance
@@ -387,37 +388,43 @@ private:
 			}
 			std::cout << "\n";
 
+			std::cout << "node->m1: " << node->m1 << "\n";
+			std::cout << "node->m2_1: " << node->m2_1 << "\n";
+			std::cout << "node->m2_2: " << node->m2_2 << "\n";
+			assert(_items[lower] == node->indexVP1);
+			assert(_items[median] == node->indexVP2);
+
 			std::cout << "Items in SS1_left are:\n";
 			for (size_t i = lowerSS1; i < median2_1; ++i) {
-				std::cout << split_string(_splits[_items[i]]) << " with d1 = "
-						<< distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2) << " and d2 = "
-						<< distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]], _nTax_div_2) << "\n";
-				assert(distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2) <= node->m1);
-				assert(distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]], _nTax_div_2) <= node->m2_1);
+				unsigned int d1 = distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2);
+				unsigned int d2 = distance(_splits[_items[median]], _inv_splits[_items[median]], _splits[_items[i]], _nTax_div_2);
+				std::cout << split_string(_splits[_items[i]]) << " with d1 = " << d1 << " and d2 = " << d2 << "\n";
+				assert(d1 <= node->m1);
+				assert(d2 <= node->m2_1);
 			}
 			std::cout << "Items in SS1_right are:\n";
 			for (size_t i = median2_1; i < upperSS1; ++i) {
-				std::cout << split_string(_splits[_items[i]]) << " with d1 = "
-						<< distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2) << " and d2 = "
-						<< distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]], _nTax_div_2) << "\n";
-				assert(distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2) <= node->m1);
-				assert(distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]], _nTax_div_2) >= node->m2_1);
+				unsigned int d1 = distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2);
+				unsigned int d2 = distance(_splits[_items[median]], _inv_splits[_items[median]], _splits[_items[i]], _nTax_div_2);
+				std::cout << split_string(_splits[_items[i]]) << " with d1 = " << d1 << " and d2 = " << d2 << "\n";
+				assert(d1 <= node->m1);
+				assert(d2 >= node->m2_1);
 			}
 			std::cout << "Items in SS2_left are:\n";
 			for (size_t i = lowerSS2; i < median2_2; ++i) {
-				std::cout << split_string(_splits[_items[i]]) << " with d1 = "
-						<< distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2) << " and d2 = "
-						<< distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]], _nTax_div_2) << "\n";
-				assert(distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2) >= node->m1);
-				assert(distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]], _nTax_div_2) <= node->m2_1);
+				unsigned int d1 = distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2);
+				unsigned int d2 = distance(_splits[_items[median]], _inv_splits[_items[median]], _splits[_items[i]], _nTax_div_2);
+				std::cout << split_string(_splits[_items[i]]) << " with d1 = " << d1 << " and d2 = " << d2 << "\n";
+				assert(d1 >= node->m1);
+				assert(d2 <= node->m2_2);
 			}
 			std::cout << "Items in SS2_right are:\n";
 			for (size_t i = median2_2; i < upperSS2; ++i) {
-				std::cout << split_string(_splits[_items[i]]) << " with d1 = "
-						<< distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2) << " and d2 = "
-						<< distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]], _nTax_div_2) << "\n";
-				assert(distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2) >= node->m1);
-				assert(distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]], _nTax_div_2) >= node->m2_1);
+				unsigned int d1 = distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2);
+				unsigned int d2 = distance(_splits[_items[median]], _inv_splits[_items[median]], _splits[_items[i]], _nTax_div_2);
+				std::cout << split_string(_splits[_items[i]]) << " with d1 = " << d1 << " and d2 = " << d2 << "\n";
+				assert(d1 >= node->m1);
+				assert(d2 >= node->m2_2);
 			}
 
 			level += 2;
