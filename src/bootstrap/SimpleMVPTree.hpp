@@ -273,22 +273,61 @@ private:
 		if (upper == lower) {
 			return root;
 		}
-		// choose all VP_points at once, always move them to the start.
-		for (size_t i = 0; i < NUM_VANTAGE_POINTS; ++i) {
-			unsigned int vp = findVantagePoint(i, upper);
-			_vp_indices[i] = _items[vp];
-			std::swap(_items[lower + i], _items[vp]);
-		}
-		// precompute distances to the vantage points
-		for (size_t i = NUM_VANTAGE_POINTS; i < upper; ++i) {
-			for (size_t j = 0; j < NUM_VANTAGE_POINTS; ++j) {
-				unsigned int dist = distance(_splits[_items[lower + j]], _inv_splits[_items[lower + j]], _splits[_items[i]], _nTax_div_2);
-				_distToVP[_items[i]][j] = dist;
+		unsigned int actVPIndex = 0;
+
+		unsigned int maxDist = 0;
+		unsigned int maxDistIdx = 0;
+		// first Vantage point is a bit different from the rest:
+		unsigned int vp = findVantagePoint(0, upper);
+		_vp_indices[0] = _items[vp];
+		std::swap(_items[lower + 0], _items[vp]);
+		for (size_t j = lower + 0 + 1; j < upper; ++j) {
+			unsigned int dist = distance(_splits[_items[j]], _inv_splits[_items[j]], _splits[_items[lower + 0]], _nTax_div_2);
+			_distToVP[_items[j]][0] = dist;
+			if (dist > maxDist) {
+				maxDist = dist;
+				maxDistIdx = _items[j];
 			}
 		}
-		// reorder the items and store it in the directory.
 
-		unsigned int actVPIndex = 0;
+		for (size_t i = 1; i < NUM_VANTAGE_POINTS; ++i) {
+			unsigned int vp = maxDistIdx;
+			_vp_indices[i] = _items[vp];
+			std::swap(_items[lower + i], _items[vp]);
+			maxDist = 0;
+			maxDistIdx = 0;
+			for (size_t j = lower + i + 1; j < upper; ++j) {
+				unsigned int dist = distance(_splits[_items[j]], _inv_splits[_items[j]], _splits[_items[lower + i]], _nTax_div_2);
+				_distToVP[_items[j]][i] = dist;
+
+				// look at the minimum distance from vantage points so far
+				for (size_t k = 1; k < i; ++k) {
+					dist = std::min(dist, _distToVP[_items[j]][k]);
+				}
+
+				if (dist > maxDist) {
+					maxDist = dist;
+					maxDistIdx = _items[j];
+				}
+			}
+		}
+
+		/*
+		 // choose all VP_points at once, always move them to the start.
+		 for (size_t i = 0; i < NUM_VANTAGE_POINTS; ++i) {
+		 unsigned int vp = findVantagePoint2(i, upper, 0);
+		 _vp_indices[i] = _items[vp];
+		 std::swap(_items[lower + i], _items[vp]);
+		 }
+		 // precompute distances to the vantage points
+		 for (size_t i = NUM_VANTAGE_POINTS; i < upper; ++i) {
+		 for (size_t j = 0; j < NUM_VANTAGE_POINTS; ++j) {
+		 unsigned int dist = distance(_splits[_items[lower + j]], _inv_splits[_items[lower + j]], _splits[_items[i]], _nTax_div_2);
+		 _distToVP[_items[i]][j] = dist;
+		 }
+		 }
+		 */
+		// reorder the items and store it in the directory.
 		unsigned int median = (upper + lower + NUM_VANTAGE_POINTS) / 2;
 		// partition around the median distance from first VP
 		std::nth_element(_items.begin() + lower + NUM_VANTAGE_POINTS, _items.begin() + median, _items.begin() + upper,
