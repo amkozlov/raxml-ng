@@ -57,6 +57,7 @@ public:
 			_items[i] = i;
 		}
 		_vp_indices.resize(NUM_VANTAGE_POINTS);
+		_distToVP.resize(num_splits);
 		std::vector<unsigned int> dist_to_lower(_items.size());
 		buildFromPoints(0, _items.size(), dist_to_lower);
 	}
@@ -98,13 +99,8 @@ private:
 	unsigned int _nTax;
 	unsigned int _nTax_div_2;
 
-	typedef struct LeafInformation {
-		unsigned int index;
-		std::array<unsigned int, NUM_VANTAGE_POINTS> distToVP;
-	} LeafInformation;
-
-	std::vector<LeafInformation> _leafData;
 	std::vector<unsigned int> _vp_indices;
+	std::vector<std::array<unsigned int, NUM_VANTAGE_POINTS> > _distToVP;
 
 	/* This function computes a lower bound of Hamming distance between splits:
 	 * the computation terminates as soon as current distance values exceeds min_hdist.
@@ -217,13 +213,10 @@ private:
 		if (upper == lower) {
 			return;
 		}
-
-		// Create a leaf node.
 		// choose an arbitrary point and move it to the start
 		unsigned int vp1 = (int) ((double) rand() / RAND_MAX * (upper - lower - 1)) + lower;
 		std::swap(_items[lower], _items[vp1]);
 		_vp_indices[0] = _items[lower];
-		_leafData.reserve(upper - lower);
 
 		unsigned int maxDist = 0;
 		unsigned int maxDistIdx = 0;
@@ -239,25 +232,22 @@ private:
 		std::swap(_items[lower + 1], _items[maxDistIdx]);
 		_vp_indices[1] = _items[lower + 1];
 		// create leaf data
-		for (size_t i = lower + 2; i < upper; ++i) {
-			LeafInformation info;
-			info.index = _items[i];
-			info.distToVP[0] = dist_to_lower[info.index];
-			info.distToVP[1] = distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]], _nTax_div_2);
-			_leafData.push_back(info);
+		for (size_t i = lower + NUM_VANTAGE_POINTS; i < upper; ++i) {
+			_distToVP[_items[i]][0] = dist_to_lower[_items[i]];
+			_distToVP[_items[i]][1] = distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]],
+					_nTax_div_2);
 		}
-		_leafData.shrink_to_fit();
 	}
 
 	void search(pll_split_t target, unsigned int p) {
-		std::vector<unsigned int> vp_min_dist(NUM_VANTAGE_POINTS);
-		for (size_t i = 0; i < NUM_VANTAGE_POINTS; ++i) {
-			if (p >= _bs_light[_vp_indices[i]]) {
-				vp_min_dist[i] = p - _bs_light[_vp_indices[i]];
-			} else {
-				vp_min_dist[i] = _bs_light[_vp_indices[i]] - p;
-			}
-		}
+		/*std::vector<unsigned int> vp_min_dist(NUM_VANTAGE_POINTS);
+		 for (size_t i = 0; i < NUM_VANTAGE_POINTS; ++i) {
+		 if (p >= _bs_light[_vp_indices[i]]) {
+		 vp_min_dist[i] = p - _bs_light[_vp_indices[i]];
+		 } else {
+		 vp_min_dist[i] = _bs_light[_vp_indices[i]] - p;
+		 }
+		 }*/
 
 		std::vector<unsigned int> vp_dist(NUM_VANTAGE_POINTS);
 		for (size_t i = 0; i < NUM_VANTAGE_POINTS; ++i) {
@@ -268,18 +258,23 @@ private:
 			}
 		}
 
-		for (size_t i = 0; i < _leafData.size(); ++i) {
-			unsigned int d1 = _leafData[i].distToVP[0];
-			unsigned int d2 = _leafData[i].distToVP[1];
-			if ((vp_dist[0] <= d1 + _tau && d1 <= vp_dist[0] + _tau) && (vp_dist[1] <= d2 + _tau && d2 <= vp_dist[1] + _tau)) {
+		for (size_t i = NUM_VANTAGE_POINTS; i < _items.size(); ++i) {
+			bool okay = true;
+			for (size_t j = 0; j < NUM_VANTAGE_POINTS; ++j) {
+				if ((vp_dist[j] > _distToVP[_items[i]][j] + _tau) || (_distToVP[_items[i]][j] > vp_dist[j] + _tau)) {
+					okay = false;
+					break;
+				}
+			}
+			if (okay) {
 				unsigned int actMinDist;
-				if (p >= _bs_light[_leafData[i].index]) {
-					actMinDist = p - _bs_light[_leafData[i].index];
+				if (p >= _bs_light[_items[i]]) {
+					actMinDist = p - _bs_light[_items[i]];
 				} else {
-					actMinDist = _bs_light[_leafData[i].index] - p;
+					actMinDist = _bs_light[_items[i]] - p;
 				}
 				if (actMinDist < _tau) {
-					unsigned int dist = distance(_splits[_leafData[i].index], _inv_splits[_leafData[i].index], target, _tau);
+					unsigned int dist = distance(_splits[_items[i]], _inv_splits[_items[i]], target, _tau);
 					_tau = std::min(_tau, dist);
 					if (_tau == 1) {
 						return;
