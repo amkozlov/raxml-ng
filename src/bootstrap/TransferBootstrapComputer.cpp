@@ -7,7 +7,7 @@
 
 #include "TransferBootstrapComputer.hpp"
 #include "VPTree.hpp"
-#include "MVPTree.hpp"
+#include "SimpleMVPTree.hpp"
 
 #include <chrono>
 
@@ -69,9 +69,9 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 		inv_bs_splits[i] = inv_split;
 	}
 
-	MvpTree bsVPTree;
+	SimpleMvpTree bsVPTree;
 	bool index_constructed = false;
-	unsigned long int total_query_time = 0;
+	//unsigned long int total_query_time = 0;
 
 	/* iterate over all splits of the reference tree */
 	for (i = 0; i < split_count; i++) {
@@ -92,19 +92,18 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 		}
 
 		if (!index_constructed) {
-			auto start = std::chrono::high_resolution_clock::now();
+			//auto start = std::chrono::high_resolution_clock::now();
 			bsVPTree.create(bs_splits, inv_bs_splits, split_len, split_count, tip_count);
-			auto mid = std::chrono::high_resolution_clock::now();
-			std::cout << "Runtime VP-Tree construction: " << std::chrono::duration_cast<std::chrono::microseconds>(mid - start).count()
-					<< std::endl;
+			//auto mid = std::chrono::high_resolution_clock::now();
+			//std::cout << "Runtime VP-Tree construction: " << std::chrono::duration_cast<std::chrono::microseconds>(mid - start).count() << std::endl;
 			index_constructed = true;
 		}
 
 		// else, we are in the search for minimum distance...
-		auto s1 = std::chrono::high_resolution_clock::now();
+		//auto s1 = std::chrono::high_resolution_clock::now();
 		min_hdist = bsVPTree.search_mindist(ref_split, p);
-		auto e1 = std::chrono::high_resolution_clock::now();
-		total_query_time += std::chrono::duration_cast<std::chrono::microseconds>(e1 - s1).count();
+		//auto e1 = std::chrono::high_resolution_clock::now();
+		//total_query_time += std::chrono::duration_cast<std::chrono::microseconds>(e1 - s1).count();
 
 		//std::cout << "minimum distance found Sarah: " << min_hdist << "\n";
 
@@ -112,8 +111,8 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 		support[i] = 1.0 - (((double) min_hdist) / (p - 1));
 	}
 
-	auto end = std::chrono::high_resolution_clock::now();
-	std::cout << "Runtime VP-Tree queries: " << total_query_time << std::endl;
+	//auto end = std::chrono::high_resolution_clock::now();
+	//std::cout << "Runtime VP-Tree queries: " << total_query_time << std::endl;
 
 	pllmod_utree_split_hashtable_destroy(bs_splits_hash);
 	free(bs_light);
