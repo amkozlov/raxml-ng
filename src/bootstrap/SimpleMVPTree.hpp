@@ -30,17 +30,23 @@ inline std::string split_string(pll_split_t split) {
 
 /*
  * A very simple MVP tree. It consists of only a single node and a bunch of vantage points.
+ * TODO: Add the directory node back. It splits the items in NUM_VANTAGE_POINTS^2 directories.
  */
 
 class SimpleMvpTree {
 public:
-	static const unsigned int NUM_VANTAGE_POINTS = 12;
+	static const unsigned int NUM_VANTAGE_POINTS = 2; //12;
 
 	SimpleMvpTree() :
-			_split_len(0), _splits(0), _inv_splits(0), _tau(std::numeric_limits<unsigned int>::max()), _nTax(0), _nTax_div_2(0) {
+			_split_len(0), _splits(0), _inv_splits(0), _tau(std::numeric_limits<unsigned int>::max()), _nTax(0), _nTax_div_2(0), _root(NULL) {
+	}
+
+	~SimpleMvpTree() {
+		delete _root;
 	}
 
 	void create(pll_split_t * splits, pll_split_t * inv_splits, size_t split_len, size_t num_splits, size_t nTax) {
+		delete _root;
 		_split_len = split_len;
 		_splits = splits;
 		_inv_splits = inv_splits;
@@ -58,8 +64,8 @@ public:
 		}
 		_vp_indices.resize(NUM_VANTAGE_POINTS);
 		_distToVP.resize(num_splits);
-		std::vector<unsigned int> dist_to_lower(_items.size());
-		buildFromPoints(0, _items.size(), dist_to_lower);
+
+		_root = buildFromPoints(0, _items.size());
 	}
 
 	unsigned int search_mindist(pll_split_t target, unsigned int p) {
@@ -98,9 +104,18 @@ private:
 	unsigned int _tau;
 	unsigned int _nTax;
 	unsigned int _nTax_div_2;
-
 	std::vector<unsigned int> _vp_indices;
 	std::vector<std::array<unsigned int, NUM_VANTAGE_POINTS> > _distToVP;
+
+	typedef struct DirectoryNode {
+		DirectoryNode* left;
+		DirectoryNode* right;
+		unsigned int s1, e1;
+		unsigned int s2, e2;
+		unsigned int threshold; // median distance
+	} DirectoryNode;
+
+	DirectoryNode* _root;
 
 	/* This function computes a lower bound of Hamming distance between splits:
 	 * the computation terminates as soon as current distance values exceeds min_hdist.
@@ -165,12 +180,14 @@ private:
 	}
 
 	struct DistanceComparator {
-		const std::vector<unsigned int>& _dist_to_lower;
-		DistanceComparator(const std::vector<unsigned int>& dist_to_lower) :
-				_dist_to_lower(dist_to_lower) {
+		const std::vector<std::array<unsigned int, NUM_VANTAGE_POINTS> >& _distToVP;
+		unsigned int _vpIdx;
+
+		DistanceComparator(const std::vector<std::array<unsigned int, NUM_VANTAGE_POINTS> >& distToVP, unsigned int vpIdx) :
+				_distToVP(distToVP), _vpIdx(vpIdx) {
 		}
 		bool operator()(const unsigned int& a, const unsigned int& b) {
-			return _dist_to_lower[a] < _dist_to_lower[b];
+			return _distToVP[a][_vpIdx] < _distToVP[b][_vpIdx];
 		}
 	};
 
@@ -209,9 +226,10 @@ private:
 		return vpPoint;
 	}
 
-	void buildFromPoints(unsigned int lower, unsigned int upper, std::vector<unsigned int>& dist_to_lower) {
+	DirectoryNode* buildFromPoints(unsigned int lower, unsigned int upper) {
+		DirectoryNode* root = new DirectoryNode();
 		if (upper == lower) {
-			return;
+			return root;
 		}
 		// choose all VP_points at once, always move them to the start.
 		for (size_t i = 0; i < NUM_VANTAGE_POINTS; ++i) {
@@ -226,28 +244,51 @@ private:
 				_distToVP[_items[i]][j] = dist;
 			}
 		}
+		// reorder the items and store it in the directory.
+
+		// first, here comes the implementation for two vantage points. Will be generalized afterwards.
+		unsigned int actVPIndex = 0;
+		unsigned int median = (upper + lower + NUM_VANTAGE_POINTS) / 2;
+		// partition around the median distance from first VP
+		std::nth_element(_items.begin() + lower + NUM_VANTAGE_POINTS, _items.begin() + median, _items.begin() + upper,
+				DistanceComparator(_distToVP, actVPIndex));
+		root->s1 = lower + NUM_VANTAGE_POINTS;
+		root->e1 = median;
+		root->s2 = median;
+		root->e2 = upper;
+		root->threshold = _distToVP[_items[median]][actVPIndex];
+
+		actVPIndex = 1;
+		DirectoryNode* left = new DirectoryNode();
+		unsigned int median_1 = (root->e1 + root->s1) / 2;
+		// partition around the median distance from second VP, part 1
+		std::nth_element(_items.begin() + root->s1, _items.begin() + median_1, _items.begin() + root->e1,
+				DistanceComparator(_distToVP, actVPIndex));
+		left->s1 = root->s1;
+		left->e1 = median_1;
+		left->s2 = median_1;
+		left->e2 = root->e1;
+		left->threshold = _distToVP[_items[median_1]][actVPIndex];
+		root->left = left;
+
+		DirectoryNode* right = new DirectoryNode();
+		actVPIndex = 1;
+		unsigned int median_2 = (root->e2 + root->s2) / 2;
+		// partition around the median distance from second VP, part 1
+		std::nth_element(_items.begin() + root->s2, _items.begin() + median_2, _items.begin() + root->e2,
+				DistanceComparator(_distToVP, actVPIndex));
+		right->s1 = root->s2;
+		right->e1 = median_2;
+		right->s2 = median_2;
+		right->e2 = root->e2;
+		right->threshold = _distToVP[_items[median_2]][actVPIndex];
+		root->right = right;
+
+		return root;
 	}
 
-	void search(pll_split_t target, unsigned int p) {
-		/*std::vector<unsigned int> vp_min_dist(NUM_VANTAGE_POINTS);
-		 for (size_t i = 0; i < NUM_VANTAGE_POINTS; ++i) {
-		 if (p >= _bs_light[_vp_indices[i]]) {
-		 vp_min_dist[i] = p - _bs_light[_vp_indices[i]];
-		 } else {
-		 vp_min_dist[i] = _bs_light[_vp_indices[i]] - p;
-		 }
-		 }*/
-
-		std::vector<unsigned int> vp_dist(NUM_VANTAGE_POINTS);
-		for (size_t i = 0; i < NUM_VANTAGE_POINTS; ++i) {
-			vp_dist[i] = distance(_splits[_vp_indices[i]], _inv_splits[_vp_indices[i]], target, _nTax_div_2);
-			_tau = std::min(_tau, vp_dist[i]);
-			if (_tau == 1) {
-				return;
-			}
-		}
-
-		for (size_t i = NUM_VANTAGE_POINTS; i < _items.size(); ++i) {
+	void iterate(pll_split_t target, unsigned int p, const std::vector<unsigned int>& vp_dist, unsigned int lower, unsigned int upper) {
+		for (size_t i = lower; i < upper; ++i) {
 			bool okay = true;
 			for (size_t j = 0; j < NUM_VANTAGE_POINTS; ++j) {
 				if ((vp_dist[j] > _distToVP[_items[i]][j] + _tau) || (_distToVP[_items[i]][j] > vp_dist[j] + _tau)) {
@@ -269,6 +310,42 @@ private:
 						return;
 					}
 				}
+			}
+		}
+	}
+
+	void search(pll_split_t target, unsigned int p) {
+		/*std::vector<unsigned int> vp_min_dist(NUM_VANTAGE_POINTS);
+		 for (size_t i = 0; i < NUM_VANTAGE_POINTS; ++i) {
+		 if (p >= _bs_light[_vp_indices[i]]) {
+		 vp_min_dist[i] = p - _bs_light[_vp_indices[i]];
+		 } else {
+		 vp_min_dist[i] = _bs_light[_vp_indices[i]] - p;
+		 }
+		 }*/
+		std::vector<unsigned int> vp_dist(NUM_VANTAGE_POINTS);
+		for (size_t i = 0; i < NUM_VANTAGE_POINTS; ++i) {
+			vp_dist[i] = distance(_splits[_vp_indices[i]], _inv_splits[_vp_indices[i]], target, _nTax_div_2);
+			_tau = std::min(_tau, vp_dist[i]);
+			if (_tau == 1) {
+				return;
+			}
+		}
+
+		if (vp_dist[0] <= _root->threshold + _tau) { // search in left side
+			if (vp_dist[1] <= _root->left->threshold + _tau) { // search in left side from left side
+				iterate(target, p, vp_dist, _root->left->s1, _root->left->e1);
+			}
+			if (vp_dist[1] + _tau >= _root->left->threshold) { // search in right side from left side
+				iterate(target, p, vp_dist, _root->left->s2, _root->left->e2);
+			}
+		}
+		if (vp_dist[0] + _tau >= _root->threshold) { // search in right side
+			if (vp_dist[1] <= _root->right->threshold + _tau) { // search in left side from right side
+				iterate(target, p, vp_dist, _root->right->s1, _root->right->e1);
+			}
+			if (vp_dist[1] + _tau >= _root->right->threshold) { // search in right side from right side
+				iterate(target, p, vp_dist, _root->right->s2, _root->right->e2);
 			}
 		}
 	}
