@@ -79,8 +79,8 @@ public:
 
 		//std::cout << "tau start: " << _tau << " ; n/2: " << _nTax_div_2 << "\n";
 		std::vector<unsigned int> searchPath(LOOK_BACK + 1);
-		//search(_root, target, p, 1, searchPath);
-		search_dumb(_root, target, p, 1, searchPath);
+		search(_root, target, p, 1, searchPath);
+		//search_dumb(_root, target, p, 1, searchPath);
 
 		// check if the result is correct
 		size_t min_idx = 0;
@@ -343,7 +343,8 @@ private:
 			std::cout << "VP2 is: " << split_string(_splits[node->indexVP2]) << "\n";
 			// calculate distances to second vantage point, reusing the array from before.
 			for (size_t i = lower + 1; i < upper; ++i) {
-				if (i == median) continue;
+				if (i == median)
+					continue;
 				unsigned int dist = distance(_splits[_items[median]], _inv_splits[_items[median]], _splits[_items[i]], _nTax_div_2);
 				dist_to_lower[_items[i]] = dist;
 				if (level < LOOK_BACK) {
@@ -438,7 +439,6 @@ private:
 	}
 
 	void search_dumb(Node* node, pll_split_t target, unsigned int p, unsigned int level, std::vector<unsigned int>& searchPath) {
-		//std::cout << "search called\n";
 		if (node == NULL || _tau == 1) {
 			return;
 		}
@@ -461,10 +461,52 @@ private:
 
 		if (!node->leafData.empty()) { // current node is a leaf node
 			for (size_t i = 0; i < node->leafData.size(); ++i) {
-				unsigned int dist = distance(_splits[node->leafData[i].index], _inv_splits[node->leafData[i].index], target, _tau);
-				_tau = std::min(_tau, dist);
+				unsigned int d1 = node->leafData[i].distFirstVP;
+				unsigned int d2 = node->leafData[i].distSecondVP;
+				if ((dVP1 <= d1 + _tau && d1 <= dVP1 + _tau) && (dVP2 <= d2 + _tau && d2 <= dVP2 + _tau)) {
+					bool condHolds = true;
+					for (size_t j = 1; j <= LOOK_BACK; ++j) {
+						if ((searchPath[j] > _path[node->leafData[i].index][j] + _tau)
+								|| (searchPath[j] + _tau < _path[node->leafData[i].index][j])) {
+							condHolds = false;
+							break;
+						}
+					}
+					if (condHolds) {
+						unsigned int actMinDist;
+						if (p >= _bs_light[node->leafData[i].index]) {
+							actMinDist = p - _bs_light[node->leafData[i].index];
+						} else {
+							actMinDist = _bs_light[node->leafData[i].index] - p;
+						}
+
+						//unsigned int dist = distance(_splits[node->leafData[i].index], _inv_splits[node->leafData[i].index], target, _tau);
+
+						unsigned int dist = distance(_splits[node->leafData[i].index], _inv_splits[node->leafData[i].index], target, _nTax_div_2);
+
+						std::cout << "actMinDist: " << actMinDist << "\n";
+						std::cout << "dist: " << dist << "\n";
+
+						std::cout << "current leaf: " << split_string(_splits[node->leafData[i].index]) << "\n";
+						std::cout << "current inverted leaf: " << split_string(_inv_splits[node->leafData[i].index]) << "\n";
+						std::cout << "current target: " << split_string(target) << "\n";
+
+						std::cout << "p: " << p << "\n";
+						std::cout << "_bs_light[node->leafData[i].index]: " << _bs_light[node->leafData[i].index] << "\n";
+
+						assert(actMinDist <= dist);
+						_tau = std::min(_tau, dist);
+					}
+				}
 			}
 		} else { // current node is an internal node
+			if (level <= LOOK_BACK) {
+				searchPath[level] = dVP1;
+				if (level < LOOK_BACK) {
+					searchPath[level + 1] = dVP2;
+				}
+			}
+
 			if (dVP1 <= node->m1 + _tau) {
 				std::cout << "considering SS1\n";
 				if (dVP2 <= node->m2_1 + _tau) {
@@ -514,10 +556,10 @@ private:
 					}
 					if (condHolds) {
 						unsigned int actMinDist;
-						if (p >= _bs_light[_items[node->leafData[i].index]]) {
-							actMinDist = p - _bs_light[_items[node->leafData[i].index]];
+						if (p >= _bs_light[node->leafData[i].index]) {
+							actMinDist = p - _bs_light[node->leafData[i].index];
 						} else {
-							actMinDist = _bs_light[_items[node->leafData[i].index]] - p;
+							actMinDist = _bs_light[node->leafData[i].index] - p;
 						}
 						if (actMinDist < _tau) {
 							unsigned int dist = distance(_splits[node->leafData[i].index], _inv_splits[node->leafData[i].index], target,
@@ -556,6 +598,7 @@ private:
 			}
 		}
 	}
-};
+}
+;
 
 #endif /* SRC_BOOTSTRAP_MVPTREE_HPP_ */
