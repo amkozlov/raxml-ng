@@ -297,41 +297,68 @@ private:
 			node->m1 = dist_to_lower[_items[median]];
 			// now, SS1 = [lower + 1, median) and SS2 = [median, upper)
 
-			// select second vantage point from SS2 and move it to median.
-			unsigned int vp2 = (int) ((double) rand() / RAND_MAX * (upper - median - 1)) + median;
-			std::swap(_items[median], _items[vp2]);
-			node->indexVP2 = _items[median];
-			// now SS1 = [lower + 1, median) and SS2 = [median + 1, upper).
-			// calculate distances to second vantage point, reusing the array from before.
+			std::cout << "distances to VP 1:\n";
 			for (size_t i = lower + 1; i < upper; ++i) {
 				if (i == median) {
-					dist_to_lower[_items[i]] = 0;
+					std::cout << "*" << dist_to_lower[_items[i]] << "* ";
 				} else {
-					unsigned int dist = distance(_splits[_items[median]], _inv_splits[_items[median]], _splits[_items[i]], _nTax_div_2);
-					dist_to_lower[_items[i]] = dist;
-					if (level < LOOK_BACK) {
-						_path[_items[i]][level + 1] = dist;
-					}
+					std::cout << dist_to_lower[_items[i]] << " ";
 				}
 			}
+			std::cout << "\n";
 
-			unsigned int lowerSS1 = lower + 1;
+			// select second vantage point from SS2 and move it to lower + 1.
+			unsigned int vp2 = (int) ((double) rand() / RAND_MAX * (upper - median - 1)) + median;
+			std::swap(_items[lower + 1], _items[vp2]);
+			node->indexVP2 = _items[lower + 1];
+			// calculate distances to second vantage point, reusing the array from before.
+			for (size_t i = lower + 2; i < upper; ++i) {
+				unsigned int dist = distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]], _nTax_div_2);
+				dist_to_lower[_items[i]] = dist;
+				if (level < LOOK_BACK) {
+					_path[_items[i]][level + 1] = dist;
+				}
+			}
+			// now SS1 = [lower + 2, median) and SS2 = [median, upper).
+
+			unsigned int lowerSS1 = lower + 2;
 			unsigned int upperSS1 = median;
 			unsigned int median2_1 = (upperSS1 + lowerSS1) / 2;
 			// partition SS1 around the median distance
-			std::nth_element(_items.begin() + lowerSS1 + 1, _items.begin() + median2_1, _items.begin() + upperSS1,
+			std::nth_element(_items.begin() + lowerSS1, _items.begin() + median2_1, _items.begin() + upperSS1,
 					DistanceComparator(dist_to_lower));
 			node->m2_1 = dist_to_lower[_items[median2_1]];
 
-			unsigned int lowerSS2 = median + 1;
+			unsigned int lowerSS2 = median;
 			unsigned int upperSS2 = upper;
 			unsigned int median2_2 = (upperSS2 + lowerSS2) / 2;
 			// partition SS2 around the median distance
-			std::nth_element(_items.begin() + lowerSS2 + 1, _items.begin() + median2_2, _items.begin() + upperSS2,
+			std::nth_element(_items.begin() + lowerSS2, _items.begin() + median2_2, _items.begin() + upperSS2,
 					DistanceComparator(dist_to_lower));
 			node->m2_2 = dist_to_lower[_items[median2_2]];
 
+			std::cout << "distances to VP 2 in SS1:\n";
+			for (size_t i = lowerSS1; i < upperSS1; ++i) {
+				if (i == median2_1) {
+					std::cout << "*" << dist_to_lower[_items[i]] << "* ";
+				} else {
+					std::cout << dist_to_lower[_items[i]] << " ";
+				}
+			}
+			std::cout << "\n";
+
+			std::cout << "distances to VP 2 in SS2:\n";
+			for (size_t i = lowerSS2; i < upperSS2; ++i) {
+				if (i == median2_2) {
+					std::cout << "*" << dist_to_lower[_items[i]] << "* ";
+				} else {
+					std::cout << dist_to_lower[_items[i]] << " ";
+				}
+			}
+			std::cout << "\n";
+
 			level += 2;
+
 			node->left1 = buildFromPoints(lowerSS1, median2_1, dist_to_lower, level);
 			node->left2 = buildFromPoints(median2_1, upperSS1, dist_to_lower, level);
 			node->right1 = buildFromPoints(lowerSS2, median2_2, dist_to_lower, level);
