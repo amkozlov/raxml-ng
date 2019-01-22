@@ -338,7 +338,7 @@ private:
 
 			// select second vantage point from SS2 and move it to lower + 1.
 			unsigned int vp2 = (int) ((double) rand() / RAND_MAX * (upper - median - 1)) + median;
-			std::swap(_items[lower + 1], _items[vp2]);
+			std::swap(_items[lower + 1], _items[vp2]); // here is the problem. The item that has been at lower + 1 which belonged to SS1 has now been moved to SS2.
 			node->indexVP2 = _items[lower + 1];
 			std::cout << "VP2 is: " << split_string(_splits[node->indexVP2]) << "\n";
 			// calculate distances to second vantage point, reusing the array from before.
