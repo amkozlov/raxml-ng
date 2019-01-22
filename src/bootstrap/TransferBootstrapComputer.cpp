@@ -70,7 +70,7 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 		inv_bs_splits[i] = inv_split;
 	}
 	VpTree bsVPTree;
-	bsVPTree.create(bs_splits, inv_bs_splits, split_len, split_count, tip_count);
+	bool index_constructed = false;
 
 	//auto mid = std::chrono::high_resolution_clock::now();
 	//std::cout << "Runtime VP-Tree construction: " << std::chrono::duration_cast<std::chrono::microseconds>(mid - start).count() << std::endl;
@@ -91,6 +91,14 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 			/* found identical split in a bootstrap tree -> assign full support */
 			support[i] = 1.0;
 			continue;
+		}
+
+		if (!index_constructed) {
+			//auto start = std::chrono::high_resolution_clock::now();
+			bsVPTree.create(bs_splits, inv_bs_splits, split_len, split_count, tip_count);
+			//auto mid = std::chrono::high_resolution_clock::now();
+			//std::cout << "Runtime VP-Tree construction: " << std::chrono::duration_cast<std::chrono::microseconds>(mid - start).count() << std::endl;
+			index_constructed = true;
 		}
 
 		// else, we are in the search for minimum distance...
