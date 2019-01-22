@@ -27,15 +27,10 @@
 #include "../../build/localdeps/include/libpll/pll.h"
 #include "../../build/localdeps/include/libpll/pll_tree.h"
 
-inline std::string split_string(pll_split_t split) {
-	std::string binary = std::bitset<20>(*split).to_string();
-	return binary;
-}
-
-static const unsigned int BUCKET_SIZE = 100;
 
 class VpTree {
 public:
+	static const unsigned int BUCKET_SIZE = 100;
 	VpTree() :
 			_split_len(0), _splits(0), _inv_splits(0), _tau(std::numeric_limits<unsigned int>::max()), _nTax(0), _nTax_div_2(0), _root(0) {
 	}
@@ -262,7 +257,7 @@ private:
 					DistanceComparator(dist_to_lower));
 
 			// what was the median?
-			node->threshold = distance(_splits[_items[lower]], _splits[_items[median]]);
+			node->threshold = dist_to_lower[_items[median]];
 			/*std::cout << "Median distance was: " << node->threshold << " " << "nTax/2 is: " << _nTax / 2 << " nItems is: " << upper - lower
 			 << "\n";*/
 

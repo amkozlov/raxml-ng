@@ -7,6 +7,7 @@
 
 #include "TransferBootstrapComputer.hpp"
 #include "VPTree.hpp"
+#include "SimpleMVPTree.hpp"
 
 #include <chrono>
 
@@ -69,11 +70,10 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 		inv_split[split_len - 1] &= split_mask;
 		inv_bs_splits[i] = inv_split;
 	}
-	VpTree bsVPTree;
-	bool index_constructed = false;
 
-	//auto mid = std::chrono::high_resolution_clock::now();
-	//std::cout << "Runtime VP-Tree construction: " << std::chrono::duration_cast<std::chrono::microseconds>(mid - start).count() << std::endl;
+	SimpleMvpTree bsVPTree;
+	bool index_constructed = false;
+	//unsigned long int total_query_time = 0;
 
 	/* iterate over all splits of the reference tree */
 	for (i = 0; i < split_count; i++) {
@@ -102,7 +102,10 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 		}
 
 		// else, we are in the search for minimum distance...
+		//auto s1 = std::chrono::high_resolution_clock::now();
 		min_hdist = bsVPTree.search_mindist(ref_split, p);
+		//auto e1 = std::chrono::high_resolution_clock::now();
+		//total_query_time += std::chrono::duration_cast<std::chrono::microseconds>(e1 - s1).count();
 
 		//std::cout << "minimum distance found Sarah: " << min_hdist << "\n";
 
@@ -111,7 +114,7 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 	}
 
 	//auto end = std::chrono::high_resolution_clock::now();
-	//std::cout << "Runtime VP-Tree queries: " << std::chrono::duration_cast<std::chrono::microseconds>(end - mid).count() << std::endl;
+	//std::cout << "Runtime VP-Tree queries: " << total_query_time << std::endl;
 
 	pllmod_utree_split_hashtable_destroy(bs_splits_hash);
 	free(bs_light);
