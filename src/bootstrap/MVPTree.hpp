@@ -21,9 +21,14 @@
 #include "../../build/localdeps/include/libpll/pll.h"
 #include "../../build/localdeps/include/libpll/pll_tree.h"
 
+inline std::string split_string(pll_split_t split) {
+	std::string binary = std::bitset<20>(*split).to_string();
+	return binary;
+}
+
 class MvpTree {
 public:
-	static const unsigned int BUCKET_SIZE = 100; // This is the k parameter
+	static const unsigned int BUCKET_SIZE = 10; // This is the k parameter
 	static const unsigned int LOOK_BACK = 2; // This is the p parameter
 
 	MvpTree() :
@@ -48,6 +53,11 @@ public:
 			_bs_light[j] = pllmod_utree_split_lightside(splits[j], nTax);
 		}
 
+		std::cout << "The splits:\n";
+		for (size_t i = 0; i < num_splits; ++i) {
+			std::cout << split_string(_splits[i]) << "\n";
+		}
+
 		_items.resize(num_splits);
 		for (size_t i = 0; i < num_splits; ++i) {
 			_items[i] = i;
@@ -63,6 +73,10 @@ public:
 
 	unsigned int search_mindist(pll_split_t target, unsigned int p) {
 		_tau = p - 1;
+
+		std::cout << "The query:\n";
+		std::cout << split_string(target) << "\n";
+
 		//std::cout << "tau start: " << _tau << " ; n/2: " << _nTax_div_2 << "\n";
 		std::vector<unsigned int> searchPath(LOOK_BACK + 1);
 		//search(_root, target, p, 1, searchPath);
@@ -83,6 +97,7 @@ public:
 			std::cout << "_tau: " << _tau << "\n";
 			std::cout << "min: " << min << "\n";
 			std::cout << "p-1: " << p - 1 << "\n";
+			std::cout << "witness: " << split_string(_splits[min_idx]) << "\n";
 			throw std::runtime_error("Stopping now");
 		}
 
@@ -241,45 +256,59 @@ private:
 			return NULL;
 		}
 
+		std::cout << "NEW CALL! Current items are:\n";
+		for (size_t i = lower; i < upper; ++i) {
+			std::cout << split_string(_splits[_items[i]]) << "\n";
+		}
+
 		Node* node = new Node();
 		if (upper - lower <= BUCKET_SIZE + 2) { // Create a leaf node.
-		// choose an arbitrary point and move it to the start
+			std::cout << "Creating leaf node\n";
+			// choose an arbitrary point and move it to the start
 			unsigned int vp1 = (int) ((double) rand() / RAND_MAX * (upper - lower - 1)) + lower;
-			node->indexVP1 = _items[vp1];
-			node->leafData.resize(upper - lower);
+			std::swap(_items[lower], _items[vp1]);
+			node->indexVP1 = _items[lower];
+			node->leafData.reserve(upper - lower);
+			std::cout << "VP1 is: " << split_string(_splits[node->indexVP1]) << "\n";
+
 			unsigned int maxDist = 0;
 			unsigned int maxDistIdx = 0;
-			for (size_t i = 0; i < node->leafData.size(); ++i) {
-				node->leafData[i].index = _items[lower + i];
-				if (node->leafData[i].index == node->indexVP1) {
-					node->leafData[i].distFirstVP = 0;
-				} else {
-					unsigned int dist = distance(_splits[_items[node->indexVP1]], _inv_splits[_items[node->indexVP1]],
-							_splits[_items[node->leafData[i].index]], _nTax_div_2);
-					if (dist > maxDist) {
-						maxDist = dist;
-						maxDistIdx = node->leafData[i].index;
-					}
-					node->leafData[i].distFirstVP = dist;
+			// precompute dist to lower
+			for (size_t i = lower + 1; i < upper; ++i) {
+				unsigned int dist = distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2);
+				dist_to_lower[_items[i]] = dist;
+				if (dist > maxDist) {
+					maxDist = dist;
+					maxDistIdx = i;
 				}
 			}
-			node->indexVP2 = maxDistIdx;
-			for (size_t i = 0; i < node->leafData.size(); ++i) {
-				if (node->leafData[i].index == node->indexVP1) {
-					continue;
-				} else if (node->leafData[i].index == node->indexVP2) {
-					node->leafData[i].distSecondVP = 0;
-				} else {
-					unsigned int dist = distance(_splits[_items[node->indexVP2]], _inv_splits[_items[node->indexVP2]],
-							_splits[_items[node->leafData[i].index]], _nTax_div_2);
-					node->leafData[i].distSecondVP = dist;
-				}
+			std::swap(_items[lower + 1], _items[maxDistIdx]);
+			node->indexVP2 = _items[lower + 1];
+			std::cout << "VP2 is: " << split_string(_splits[node->indexVP2]) << "\n";
+
+			// create leaf data
+			for (size_t i = lower + 2; i < upper; ++i) {
+				LeafInformation info;
+				info.index = _items[i];
+				info.distFirstVP = dist_to_lower[info.index];
+				info.distSecondVP = distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]], _nTax_div_2);
+				node->leafData.push_back(info);
 			}
+			node->leafData.shrink_to_fit();
+
+			std::cout << "Data in leaf with distances to VP 1 and VP2:\n";
+			for (size_t i = 0; i < node->leafData.size(); ++i) {
+				std::cout << split_string(_splits[node->leafData[i].index]) << " with d1 = " << node->leafData[i].distFirstVP
+						<< " and d2 = " << node->leafData[i].distSecondVP << "\n";
+			}
+
 		} else { // Create an inner node.
 			// choose an arbitrary point and move it to the start
 			unsigned int vp1 = (int) ((double) rand() / RAND_MAX * (upper - lower - 1)) + lower;
 			std::swap(_items[lower], _items[vp1]);
 			node->indexVP1 = _items[lower];
+
+			std::cout << "VP1 is: " << split_string(_splits[node->indexVP1]) << "\n";
 
 			// precompute dist_to_lower once
 			for (size_t i = lower + 1; i < upper; ++i) {
@@ -311,6 +340,7 @@ private:
 			unsigned int vp2 = (int) ((double) rand() / RAND_MAX * (upper - median - 1)) + median;
 			std::swap(_items[lower + 1], _items[vp2]);
 			node->indexVP2 = _items[lower + 1];
+			std::cout << "VP2 is: " << split_string(_splits[node->indexVP2]) << "\n";
 			// calculate distances to second vantage point, reusing the array from before.
 			for (size_t i = lower + 2; i < upper; ++i) {
 				unsigned int dist = distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]], _nTax_div_2);
@@ -357,6 +387,39 @@ private:
 			}
 			std::cout << "\n";
 
+			std::cout << "Items in SS1_left are:\n";
+			for (size_t i = lowerSS1; i < median2_1; ++i) {
+				std::cout << split_string(_splits[_items[i]]) << " with d1 = "
+						<< distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2) << " and d2 = "
+						<< distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]], _nTax_div_2) << "\n";
+				assert(distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2) <= node->m1);
+				assert(distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]], _nTax_div_2) <= node->m2_1);
+			}
+			std::cout << "Items in SS1_right are:\n";
+			for (size_t i = median2_1; i < upperSS1; ++i) {
+				std::cout << split_string(_splits[_items[i]]) << " with d1 = "
+						<< distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2) << " and d2 = "
+						<< distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]], _nTax_div_2) << "\n";
+				assert(distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2) <= node->m1);
+				assert(distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]], _nTax_div_2) >= node->m2_1);
+			}
+			std::cout << "Items in SS2_left are:\n";
+			for (size_t i = lowerSS2; i < median2_2; ++i) {
+				std::cout << split_string(_splits[_items[i]]) << " with d1 = "
+						<< distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2) << " and d2 = "
+						<< distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]], _nTax_div_2) << "\n";
+				assert(distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2) >= node->m1);
+				assert(distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]], _nTax_div_2) <= node->m2_1);
+			}
+			std::cout << "Items in SS2_right are:\n";
+			for (size_t i = median2_2; i < upperSS2; ++i) {
+				std::cout << split_string(_splits[_items[i]]) << " with d1 = "
+						<< distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2) << " and d2 = "
+						<< distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]], _nTax_div_2) << "\n";
+				assert(distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2) >= node->m1);
+				assert(distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]], _nTax_div_2) >= node->m2_1);
+			}
+
 			level += 2;
 
 			node->left1 = buildFromPoints(lowerSS1, median2_1, dist_to_lower, level);
@@ -374,21 +437,49 @@ private:
 		}
 		unsigned int dVP1 = distance(_splits[node->indexVP1], _inv_splits[node->indexVP1], target, _nTax_div_2);
 		unsigned int dVP2 = distance(_splits[node->indexVP2], _inv_splits[node->indexVP2], target, _nTax_div_2);
+
+		std::cout << "distance query to VP1: " << dVP1 << "\n";
+		std::cout << "distance query to VP 2: " << dVP2 << "\n";
+
 		_tau = std::min(_tau, dVP1);
 		_tau = std::min(_tau, dVP2);
+
+		std::cout << "_tau is now: " << _tau << "\n";
+
+		if (node->leafData.empty()) {
+			std::cout << "node->m1: " << node->m1 << "\n";
+			std::cout << "node->m2_1: " << node->m2_1 << "\n";
+			std::cout << "node->m2_2: " << node->m2_2 << "\n";
+		}
+
 		if (!node->leafData.empty()) { // current node is a leaf node
 			for (size_t i = 0; i < node->leafData.size(); ++i) {
 				unsigned int dist = distance(_splits[node->leafData[i].index], _inv_splits[node->leafData[i].index], target, _tau);
 				_tau = std::min(_tau, dist);
 			}
 		} else { // current node is an internal node
-			if (dVP1 <= _tau + node->m1) {
-				search_dumb(node->left1, target, p, level + 2, searchPath);
-				search_dumb(node->left2, target, p, level + 2, searchPath);
+			if (dVP1 <= node->m1 + _tau) {
+				std::cout << "considering SS1\n";
+				if (dVP2 <= node->m2_1 + _tau) {
+					std::cout << "searching in SS1_left\n";
+					search_dumb(node->left1, target, p, level + 2, searchPath);
+				}
+				if (dVP2 + _tau >= node->m2_1) {
+					std::cout << "searching in SS1_right\n";
+					search_dumb(node->left2, target, p, level + 2, searchPath);
+
+				}
 			}
-			if (dVP2 + _tau >= node->m1) {
-				search_dumb(node->right1, target, p, level + 2, searchPath);
-				search_dumb(node->right2, target, p, level + 2, searchPath);
+			if (dVP1 + _tau >= node->m1) {
+				std::cout << "considering SS2\n";
+				if (dVP2 <= node->m2_2 + _tau) {
+					std::cout << "searching in SS2_left\n";
+					search_dumb(node->right1, target, p, level + 2, searchPath);
+				}
+				if (dVP2 + _tau >= node->m2_2) {
+					std::cout << "searching in SS2_right\n";
+					search_dumb(node->right2, target, p, level + 2, searchPath);
+				}
 			}
 		}
 	}
@@ -436,22 +527,22 @@ private:
 					searchPath[level + 1] = dVP2;
 				}
 			}
-			if (dVP1 + _tau <= node->m1) {
-				if (dVP2 + _tau <= node->m2_1) {
+			if (dVP1 <= node->m1 + _tau) {
+				if (dVP2 <= node->m2_1 + _tau) {
 					// recursively search the first branch with level = level + 2
 					search(node->left1, target, p, level + 2, searchPath);
 				}
-				if (dVP2 >= node->m2_1 + _tau) {
+				if (dVP2 + _tau >= node->m2_1) {
 					// recursively search the second branch with level = level + 2
 					search(node->left2, target, p, level + 2, searchPath);
 				}
 			}
-			if (dVP1 >= node->m1 + _tau) {
-				if (dVP2 + _tau <= node->m2_2) {
+			if (dVP1 + _tau >= node->m1) {
+				if (dVP2 <= node->m2_2 + _tau) {
 					// recursively search the third branch with level = level + 2
 					search(node->right1, target, p, level + 2, searchPath);
 				}
-				if (dVP2 >= node->m2_2 + _tau) {
+				if (dVP2 + _tau >= node->m2_2) {
 					// recursively search the fourth branch with level = level + 2
 					search(node->right2, target, p, level + 2, searchPath);
 				}
