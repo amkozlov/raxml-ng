@@ -213,29 +213,18 @@ private:
 		if (upper == lower) {
 			return;
 		}
-		// choose an arbitrary point and move it to the start
-		unsigned int vp1 = (int) ((double) rand() / RAND_MAX * (upper - lower - 1)) + lower;
-		std::swap(_items[lower], _items[vp1]);
-		_vp_indices[0] = _items[lower];
-
-		unsigned int maxDist = 0;
-		unsigned int maxDistIdx = 0;
-		// precompute dist to lower
-		for (size_t i = lower + 1; i < upper; ++i) {
-			unsigned int dist = distance(_splits[_items[lower]], _inv_splits[_items[lower]], _splits[_items[i]], _nTax_div_2);
-			dist_to_lower[_items[i]] = dist;
-			if (dist > maxDist) {
-				maxDist = dist;
-				maxDistIdx = i;
-			}
+		// choose all VP_points at once, always move them to the start.
+		for (size_t i = 0; i < NUM_VANTAGE_POINTS; ++i) {
+			unsigned int vp = findVantagePoint(i, upper);
+			_vp_indices[i] = _items[vp];
+			std::swap(_items[lower + i], _items[vp]);
 		}
-		std::swap(_items[lower + 1], _items[maxDistIdx]);
-		_vp_indices[1] = _items[lower + 1];
-		// create leaf data
-		for (size_t i = lower + NUM_VANTAGE_POINTS; i < upper; ++i) {
-			_distToVP[_items[i]][0] = dist_to_lower[_items[i]];
-			_distToVP[_items[i]][1] = distance(_splits[_items[lower + 1]], _inv_splits[_items[lower + 1]], _splits[_items[i]],
-					_nTax_div_2);
+		// precompute distances to the vantage points
+		for (size_t i = NUM_VANTAGE_POINTS; i < upper; ++i) {
+			for (size_t j = 0; j < NUM_VANTAGE_POINTS; ++j) {
+				unsigned int dist = distance(_splits[_items[lower + j]], _inv_splits[_items[lower + j]], _splits[_items[i]], _nTax_div_2);
+				_distToVP[_items[i]][j] = dist;
+			}
 		}
 	}
 
