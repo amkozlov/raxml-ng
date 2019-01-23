@@ -78,7 +78,6 @@ public:
 		std::vector<unsigned int> vp_dist(NUM_VANTAGE_POINTS);
 		for (size_t i = 0; i < NUM_VANTAGE_POINTS; ++i) {
 			vp_dist[i] = distance(_splits[_vp_indices[i]], target);
-			//vp_dist[i] = distance(_splits[_vp_indices[i]], _inv_splits[_vp_indices[i]], target, _nTax_div_2);
 			_tau = std::min(_tau, vp_dist[i]);
 			if (_tau == 1) {
 				return 1;
@@ -232,7 +231,6 @@ private:
 
 		for (unsigned int i : samples) {
 			unsigned int dist = distance(_splits[_items[cand]], _splits[_items[i]]);
-			//unsigned int dist = distance(_splits[_items[cand]], _inv_splits[_items[cand]], _splits[_items[i]], _nTax_div_2);
 			if (dist > maxDist) {
 				maxDist = dist;
 				vpPoint = i;
@@ -279,7 +277,6 @@ private:
 		std::swap(_items[lower], _items[vp]);
 		for (size_t j = lower + 1; j < upper; ++j) {
 			unsigned int dist = distance(_splits[_items[j]], _splits[_items[lower]]);
-			//unsigned int dist = distance(_splits[_items[j]], _inv_splits[_items[j]], _splits[_items[lower]], _nTax_div_2);
 			_distToVP[_items[j]][0] = dist;
 			if (dist > maxDist) {
 				maxDist = dist;
@@ -295,7 +292,6 @@ private:
 			maxDistIdx = 0;
 			for (size_t j = lower + i + 1; j < upper; ++j) {
 				unsigned int dist = distance(_splits[_items[j]], _splits[_items[lower + i]]);
-				//unsigned int dist = distance(_splits[_items[j]], _inv_splits[_items[j]], _splits[_items[lower + i]], _nTax_div_2);
 				_distToVP[_items[j]][i] = dist;
 				// look at the minimum distance from vantage points so far
 				for (size_t k = 1; k < i; ++k) {
@@ -307,22 +303,6 @@ private:
 				}
 			}
 		}
-
-		/*
-		 // choose all VP_points at once, always move them to the start.
-		 for (size_t i = 0; i < NUM_VANTAGE_POINTS; ++i) {
-		 unsigned int vp = findVantagePoint2(i, upper, 0);
-		 _vp_indices[i] = _items[vp];
-		 std::swap(_items[lower + i], _items[vp]);
-		 }
-		 // precompute distances to the vantage points
-		 for (size_t i = NUM_VANTAGE_POINTS; i < upper; ++i) {
-		 for (size_t j = 0; j < NUM_VANTAGE_POINTS; ++j) {
-		 unsigned int dist = distance(_splits[_items[lower + j]], _inv_splits[_items[lower + j]], _splits[_items[i]], _nTax_div_2);
-		 _distToVP[_items[i]][j] = dist;
-		 }
-		 }
-		 */
 		// reorder the items and store it in the directory.
 		unsigned int median = (upper + lower + NUM_VANTAGE_POINTS) / 2;
 		// partition around the median distance from first VP
@@ -345,7 +325,7 @@ private:
 		for (size_t i = lower; i < upper; ++i) {
 			bool okay = true;
 			for (size_t j = 0; j < NUM_VANTAGE_POINTS; ++j) {
-				if ((vp_dist[j] > _distToVP[_items[i]][j] + _tau) || (_distToVP[_items[i]][j] > vp_dist[j] + _tau)) {
+				if ((vp_dist[j] > _distToVP[_items[i]][j] + _tau - 1) || (_distToVP[_items[i]][j] > vp_dist[j] + _tau - 1)) {
 					okay = false;
 					break;
 				}
@@ -358,7 +338,7 @@ private:
 					actMinDist = _bs_light[_items[i]] - p;
 				}
 				if (actMinDist < _tau) {
-					unsigned int dist = distance(_splits[_items[i]], _inv_splits[_items[i]], target, _tau);
+					unsigned int dist = distance(_splits[_items[i]], _inv_splits[_items[i]], target, _tau - 1);
 					_tau = std::min(_tau, dist);
 					if (_tau == 1) {
 						return;
@@ -373,17 +353,17 @@ private:
 			return;
 		}
 		if (actVPIdx == NUM_VANTAGE_POINTS - 1) {
-			if (vp_dist[actVPIdx] <= node->threshold + _tau) { // search in left side
+			if (vp_dist[actVPIdx] < node->threshold + _tau) { // search in left side
 				iterate(target, p, vp_dist, node->s1, node->e1);
 			}
-			if (vp_dist[actVPIdx] + _tau >= node->threshold) { // search in right side
+			if (vp_dist[actVPIdx] + _tau > node->threshold) { // search in right side
 				iterate(target, p, vp_dist, node->s2, node->e2);
 			}
 		} else { // more search in directory structure
-			if (vp_dist[actVPIdx] <= node->threshold + _tau) { // search in left side
+			if (vp_dist[actVPIdx] < node->threshold + _tau) { // search in left side
 				search(node->left, target, p, vp_dist, actVPIdx + 1);
 			}
-			if (vp_dist[actVPIdx] + _tau >= node->threshold) { // search in right side
+			if (vp_dist[actVPIdx] + _tau > node->threshold) { // search in right side
 				search(node->right, target, p, vp_dist, actVPIdx + 1);
 			}
 		}
