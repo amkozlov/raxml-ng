@@ -28,11 +28,6 @@ inline std::string split_string(pll_split_t split) {
 	return binary;
 }
 
-/*
- * A very simple MVP tree. It consists of only a single node and a bunch of vantage points.
- * TODO: Add the directory node back. It splits the items in NUM_VANTAGE_POINTS^2 directories.
- */
-
 class SimpleMvpTree {
 public:
 	static const unsigned int NUM_VANTAGE_POINTS = 7;
@@ -251,7 +246,6 @@ private:
 		}
 
 		unsigned int median = (upper + lower) / 2;
-		// partition around the median distance from second VP, part 1
 		std::nth_element(_items.begin() + lower, _items.begin() + median, _items.begin() + upper,
 				DistanceComparator(_distToVP, actVPIndex));
 		node->s1 = lower;
@@ -280,9 +274,9 @@ private:
 		// first Vantage point is a bit different from the rest:
 		unsigned int vp = findVantagePoint(0, upper);
 		_vp_indices[0] = _items[vp];
-		std::swap(_items[lower + 0], _items[vp]);
-		for (size_t j = lower + 0 + 1; j < upper; ++j) {
-			unsigned int dist = distance(_splits[_items[j]], _inv_splits[_items[j]], _splits[_items[lower + 0]], _nTax_div_2);
+		std::swap(_items[lower], _items[vp]);
+		for (size_t j = lower + 1; j < upper; ++j) {
+			unsigned int dist = distance(_splits[_items[j]], _inv_splits[_items[j]], _splits[_items[lower]], _nTax_div_2);
 			_distToVP[_items[j]][0] = dist;
 			if (dist > maxDist) {
 				maxDist = dist;

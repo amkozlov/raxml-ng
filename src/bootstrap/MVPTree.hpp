@@ -17,6 +17,7 @@
 #include <limits>
 #include <string>
 #include <vector>
+#include <unordered_set>
 
 #include "../../build/localdeps/include/libpll/pll.h"
 #include "../../build/localdeps/include/libpll/pll_tree.h"
