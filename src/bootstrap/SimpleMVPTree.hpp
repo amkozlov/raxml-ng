@@ -77,7 +77,8 @@ public:
 
 		std::vector<unsigned int> vp_dist(NUM_VANTAGE_POINTS);
 		for (size_t i = 0; i < NUM_VANTAGE_POINTS; ++i) {
-			vp_dist[i] = distance(_splits[_vp_indices[i]], _inv_splits[_vp_indices[i]], target, _nTax_div_2);
+			vp_dist[i] = distance(_splits[_vp_indices[i]], target);
+			//vp_dist[i] = distance(_splits[_vp_indices[i]], _inv_splits[_vp_indices[i]], target, _nTax_div_2);
 			_tau = std::min(_tau, vp_dist[i]);
 			if (_tau == 1) {
 				return 1;
@@ -230,7 +231,8 @@ private:
 		}
 
 		for (unsigned int i : samples) {
-			unsigned int dist = distance(_splits[_items[cand]], _inv_splits[_items[cand]], _splits[_items[i]], _nTax_div_2);
+			unsigned int dist = distance(_splits[_items[cand]], _splits[_items[i]]);
+			//unsigned int dist = distance(_splits[_items[cand]], _inv_splits[_items[cand]], _splits[_items[i]], _nTax_div_2);
 			if (dist > maxDist) {
 				maxDist = dist;
 				vpPoint = i;
@@ -276,7 +278,8 @@ private:
 		_vp_indices[0] = _items[vp];
 		std::swap(_items[lower], _items[vp]);
 		for (size_t j = lower + 1; j < upper; ++j) {
-			unsigned int dist = distance(_splits[_items[j]], _inv_splits[_items[j]], _splits[_items[lower]], _nTax_div_2);
+			unsigned int dist = distance(_splits[_items[j]], _splits[_items[lower]]);
+			//unsigned int dist = distance(_splits[_items[j]], _inv_splits[_items[j]], _splits[_items[lower]], _nTax_div_2);
 			_distToVP[_items[j]][0] = dist;
 			if (dist > maxDist) {
 				maxDist = dist;
@@ -291,7 +294,8 @@ private:
 			maxDist = 0;
 			maxDistIdx = 0;
 			for (size_t j = lower + i + 1; j < upper; ++j) {
-				unsigned int dist = distance(_splits[_items[j]], _inv_splits[_items[j]], _splits[_items[lower + i]], _nTax_div_2);
+				unsigned int dist = distance(_splits[_items[j]], _splits[_items[lower + i]]);
+				//unsigned int dist = distance(_splits[_items[j]], _inv_splits[_items[j]], _splits[_items[lower + i]], _nTax_div_2);
 				_distToVP[_items[j]][i] = dist;
 				// look at the minimum distance from vantage points so far
 				for (size_t k = 1; k < i; ++k) {
