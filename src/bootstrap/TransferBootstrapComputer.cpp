@@ -21,7 +21,11 @@ inline unsigned int bitv_length(unsigned int bit_count) {
 /* Compute Transfer Support (Lemoine et al., Nature 2018) for every split in ref_splits. Sarahs version with VP-Trees. */
 PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_splits, pll_split_t * bs_splits, unsigned int tip_count,
 		double * support) {
-	unsigned int i, j;
+	if (!wordbits_filled) {
+		popcount32e_init();
+		wordbits_filled = true;
+	}
+	unsigned int i;
 	unsigned int split_count = tip_count - 3;
 	unsigned int split_len = bitv_length(tip_count);
 	unsigned int split_size = sizeof(pll_split_base_t) * 8;
@@ -47,10 +51,6 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 		pllmod_utree_split_hashtable_destroy(bs_splits_hash);
 		//pllmod_set_error(PLL_ERROR_MEM_ALLOC, "Cannot allocate memory\n");
 		return PLL_FAILURE;
-	}
-	// precompute lightside size for all bootstrap splits
-	for (j = 0; j < split_count; j++) {
-		bs_light[j] = pllmod_utree_split_lightside(bs_splits[j], tip_count);
 	}
 	// precompute all inverse bootstrap splits
 	pll_split_t * inv_bs_splits = (pll_split_t *) malloc(split_count * sizeof(pll_split_t));
@@ -78,7 +78,7 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 	/* iterate over all splits of the reference tree */
 	for (i = 0; i < split_count; i++) {
 		pll_split_t ref_split = ref_splits[i];
-		unsigned int p = pllmod_utree_split_lightside(ref_split, tip_count);
+		unsigned int p = pllmod_utree_split_lightside_sarah(ref_split, tip_count);
 
 		if (p == 2) { // no need for further searching
 			support[i] = 0.0;
@@ -117,7 +117,6 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 	//std::cout << "Runtime VP-Tree queries: " << total_query_time << std::endl;
 
 	pllmod_utree_split_hashtable_destroy(bs_splits_hash);
-	free(bs_light);
 	free(inv_bs_splits);
 
 	return PLL_SUCCESS;

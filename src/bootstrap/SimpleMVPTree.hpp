@@ -20,12 +20,49 @@
 #include <array>
 #include <unordered_set>
 
+#include "FastPopcount.hpp"
+
 #include "../../build/localdeps/include/libpll/pll.h"
 #include "../../build/localdeps/include/libpll/pll_tree.h"
 
 inline std::string split_string(pll_split_t split) {
 	std::string binary = std::bitset<20>(*split).to_string();
 	return binary;
+}
+
+inline unsigned int bitv_length_sarah(unsigned int bit_count) {
+	unsigned int split_size = sizeof(pll_split_base_t) * 8;
+	unsigned int split_offset = bit_count % split_size;
+
+	return bit_count / split_size + (split_offset > 0);
+}
+
+inline unsigned int bitv_popcount_sarah(const pll_split_t bitv, unsigned int bit_count,
+                                  unsigned int bitv_len)
+{
+  unsigned int setb = 0;
+  unsigned int i;
+
+  if (!bitv_len)
+    bitv_len = bitv_length_sarah(bit_count);
+
+  for (i = 0; i < bitv_len; ++i)
+  {
+    setb += (unsigned int) popcount32e(bitv[i]);
+  }
+  return setb;
+}
+
+inline unsigned int bitv_lightside_sarah(const pll_split_t bitv, unsigned int bit_count,
+                                   unsigned int bitv_len)
+{
+  unsigned int setb = bitv_popcount_sarah(bitv, bit_count, bitv_len);
+
+  return PLL_MIN(setb, bit_count - setb);
+}
+
+inline unsigned int pllmod_utree_split_lightside_sarah(pll_split_t split, unsigned int tip_count) {
+	return bitv_lightside_sarah(split, tip_count, 0);
 }
 
 class SimpleMvpTree {
@@ -51,7 +88,7 @@ public:
 		_bs_light.resize(num_splits);
 		// precompute lightside size for all bootstrap splits
 		for (unsigned int j = 0; j < num_splits; j++) {
-			_bs_light[j] = pllmod_utree_split_lightside(splits[j], nTax);
+			_bs_light[j] = pllmod_utree_split_lightside_sarah(splits[j], nTax);
 		}
 		_items.resize(num_splits);
 		for (size_t i = 0; i < num_splits; ++i) {
@@ -66,19 +103,9 @@ public:
 	unsigned int search_mindist(pll_split_t target, unsigned int p) {
 		_tau = p - 1;
 
-		/*std::vector<unsigned int> vp_min_dist(NUM_VANTAGE_POINTS);
-		 for (size_t i = 0; i < NUM_VANTAGE_POINTS; ++i) {
-		 if (p >= _bs_light[_vp_indices[i]]) {
-		 vp_min_dist[i] = p - _bs_light[_vp_indices[i]];
-		 } else {
-		 vp_min_dist[i] = _bs_light[_vp_indices[i]] - p;
-		 }
-		 }*/
-
 		std::vector<unsigned int> vp_dist(NUM_VANTAGE_POINTS);
 		for (size_t i = 0; i < NUM_VANTAGE_POINTS; ++i) {
 			vp_dist[i] = distance(_splits[_vp_indices[i]], target);
-			//vp_dist[i] = distance(_splits[_vp_indices[i]], _inv_splits[_vp_indices[i]], target, _nTax_div_2);
 			_tau = std::min(_tau, vp_dist[i]);
 			if (_tau == 1) {
 				return 1;
@@ -87,24 +114,24 @@ public:
 		search(_root, target, p, vp_dist, 0);
 
 		/*
-		 // check if the result is correct
-		 size_t min_idx = 0;
-		 unsigned int min = p - 1;
-		 for (size_t i = 0; i < _items.size(); ++i) {
-		 unsigned int dist = distance(target, _splits[i]);
-		 if (dist < min) {
-		 min = dist;
-		 min_idx = i;
-		 }
-		 }
-		 if (_tau != min) {
-		 std::cout << "ERROR!!! THE RESULT IS WRONG!!!\n";
-		 std::cout << "_tau: " << _tau << "\n";
-		 std::cout << "min: " << min << "\n";
-		 std::cout << "p-1: " << p - 1 << "\n";
-		 std::cout << "witness: " << split_string(_splits[min_idx]) << "\n";
-		 throw std::runtime_error("Stopping now");
-		 }*/
+		// check if the result is correct
+		size_t min_idx = 0;
+		unsigned int min = p - 1;
+		for (size_t i = 0; i < _items.size(); ++i) {
+			unsigned int dist = distance(target, _splits[i]);
+			if (dist < min) {
+				min = dist;
+				min_idx = i;
+			}
+		}
+		if (_tau != min) {
+			std::cout << "ERROR!!! THE RESULT IS WRONG!!!\n";
+			std::cout << "_tau: " << _tau << "\n";
+			std::cout << "min: " << min << "\n";
+			std::cout << "p-1: " << p - 1 << "\n";
+			std::cout << "witness: " << split_string(_splits[min_idx]) << "\n";
+			throw std::runtime_error("Stopping now");
+		}*/
 
 		return _tau;
 	}
@@ -144,7 +171,8 @@ private:
 		unsigned int hdist = 0;
 		unsigned int i;
 		for (i = 0; (i < _split_len) && (hdist <= min_hdist); ++i) {
-			hdist += PLL_POPCNT32(s1[i] ^ s2[i]);
+			hdist += popcount32e(s1[i] ^ s2[i]);
+			//hdist += PLL_POPCNT32(s1[i] ^ s2[i]);
 		}
 		return hdist;
 	}
@@ -152,7 +180,8 @@ private:
 	inline void split_hamming_distance_lbound(pll_split_t s1, pll_split_t s2, unsigned int min_hdist, unsigned int& hdist,
 			unsigned int& i) {
 		for (; (i < _split_len) && (hdist <= min_hdist); ++i) {
-			hdist += PLL_POPCNT32(s1[i] ^ s2[i]);
+			hdist += popcount32e(s1[i] ^ s2[i]);
+			//hdist += PLL_POPCNT32(s1[i] ^ s2[i]);
 		}
 	}
 
@@ -160,7 +189,8 @@ private:
 		unsigned int hdist = 0;
 		unsigned int i;
 		for (i = 0; (i < _split_len); ++i) {
-			hdist += PLL_POPCNT32(s1[i] ^ s2[i]);
+			hdist += popcount32e(s1[i] ^ s2[i]);
+			//hdist += PLL_POPCNT32(s1[i] ^ s2[i]);
 		}
 		return hdist;
 	}
@@ -232,7 +262,6 @@ private:
 
 		for (unsigned int i : samples) {
 			unsigned int dist = distance(_splits[_items[cand]], _splits[_items[i]]);
-			//unsigned int dist = distance(_splits[_items[cand]], _inv_splits[_items[cand]], _splits[_items[i]], _nTax_div_2);
 			if (dist > maxDist) {
 				maxDist = dist;
 				vpPoint = i;
@@ -279,14 +308,13 @@ private:
 		std::swap(_items[lower], _items[vp]);
 		for (size_t j = lower + 1; j < upper; ++j) {
 			unsigned int dist = distance(_splits[_items[j]], _splits[_items[lower]]);
-			//unsigned int dist = distance(_splits[_items[j]], _inv_splits[_items[j]], _splits[_items[lower]], _nTax_div_2);
 			_distToVP[_items[j]][0] = dist;
 			if (dist > maxDist) {
 				maxDist = dist;
 				maxDistIdx = _items[j];
 			}
 		}
-
+		// select remaining Vantage points
 		for (size_t i = 1; i < NUM_VANTAGE_POINTS; ++i) {
 			unsigned int vp = maxDistIdx;
 			_vp_indices[i] = _items[vp];
@@ -295,7 +323,6 @@ private:
 			maxDistIdx = 0;
 			for (size_t j = lower + i + 1; j < upper; ++j) {
 				unsigned int dist = distance(_splits[_items[j]], _splits[_items[lower + i]]);
-				//unsigned int dist = distance(_splits[_items[j]], _inv_splits[_items[j]], _splits[_items[lower + i]], _nTax_div_2);
 				_distToVP[_items[j]][i] = dist;
 				// look at the minimum distance from vantage points so far
 				for (size_t k = 1; k < i; ++k) {
@@ -307,22 +334,6 @@ private:
 				}
 			}
 		}
-
-		/*
-		 // choose all VP_points at once, always move them to the start.
-		 for (size_t i = 0; i < NUM_VANTAGE_POINTS; ++i) {
-		 unsigned int vp = findVantagePoint2(i, upper, 0);
-		 _vp_indices[i] = _items[vp];
-		 std::swap(_items[lower + i], _items[vp]);
-		 }
-		 // precompute distances to the vantage points
-		 for (size_t i = NUM_VANTAGE_POINTS; i < upper; ++i) {
-		 for (size_t j = 0; j < NUM_VANTAGE_POINTS; ++j) {
-		 unsigned int dist = distance(_splits[_items[lower + j]], _inv_splits[_items[lower + j]], _splits[_items[i]], _nTax_div_2);
-		 _distToVP[_items[i]][j] = dist;
-		 }
-		 }
-		 */
 		// reorder the items and store it in the directory.
 		unsigned int median = (upper + lower + NUM_VANTAGE_POINTS) / 2;
 		// partition around the median distance from first VP
