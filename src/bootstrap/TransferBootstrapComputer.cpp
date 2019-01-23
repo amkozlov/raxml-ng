@@ -45,13 +45,6 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 	}
 
 	//auto start = std::chrono::high_resolution_clock::now();
-
-	int * bs_light = (int*) calloc(split_count, sizeof(int));
-	if (!bs_light) {
-		pllmod_utree_split_hashtable_destroy(bs_splits_hash);
-		//pllmod_set_error(PLL_ERROR_MEM_ALLOC, "Cannot allocate memory\n");
-		return PLL_FAILURE;
-	}
 	// precompute all inverse bootstrap splits
 	pll_split_t * inv_bs_splits = (pll_split_t *) malloc(split_count * sizeof(pll_split_t));
 	if (!inv_bs_splits) {
