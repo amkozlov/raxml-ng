@@ -8,6 +8,7 @@
 #include "TransferBootstrapComputer.hpp"
 #include "VPTree.hpp"
 #include "SimpleMVPTree.hpp"
+#include "NearestSplitFinder.hpp"
 
 #include <chrono>
 
@@ -18,7 +19,86 @@ inline unsigned int bitv_length(unsigned int bit_count) {
 	return bit_count / split_size + (split_offset > 0);
 }
 
-/* Compute Transfer Support (Lemoine et al., Nature 2018) for every split in ref_splits. Sarahs version with VP-Trees. */
+/* Compute Transfer Support (Lemoine et al., Nature 2018) for every split in ref_splits. Sarahs implementation of the algorithm from the Nature paper. */
+PLL_EXPORT int pllmod_utree_split_transfer_support_nature(pll_split_t * ref_splits, pll_split_t * bs_splits, pll_unode_t* bs_root,
+		unsigned int tip_count, double * support) {
+	if (!wordbits_filled) {
+		popcount32e_init();
+		wordbits_filled = true;
+	}
+	unsigned int i;
+	unsigned int split_count = tip_count - 3;
+	unsigned int split_len = bitv_length(tip_count);
+
+	if (!ref_splits || !bs_splits || !support) {
+		//pllmod_set_error(PLL_ERROR_PARAM_INVALID, "Parameter is NULL!\n");
+		return PLL_FAILURE;
+	}
+
+	bitv_hashtable_t * bs_splits_hash = pllmod_utree_split_hashtable_insert(NULL, bs_splits, tip_count, split_count,
+	NULL, 0);
+
+	if (!bs_splits_hash) {
+		return PLL_FAILURE;
+	}
+
+	//auto start = std::chrono::high_resolution_clock::now();
+
+	NearestSplitFinder splitFinder;
+	bool index_constructed = false;
+	//unsigned long int total_query_time = 0;
+
+	/* iterate over all splits of the reference tree */
+	for (i = 0; i < split_count; i++) {
+		pll_split_t ref_split = ref_splits[i];
+
+		if (pllmod_utree_split_hashtable_lookup(bs_splits_hash, ref_split, tip_count)) {
+			/* found identical split in a bootstrap tree -> assign full support */
+			support[i] = 1.0;
+			continue;
+		}
+
+		bool lightsideIsZeros;
+		unsigned int p = pllmod_utree_split_lightside_sarah(ref_split, tip_count, lightsideIsZeros);
+
+		if (p == 2) { // no need for further searching
+			support[i] = 0.0;
+			continue;
+		}
+
+		unsigned int min_hdist = p - 1;
+
+		if (!index_constructed) {
+			//auto start = std::chrono::high_resolution_clock::now();
+			splitFinder.create(bs_root, split_len, tip_count);
+			//auto mid = std::chrono::high_resolution_clock::now();
+			//std::cout << "Runtime VP-Tree construction: " << std::chrono::duration_cast<std::chrono::microseconds>(mid - start).count() << std::endl;
+			index_constructed = true;
+		}
+
+		// else, we are in the search for minimum distance...
+		//auto s1 = std::chrono::high_resolution_clock::now();
+		min_hdist = splitFinder.search_mindist(ref_split, p, lightsideIsZeros);
+		//std::cout << "min_hdist is: " << min_hdist << "\n";
+
+		//auto e1 = std::chrono::high_resolution_clock::now();
+		//total_query_time += std::chrono::duration_cast<std::chrono::microseconds>(e1 - s1).count();
+
+		//std::cout << "minimum distance found Sarah: " << min_hdist << "\n";
+
+		assert(min_hdist > 0);
+		support[i] = 1.0 - (((double) min_hdist) / (p - 1));
+	}
+
+	//auto end = std::chrono::high_resolution_clock::now();
+	//std::cout << "Runtime VP-Tree queries: " << total_query_time << std::endl;
+
+	pllmod_utree_split_hashtable_destroy(bs_splits_hash);
+
+	return PLL_SUCCESS;
+}
+
+/* Compute Transfer Support (Lemoine et al., Nature 2018) for every split in ref_splits. Sarahs version with MVP-Trees. */
 PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_splits, pll_split_t * bs_splits, unsigned int tip_count,
 		double * support) {
 	if (!wordbits_filled) {
@@ -71,6 +151,13 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 	/* iterate over all splits of the reference tree */
 	for (i = 0; i < split_count; i++) {
 		pll_split_t ref_split = ref_splits[i];
+
+		if (pllmod_utree_split_hashtable_lookup(bs_splits_hash, ref_split, tip_count)) {
+			/* found identical split in a bootstrap tree -> assign full support */
+			support[i] = 1.0;
+			continue;
+		}
+
 		unsigned int p = pllmod_utree_split_lightside_sarah(ref_split, tip_count);
 
 		if (p == 2) { // no need for further searching
@@ -79,12 +166,6 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_split
 		}
 
 		unsigned int min_hdist = p - 1;
-
-		if (pllmod_utree_split_hashtable_lookup(bs_splits_hash, ref_split, tip_count)) {
-			/* found identical split in a bootstrap tree -> assign full support */
-			support[i] = 1.0;
-			continue;
-		}
 
 		if (!index_constructed) {
 			//auto start = std::chrono::high_resolution_clock::now();

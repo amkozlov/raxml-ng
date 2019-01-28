@@ -37,32 +37,42 @@ inline unsigned int bitv_length_sarah(unsigned int bit_count) {
 	return bit_count / split_size + (split_offset > 0);
 }
 
-inline unsigned int bitv_popcount_sarah(const pll_split_t bitv, unsigned int bit_count,
-                                  unsigned int bitv_len)
-{
-  unsigned int setb = 0;
-  unsigned int i;
+inline unsigned int bitv_popcount_sarah(const pll_split_t bitv, unsigned int bit_count, unsigned int bitv_len) {
+	unsigned int setb = 0;
+	unsigned int i;
 
-  if (!bitv_len)
-    bitv_len = bitv_length_sarah(bit_count);
+	if (!bitv_len)
+		bitv_len = bitv_length_sarah(bit_count);
 
-  for (i = 0; i < bitv_len; ++i)
-  {
-    setb += (unsigned int) popcount32e(bitv[i]);
-  }
-  return setb;
+	for (i = 0; i < bitv_len; ++i) {
+		setb += (unsigned int) popcount32e(bitv[i]);
+	}
+	return setb;
 }
 
-inline unsigned int bitv_lightside_sarah(const pll_split_t bitv, unsigned int bit_count,
-                                   unsigned int bitv_len)
-{
-  unsigned int setb = bitv_popcount_sarah(bitv, bit_count, bitv_len);
+inline unsigned int bitv_lightside_sarah(const pll_split_t bitv, unsigned int bit_count, unsigned int bitv_len) {
+	unsigned int setb = bitv_popcount_sarah(bitv, bit_count, bitv_len);
 
-  return PLL_MIN(setb, bit_count - setb);
+	return PLL_MIN(setb, bit_count - setb);
+}
+
+inline unsigned int bitv_lightside_sarah(const pll_split_t bitv, unsigned int bit_count, unsigned int bitv_len, bool& lightsideIsZero) {
+	unsigned int setb = bitv_popcount_sarah(bitv, bit_count, bitv_len);
+	if (setb <= bit_count - setb) {
+		lightsideIsZero = false;
+		return setb;
+	} else {
+		lightsideIsZero = true;
+		return bit_count - setb;
+	}
 }
 
 inline unsigned int pllmod_utree_split_lightside_sarah(pll_split_t split, unsigned int tip_count) {
 	return bitv_lightside_sarah(split, tip_count, 0);
+}
+
+inline unsigned int pllmod_utree_split_lightside_sarah(pll_split_t split, unsigned int tip_count, bool& lightsideIsZero) {
+	return bitv_lightside_sarah(split, tip_count, 0, lightsideIsZero);
 }
 
 class SimpleMvpTree {
@@ -114,24 +124,24 @@ public:
 		search(_root, target, p, vp_dist, 0);
 
 		/*
-		// check if the result is correct
-		size_t min_idx = 0;
-		unsigned int min = p - 1;
-		for (size_t i = 0; i < _items.size(); ++i) {
-			unsigned int dist = distance(target, _splits[i]);
-			if (dist < min) {
-				min = dist;
-				min_idx = i;
-			}
-		}
-		if (_tau != min) {
-			std::cout << "ERROR!!! THE RESULT IS WRONG!!!\n";
-			std::cout << "_tau: " << _tau << "\n";
-			std::cout << "min: " << min << "\n";
-			std::cout << "p-1: " << p - 1 << "\n";
-			std::cout << "witness: " << split_string(_splits[min_idx]) << "\n";
-			throw std::runtime_error("Stopping now");
-		}*/
+		 // check if the result is correct
+		 size_t min_idx = 0;
+		 unsigned int min = p - 1;
+		 for (size_t i = 0; i < _items.size(); ++i) {
+		 unsigned int dist = distance(target, _splits[i]);
+		 if (dist < min) {
+		 min = dist;
+		 min_idx = i;
+		 }
+		 }
+		 if (_tau != min) {
+		 std::cout << "ERROR!!! THE RESULT IS WRONG!!!\n";
+		 std::cout << "_tau: " << _tau << "\n";
+		 std::cout << "min: " << min << "\n";
+		 std::cout << "p-1: " << p - 1 << "\n";
+		 std::cout << "witness: " << split_string(_splits[min_idx]) << "\n";
+		 throw std::runtime_error("Stopping now");
+		 }*/
 
 		return _tau;
 	}
