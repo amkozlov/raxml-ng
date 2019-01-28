@@ -60,13 +60,16 @@ public:
 				// collect the number of ones and zeros from the child nodes
 				unsigned int idxLeft = _travbuffer[i]->next->back->node_index;
 				unsigned int idxRight = _travbuffer[i]->next->next->back->node_index;
-				assert(ones[idxLeft] + zeros[idxLeft] > 0);
-				assert(ones[idxRight] + zeros[idxRight] > 0);
+				//assert(ones[idxLeft] + zeros[idxLeft] > 0);
+				//assert(ones[idxRight] + zeros[idxRight] > 0);
 				ones[idx] = ones[idxLeft] + ones[idxRight];
 				zeros[idx] = zeros[idxLeft] + zeros[idxRight];
 				unsigned int actDist = std::min(p - zeros[idx] + ones[idx], _nTax - p - ones[idx] + zeros[idx]); // TODO: Avoid unsigned int underflow issues here.
 				if (actDist < minDist) {
 					minDist = actDist;
+					if (minDist == 1) {
+						return minDist;
+					}
 				}
 			}
 		}
