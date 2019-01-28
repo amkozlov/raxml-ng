@@ -46,7 +46,7 @@ public:
 		//std::cout << "Initial minDist: " << minDist << "\n";
 		std::vector<unsigned int> ones(_nodes_count * 3, 0);
 		std::vector<unsigned int> zeros(_nodes_count * 3, 0);
-		for (size_t i = 0; i < _nodes_count; ++i) {
+		for (size_t i = 0; i < _trav_size; ++i) {
 			unsigned int idx = _travbuffer[i]->node_index;
 			if (!_travbuffer[i]->next) { // we are at a leaf node
 				//std::cout << "I am at a leaf with index " << idx << "\n";
