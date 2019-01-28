@@ -49,8 +49,8 @@ public:
 		for (size_t i = 0; i < _nodes_count; ++i) {
 			unsigned int idx = _travbuffer[i]->node_index;
 			if (!_travbuffer[i]->next) { // we are at a leaf node
-				//std::cout << "I am at a leaf with index " << idx << "\n"; // this one should be the index of the leaf node??? Mybe print it and figure out how they are labeled
-				bool isOne = check_bipartition_at(query, idx, lightsideIsZeros); // TODO: Figure out if this one has be be one or zero.
+				//std::cout << "I am at a leaf with index " << idx << "\n";
+				bool isOne = check_bipartition_at(query, idx, lightsideIsZeros);
 				if (isOne) {
 					ones[idx] = 1;
 				} else {
@@ -60,11 +60,6 @@ public:
 				// collect the number of ones and zeros from the child nodes
 				unsigned int idxLeft = _travbuffer[i]->next->back->node_index;
 				unsigned int idxRight = _travbuffer[i]->next->next->back->node_index;
-
-				//std::cout << "idxLeft: " << idxLeft << "\n";
-				//std::cout << "idxRight: " << idxRight << "\n";
-				//std::cout << "nodes_count: " << _nodes_count << "\n";
-
 				assert(ones[idxLeft] + zeros[idxLeft] > 0);
 				assert(ones[idxRight] + zeros[idxRight] > 0);
 				ones[idx] = ones[idxLeft] + ones[idxRight];
@@ -75,7 +70,6 @@ public:
 				}
 			}
 		}
-		//std::cout << "I am ready to return minDist, which is: " << minDist << "\n";
 		return minDist;
 	}
 private:
