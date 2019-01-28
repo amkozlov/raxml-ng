@@ -44,7 +44,6 @@ public:
 		//std::cout << "p is: " << p << "\n";
 		unsigned int minDist = p - 1;
 		//std::cout << "Initial minDist: " << minDist << "\n";
-		std::vector<bool> taxLabels(_nTax);
 		std::vector<unsigned int> ones(_nodes_count * 3, 0);
 		std::vector<unsigned int> zeros(_nodes_count * 3, 0);
 		for (size_t i = 0; i < _nodes_count; ++i) {
