@@ -12,8 +12,7 @@
 #include <vector>
 #include <iostream>
 
-#include "../../build/localdeps/include/libpll/pll.h"
-#include "../../build/localdeps/include/libpll/pll_tree.h"
+#include "../common.h"
 
 /*
  * The algorithm for transfer bootstrap distance from the Nature paper. I had no better idea of how to name that class.

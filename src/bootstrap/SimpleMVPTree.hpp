@@ -22,8 +22,7 @@
 
 #include "FastPopcount.hpp"
 
-#include "../../build/localdeps/include/libpll/pll.h"
-#include "../../build/localdeps/include/libpll/pll_tree.h"
+#include "../common.h"
 
 inline std::string split_string(pll_split_t split) {
 	std::string binary = std::bitset<20>(*split).to_string();
