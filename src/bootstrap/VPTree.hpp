@@ -24,8 +24,7 @@
 #include <string>
 #include <vector>
 
-#include "../../build/localdeps/include/libpll/pll.h"
-#include "../../build/localdeps/include/libpll/pll_tree.h"
+#include "../common.h"
 
 
 class VpTree {
