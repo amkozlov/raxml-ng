@@ -77,7 +77,7 @@ inline unsigned int pllmod_utree_split_lightside_sarah(pll_split_t split, unsign
 
 class SimpleMvpTree {
 public:
-	static const unsigned int NUM_VANTAGE_POINTS = 7;
+	static const unsigned int NUM_VANTAGE_POINTS = 13; //15;
 
 	SimpleMvpTree() :
 			_split_len(0), _splits(0), _inv_splits(0), _tau(std::numeric_limits<unsigned int>::max()), _nTax(0), _nTax_div_2(0), _root(NULL) {

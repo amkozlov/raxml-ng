@@ -13,5 +13,7 @@
 
 PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_splits, pll_split_t * bs_splits, unsigned int tip_count, double * support);
 PLL_EXPORT int pllmod_utree_split_transfer_support_nature(pll_split_t * ref_splits, pll_split_t * bs_splits, pll_unode_t* bs_root, unsigned int tip_count, double * support);
+PLL_EXPORT int pllmod_utree_split_transfer_support_nature_naked(pll_split_t * ref_splits, pll_split_t * bs_splits, pll_unode_t* bs_root, unsigned int tip_count, double * support);
+
 
 #endif /* SRC_BOOTSTRAP_TRANSFERBOOTSTRAPCOMPUTER_HPP_ */
