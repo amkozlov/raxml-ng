@@ -8,7 +8,7 @@
 #ifndef SRC_BOOTSTRAP_FASTPOPCOUNT_HPP_
 #define SRC_BOOTSTRAP_FASTPOPCOUNT_HPP_
 
-#include <bits/stdint-uintn.h>
+#include <cstdint>
 
 static uint16_t wordbits[65536];
 static bool wordbits_filled = false;
