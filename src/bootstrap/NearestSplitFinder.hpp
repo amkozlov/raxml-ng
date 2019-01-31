@@ -39,41 +39,42 @@ public:
 		// do a single post order traversal.
 		pll_utree_traverse(root, PLL_TREE_TRAVERSE_POSTORDER, cb_full_traversal, _travbuffer, &_trav_size);
 	}
+
 	unsigned int search_mindist(pll_split_t query, unsigned int p, bool lightsideIsZeros) {
-		//std::cout << "p is: " << p << "\n";
-		unsigned int minDist = p - 1;
-		//std::cout << "Initial minDist: " << minDist << "\n";
-		std::vector<unsigned int> ones(_nodes_count * 3, 0);
-		std::vector<unsigned int> zeros(_nodes_count * 3, 0);
-		for (size_t i = 0; i < _trav_size; ++i) {
-			unsigned int idx = _travbuffer[i]->node_index;
-			if (!_travbuffer[i]->next) { // we are at a leaf node
-				//std::cout << "I am at a leaf with index " << idx << "\n";
-				bool isOne = check_bipartition_at(query, idx, lightsideIsZeros);
-				if (isOne) {
-					ones[idx] = 1;
+			//std::cout << "p is: " << p << "\n";
+			unsigned int minDist = p - 1;
+			//std::cout << "Initial minDist: " << minDist << "\n";
+
+			std::vector<std::array<unsigned int, 2> > counts(_nodes_count * 3); // counts[i][0] for the number of zeros, counts[i][1] for the number of ones.
+			for (size_t i = 0; i < _trav_size; ++i) {
+				unsigned int idx = _travbuffer[i]->node_index;
+				if (!_travbuffer[i]->next) { // we are at a leaf node
+					//std::cout << "I am at a leaf with index " << idx << "\n";
+					bool isOne = check_bipartition_at(query, idx, lightsideIsZeros);
+					if (isOne) {
+						counts[idx][1] = 1;
+					} else {
+						counts[idx][0] = 1;
+					}
 				} else {
-					zeros[idx] = 1;
-				}
-			} else {
-				// collect the number of ones and zeros from the child nodes
-				unsigned int idxLeft = _travbuffer[i]->next->back->node_index;
-				unsigned int idxRight = _travbuffer[i]->next->next->back->node_index;
-				//assert(ones[idxLeft] + zeros[idxLeft] > 0);
-				//assert(ones[idxRight] + zeros[idxRight] > 0);
-				ones[idx] = ones[idxLeft] + ones[idxRight];
-				zeros[idx] = zeros[idxLeft] + zeros[idxRight];
-				unsigned int actDist = std::min(p - zeros[idx] + ones[idx], _nTax - p - ones[idx] + zeros[idx]); // TODO: Avoid unsigned int underflow issues here.
-				if (actDist < minDist) {
-					minDist = actDist;
-					if (minDist == 1) {
-						return minDist;
+					// collect the number of ones and zeros from the child nodes
+					unsigned int idxLeft = _travbuffer[i]->next->back->node_index;
+					unsigned int idxRight = _travbuffer[i]->next->next->back->node_index;
+					//assert(counts[idxLeft][0] + counts[idxLeft][1] > 0);
+					//assert(counts[idxRight][0] + counts[idxRight][1] > 0);
+					counts[idx][0] = counts[idxLeft][0] + counts[idxRight][0];
+					counts[idx][1] = counts[idxLeft][1] + counts[idxRight][1];
+					unsigned int actDist = std::min(p - counts[idx][0] + counts[idx][1], _nTax - p - counts[idx][1] + counts[idx][0]); // TODO: Avoid unsigned int underflow issues here.
+					if (actDist < minDist) {
+						minDist = actDist;
+						if (minDist == 1) {
+							return minDist;
+						}
 					}
 				}
 			}
+			return minDist;
 		}
-		return minDist;
-	}
 private:
 	bool check_bipartition_at(pll_split_t query, unsigned int idx, bool lightsideIsZeros) {
 		bool res;
