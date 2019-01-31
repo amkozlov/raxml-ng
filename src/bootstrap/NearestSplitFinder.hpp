@@ -35,20 +35,17 @@ public:
 		/* allocate a buffer for storing pointers to nodes of the tree in postorder
 		 traversal */
 		_nodes_count = 2 * nTax - 2;
-		counts.resize(_nodes_count * 3);
+		counts.resize(_nodes_count);
 		_travbuffer = (pll_unode_t **) malloc(_nodes_count * sizeof(pll_unode_t *));
 		// do a single post order traversal.
 		pll_utree_traverse(root, PLL_TREE_TRAVERSE_POSTORDER, cb_full_traversal, _travbuffer, &_trav_size);
 	}
 
 	unsigned int search_mindist(pll_split_t query, unsigned int p, bool lightsideIsZeros) {
-			//std::cout << "p is: " << p << "\n";
 			unsigned int minDist = p - 1;
-			//std::cout << "Initial minDist: " << minDist << "\n";
 
-			//std::vector<std::array<unsigned int, 2> > counts(_nodes_count * 3); // counts[i][0] for the number of zeros, counts[i][1] for the number of ones.
 			for (size_t i = 0; i < _trav_size; ++i) {
-				unsigned int idx = _travbuffer[i]->node_index;
+				unsigned int idx = _travbuffer[i]->clv_index;
 				if (!_travbuffer[i]->next) { // we are at a leaf node
 					//std::cout << "I am at a leaf with index " << idx << "\n";
 					bool isOne = check_bipartition_at(query, idx, lightsideIsZeros);
@@ -61,8 +58,8 @@ public:
 					}
 				} else {
 					// collect the number of ones and zeros from the child nodes
-					unsigned int idxLeft = _travbuffer[i]->next->back->node_index;
-					unsigned int idxRight = _travbuffer[i]->next->next->back->node_index;
+					unsigned int idxLeft = _travbuffer[i]->next->back->clv_index;
+					unsigned int idxRight = _travbuffer[i]->next->next->back->clv_index;
 					//assert(counts[idxLeft][0] + counts[idxLeft][1] > 0);
 					//assert(counts[idxRight][0] + counts[idxRight][1] > 0);
 					counts[idx][0] = counts[idxLeft][0] + counts[idxRight][0];
