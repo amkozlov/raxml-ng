@@ -35,6 +35,7 @@ public:
 		/* allocate a buffer for storing pointers to nodes of the tree in postorder
 		 traversal */
 		_nodes_count = 2 * nTax - 2;
+		counts.resize(_nodes_count * 3);
 		_travbuffer = (pll_unode_t **) malloc(_nodes_count * sizeof(pll_unode_t *));
 		// do a single post order traversal.
 		pll_utree_traverse(root, PLL_TREE_TRAVERSE_POSTORDER, cb_full_traversal, _travbuffer, &_trav_size);
@@ -45,7 +46,7 @@ public:
 			unsigned int minDist = p - 1;
 			//std::cout << "Initial minDist: " << minDist << "\n";
 
-			std::vector<std::array<unsigned int, 2> > counts(_nodes_count * 3); // counts[i][0] for the number of zeros, counts[i][1] for the number of ones.
+			//std::vector<std::array<unsigned int, 2> > counts(_nodes_count * 3); // counts[i][0] for the number of zeros, counts[i][1] for the number of ones.
 			for (size_t i = 0; i < _trav_size; ++i) {
 				unsigned int idx = _travbuffer[i]->node_index;
 				if (!_travbuffer[i]->next) { // we are at a leaf node
@@ -101,6 +102,7 @@ private:
 	pll_unode_t ** _travbuffer;
 	unsigned int _nodes_count;
 	unsigned int _trav_size;
+	std::vector<std::array<unsigned int, 2> > counts; // counts[i][0] for the number of zeros, counts[i][1] for the number of ones.
 };
 
 #endif /* SRC_BOOTSTRAP_NEARESTSPLITFINDER_HPP_ */
