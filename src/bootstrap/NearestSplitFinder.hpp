@@ -53,9 +53,11 @@ public:
 					//std::cout << "I am at a leaf with index " << idx << "\n";
 					bool isOne = check_bipartition_at(query, idx, lightsideIsZeros);
 					if (isOne) {
+						counts[idx][0] = 0;
 						counts[idx][1] = 1;
 					} else {
 						counts[idx][0] = 1;
+						counts[idx][1] = 0;
 					}
 				} else {
 					// collect the number of ones and zeros from the child nodes
