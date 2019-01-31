@@ -42,11 +42,8 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_nature(pll_split_t * ref_spli
 		return PLL_FAILURE;
 	}
 
-	//auto start = std::chrono::high_resolution_clock::now();
-
 	NearestSplitFinder splitFinder;
 	bool index_constructed = false;
-	//unsigned long int total_query_time = 0;
 
 	/* iterate over all splits of the reference tree */
 	for (i = 0; i < split_count; i++) {
@@ -69,29 +66,15 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_nature(pll_split_t * ref_spli
 		unsigned int min_hdist = p - 1;
 
 		if (!index_constructed) {
-			//auto start = std::chrono::high_resolution_clock::now();
 			splitFinder.create(bs_root, split_len, tip_count);
-			//auto mid = std::chrono::high_resolution_clock::now();
-			//std::cout << "Runtime VP-Tree construction: " << std::chrono::duration_cast<std::chrono::microseconds>(mid - start).count() << std::endl;
 			index_constructed = true;
 		}
 
 		// else, we are in the search for minimum distance...
-		//auto s1 = std::chrono::high_resolution_clock::now();
 		min_hdist = splitFinder.search_mindist(ref_split, p, lightsideIsZeros);
-		//std::cout << "min_hdist is: " << min_hdist << "\n";
-
-		//auto e1 = std::chrono::high_resolution_clock::now();
-		//total_query_time += std::chrono::duration_cast<std::chrono::microseconds>(e1 - s1).count();
-
-		//std::cout << "minimum distance found Sarah: " << min_hdist << "\n";
-
 		assert(min_hdist > 0);
 		support[i] = 1.0 - (((double) min_hdist) / (p - 1));
 	}
-
-	//auto end = std::chrono::high_resolution_clock::now();
-	//std::cout << "Runtime VP-Tree queries: " << total_query_time << std::endl;
 
 	pllmod_utree_split_hashtable_destroy(bs_splits_hash);
 

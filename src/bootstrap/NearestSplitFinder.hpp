@@ -42,39 +42,38 @@ public:
 	}
 
 	unsigned int search_mindist(pll_split_t query, unsigned int p, bool lightsideIsZeros) {
-			unsigned int minDist = p - 1;
-
-			for (size_t i = 0; i < _trav_size; ++i) {
-				unsigned int idx = _travbuffer[i]->clv_index;
-				if (!_travbuffer[i]->next) { // we are at a leaf node
-					//std::cout << "I am at a leaf with index " << idx << "\n";
-					bool isOne = check_bipartition_at(query, idx, lightsideIsZeros);
-					if (isOne) {
-						counts[idx][0] = 0;
-						counts[idx][1] = 1;
-					} else {
-						counts[idx][0] = 1;
-						counts[idx][1] = 0;
-					}
+		unsigned int minDist = p - 1;
+		for (size_t i = 0; i < _trav_size; ++i) {
+			unsigned int idx = _travbuffer[i]->clv_index;
+			if (!_travbuffer[i]->next) { // we are at a leaf node
+				//std::cout << "I am at a leaf with index " << idx << "\n";
+				bool isOne = check_bipartition_at(query, idx, lightsideIsZeros);
+				if (isOne) {
+					counts[idx][0] = 0;
+					counts[idx][1] = 1;
 				} else {
-					// collect the number of ones and zeros from the child nodes
-					unsigned int idxLeft = _travbuffer[i]->next->back->clv_index;
-					unsigned int idxRight = _travbuffer[i]->next->next->back->clv_index;
-					//assert(counts[idxLeft][0] + counts[idxLeft][1] > 0);
-					//assert(counts[idxRight][0] + counts[idxRight][1] > 0);
-					counts[idx][0] = counts[idxLeft][0] + counts[idxRight][0];
-					counts[idx][1] = counts[idxLeft][1] + counts[idxRight][1];
-					unsigned int actDist = std::min(p - counts[idx][0] + counts[idx][1], _nTax - p - counts[idx][1] + counts[idx][0]); // TODO: Avoid unsigned int underflow issues here.
-					if (actDist < minDist) {
-						minDist = actDist;
-						if (minDist == 1) {
-							return minDist;
-						}
+					counts[idx][0] = 1;
+					counts[idx][1] = 0;
+				}
+			} else {
+				// collect the number of ones and zeros from the child nodes
+				unsigned int idxLeft = _travbuffer[i]->next->back->clv_index;
+				unsigned int idxRight = _travbuffer[i]->next->next->back->clv_index;
+				//assert(counts[idxLeft][0] + counts[idxLeft][1] > 0);
+				//assert(counts[idxRight][0] + counts[idxRight][1] > 0);
+				counts[idx][0] = counts[idxLeft][0] + counts[idxRight][0];
+				counts[idx][1] = counts[idxLeft][1] + counts[idxRight][1];
+				unsigned int actDist = std::min(p - counts[idx][0] + counts[idx][1], _nTax - p - counts[idx][1] + counts[idx][0]); // TODO: Avoid unsigned int underflow issues here.
+				if (actDist < minDist) {
+					minDist = actDist;
+					if (minDist == 1) {
+						return minDist;
 					}
 				}
 			}
-			return minDist;
 		}
+		return minDist;
+	}
 private:
 	bool check_bipartition_at(pll_split_t query, unsigned int idx, bool lightsideIsZeros) {
 		bool res;
