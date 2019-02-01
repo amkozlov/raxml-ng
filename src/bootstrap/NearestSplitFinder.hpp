@@ -18,14 +18,20 @@
  * The algorithm for transfer bootstrap distance from the Nature paper. I had no better idea of how to name that class.
  */
 
+typedef struct {
+	unsigned int idx;
+	unsigned int idxLeft;
+	unsigned int idxRight;
+} IndexInformation;
+
 class NearestSplitFinder {
 public:
 	NearestSplitFinder() :
-			_split_len(0), _nTax(0), _root(NULL), _travbuffer(NULL), _nodes_count(0), _trav_size(0) {
+			_split_len(0), _nTax(0), _root(NULL), _nodes_count(0), _trav_size(0) {
 	}
 
 	~NearestSplitFinder() {
-		delete _travbuffer;
+
 	}
 
 	void create(pll_unode_t* root, unsigned int split_len, unsigned int nTax) {
@@ -36,71 +42,82 @@ public:
 		 traversal */
 		_nodes_count = 2 * nTax - 2;
 		counts.resize(_nodes_count);
-		_travbuffer = (pll_unode_t **) malloc(_nodes_count * sizeof(pll_unode_t *));
+		_trav_size = 0;
+		idxInfos.clear();
+		idxInfos.resize(_nodes_count);
 		// do a single post order traversal.
-		pll_utree_traverse(root, PLL_TREE_TRAVERSE_POSTORDER, cb_full_traversal, _travbuffer, &_trav_size);
+		pll_utree_traverse_sarah(root, &_trav_size);
 	}
 
-	unsigned int search_mindist(pll_split_t query, unsigned int p, bool lightsideIsZeros) {
-		unsigned int minDist = p - 1;
+	unsigned int search_mindist(const RefSplitInfo& query) {
+		unsigned int minDist = query.p - 1;
+		// initialize the leaf node informations...
+		for (size_t i = 0; i < query.leftLeafIdx; ++i) {
+			counts[i][0] = query.subtreeRes;
+			counts[i][1] = !query.subtreeRes;
+		}
+		for (size_t i = query.leftLeafIdx; i <= query.rightLeafIdx; ++i) {
+			counts[i][0] = !query.subtreeRes;
+			counts[i][1] = query.subtreeRes;
+		}
+		for (size_t i = query.rightLeafIdx + 1; i < counts.size(); ++i) {
+			counts[i][0] = query.subtreeRes;
+			counts[i][1] = !query.subtreeRes;
+		}
+
 		for (size_t i = 0; i < _trav_size; ++i) {
-			unsigned int idx = _travbuffer[i]->clv_index;
-			if (!_travbuffer[i]->next) { // we are at a leaf node
-				//std::cout << "I am at a leaf with index " << idx << "\n";
-				bool isOne = check_bipartition_at(query, idx, lightsideIsZeros);
-				if (isOne) {
-					counts[idx][0] = 0;
-					counts[idx][1] = 1;
-				} else {
-					counts[idx][0] = 1;
-					counts[idx][1] = 0;
-				}
-			} else {
-				// collect the number of ones and zeros from the child nodes
-				unsigned int idxLeft = _travbuffer[i]->next->back->clv_index;
-				unsigned int idxRight = _travbuffer[i]->next->next->back->clv_index;
-				//assert(counts[idxLeft][0] + counts[idxLeft][1] > 0);
-				//assert(counts[idxRight][0] + counts[idxRight][1] > 0);
-				counts[idx][0] = counts[idxLeft][0] + counts[idxRight][0];
-				counts[idx][1] = counts[idxLeft][1] + counts[idxRight][1];
-				unsigned int actDist = std::min(p - counts[idx][0] + counts[idx][1], _nTax - p - counts[idx][1] + counts[idx][0]); // TODO: Avoid unsigned int underflow issues here.
-				if (actDist < minDist) {
-					minDist = actDist;
-					if (minDist == 1) {
-						return minDist;
-					}
+			unsigned int idx = idxInfos[i].idx;
+			unsigned int idxLeft = idxInfos[i].idxLeft;
+			unsigned int idxRight = idxInfos[i].idxRight;
+			counts[idx][0] = counts[idxLeft][0] + counts[idxRight][0];
+			counts[idx][1] = counts[idxLeft][1] + counts[idxRight][1];
+			unsigned int actDist = std::min(query.p - counts[idx][0] + counts[idx][1], _nTax - query.p - counts[idx][1] + counts[idx][0]);
+			if (actDist < minDist) {
+				minDist = actDist;
+				if (minDist == 1) {
+					return minDist;
 				}
 			}
 		}
 		return minDist;
 	}
 private:
-	bool check_bipartition_at(pll_split_t query, unsigned int idx, bool lightsideIsZeros) {
-		bool res;
-		// 1) find the correct 32-bit-number that contains the bit in question
-		unsigned int numberIdx = idx / 32;
-		// 2) find the correct bit in this number that is the bit in question
-		unsigned int bitIdx = idx - (numberIdx * 32);
-		// 3) read this bit into res
-		res = (query[numberIdx] >> bitIdx) & 1;
-		if (!lightsideIsZeros) {
-			res = !res;
-		}
-		return res;
+	void utree_traverse_recursive_sarah(pll_unode_t * node, unsigned int * index) {
+		if (node->next == NULL)
+			return;
+		pll_unode_t * snode = node->next;
+		do {
+			utree_traverse_recursive_sarah(snode->back, index);
+			snode = snode->next;
+		} while (snode && snode != node);
+		idxInfos[*index].idx = node->clv_index;
+		idxInfos[*index].idxLeft = node->next->back->clv_index;
+		idxInfos[*index].idxRight = node->next->next->back->clv_index;
+		*index = *index + 1;
 	}
 
-	static int cb_full_traversal(pll_unode_t * node) {
-		(void) node;
-		return 1;
+	void pll_utree_traverse_sarah(pll_unode_t * root, unsigned int * trav_size) {
+		*trav_size = 0;
+		/* we will traverse an unrooted tree in the following way
+
+		 2
+		 /
+		 1  --*
+		 3
+
+		 at each node the callback function is called to decide whether we
+		 are going to traversing the subtree rooted at the specific node */
+		utree_traverse_recursive_sarah(root->back, trav_size);
+		utree_traverse_recursive_sarah(root, trav_size);
 	}
 
 	unsigned int _split_len;
 	unsigned int _nTax;
 	pll_unode_t* _root;
-	pll_unode_t ** _travbuffer;
 	unsigned int _nodes_count;
 	unsigned int _trav_size;
 	std::vector<std::array<unsigned int, 2> > counts; // counts[i][0] for the number of zeros, counts[i][1] for the number of ones.
+	std::vector<IndexInformation> idxInfos;
 };
 
 #endif /* SRC_BOOTSTRAP_NEARESTSPLITFINDER_HPP_ */

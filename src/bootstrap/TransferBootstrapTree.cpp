@@ -26,7 +26,7 @@ void TransferBootstrapTree::add_boot_splits_to_hashtable(const pll_unode_t& root
 		pllmod_utree_split_transfer_support_sarah(_ref_splits.get(), splits, _num_tips, tbe.data());
 	} else if (RUN_NATURE) {
 		// compute TBE, Nature version
-		pllmod_utree_split_transfer_support_nature(_ref_splits.get(), splits, (pll_unode_t*) &root, _num_tips, tbe.data());
+		pllmod_utree_split_transfer_support_nature(_ref_splits.get(), splits, (pll_unode_t*) &root, _num_tips, tbe.data(), _node_split_map, (pll_unode_t*) &pll_utree_root());
 	} else {
 		// compute TBE, Alexey version
 		pllmod_utree_split_transfer_support(_ref_splits.get(), splits, _num_tips, tbe.data());
