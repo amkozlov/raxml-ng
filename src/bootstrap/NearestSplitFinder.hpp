@@ -51,7 +51,6 @@ public:
 
 	unsigned int search_mindist(const RefSplitInfo& query) {
 		unsigned int minDist = query.p - 1;
-
 		// initialize the leaf node informations...
 		std::array<unsigned int, 2> outsideCounts = { query.subtreeRes, !query.subtreeRes };
 		std::array<unsigned int, 2> insideCounts = { !query.subtreeRes, query.subtreeRes };
@@ -64,7 +63,6 @@ public:
 		for (size_t i = query.rightLeafIdx + 1; i < counts.size(); ++i) {
 			counts[i] = outsideCounts;
 		}
-
 		// maybe a level-order-traversal would be better?
 		for (size_t i = 0; i < _trav_size; ++i) { // TODO: This should be possible to vectorize.
 			unsigned int idx = idxInfos[i].idx;
