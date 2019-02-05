@@ -74,21 +74,13 @@ public:
 			counts[idx][1] = counts[idxLeft][1] + counts[idxRight][1];
 
 			unsigned int distCand = query.p - counts[idx][0] + counts[idx][1];
-
-			if (distCand <= _nTax_div_2) {
-				if (distCand < minDist) {
-					minDist = distCand;
-					if (minDist == 1) {
-						return minDist;
-					}
-				}
-			} else {
+			if (distCand > _nTax_div_2) {
 				distCand = _nTax - distCand;
-				if (distCand < minDist) {
-					minDist = distCand;
-					if (minDist == 1) {
-						return minDist;
-					}
+			}
+			if (distCand < minDist) {
+				minDist = distCand;
+				if (minDist == 1) {
+					return minDist;
 				}
 			}
 		}
