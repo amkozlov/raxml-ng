@@ -73,27 +73,23 @@ public:
 			counts[idx][1] = counts[idxLeft][1] + counts[idxRight][1];
 
 			unsigned int distCand = query.p - counts[idx][0] + counts[idx][1];
-			unsigned int distCand2 = _nTax - distCand;
 
-			if (distCand < minDist) {
-				minDist = distCand;
-				if (minDist == 1) {
-					return minDist;
+			if (distCand <= _nTax / 2) {
+				if (distCand < minDist) {
+					minDist = distCand;
+					if (minDist == 1) {
+						return minDist;
+					}
 				}
-			} else if (distCand2 < minDist) {
-				minDist = distCand2;
-				if (minDist == 1) {
-					return minDist;
+			} else {
+				distCand = _nTax - distCand;
+				if (distCand < minDist) {
+					minDist = distCand;
+					if (minDist == 1) {
+						return minDist;
+					}
 				}
 			}
-
-			/*unsigned int actDist = std::min(distCand, distCand2);
-			if (actDist < minDist) {
-				minDist = actDist;
-				if (minDist == 1) {
-					return minDist;
-				}
-			}*/
 		}
 		return minDist;
 	}
