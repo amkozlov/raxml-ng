@@ -63,19 +63,10 @@ PLL_EXPORT int pllmod_utree_split_transfer_support_nature(pll_split_t * ref_spli
 		for (i = 0; i < split_count; ++i) {
 			unsigned int node_idx = split_to_node_map[i]->clv_index;
 			unsigned int firstLeafIdx = aLeafIdx[node_idx];
-			// we need to check if the split at firstLeafIdx is zero or one
-			bool firstLeafOne;
-			// 1) find the correct 32-bit-number that contains the bit in question
-			unsigned int numberIdx = firstLeafIdx / 32;
-			// 2) find the correct bit in this number that is the bit in question
-			unsigned int bitIdx = firstLeafIdx - (numberIdx * 32);
-			// 3) read this bit into res
-			firstLeafOne = (ref_splits[i][numberIdx] >> bitIdx) & 1;
-
+			bool firstLeafOne = (firstLeafIdx > 0); // because taxon 0 is by convention always zero
 			if (subtree_size[node_idx] <= tip_count - subtree_size[node_idx]) {
 				split_info[i].p = subtree_size[node_idx];
 				split_info[i].subtreeRes = !firstLeafOne ? firstLeafOne : !firstLeafOne;
-
 			} else {
 				split_info[i].p = tip_count - subtree_size[node_idx];
 				split_info[i].subtreeRes = firstLeafOne ? firstLeafOne : !firstLeafOne;
