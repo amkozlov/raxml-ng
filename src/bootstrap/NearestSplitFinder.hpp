@@ -27,7 +27,7 @@ typedef struct {
 class NearestSplitFinder {
 public:
 	NearestSplitFinder() :
-			_split_len(0), _nTax(0), _root(NULL), _nodes_count(0), _trav_size(0) {
+			_split_len(0), _nTax(0), _nTax_div_2(0), _root(NULL), _nodes_count(0), _trav_size(0) {
 	}
 
 	~NearestSplitFinder() {
@@ -37,13 +37,13 @@ public:
 	void create(pll_unode_t* root, unsigned int split_len, unsigned int nTax) {
 		_split_len = split_len;
 		_nTax = nTax;
+		_nTax_div_2 = nTax / 2;
 		_root = root;
-		/* allocate a buffer for storing pointers to nodes of the tree in postorder
+		/* allocate a buffer for storing clv_indices of the nodes in postorder
 		 traversal */
 		_nodes_count = 2 * nTax - 2;
 		counts.resize(_nodes_count);
 		_trav_size = 0;
-		idxInfos.clear();
 		idxInfos.resize(_nodes_count);
 		// do a single post order traversal.
 		pll_utree_traverse_sarah(root, &_trav_size);
@@ -65,6 +65,7 @@ public:
 			counts[i][1] = !query.subtreeRes;
 		}
 
+		// maybe a level-order-traversal would be better?
 		for (size_t i = 0; i < _trav_size; ++i) { // TODO: This should be possible to vectorize.
 			unsigned int idx = idxInfos[i].idx;
 			unsigned int idxLeft = idxInfos[i].idxLeft;
@@ -74,7 +75,7 @@ public:
 
 			unsigned int distCand = query.p - counts[idx][0] + counts[idx][1];
 
-			if (distCand <= _nTax / 2) {
+			if (distCand <= _nTax_div_2) {
 				if (distCand < minDist) {
 					minDist = distCand;
 					if (minDist == 1) {
@@ -125,6 +126,7 @@ private:
 
 	unsigned int _split_len;
 	unsigned int _nTax;
+	unsigned int _nTax_div_2;
 	pll_unode_t* _root;
 	unsigned int _nodes_count;
 	unsigned int _trav_size;
