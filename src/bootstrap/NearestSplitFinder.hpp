@@ -71,7 +71,9 @@ public:
 			unsigned int idxRight = idxInfos[i].idxRight;
 			counts[idx][0] = counts[idxLeft][0] + counts[idxRight][0];
 			counts[idx][1] = counts[idxLeft][1] + counts[idxRight][1];
-			unsigned int actDist = std::min(query.p - counts[idx][0] + counts[idx][1], _nTax - query.p - counts[idx][1] + counts[idx][0]);
+
+			unsigned int distCand = query.p - counts[idx][0] + counts[idx][1];
+			unsigned int actDist = std::min(distCand, _nTax - distCand);
 			if (actDist < minDist) {
 				minDist = actDist;
 				if (minDist == 1) {
