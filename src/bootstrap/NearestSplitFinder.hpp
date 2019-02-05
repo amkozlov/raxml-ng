@@ -51,18 +51,18 @@ public:
 
 	unsigned int search_mindist(const RefSplitInfo& query) {
 		unsigned int minDist = query.p - 1;
+
 		// initialize the leaf node informations...
+		std::array<unsigned int, 2> outsideCounts = { query.subtreeRes, !query.subtreeRes };
+		std::array<unsigned int, 2> insideCounts = { !query.subtreeRes, query.subtreeRes };
 		for (size_t i = 0; i < query.leftLeafIdx; ++i) {
-			counts[i][0] = query.subtreeRes;
-			counts[i][1] = !query.subtreeRes;
+			counts[i] = outsideCounts;
 		}
 		for (size_t i = query.leftLeafIdx; i <= query.rightLeafIdx; ++i) {
-			counts[i][0] = !query.subtreeRes;
-			counts[i][1] = query.subtreeRes;
+			counts[i] = insideCounts;
 		}
 		for (size_t i = query.rightLeafIdx + 1; i < counts.size(); ++i) {
-			counts[i][0] = query.subtreeRes;
-			counts[i][1] = !query.subtreeRes;
+			counts[i] = outsideCounts;
 		}
 
 		// maybe a level-order-traversal would be better?
