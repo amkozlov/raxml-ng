@@ -21,10 +21,8 @@
 
 typedef struct {
 	unsigned int idx;
-	unsigned int firstIdx;
-	unsigned int lastIdx;
-	unsigned int subtreeSize;
-	unsigned int p;
+	unsigned int idxLeft;
+	unsigned int idxRight;
 } IndexInformation;
 
 class NearestSplitFinder {
@@ -42,61 +40,38 @@ public:
 		_nTax = nTax;
 		_nTax_div_2 = nTax / 2;
 		_root = root;
-		/* allocate a buffer for storing clv_indices of the nodes in postorder
-		 traversal */
 		_nodes_count = 2 * nTax - 2;
 		_trav_size = 0;
+		/* allocate a buffer for storing clv_indices of the nodes in postorder
+		 traversal */
 		idxInfos.resize(_nodes_count);
+		countOnes.resize(_nodes_count);
+		subtreeSize.resize(_nodes_count);
 		// do a single post order traversal.
 		pll_utree_traverse_sarah(root, &_trav_size);
 	}
 
-	unsigned int zerosFromTo(unsigned int start, unsigned int end, unsigned int zerosInsideSubtree,
-			const RefSplitInfo& query) {
-		unsigned int res = 0;
-		if (end < query.leftLeafIdx) { // collect some zeros left from subtree
-			res = query.subtreeRes * (end + 1 - start);
-		} else if (end <= query.rightLeafIdx) {
-			if (start < query.leftLeafIdx) {
-				res += query.subtreeRes * ((query.leftLeafIdx - 1) + 1 - start);
-				res += !query.subtreeRes * (end + 1 - query.leftLeafIdx);
-			} else {
-				res = !query.subtreeRes * (end + 1 - start);
-			}
-		} else { // end is right from the subtree
-			if (start < query.leftLeafIdx) {
-				res += query.subtreeRes * ((query.leftLeafIdx - 1) + 1 - start);
-				res += zerosInsideSubtree;
-				res += query.subtreeRes * (end + 1 - (query.rightLeafIdx + 1));
-			} else if (start < query.rightLeafIdx) {
-				res += !query.subtreeRes * (query.rightLeafIdx + 1 - start);
-				res += query.subtreeRes * (end + 1 - (query.rightLeafIdx + 1));
-			} else {
-				res = query.subtreeRes * (end + 1 - start);
-			}
-		}
-		return res;
-	}
-
 	unsigned int search_mindist(const RefSplitInfo& query) {
 		unsigned int minDist = query.p - 1;
-		// fast way to get prefix sum of zeros in the query, TODO: check these numbers
-		unsigned int zerosInsideSubtree = (query.rightLeafIdx + 1 - query.leftLeafIdx) * !query.subtreeRes;
+		// initialize the leaf node informations...
+		for (size_t i = 0; i < query.leftLeafIdx; ++i) {
+			countOnes[i] = !query.subtreeRes;
+		}
+		for (size_t i = query.leftLeafIdx; i <= query.rightLeafIdx; ++i) {
+			countOnes[i] = query.subtreeRes;
+		}
+		for (size_t i = query.rightLeafIdx + 1; i < countOnes.size(); ++i) {
+			countOnes[i] = !query.subtreeRes;
+		}
+		// maybe a level-order-traversal would be better?
+		for (size_t i = 0; i < _trav_size; ++i) { // TODO: This should be possible to vectorize.
+			unsigned int idx = idxInfos[i].idx;
+			unsigned int idxLeft = idxInfos[i].idxLeft;
+			unsigned int idxRight = idxInfos[i].idxRight;
+			countOnes[idx] = countOnes[idxLeft] + countOnes[idxRight];
+			unsigned int countZeros = subtreeSize[idx] - countOnes[idx];
 
-		for (size_t i = 0; i < _trav_size; ++i) {
-			if (idxInfos[i].p <= query.p) {
-				if (idxInfos[i].p <= query.p - minDist) {
-					continue;
-				}
-			} else {
-				if (idxInfos[i].p >= minDist + query.p) {
-					continue;
-				}
-			}
-			unsigned int countZeros = zerosFromTo(idxInfos[i].firstIdx, idxInfos[i].lastIdx, zerosInsideSubtree,
-					query);
-			unsigned int countOnes = idxInfos[i].subtreeSize - countZeros;
-			unsigned int distCand = query.p - countZeros + countOnes;
+			unsigned int distCand = query.p - countZeros + countOnes[idx];
 			if (distCand > _nTax_div_2) {
 				distCand = _nTax - distCand;
 			}
@@ -111,20 +86,19 @@ public:
 	}
 private:
 	void utree_traverse_recursive_sarah(pll_unode_t * node, unsigned int * index) {
-		if (node->next == NULL)
+		if (node->next == NULL) {
+			subtreeSize[node->clv_index] = 1;
 			return;
+		}
 		pll_unode_t * snode = node->next;
 		do {
 			utree_traverse_recursive_sarah(snode->back, index);
 			snode = snode->next;
 		} while (snode && snode != node);
 		idxInfos[*index].idx = node->clv_index;
-		unsigned int idxLeft = node->next->back->clv_index;
-		unsigned int idxRight = node->next->next->back->clv_index;
-		idxInfos[*index].firstIdx = idxInfos[idxLeft].firstIdx;
-		idxInfos[*index].lastIdx = idxInfos[idxRight].lastIdx;
-		idxInfos[*index].subtreeSize = idxInfos[*index].lastIdx + 1 - idxInfos[*index].firstIdx;
-		idxInfos[*index].p = std::min(idxInfos[*index].subtreeSize, _nTax - idxInfos[*index].subtreeSize);
+		idxInfos[*index].idxLeft = node->next->back->clv_index;
+		idxInfos[*index].idxRight = node->next->next->back->clv_index;
+		subtreeSize[node->clv_index] = subtreeSize[idxInfos[*index].idxLeft] + subtreeSize[idxInfos[*index].idxRight];
 		*index = *index + 1;
 	}
 
@@ -150,6 +124,8 @@ private:
 	unsigned int _nodes_count;
 	unsigned int _trav_size;
 	std::vector<IndexInformation> idxInfos;
+	std::vector<unsigned int> subtreeSize;
+	std::vector<unsigned int> countOnes; // stores the number of ones in the subtrees...
 };
 
 #endif /* SRC_BOOTSTRAP_NEARESTSPLITFINDER_HPP_ */
