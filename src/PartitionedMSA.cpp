@@ -219,7 +219,7 @@ std::ostream& operator<<(std::ostream& stream, const PartitionedMSA& part_msa)
 
 //    stream << fixed;
     stream << "Gaps: " << setprecision(2) << (pstats.gap_prop * 100) << " %" << endl;
-    stream << "Invariant sites: " << setprecision(2) << (pstats.inv_prop() * 100) << " %" << endl;
+    stream << "Invariant sites: " << setprecision(2) << (pstats.inv_prop * 100) << " %" << endl;
     stream << endl;
   }
 

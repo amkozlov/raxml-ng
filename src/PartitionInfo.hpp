@@ -11,22 +11,22 @@ struct PartitionStats
 {
   size_t site_count;
   size_t pattern_count;
-  size_t inv_count;
+  double inv_prop;
   double gap_prop;
   IDVector gap_seqs;
   doubleVector emp_base_freqs;
   doubleVector emp_subst_rates;
 
-  double inv_prop() const { return site_count > 0 ? ((double) inv_count) / site_count : 0.;  };
   bool empty() const { return site_count == 0; }
   size_t gap_seq_count() const { return gap_seqs.size(); }
+  size_t inv_count() const { return (size_t) site_count * inv_prop; }
 
-  PartitionStats() : site_count(0), pattern_count(0), inv_count(0), gap_prop(0.), gap_seqs(),
+  PartitionStats() : site_count(0), pattern_count(0), inv_prop(0.), gap_prop(0.), gap_seqs(),
       emp_base_freqs(), emp_subst_rates() {}
 
   PartitionStats(const PartitionStats& other) : site_count(other.site_count),
-      pattern_count(other.pattern_count), inv_count(other.inv_count),
-      gap_prop(other.gap_prop), gap_seqs(other.gap_seqs),
+      pattern_count(other.pattern_count),
+      inv_prop(other.inv_prop), gap_prop(other.gap_prop), gap_seqs(other.gap_seqs),
       emp_base_freqs(other.emp_base_freqs), emp_subst_rates(other.emp_subst_rates) {}
 };
 
