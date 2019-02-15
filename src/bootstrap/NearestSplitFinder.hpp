@@ -10,8 +10,6 @@
 
 #include <stdlib.h>
 #include <vector>
-#include <iostream>
-#include <algorithm>
 
 #include "../common.h"
 
@@ -28,11 +26,13 @@ typedef struct {
 class NearestSplitFinder {
 public:
 	NearestSplitFinder() :
-			_split_len(0), _nTax(0), _nTax_div_2(0), _root(NULL), _nodes_count(0), _trav_size(0) {
+			_split_len(0), _nTax(0), _nTax_div_2(0), _root(NULL), _nodes_count(0), _trav_size(0), idxInfos(NULL), subtreeSize(NULL), countOnes(NULL) {
 	}
 
 	~NearestSplitFinder() {
-
+		free(idxInfos);
+		free(countOnes);
+		free(subtreeSize);
 	}
 
 	void create(pll_unode_t* root, unsigned int split_len, unsigned int nTax) {
@@ -44,9 +44,9 @@ public:
 		_trav_size = 0;
 		/* allocate a buffer for storing clv_indices of the nodes in postorder
 		 traversal */
-		idxInfos.resize(_nodes_count);
-		countOnes.resize(_nodes_count);
-		subtreeSize.resize(_nodes_count);
+		idxInfos = (IndexInformation*) malloc(_nodes_count * sizeof(IndexInformation));
+		subtreeSize = (unsigned int*) malloc(_nodes_count * sizeof(unsigned int));
+		countOnes = (unsigned int*) malloc(_nodes_count * sizeof(unsigned int));
 		// do a single post order traversal.
 		pll_utree_traverse_sarah(root, &_trav_size);
 	}
@@ -60,9 +60,10 @@ public:
 		for (size_t i = query.leftLeafIdx; i <= query.rightLeafIdx; ++i) {
 			countOnes[i] = query.subtreeRes;
 		}
-		for (size_t i = query.rightLeafIdx + 1; i < countOnes.size(); ++i) {
+		for (size_t i = query.rightLeafIdx + 1; i < _nodes_count; ++i) {
 			countOnes[i] = !query.subtreeRes;
 		}
+
 		// maybe a level-order-traversal would be better?
 		for (size_t i = 0; i < _trav_size; ++i) { // TODO: This should be possible to vectorize.
 			unsigned int idx = idxInfos[i].idx;
@@ -70,8 +71,8 @@ public:
 			unsigned int idxRight = idxInfos[i].idxRight;
 			countOnes[idx] = countOnes[idxLeft] + countOnes[idxRight];
 			unsigned int countZeros = subtreeSize[idx] - countOnes[idx];
-
 			unsigned int distCand = query.p - countZeros + countOnes[idx];
+
 			if (distCand > _nTax_div_2) {
 				distCand = _nTax - distCand;
 			}
@@ -95,10 +96,12 @@ private:
 			utree_traverse_recursive_sarah(snode->back, index);
 			snode = snode->next;
 		} while (snode && snode != node);
-		idxInfos[*index].idx = node->clv_index;
-		idxInfos[*index].idxLeft = node->next->back->clv_index;
-		idxInfos[*index].idxRight = node->next->next->back->clv_index;
-		subtreeSize[node->clv_index] = subtreeSize[idxInfos[*index].idxLeft] + subtreeSize[idxInfos[*index].idxRight];
+		IndexInformation info;
+		info.idx = node->clv_index;
+		info.idxLeft = node->next->back->clv_index;
+		info.idxRight = node->next->next->back->clv_index;
+		subtreeSize[node->clv_index] = subtreeSize[info.idxLeft] + subtreeSize[info.idxRight];
+		idxInfos[*index] = info;
 		*index = *index + 1;
 	}
 
@@ -123,9 +126,10 @@ private:
 	pll_unode_t* _root;
 	unsigned int _nodes_count;
 	unsigned int _trav_size;
-	std::vector<IndexInformation> idxInfos;
-	std::vector<unsigned int> subtreeSize;
-	std::vector<unsigned int> countOnes; // stores the number of ones in the subtrees...
+
+	IndexInformation* idxInfos;
+	unsigned int* subtreeSize;
+	unsigned int* countOnes; // stores the number of ones in the subtrees
 };
 
 #endif /* SRC_BOOTSTRAP_NEARESTSPLITFINDER_HPP_ */
