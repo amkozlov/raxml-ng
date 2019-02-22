@@ -10,14 +10,6 @@
 
 #include "../common.h"
 
-typedef struct {
-	unsigned int p;
-	bool subtreeRes;
-	unsigned int leftLeafIdx;
-	unsigned int rightLeafIdx;
-} RefSplitInfo;
-
-PLL_EXPORT int pllmod_utree_split_transfer_support_sarah(pll_split_t * ref_splits, pll_split_t * bs_splits, unsigned int tip_count, double * support);
-PLL_EXPORT int pllmod_utree_split_transfer_support_nature(pll_split_t * ref_splits, pll_split_t * bs_splits, pll_unode_t* bs_root, unsigned int tip_count, double * support, const std::vector<pll_unode_t*>& split_to_node_map, pll_unode_t * ref_root);
+PLL_EXPORT int pllmod_utree_split_transfer_support_nature(pll_split_t * ref_splits, pll_split_t * bs_splits, pll_unode_t* bs_root, unsigned int tip_count, double * support, const pll_unode_t** split_to_node_map, pll_unode_t * ref_root);
 
 #endif /* SRC_BOOTSTRAP_TRANSFERBOOTSTRAPCOMPUTER_HPP_ */
