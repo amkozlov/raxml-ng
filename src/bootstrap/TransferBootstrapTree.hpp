@@ -2,7 +2,6 @@
 #define RAXML_BOOTSTRAP_TRANSFERBOOTSTRAPTREE_HPP_
 
 #include "BootstrapTree.hpp"
-#include "TBEFunctions.hpp"
 
 class TransferBootstrapTree : public BootstrapTree
 {

@@ -1,10 +1,8 @@
 #include "TransferBootstrapTree.hpp"
 
-#include <chrono>
-
 TransferBootstrapTree::TransferBootstrapTree(const Tree& tree) :
 		BootstrapTree(tree) {
-	split_info = initRefsplits((pll_unode_t*) &pll_utree_root(), _num_tips, (const pll_unode_t**) _node_split_map.data());
+	split_info = init_ref_splits_tbe((pll_unode_t*) &pll_utree_root(), _num_tips, (const pll_unode_t**) _node_split_map.data());
 }
 
 TransferBootstrapTree::~TransferBootstrapTree() {
