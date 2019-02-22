@@ -190,6 +190,8 @@ private:
   void autodetect_data_type(const std::string& model_name);
   pllmod_mixture_model_t * init_mix_model(const std::string& model_name);
   void init_model_opts(const std::string& model_opts, const pllmod_mixture_model_t& mix_model);
+  void set_user_srates(doubleVector& srates, bool normalize = true);
+  void set_user_freqs(doubleVector& freqs);
 };
 
 void assign(Model& model, const pll_partition_t * partition);
