@@ -10,13 +10,6 @@
 
 RefSplitInfo* split_info = NULL;
 
-inline unsigned int bitv_length(unsigned int bit_count) {
-	unsigned int split_size = sizeof(pll_split_base_t) * 8;
-	unsigned int split_offset = bit_count % split_size;
-
-	return bit_count / split_size + (split_offset > 0);
-}
-
 /* Compute Transfer Support (Lemoine et al., Nature 2018) for every split in ref_splits. Sarahs implementation of the algorithm from the Nature paper. */
 PLL_EXPORT int pllmod_utree_split_transfer_support_nature(pll_split_t * ref_splits, pll_split_t * bs_splits, pll_unode_t* bs_root,
 		unsigned int tip_count, double * support, const pll_unode_t** split_to_node_map, pll_unode_t * ref_root) {
