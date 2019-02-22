@@ -529,11 +529,11 @@ void check_models(const RaxmlInstance& instance)
     }
 
     // check partitions which contain invariant sites and have ascertainment bias enabled
-    if (model.ascbias_type() != AscBiasCorrection::none && stats.inv_count > 0)
+    if (model.ascbias_type() != AscBiasCorrection::none && stats.inv_count() > 0)
     {
       throw runtime_error("You enabled ascertainment bias correction for partition " +
                            pinfo.name() + ", but it contains " +
-                           to_string(stats.inv_count) + " invariant sites.\n"
+                           to_string(stats.inv_count()) + " invariant sites.\n"
                           "This is not allowed! Please either remove invariant sites or "
                           "disable ascertainment bias correction.");
     }

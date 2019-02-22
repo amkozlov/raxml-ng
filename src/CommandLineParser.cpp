@@ -179,8 +179,14 @@ void CommandLineParser::compute_num_searches(Options &opts)
   {
     if (opts.start_trees.empty())
     {
-      opts.start_trees[StartingTree::random] = 10;
-      opts.start_trees[StartingTree::parsimony] = 10;
+      /* parsimony starting trees are not supported with topological constraint! */
+      if (opts.constraint_tree_file.empty())
+      {
+        opts.start_trees[StartingTree::random] = 10;
+        opts.start_trees[StartingTree::parsimony] = 10;
+      }
+      else
+        opts.start_trees[StartingTree::random] = 20;
     }
     else
     {
@@ -345,7 +351,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
                                                   + ". Only one tree file is allowed!");
               }
             }
-            opts.start_trees[st_tree_type] = num_searches;
+            if (!opts.start_trees.count(st_tree_type) || num_searches > 0)
+              opts.start_trees[st_tree_type] = num_searches;
           }
         }
         break;
@@ -732,8 +739,15 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
       case 48: /* search from a single starting tree */
         opts.command = Command::search;
-        opts.start_trees.clear();
-        opts.start_trees[StartingTree::random] = 1;
+        if (opts.start_trees.empty())
+          opts.start_trees[StartingTree::random] = 1;
+        else
+        {
+          if (opts.start_trees.count(StartingTree::random))
+            opts.start_trees[StartingTree::random] = 1;
+          if (opts.start_trees.count(StartingTree::parsimony))
+            opts.start_trees[StartingTree::parsimony] = 1;
+        }
         num_commands++;
         break;
       case 49: /* generate bootstrap replicate MSAs */

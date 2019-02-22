@@ -298,7 +298,8 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const PartitionStats& p
 {
   stream << ps.site_count;
   stream << ps.pattern_count;
-  stream << ps.inv_count;
+  // TODO: save ps.inv_prop instead
+  stream << ps.inv_count();
   stream << ps.gap_prop;
   stream << ps.emp_base_freqs;
   stream << ps.emp_subst_rates;
@@ -310,7 +311,12 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, PartitionStats& ps)
 {
   stream >> ps.site_count;
   stream >> ps.pattern_count;
-  stream >> ps.inv_count;
+  // TODO: read ps.inv_prop instead
+  {
+    size_t inv_count;
+    stream >> inv_count;
+    ps.inv_prop = ((double) inv_count) / ps.site_count;
+  }
   stream >> ps.gap_prop;
   stream >> ps.emp_base_freqs;
   stream >> ps.emp_subst_rates;
