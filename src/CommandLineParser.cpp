@@ -281,6 +281,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.force_mode = false;
   opts.nofiles_mode = false;
 
+  opts.tbe_naive = false;
+
   bool log_level_set = false;
 
   int option_index = 0;
@@ -709,6 +711,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.thread_pinning = true;
             else if (eopt == "thread-nopin")
               opts.thread_pinning = false;
+            else if (eopt == "tbe-naive")
+              opts.tbe_naive = true;
+            else if (eopt == "tbe-nature")
+              opts.tbe_naive = false;
             else
               throw InvalidOptionValueException("Unknown extra option: " + string(optarg));
           }

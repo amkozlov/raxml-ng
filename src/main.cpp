@@ -1284,7 +1284,7 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree, const TreeC
       }
       else if (metric == BranchSupportMetric::tbe)
       {
-        sup_tree = make_shared<TransferBootstrapTree>(ref_tree);
+        sup_tree = make_shared<TransferBootstrapTree>(ref_tree, instance.opts.tbe_naive);
         support_in_pct = false;
       }
       else

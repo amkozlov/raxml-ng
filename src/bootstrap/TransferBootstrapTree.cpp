@@ -1,14 +1,20 @@
 #include "TransferBootstrapTree.hpp"
 
-TransferBootstrapTree::TransferBootstrapTree(const Tree& tree) :
-   BootstrapTree (tree)
+TransferBootstrapTree::TransferBootstrapTree(const Tree& tree, bool naive) :
+   BootstrapTree (tree), _naive_method(naive)
 {
+  if (!_naive_method)
+  {
+    _split_info = pllmod_utree_tbe_nature_init((pll_unode_t*) &pll_utree_root(), _num_tips,
+                                              (const pll_unode_t**) _node_split_map.data());
+  }
 }
 
 TransferBootstrapTree::~TransferBootstrapTree()
 {
+  if (_split_info)
+    free(_split_info);
 }
-
 
 void TransferBootstrapTree::add_boot_splits_to_hashtable(const pll_unode_t& root)
 {
@@ -21,7 +27,13 @@ void TransferBootstrapTree::add_boot_splits_to_hashtable(const pll_unode_t& root
                                                        nullptr);
 
   // compute TBE
-  pllmod_utree_split_transfer_support(_ref_splits.get(), splits, _num_tips, tbe.data());
+  if (_naive_method)
+    pllmod_utree_tbe_naive(_ref_splits.get(), splits, _num_tips, tbe.data());
+  else
+  {
+    pllmod_utree_tbe_nature(_ref_splits.get(), splits, (pll_unode_t*) &root,
+                                             _num_tips, tbe.data(), _split_info);
+  }
 
   pllmod_utree_split_destroy(splits);
 

@@ -6,6 +6,7 @@ set(CMAKE_DISABLE_SOURCE_CHANGES  ON)
 set(RAXML_BINARY_NAME "" CACHE STRING "Custom RAxML-NG binary name")
 set(USE_LIBPLL_CMAKE ON CACHE BOOL "Use CMake to build libpll and pll-modules")
 set(BUILD_AS_LIBRARY OFF CACHE BOOL "Build RAxML-NG as shared library (instead of stand-alone executable)")
+set(PLLMOD_DEBUG OFF CACHE BOOL "Debug pll-modules (tons of console output!)")
 
 set (USE_PTHREADS ON CACHE BOOL "Enable multi-threading support (PTHREADS)")
 set (USE_MPI OFF CACHE BOOL "Enable MPI support")
