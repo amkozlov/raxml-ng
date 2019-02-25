@@ -1,7 +1,7 @@
 #include "TransferBootstrapTree.hpp"
 
 TransferBootstrapTree::TransferBootstrapTree(const Tree& tree, bool naive) :
-   BootstrapTree (tree), _naive_method(naive)
+   BootstrapTree (tree), _split_info(nullptr), _naive_method(naive)
 {
   if (!_naive_method)
   {
