@@ -945,9 +945,13 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
 void load_constraint(RaxmlInstance& instance)
 {
   const auto& parted_msa = *instance.parted_msa;
+  const auto& opts = instance.opts;
 
   if (!instance.opts.constraint_tree_file.empty())
   {
+    if (!sysutil_file_exists(opts.constraint_tree_file))
+      throw runtime_error("Constraint tree file not found: " + opts.constraint_tree_file);
+
     NewickStream nw_cons(instance.opts.constraint_tree_file, std::ios::in);
     Tree& cons_tree = instance.constraint_tree;
     nw_cons >> cons_tree;
