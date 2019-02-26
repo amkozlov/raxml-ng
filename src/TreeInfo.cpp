@@ -77,8 +77,13 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
         libpll_check_error("ERROR adding treeinfo partition");
       }
 
-      // set per-partition branch lengths
-      if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED && !tree.partition_brlens().empty())
+      // set per-partition branch lengths or scalers
+      if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_SCALED)
+      {
+        assert (_pll_treeinfo->brlen_scalers);
+        _pll_treeinfo->brlen_scalers[p] = pinfo.model().brlen_scaler();
+      }
+      else if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED && !tree.partition_brlens().empty())
       {
         assert(_pll_treeinfo->branch_lengths[p]);
         memcpy(_pll_treeinfo->branch_lengths[p], tree.partition_brlens(p).data(),
