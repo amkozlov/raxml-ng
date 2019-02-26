@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "PartitionedMSA.hpp"
+#include "util/SafetyCheck.hpp"
 
 struct OutputFileNames
 {
@@ -28,8 +29,8 @@ class Options
 public:
   Options() : cmdline(""), command(Command::none), use_tip_inner(true),
   use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false), use_repeats(true),
-  optimize_model(true), optimize_brlen(true), redo_mode(false), force_mode(false),
-  nofiles_mode(false),  log_level(LogLevel::progress),
+  optimize_model(true), optimize_brlen(true), force_mode(false), safety_checks(SafetyCheck::all),
+  redo_mode(false), nofiles_mode(false), log_level(LogLevel::progress),
   msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
   random_seed(0), start_trees(), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
   spr_cutoff(1.0),
@@ -59,8 +60,10 @@ public:
   bool optimize_model;
   bool optimize_brlen;
 
-  bool redo_mode;
   bool force_mode;
+  SafetyCheck safety_checks;
+
+  bool redo_mode;
   bool nofiles_mode;
 
   LogLevel log_level;

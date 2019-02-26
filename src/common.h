@@ -49,4 +49,8 @@ std::string sysutil_realpath(const std::string& path);
 bool sysutil_file_exists(const std::string& fname, int access_mode = F_OK);
 bool sysutil_dir_exists(const std::string& dname);
 
+/* parsing utils */
+std::vector<std::string> split_string(const std::string& s, char delim);
+
+
 #endif /* RAXML_COMMON_H_ */

@@ -43,7 +43,7 @@ static struct option long_options[] =
   {"all",                no_argument,       0, 0 },  /*  25 */
   {"bs-trees",           required_argument, 0, 0 },  /*  26 */
   {"redo",               no_argument,       0, 0 },  /*  27 */
-  {"force",              no_argument,       0, 0 },  /*  28 */
+  {"force",              optional_argument, 0, 0 },  /*  28 */
 
   {"site-repeats",       required_argument, 0, 0 },  /*  29 */
   {"support",            no_argument,       0, 0 },  /*  30 */
@@ -82,18 +82,6 @@ static std::string get_cmdline(int argc, char** argv)
   for (int i = 0; i < argc; ++i)
     s << argv[i] << (i < argc-1 ? " " : "");
   return s.str();
-}
-
-std::vector<std::string> split_string(const std::string& s, char delim)
-{
-   std::vector<std::string> tokens;
-   std::string token;
-   std::istringstream ss(s);
-   while (std::getline(ss, token, delim))
-   {
-      tokens.push_back(token);
-   }
-   return tokens;
 }
 
 void CommandLineParser::check_options(Options &opts)
@@ -277,8 +265,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.num_searches = 0;
   opts.num_bootstraps = 0;
 
-  opts.redo_mode = false;
   opts.force_mode = false;
+  opts.safety_checks = SafetyCheck::all;
+
+  opts.redo_mode = false;
   opts.nofiles_mode = false;
 
   opts.tbe_naive = false;
@@ -295,6 +285,19 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   while ((c = getopt_long_only(argc, argv, "", long_options, &option_index)) == 0)
   {
+    /* optional arguments in getopt() are broken, this hack is needed fix them... */
+    if (!optarg
+        && optind < argc // make sure optind is valid
+        && long_options[option_index].has_arg == optional_argument // and has optional argument
+        && NULL != argv[optind] // make sure it's not a null string
+        && '\0' != argv[optind][0] // ... or an empty string
+        && '-' != argv[optind][0] // ... or another option
+       )
+    {
+      // update optind so the next getopt_long invocation skips argv[optind]
+      optarg = argv[optind++];
+    }
+
     switch (option_index)
     {
       case 0:
@@ -569,8 +572,22 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       case 28:
         opts.force_mode = true;
+        if (!optarg || strlen(optarg) == 0)
+        {
+          opts.safety_checks = SafetyCheck::none;
+        }
+        else
+        {
+          try
+          {
+            opts.safety_checks.unset(optarg);
+          }
+          catch(runtime_error& e)
+          {
+            throw InvalidOptionValueException("Invalid --force option: " + string(optarg));
+          }
+        }
         break;
-
       case 29:  /* site repeats */
         if (!optarg || (strcasecmp(optarg, "off") != 0))
         {

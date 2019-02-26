@@ -270,6 +270,7 @@ bool check_msa(RaxmlInstance& instance)
 {
   LOG_VERB_TS << "Checking the alignment...\n";
 
+  const auto& opts = instance.opts;
   auto& parted_msa = *instance.parted_msa;
   const auto& full_msa = parted_msa.full_msa();
   const auto pll_msa = full_msa.pll_msa();
@@ -283,40 +284,46 @@ bool check_msa(RaxmlInstance& instance)
   std::set<size_t> gap_seqs;
 
   /* check taxon names for invalid characters */
-  const string invalid_chars = "(),;:' \t\n";
-  for (const auto& taxon: parted_msa.taxon_names())
+  if (opts.safety_checks.isset(SafetyCheck::msa_names))
   {
-    if (taxon.find_first_of(invalid_chars) != std::string::npos)
+    const string invalid_chars = "(),;:' \t\n";
+    for (const auto& taxon: parted_msa.taxon_names())
     {
-      size_t i = 0;
-      auto fixed_name = taxon;
-      while ((i = fixed_name.find_first_of(invalid_chars, i)) != std::string::npos)
-        fixed_name[i++] = '_';
-      parted_msa_view.map_taxon_name(taxon, fixed_name);
+      if (taxon.find_first_of(invalid_chars) != std::string::npos)
+      {
+        size_t i = 0;
+        auto fixed_name = taxon;
+        while ((i = fixed_name.find_first_of(invalid_chars, i)) != std::string::npos)
+          fixed_name[i++] = '_';
+        parted_msa_view.map_taxon_name(taxon, fixed_name);
+      }
     }
-  }
 
-  msa_valid &= parted_msa_view.taxon_name_map().empty();
+    msa_valid &= parted_msa_view.taxon_name_map().empty();
+  }
 
   /* check for duplicate sequences */
-  unsigned long stats_mask = PLLMOD_MSA_STATS_DUP_SEQS;
-
-  pllmod_msa_stats_t * stats = pllmod_msa_compute_stats(pll_msa,
-                                                        4,
-                                                        pll_map_nt, // map is not used here
-                                                        NULL,
-                                                        stats_mask);
-
-  libpll_check_error("ERROR computing MSA stats");
-  assert(stats);
-
-  for (unsigned long c = 0; c < stats->dup_seqs_pairs_count; ++c)
+  if (opts.safety_checks.isset(SafetyCheck::msa_dups))
   {
-    dup_seqs.emplace_back(stats->dup_seqs_pairs[c*2],
-                          stats->dup_seqs_pairs[c*2+1]);
-  }
+    unsigned long stats_mask = PLLMOD_MSA_STATS_DUP_SEQS;
 
-  pllmod_msa_destroy_stats(stats);
+    pllmod_msa_stats_t * stats = pllmod_msa_compute_stats(pll_msa,
+                                                          4,
+                                                          pll_map_nt, // map is not used here
+                                                          NULL,
+                                                          stats_mask);
+
+    libpll_check_error("ERROR computing MSA stats");
+    assert(stats);
+
+    for (unsigned long c = 0; c < stats->dup_seqs_pairs_count; ++c)
+    {
+      dup_seqs.emplace_back(stats->dup_seqs_pairs[c*2],
+                            stats->dup_seqs_pairs[c*2+1]);
+    }
+
+    pllmod_msa_destroy_stats(stats);
+  }
 
   size_t total_gap_cols = 0;
   size_t part_num = 0;
@@ -347,36 +354,40 @@ bool check_msa(RaxmlInstance& instance)
       libpll_check_error("MSA check failed");
 
 
-    stats_mask = PLLMOD_MSA_STATS_GAP_SEQS | PLLMOD_MSA_STATS_GAP_COLS;
-
-    pllmod_msa_stats_t * stats = pinfo.compute_stats(stats_mask);
-
-    if (stats->gap_cols_count > 0)
+    /* Check for all-gap columns and sequences */
+    if (opts.safety_checks.isset(SafetyCheck::msa_allgaps))
     {
-      total_gap_cols += stats->gap_cols_count;
-      std::vector<size_t> gap_cols(stats->gap_cols, stats->gap_cols + stats->gap_cols_count);
-      pinfo.msa().remove_sites(gap_cols);
-//      parted_msa_view.exclude_sites(part_num, gap_cols);
-    }
+      unsigned long stats_mask = PLLMOD_MSA_STATS_GAP_SEQS | PLLMOD_MSA_STATS_GAP_COLS;
 
-    std::set<size_t> cur_gap_seq(stats->gap_seqs, stats->gap_seqs + stats->gap_seqs_count);
+      pllmod_msa_stats_t * stats = pinfo.compute_stats(stats_mask);
 
-    if (!part_num)
-    {
-      gap_seqs = cur_gap_seq;
-    }
-    else
-    {
-      for(auto it = gap_seqs.begin(); it != gap_seqs.end();)
+      if (stats->gap_cols_count > 0)
       {
-        if(cur_gap_seq.find(*it) == cur_gap_seq.end())
-          it = gap_seqs.erase(it);
-        else
-          ++it;
+        total_gap_cols += stats->gap_cols_count;
+        std::vector<size_t> gap_cols(stats->gap_cols, stats->gap_cols + stats->gap_cols_count);
+        pinfo.msa().remove_sites(gap_cols);
+  //      parted_msa_view.exclude_sites(part_num, gap_cols);
       }
-    }
 
-    pllmod_msa_destroy_stats(stats);
+      std::set<size_t> cur_gap_seq(stats->gap_seqs, stats->gap_seqs + stats->gap_seqs_count);
+
+      if (!part_num)
+      {
+        gap_seqs = cur_gap_seq;
+      }
+      else
+      {
+        for(auto it = gap_seqs.begin(); it != gap_seqs.end();)
+        {
+          if(cur_gap_seq.find(*it) == cur_gap_seq.end())
+            it = gap_seqs.erase(it);
+          else
+            ++it;
+        }
+      }
+
+      pllmod_msa_destroy_stats(stats);
+    }
 
     part_num++;
   }
@@ -462,61 +473,72 @@ size_t total_free_params(const RaxmlInstance& instance)
 
 void check_models(const RaxmlInstance& instance)
 {
+  const auto& opts = instance.opts;
+
   for (const auto& pinfo: instance.parted_msa->part_list())
   {
     auto stats = pinfo.stats();
     auto model = pinfo.model();
 
     // check for non-recommended model combinations
-    if ((model.name() == "LG4X" || model.name() == "LG4M") &&
-        model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) != ParamValue::model)
+    if (opts.safety_checks.isset(SafetyCheck::model_lg4_freqs))
     {
-      throw runtime_error("Partition \"" + pinfo.name() +
-                          "\": You specified LG4M or LG4X model with shared stationary based frequencies (" +
-                          model.to_string(false) + ").\n"
-                          "Please be warned, that this is against the idea of LG4 models and hence it's not recommended!" + "\n"
-                          "If you know what you're doing, you can add --force command line switch to disable this safety check.");
+      if ((model.name() == "LG4X" || model.name() == "LG4M") &&
+          model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) != ParamValue::model)
+      {
+        throw runtime_error("Partition \"" + pinfo.name() +
+                            "\": You specified LG4M or LG4X model with shared stationary based frequencies (" +
+                            model.to_string(false) + ").\n"
+                            "Please be warned, that this is against the idea of LG4 models and hence it's not recommended!" + "\n"
+                            "If you know what you're doing, you can add --force command line switch to disable this safety check.");
+      }
     }
 
     // check for zero state frequencies
-    if (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::empirical)
+    if (opts.safety_checks.isset(SafetyCheck::model_zero_freqs))
     {
-      const auto& freqs = stats.emp_base_freqs;
-      for (unsigned int i = 0; i < freqs.size(); ++i)
+      if (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::empirical)
       {
-        if (!(freqs[i] > 0.))
+        const auto& freqs = stats.emp_base_freqs;
+        for (unsigned int i = 0; i < freqs.size(); ++i)
+        {
+          if (!(freqs[i] > 0.))
+          {
+            LOG_ERROR << "\nBase frequencies: ";
+            for (unsigned int j = 0; j < freqs.size(); ++j)
+              LOG_ERROR << freqs[j] <<  " ";
+            LOG_ERROR << endl;
+
+            throw runtime_error("Frequency of state " + to_string(i) +
+                                " in partition " + pinfo.name() + " is 0!\n"
+                                "Please either change your partitioning scheme or "
+                                "use model state frequencies for this partition!");
+          }
+        }
+      }
+    }
+
+    // check for user-defined state frequencies which do not sum up to one
+    if (opts.safety_checks.isset(SafetyCheck::model_invalid_freqs))
+    {
+      if (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::user)
+      {
+        const auto& freqs = model.base_freqs(0);
+        double sum = 0.;
+        for (unsigned int i = 0; i < freqs.size(); ++i)
+          sum += freqs[i];
+
+        if (fabs(sum - 1.0) > 0.01)
         {
           LOG_ERROR << "\nBase frequencies: ";
           for (unsigned int j = 0; j < freqs.size(); ++j)
             LOG_ERROR << freqs[j] <<  " ";
           LOG_ERROR << endl;
 
-          throw runtime_error("Frequency of state " + to_string(i) +
-                              " in partition " + pinfo.name() + " is 0!\n"
-                              "Please either change your partitioning scheme or "
-                              "use model state frequencies for this partition!");
+          throw runtime_error("User-specified stationary base frequencies"
+                              " in partition " + pinfo.name() + " do not sum up to 1.0!\n"
+                              "Please provide normalized frequencies.");
         }
-      }
-    }
-
-    // check for user-defined state frequencies which do not sum up to one
-    if (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::user)
-    {
-      const auto& freqs = model.base_freqs(0);
-      double sum = 0.;
-      for (unsigned int i = 0; i < freqs.size(); ++i)
-        sum += freqs[i];
-
-      if (fabs(sum - 1.0) > 0.01)
-      {
-        LOG_ERROR << "\nBase frequencies: ";
-        for (unsigned int j = 0; j < freqs.size(); ++j)
-          LOG_ERROR << freqs[j] <<  " ";
-        LOG_ERROR << endl;
-
-        throw runtime_error("User-specified stationary base frequencies"
-                            " in partition " + pinfo.name() + " do not sum up to 1.0!\n"
-                            "Please provide normalized frequencies.");
       }
     }
 
@@ -529,39 +551,45 @@ void check_models(const RaxmlInstance& instance)
     }
 
     // check partitions which contain invariant sites and have ascertainment bias enabled
-    if (model.ascbias_type() != AscBiasCorrection::none && stats.inv_count() > 0)
+    if (opts.safety_checks.isset(SafetyCheck::model_asc_bias))
     {
-      throw runtime_error("You enabled ascertainment bias correction for partition " +
-                           pinfo.name() + ", but it contains " +
-                           to_string(stats.inv_count()) + " invariant sites.\n"
-                          "This is not allowed! Please either remove invariant sites or "
-                          "disable ascertainment bias correction.");
+      if (model.ascbias_type() != AscBiasCorrection::none && stats.inv_count() > 0)
+      {
+        throw runtime_error("You enabled ascertainment bias correction for partition " +
+                             pinfo.name() + ", but it contains " +
+                             to_string(stats.inv_count()) + " invariant sites.\n"
+                            "This is not allowed! Please either remove invariant sites or "
+                            "disable ascertainment bias correction.");
+      }
     }
   }
 
 
   /* Check for extreme cases of overfitting (K >= n) */
-  if (instance.parted_msa->part_count() > 1)
+  if (opts.safety_checks.isset(SafetyCheck::model_overfit))
   {
-    size_t model_free_params = instance.parted_msa->total_free_model_params();
-    size_t free_params = total_free_params(instance);
-    size_t sample_size = instance.parted_msa->total_sites();
-    string errmsg = "Number of free parameters (K=" + to_string(free_params) +
-        ") is larger than alignment size (n=" + to_string(sample_size) + ").\n" +
-        "       This might lead to overfitting and compromise tree inference results!\n" +
-        "       Please consider revising your partitioning scheme, conducting formal model selection\n" +
-        "       and/or using linked/scaled branch lengths across partitions.\n" +
-        "NOTE:  You can disable this check by adding the --force option.\n";
-
-    if (free_params >= sample_size)
+    if (instance.parted_msa->part_count() > 1)
     {
-      if (model_free_params >= sample_size ||
-          instance.opts.brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED)
+      size_t model_free_params = instance.parted_msa->total_free_model_params();
+      size_t free_params = total_free_params(instance);
+      size_t sample_size = instance.parted_msa->total_sites();
+      string errmsg = "Number of free parameters (K=" + to_string(free_params) +
+          ") is larger than alignment size (n=" + to_string(sample_size) + ").\n" +
+          "       This might lead to overfitting and compromise tree inference results!\n" +
+          "       Please consider revising your partitioning scheme, conducting formal model selection\n" +
+          "       and/or using linked/scaled branch lengths across partitions.\n" +
+          "NOTE:  You can disable this check by adding the --force option.\n";
+
+      if (free_params >= sample_size)
       {
-        throw runtime_error(errmsg);
+        if (model_free_params >= sample_size ||
+            instance.opts.brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED)
+        {
+          throw runtime_error(errmsg);
+        }
+        else
+          LOG_WARN << endl << "WARNING: " << errmsg << endl;
       }
-      else
-        LOG_WARN << endl << "WARNING: " << errmsg << endl;
     }
   }
 }
@@ -633,35 +661,34 @@ void check_options(RaxmlInstance& instance)
     }
   }
 
-  /* following "soft" checks will be ignored in the --force mode */
-  if (opts.force_mode)
-    return;
-
   /* check that we have enough patterns per thread */
-  if (ParallelContext::master_rank() && ParallelContext::num_procs() > 1)
+  if (opts.safety_checks.isset(SafetyCheck::perf_threads))
   {
-    StaticResourceEstimator resEstimator(*instance.parted_msa, instance.opts);
-    auto res = resEstimator.estimate();
-    if (ParallelContext::num_procs() > res.num_threads_response)
+    if (ParallelContext::master_rank() && ParallelContext::num_procs() > 1)
     {
-      LOG_WARN << endl;
-      LOG_WARN << "WARNING: You might be using too many threads (" << ParallelContext::num_procs()
-               <<  ") for your alignment with "
-               << (opts.use_pattern_compression ?
-                      to_string(instance.parted_msa->total_patterns()) + " unique patterns." :
-                      to_string(instance.parted_msa->total_sites()) + " alignment sites.")
-               << endl;
-      LOG_WARN << "NOTE:    For the optimal throughput, please consider using fewer threads " << endl;
-      LOG_WARN << "NOTE:    and parallelize across starting trees/bootstrap replicates." << endl;
-      LOG_WARN << "NOTE:    As a general rule-of-thumb, please assign at least 200-1000 "
-          "alignment patterns per thread." << endl << endl;
-
-      if (ParallelContext::num_procs() > 2 * res.num_threads_response)
+      StaticResourceEstimator resEstimator(*instance.parted_msa, instance.opts);
+      auto res = resEstimator.estimate();
+      if (ParallelContext::num_procs() > res.num_threads_response)
       {
-        throw runtime_error("Too few patterns per thread! "
-                            "RAxML-NG will terminate now to avoid wasting resources.\n"
-                            "NOTE:  Please reduce the number of threads (see guidelines above).\n"
-                            "NOTE:  This check can be disabled with the '--force' option.");
+        LOG_WARN << endl;
+        LOG_WARN << "WARNING: You might be using too many threads (" << ParallelContext::num_procs()
+                 <<  ") for your alignment with "
+                 << (opts.use_pattern_compression ?
+                        to_string(instance.parted_msa->total_patterns()) + " unique patterns." :
+                        to_string(instance.parted_msa->total_sites()) + " alignment sites.")
+                 << endl;
+        LOG_WARN << "NOTE:    For the optimal throughput, please consider using fewer threads " << endl;
+        LOG_WARN << "NOTE:    and parallelize across starting trees/bootstrap replicates." << endl;
+        LOG_WARN << "NOTE:    As a general rule-of-thumb, please assign at least 200-1000 "
+            "alignment patterns per thread." << endl << endl;
+
+        if (ParallelContext::num_procs() > 2 * res.num_threads_response)
+        {
+          throw runtime_error("Too few patterns per thread! "
+                              "RAxML-NG will terminate now to avoid wasting resources.\n"
+                              "NOTE:  Please reduce the number of threads (see guidelines above).\n"
+                              "NOTE:  This check can be disabled with the '--force' option.");
+        }
       }
     }
   }
@@ -711,12 +738,8 @@ void load_msa(RaxmlInstance& instance)
   parted_msa.split_msa();
 
   /* check alignment */
-  if (!opts.force_mode)
-  {
-    LOG_VERB_TS << "Validating alignment... " << endl;
-    if (!check_msa(instance))
-      throw runtime_error("Alignment check failed (see details above)!");
-  }
+  if (!check_msa(instance))
+    throw runtime_error("Alignment check failed (see details above)!");
 
   if (opts.use_pattern_compression)
   {
@@ -734,8 +757,7 @@ void load_msa(RaxmlInstance& instance)
 
   parted_msa.set_model_empirical_params();
 
-  if (!opts.force_mode)
-    check_models(instance);
+  check_models(instance);
 
   LOG_INFO << endl;
 
@@ -2222,8 +2244,10 @@ int internal_main(int argc, char** argv, void* comm)
 
     if (opts.force_mode)
     {
-      LOG_WARN << "WARNING: Running in FORCE mode: all safety checks are disabled!"
-          << endl << endl;
+      LOG_WARN << "WARNING: Running in FORCE mode: "
+               << (opts.safety_checks.isnone() ? "all" : "some")
+               << " safety checks are disabled!"
+               << endl << endl;
     }
 
     /* init bootstopping */
