@@ -1550,12 +1550,20 @@ void check_terrace(const RaxmlInstance& instance, const Tree& tree)
         if (!instance.opts.terrace_file().empty())
         {
           ofstream fs(instance.opts.terrace_file());
-          terrace_wrapper.print_terrace(fs);
+          terrace_wrapper.print_terrace_compressed(fs);
           LOG_INFO << "Tree terrace (in compressed Newick format) was saved to: "
-              << sysutil_realpath(instance.opts.terrace_file()) << endl << endl;
+              << sysutil_realpath(instance.opts.terrace_file()) << endl;
 
-          // TODO partial prints to multiline newick?
-          // if (terrace_size <= instance.opts.terrace_maxsize)
+          if (terrace_size <= instance.opts.terrace_maxsize)
+          {
+            auto nwk_fname = instance.opts.terrace_file() + "Newick";
+            ofstream fsn(nwk_fname);
+            terrace_wrapper.print_terrace_newick(fsn);
+            LOG_INFO << "Tree terrace (in multi-line Newick format) was saved to: "
+                << sysutil_realpath(nwk_fname) << endl;
+          }
+
+          LOG_INFO << endl;
         }
       }
       else
@@ -1886,7 +1894,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
           " distinct starting trees" << endl;
     }
 
-    LOG_RESULT << endl;
+    (instance.start_trees.size() > 1 ? LOG_RESULT : LOG_INFO) << endl;
 
     size_t start_tree_num = cm.checkpoint().ml_trees.size();
     use_ckp_tree = use_ckp_tree && cm.checkpoint().search_state.step != CheckpointStep::start;
@@ -2044,7 +2052,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   ParallelContext::thread_barrier();
 
-  LOG_RESULT << endl;
+  (instance.start_trees.size() > 1 ? LOG_RESULT : LOG_INFO) << endl;
 }
 
 void master_main(RaxmlInstance& instance, CheckpointManager& cm)
