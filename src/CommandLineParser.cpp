@@ -70,8 +70,8 @@ static struct option long_options[] =
 
   {"search1",            no_argument, 0, 0 },        /*  48 */
   {"bsmsa",              no_argument, 0, 0 },        /*  49 */
-  {"rfdist",             no_argument, 0, 0 },        /*  50 */
-  {"rf",                 no_argument, 0, 0 },        /*  51 */
+  {"rfdist",             optional_argument, 0, 0 },  /*  50 */
+  {"rf",                 optional_argument, 0, 0 },  /*  51 */
 
   { 0, 0, 0, 0 }
 };
@@ -190,6 +190,35 @@ void CommandLineParser::compute_num_searches(Options &opts)
 
     for (const auto& it: opts.start_trees)
       opts.num_searches += it.second;
+  }
+}
+
+void CommandLineParser::parse_start_trees(Options &opts, const string& arg)
+{
+  auto start_trees = split_string(arg, ',');
+  for (const auto& st_tree: start_trees)
+  {
+    StartingTree st_tree_type;
+    unsigned int num_searches = 0;
+    if (st_tree == "rand" || st_tree == "random" ||
+        sscanf(st_tree.c_str(), "rand{%u}", &num_searches) == 1 ||
+        sscanf(st_tree.c_str(), "random{%u}", &num_searches) == 1)
+    {
+      st_tree_type = StartingTree::random;
+    }
+    else if (st_tree ==  "pars" || st_tree == "parsimony" ||
+        sscanf(st_tree.c_str(), "pars{%u}", &num_searches) == 1 ||
+        sscanf(st_tree.c_str(), "parsimony{%u}", &num_searches) == 1)
+    {
+      st_tree_type = StartingTree::parsimony;
+    }
+    else
+    {
+      opts.tree_file += (opts.tree_file.empty() ? "" : ",") + st_tree;
+      st_tree_type = StartingTree::user;
+    }
+    if (!opts.start_trees.count(st_tree_type) || num_searches > 0)
+      opts.start_trees[st_tree_type] = num_searches;
   }
 }
 
@@ -325,41 +354,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
 
       case 5: /* starting tree */
-        {
-          auto start_trees = split_string(optarg, ',');
-          for (const auto& st_tree: start_trees)
-          {
-            StartingTree st_tree_type;
-            unsigned int num_searches = 0;
-            if (st_tree == "rand" || st_tree == "random" ||
-                sscanf(st_tree.c_str(), "rand{%u}", &num_searches) == 1 ||
-                sscanf(st_tree.c_str(), "random{%u}", &num_searches) == 1)
-            {
-              st_tree_type = StartingTree::random;
-            }
-            else if (st_tree ==  "pars" || st_tree == "parsimony" ||
-                sscanf(st_tree.c_str(), "pars{%u}", &num_searches) == 1 ||
-                sscanf(st_tree.c_str(), "parsimony{%u}", &num_searches) == 1)
-            {
-              st_tree_type = StartingTree::parsimony;
-            }
-            else
-            {
-              if (opts.tree_file.empty())
-              {
-                st_tree_type = StartingTree::user;
-                opts.tree_file = st_tree;
-              }
-              else
-              {
-                throw InvalidOptionValueException("Invalid --tree argument: " + string(optarg)
-                                                  + ". Only one tree file is allowed!");
-              }
-            }
-            if (!opts.start_trees.count(st_tree_type) || num_searches > 0)
-              opts.start_trees[st_tree_type] = num_searches;
-          }
-        }
+        parse_start_trees(opts, optarg);
         break;
 
       case 6: /* set prefix for output files */
@@ -781,6 +776,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 50: /* compute RF distance */
         opts.command = Command::rfdist;
         num_commands++;
+        if (optarg)
+          parse_start_trees(opts, optarg);
         break;
 
       case 51: /* compute and print average RF distance w/o noise */
@@ -789,6 +786,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.log_level = LogLevel::result;
         log_level_set = true;
         num_commands++;
+        if (optarg)
+          parse_start_trees(opts, optarg);
         break;
 
       default:

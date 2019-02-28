@@ -980,6 +980,9 @@ void load_constraint(RaxmlInstance& instance)
       }
     }
 
+//    /* branch lengths in constraint tree can be misleading, so just reset them to default value */
+//    cons_tree.reset_brlens();
+
     if (cons_tree.num_tips() < parted_msa.taxon_count())
     {
       // incomplete constraint tree -> adjust tip IDs such that all taxa in the constraint tree
@@ -1397,10 +1400,13 @@ TreeCollection read_newick_trees(Tree& ref_tree,
                                  const std::string& fname, const std::string& tree_kind)
 {
   NameIdMap ref_tip_ids;
-  NewickStream boots(fname, std::ios::in);
   TreeCollection bs_trees;
   unsigned int bs_num = 0;
 
+  if (!sysutil_file_exists(fname))
+    throw runtime_error("File not found: " + fname);
+
+  NewickStream boots(fname, std::ios::in);
   auto tree_kind_cap = tree_kind;
   tree_kind_cap[0] = toupper(tree_kind_cap[0]);
 
@@ -1449,17 +1455,19 @@ TreeCollection read_newick_trees(Tree& ref_tree,
   LOG_INFO << "Loaded " << bs_trees.size() << " trees with "
            << ref_tree.num_tips() << " taxa." << endl << endl;
 
-  if (bs_trees.size() < 2)
-  {
-    throw runtime_error("You must provide a file with multiple " + tree_kind + " trees!");
-  }
-
   return bs_trees;
 }
 
 TreeCollection read_bootstrap_trees(const RaxmlInstance& instance, Tree& ref_tree)
 {
-  return read_newick_trees(ref_tree, instance.opts.bootstrap_trees_file(), "bootstrap");
+  auto bs_trees = read_newick_trees(ref_tree, instance.opts.bootstrap_trees_file(), "bootstrap");
+
+  if (bs_trees.size() < 2)
+  {
+    throw runtime_error("You must provide a file with multiple bootstrap trees!");
+  }
+
+  return bs_trees;
 }
 
 void command_bootstop(RaxmlInstance& instance)
@@ -1506,13 +1514,16 @@ void command_rfdist(RaxmlInstance& instance)
   else
   {
     /* load trees from Newick file(s) */
-    // TODO process multiple files
-    auto topos = read_newick_trees(instance.random_tree, opts.tree_file, "input");
-    Tree ref_tree = instance.random_tree;
-    for (const auto& t: topos)
+    auto fname_list = split_string(opts.tree_file, ',');
+    for (const auto& fname: fname_list)
     {
-      ref_tree.topology(t.second);
-      instance.start_trees.emplace_back(ref_tree);
+      auto topos = read_newick_trees(instance.random_tree, fname, "input");
+      Tree ref_tree = instance.random_tree;
+      for (const auto& t: topos)
+      {
+        ref_tree.topology(t.second);
+        instance.start_trees.emplace_back(ref_tree);
+      }
     }
   }
 
