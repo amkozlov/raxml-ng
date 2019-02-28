@@ -1514,7 +1514,12 @@ void command_rfdist(RaxmlInstance& instance)
   else
   {
     /* load trees from Newick file(s) */
-    auto fname_list = split_string(opts.tree_file, ',');
+    vector<string> fname_list;
+    if (sysutil_file_exists(opts.tree_file))
+      fname_list.push_back(opts.tree_file);
+    else
+      fname_list = split_string(opts.tree_file, ',');
+
     for (const auto& fname: fname_list)
     {
       auto topos = read_newick_trees(instance.random_tree, fname, "input");
