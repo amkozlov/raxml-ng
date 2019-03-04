@@ -474,6 +474,7 @@ size_t total_free_params(const RaxmlInstance& instance)
 void check_models(const RaxmlInstance& instance)
 {
   const auto& opts = instance.opts;
+  bool zero_freqs = false;
 
   for (const auto& pinfo: instance.parted_msa->part_list())
   {
@@ -502,17 +503,24 @@ void check_models(const RaxmlInstance& instance)
         const auto& freqs = stats.emp_base_freqs;
         for (unsigned int i = 0; i < freqs.size(); ++i)
         {
-          if (!(freqs[i] > 0.))
+          if (freqs[i] < PLL_EIGEN_MINFREQ)
           {
-            LOG_ERROR << "\nBase frequencies: ";
-            for (unsigned int j = 0; j < freqs.size(); ++j)
-              LOG_ERROR << freqs[j] <<  " ";
-            LOG_ERROR << endl;
+            if (!zero_freqs)
+            {
+              LOG_WARN << endl;
+              zero_freqs = true;
+            }
 
-            throw runtime_error("Frequency of state " + to_string(i) +
-                                " in partition " + pinfo.name() + " is 0!\n"
-                                "Please either change your partitioning scheme or "
-                                "use model state frequencies for this partition!");
+            LOG_WARN << "WARNING: State " << to_string(i) <<
+                (instance.parted_msa->part_count() > 1 ? " in partition " + pinfo.name() : "") <<
+                " has very low frequency (" << FMT_PREC9(freqs[i]) << ")!" << endl;
+
+            LOG_VERB << "Base frequencies: ";
+            for (unsigned int j = 0; j < freqs.size(); ++j)
+              LOG_VERB << FMT_PREC9(freqs[j]) <<  " ";
+            LOG_VERB << endl;
+
+
           }
         }
       }
@@ -532,7 +540,7 @@ void check_models(const RaxmlInstance& instance)
         {
           LOG_ERROR << "\nBase frequencies: ";
           for (unsigned int j = 0; j < freqs.size(); ++j)
-            LOG_ERROR << freqs[j] <<  " ";
+            LOG_ERROR << FMT_PREC9(freqs[j]) <<  " ";
           LOG_ERROR << endl;
 
           throw runtime_error("User-specified stationary base frequencies"
@@ -564,6 +572,11 @@ void check_models(const RaxmlInstance& instance)
     }
   }
 
+  if (zero_freqs)
+  {
+    LOG_WARN << endl << "WARNING: Some states have very low frequencies, "
+        "which might lead to numerical issues!" << endl;
+  }
 
   /* Check for extreme cases of overfitting (K >= n) */
   if (opts.safety_checks.isset(SafetyCheck::model_overfit))

@@ -328,7 +328,7 @@ void Model::set_user_freqs(doubleVector& freqs)
   bool invalid = false;
   for (auto v: freqs)
   {
-    invalid |= (v <= 0. || v >= 1.);
+    invalid |= (v < 0. || v >= 1.);
   }
 
   if (invalid)
