@@ -157,6 +157,50 @@ static void get_cpuid(int32_t out[4], int32_t x)
 #endif
 }
 
+std::string build_path(size_t cpu_number) {
+  std::string s;
+  s += "/sys/devices/system/cpu/cpu";
+  s += std::to_string(cpu_number);
+  s += "/topology/";
+  return s;
+}
+
+
+size_t read_id_from_file(const std::string &filename) {
+  std::ifstream f(filename.c_str());
+  if(!f.good()){
+    throw std::runtime_error("couldn't open sys files");
+  }
+  char buf[32];
+  f.getline(buf, 32);
+  return std::stoi(buf);
+}
+
+size_t get_socket_id(const std::string &cpu_path) {
+  return read_id_from_file(cpu_path + "physical_package_id");
+}
+
+size_t get_core_id(const std::string &cpu_path) {
+  return read_id_from_file(cpu_path + "core_id");
+}
+
+int get_physical_core_count(size_t n_cpu) {
+#if defined(__linux__)
+  size_t cpu_max = 0;
+  size_t socket_max = 0;
+  for (size_t i = 0; i < n_cpu; ++i) {
+    std::string cpu_path = build_path(i);
+    size_t core_id = get_core_id(cpu_path);
+    cpu_max = core_id > cpu_max ? core_id : cpu_max;
+    size_t socket_id = get_socket_id(cpu_path);
+    socket_max = socket_id > socket_max ? socket_id : socket_max;
+  }
+  return (cpu_max + 1) * (socket_max + 1);
+#else
+  throw std::runtime_error("This function only supports linux");
+#endif
+}
+
 static bool ht_enabled()
 {
   int32_t info[4];
@@ -169,9 +213,13 @@ static bool ht_enabled()
 unsigned int sysutil_get_cpu_cores()
 {
   auto lcores = std::thread::hardware_concurrency();
-  auto threads_per_core = ht_enabled() ? 2 : 1;
+  try{
+    return get_physical_core_count(lcores);
+  } catch (const std::runtime_error&) {
+    auto threads_per_core = ht_enabled() ? 2 : 1;
 
-  return lcores / threads_per_core;
+    return lcores / threads_per_core;
+  }
 }
 
 unsigned long sysutil_get_cpu_features()
