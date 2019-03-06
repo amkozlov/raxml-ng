@@ -157,46 +157,58 @@ static void get_cpuid(int32_t out[4], int32_t x)
 #endif
 }
 
-std::string build_path(size_t cpu_number) {
-  std::string s;
-  s += "/sys/devices/system/cpu/cpu";
-  s += std::to_string(cpu_number);
-  s += "/topology/";
-  return s;
+static std::string build_path(size_t cpu_number)
+{
+  return "/sys/devices/system/cpu/cpu" + to_string(cpu_number) + "/topology/";
 }
 
-
-size_t read_id_from_file(const std::string &filename) {
-  std::ifstream f(filename.c_str());
-  if(!f.good()){
-    throw std::runtime_error("couldn't open sys files");
+size_t read_id_from_file(const std::string &filename)
+{
+  ifstream f(filename);
+  if (f.good())
+  {
+    size_t id;
+    f >> id;
+    return id;
   }
-  char buf[32];
-  f.getline(buf, 32);
-  return std::stoi(buf);
+  else
+    throw runtime_error("couldn't open sys files");
 }
 
-size_t get_socket_id(const std::string &cpu_path) {
+size_t get_numa_node_id(const std::string &cpu_path)
+{
+  // this is ugly, but should be reliable -> please blame Linux kernel developers & Intel!
+  string node_path = cpu_path + "../node";
+  for (size_t i = 0; i < 1000; ++i)
+  {
+    if (sysutil_dir_exists(node_path + to_string(i)))
+      return i;
+  }
+
+  // fallback solution: return socket_id which is often identical to numa id
   return read_id_from_file(cpu_path + "physical_package_id");
 }
 
-size_t get_core_id(const std::string &cpu_path) {
+size_t get_core_id(const std::string &cpu_path)
+{
   return read_id_from_file(cpu_path + "core_id");
 }
 
-int get_physical_core_count(size_t n_cpu) {
+int get_physical_core_count(size_t n_cpu)
+{
 #if defined(__linux__)
-  size_t cpu_max = 0;
-  size_t socket_max = 0;
-  for (size_t i = 0; i < n_cpu; ++i) {
-    std::string cpu_path = build_path(i);
+  unordered_set<size_t> cores;
+  for (size_t i = 0; i < n_cpu; ++i)
+  {
+    string cpu_path = build_path(i);
     size_t core_id = get_core_id(cpu_path);
-    cpu_max = core_id > cpu_max ? core_id : cpu_max;
-    size_t socket_id = get_socket_id(cpu_path);
-    socket_max = socket_id > socket_max ? socket_id : socket_max;
+    size_t node_id = get_numa_node_id(cpu_path);
+    size_t uniq_core_id = (node_id << 16) + core_id;
+    cores.insert(uniq_core_id);
   }
-  return (cpu_max + 1) * (socket_max + 1);
+  return cores.size();
 #else
+  RAXML_UNUSED(n_cpu);
   throw std::runtime_error("This function only supports linux");
 #endif
 }
@@ -213,9 +225,12 @@ static bool ht_enabled()
 unsigned int sysutil_get_cpu_cores()
 {
   auto lcores = std::thread::hardware_concurrency();
-  try{
+  try
+  {
     return get_physical_core_count(lcores);
-  } catch (const std::runtime_error&) {
+  }
+  catch (const std::runtime_error&)
+  {
     auto threads_per_core = ht_enabled() ? 2 : 1;
 
     return lcores / threads_per_core;

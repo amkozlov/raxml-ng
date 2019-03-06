@@ -519,8 +519,6 @@ void check_models(const RaxmlInstance& instance)
             for (unsigned int j = 0; j < freqs.size(); ++j)
               LOG_VERB << FMT_PREC9(freqs[j]) <<  " ";
             LOG_VERB << endl;
-
-
           }
         }
       }
