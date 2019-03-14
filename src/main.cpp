@@ -39,6 +39,7 @@
 #include "bootstrap/BootstrapGenerator.hpp"
 #include "bootstrap/BootstopCheck.hpp"
 #include "bootstrap/TransferBootstrapTree.hpp"
+#include "bootstrap/ConsensusTree.hpp"
 #include "autotune/ResourceEstimator.hpp"
 #include "ICScoreCalculator.hpp"
 #include "topology/RFDistCalculator.hpp"
@@ -59,7 +60,8 @@ struct RaxmlInstance
   TreeList bs_start_trees;
   PartitionAssignmentList proc_part_assign;
   unique_ptr<LoadBalancer> load_balancer;
-  map<BranchSupportMetric, shared_ptr<BootstrapTree> > support_trees;
+  map<BranchSupportMetric, shared_ptr<SupportTree> > support_trees;
+  shared_ptr<ConsensusTree> consens_tree;
 
   // bootstopping convergence test, only autoMRE is supported for now
   unique_ptr<BootstopCheckMRE> bootstop_checker;
@@ -1314,7 +1316,7 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree, const TreeC
 
   for (auto metric: instance.opts.bs_metrics)
   {
-      shared_ptr<BootstrapTree> sup_tree;
+      shared_ptr<SupportTree> sup_tree;
       bool support_in_pct = false;
 
       if (metric == BranchSupportMetric::fbp)
@@ -1334,9 +1336,9 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree, const TreeC
       for (auto bs: bs_trees)
       {
         tree.topology(bs.second);
-        sup_tree->add_bootstrap_tree(tree);
+        sup_tree->add_replicate_tree(tree);
       }
-      sup_tree->calc_support(support_in_pct);
+      sup_tree->draw_support(support_in_pct);
 
       instance.support_trees[metric] = sup_tree;
   }
@@ -1481,6 +1483,28 @@ TreeCollection read_bootstrap_trees(const RaxmlInstance& instance, Tree& ref_tre
   return bs_trees;
 }
 
+void read_multiple_tree_files(RaxmlInstance& instance)
+{
+  const auto& opts = instance.opts;
+
+  vector<string> fname_list;
+  if (sysutil_file_exists(opts.tree_file))
+    fname_list.push_back(opts.tree_file);
+  else
+    fname_list = split_string(opts.tree_file, ',');
+
+  for (const auto& fname: fname_list)
+  {
+    auto topos = read_newick_trees(instance.random_tree, fname, "input");
+    Tree ref_tree = instance.random_tree;
+    for (const auto& t: topos)
+    {
+      ref_tree.topology(t.second);
+      instance.start_trees.emplace_back(ref_tree);
+    }
+  }
+}
+
 void command_bootstop(RaxmlInstance& instance)
 {
   auto bs_trees = read_bootstrap_trees(instance, instance.random_tree);
@@ -1525,31 +1549,30 @@ void command_rfdist(RaxmlInstance& instance)
   else
   {
     /* load trees from Newick file(s) */
-    vector<string> fname_list;
-    if (sysutil_file_exists(opts.tree_file))
-      fname_list.push_back(opts.tree_file);
-    else
-      fname_list = split_string(opts.tree_file, ',');
-
-    for (const auto& fname: fname_list)
-    {
-      auto topos = read_newick_trees(instance.random_tree, fname, "input");
-      Tree ref_tree = instance.random_tree;
-      for (const auto& t: topos)
-      {
-        ref_tree.topology(t.second);
-        instance.start_trees.emplace_back(ref_tree);
-      }
-    }
+    read_multiple_tree_files(instance);
   }
 
-  const auto num_trees = instance.start_trees.size();
-  if (num_trees < 2)
-  {
+  if (instance.start_trees.size() < 2)
     throw runtime_error("Cannot compute RF distances since tree file contains fewer than 2 trees!");
-  }
 
   instance.dist_calculator.reset(new RFDistCalculator(instance.start_trees));
+}
+
+void command_consense(RaxmlInstance& instance)
+{
+  const auto& opts = instance.opts;
+
+  /* load trees from Newick file(s) */
+  read_multiple_tree_files(instance);
+
+  if (instance.start_trees.size() < 2)
+    throw runtime_error("Cannot consensus tree since tree file contains fewer than 2 trees!");
+
+  instance.consens_tree.reset(new ConsensusTree(instance.start_trees, opts.consense_cutoff));
+  if (instance.consens_tree)
+    instance.consens_tree->draw_support();
+  else
+    runtime_error("Cannot create consensus tree!");
 }
 
 void command_bsmsa(RaxmlInstance& instance, const Checkpoint& checkp)
@@ -1756,6 +1779,22 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
         LOG_INFO << "Best ML tree with " << metric_name << " support values saved to: " <<
             sysutil_realpath(sup_file) << endl;
       }
+    }
+  }
+
+  if (opts.command == Command::consense)
+  {
+    assert(instance.consens_tree);
+
+    auto cons_file = opts.cons_tree_file();
+    if (!cons_file.empty())
+    {
+      NewickStream nw(cons_file, std::ios::out);
+      nw.brlens(false);
+      nw << *instance.consens_tree;
+
+      LOG_INFO << opts.consense_type_name() << " consensus tree saved to: " <<
+          sysutil_realpath(cons_file) << endl;
     }
   }
 
@@ -2229,6 +2268,7 @@ int internal_main(int argc, char** argv, void* comm)
     case Command::terrace:
     case Command::bsmsa:
     case Command::rfdist:
+    case Command::consense:
       if (!opts.redo_mode && opts.result_files_exist())
       {
         LOG_ERROR << endl << "ERROR: Result files for the run with prefix `" <<
@@ -2398,6 +2438,11 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::rfdist:
       {
         command_rfdist(instance);
+        break;
+      }
+      case Command::consense:
+      {
+        command_consense(instance);
         break;
       }
       case Command::none:

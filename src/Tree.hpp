@@ -94,6 +94,8 @@ public:
                              unsigned int attributes, unsigned int * score = nullptr);
   static Tree loadFromFile(const std::string& file_name);
 
+  std::vector<const char*> tip_labels_cstr() const;
+  NameList tip_labels_list() const;
   IdNameVector tip_labels() const;
   NameIdMap tip_ids() const;
 
@@ -107,8 +109,10 @@ public:
   void add_partition_brlens(doubleVector&& brlens);
 
   // TODO: use move semantics to transfer ownership?
-  pll_utree_t * pll_utree_copy() const { return pll_utree_clone(_pll_utree.get()); }
   const pll_utree_t& pll_utree() const { return *_pll_utree; }
+  pll_utree_t * pll_utree_copy() const;
+  void pll_utree(const pll_utree_t&);
+  void pll_utree(unsigned int tip_count, const pll_unode_t& root);
 
   const pll_unode_t& pll_utree_root() const { return *_pll_utree->vroot; }
   bool empty() const { return _num_tips == 0; }

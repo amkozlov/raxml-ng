@@ -1,8 +1,14 @@
 #include "TransferBootstrapTree.hpp"
 
 TransferBootstrapTree::TransferBootstrapTree(const Tree& tree, bool naive) :
-   BootstrapTree (tree), _split_info(nullptr), _naive_method(naive)
+   SupportTree (tree), _split_info(nullptr), _naive_method(naive)
 {
+  assert(num_splits() > 0);
+  _node_split_map.resize(num_splits());
+
+  /* extract reference tree splits and add them into hashtable */
+  add_tree(pll_utree_root());
+
   if (!_naive_method)
   {
     _split_info = pllmod_utree_tbe_nature_init((pll_unode_t*) &pll_utree_root(), _num_tips,
@@ -16,31 +22,32 @@ TransferBootstrapTree::~TransferBootstrapTree()
     free(_split_info);
 }
 
-void TransferBootstrapTree::add_boot_splits_to_hashtable(const pll_unode_t& root)
+void TransferBootstrapTree::add_tree(const pll_unode_t& root)
 {
-  doubleVector tbe(num_splits(), 1.0);
+  bool ref_tree = (_num_bs_trees == 0);
+  doubleVector support(num_splits(), 0.);
 
-  assert(_ref_splits);
+  if (ref_tree)
+  {
+    _ref_splits = extract_splits_from_tree(root, _node_split_map.data());
 
-  pll_split_t * splits = pllmod_utree_split_create((pll_unode_t*) &root,
-                                                       _num_tips,
-                                                       nullptr);
-
-  // compute TBE
-  if (_naive_method)
-    pllmod_utree_tbe_naive(_ref_splits.get(), splits, _num_tips, tbe.data());
+    add_splits_to_hashtable(_ref_splits, support, 0);
+  }
   else
   {
-    pllmod_utree_tbe_nature(_ref_splits.get(), splits, (pll_unode_t*) &root,
-                                             _num_tips, tbe.data(), _split_info);
+    assert(_ref_splits);
+
+    auto splits = extract_splits_from_tree(root, nullptr);
+
+    // compute TBE
+    if (_naive_method)
+      pllmod_utree_tbe_naive(_ref_splits.get(), splits.get(), _num_tips, support.data());
+    else
+    {
+      pllmod_utree_tbe_nature(_ref_splits.get(), splits.get(), (pll_unode_t*) &root,
+                                               _num_tips, support.data(), _split_info);
+    }
+
+    add_splits_to_hashtable(_ref_splits, support, 1);
   }
-
-  pllmod_utree_split_destroy(splits);
-
-  _pll_splits_hash = pllmod_utree_split_hashtable_insert(_pll_splits_hash,
-                                                         _ref_splits.get(),
-                                                         _num_tips,
-                                                         num_splits(),
-                                                         tbe.data(),
-                                                         1 /* update_only */);
 }

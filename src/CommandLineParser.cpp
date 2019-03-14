@@ -72,6 +72,7 @@ static struct option long_options[] =
   {"bsmsa",              no_argument, 0, 0 },        /*  49 */
   {"rfdist",             optional_argument, 0, 0 },  /*  50 */
   {"rf",                 optional_argument, 0, 0 },  /*  51 */
+  {"consense",           optional_argument, 0, 0 },  /*  52 */
 
   { 0, 0, 0, 0 }
 };
@@ -790,6 +791,30 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           parse_start_trees(opts, optarg);
         break;
 
+      case 52: /* build consensus tree */
+        opts.command = Command::consense;
+        num_commands++;
+        if (optarg)
+        {
+          if (strcasecmp(optarg, "mr") == 0)
+            opts.consense_cutoff = ConsenseCutoff::MR;
+          else if (strcasecmp(optarg, "mre") == 0)
+            opts.consense_cutoff = ConsenseCutoff::MRE;
+          else if (strcasecmp(optarg, "strict") == 0)
+            opts.consense_cutoff = ConsenseCutoff::strict;
+          else if (sscanf(optarg, "%*[Mm]%*[Rr]%u", &opts.consense_cutoff) != 1 ||
+                   opts.consense_cutoff < 50 || opts.consense_cutoff > 100)
+          {
+            auto errmsg = "Invalid consensus type or threshold value: " +
+                          string(optarg) + "\n" +
+                          "Allowed values: MR, MRE, STRICT or MR<n>, where 50 <= n <= 100.";
+            throw  InvalidOptionValueException(errmsg);
+          }
+        }
+        else
+          opts.consense_cutoff = ConsenseCutoff::MR;
+        break;
+
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -832,9 +857,9 @@ void CommandLineParser::print_help()
             "  --help                                     display help information\n"
             "  --version                                  display version information\n"
             "  --evaluate                                 evaluate the likelihood of a tree (with model+brlen optimization)\n"
-            "  --search                                   ML tree search.\n"
-            "  --bootstrap                                bootstrapping\n"
-            "  --all                                      all-in-one (ML search + bootstrapping).\n"
+            "  --search                                   ML tree search (default: 10 parsimony + 10 random starting trees)\n"
+            "  --bootstrap                                bootstrapping (default: use bootstopping to auto-detect #replicates)\n"
+            "  --all                                      all-in-one (ML search + bootstrapping)\n"
             "  --support                                  compute bipartition support for a given reference tree (e.g., best ML tree)\n"
             "                                             and a set of replicate trees (e.g., from a bootstrap analysis)\n"
             "  --bsconverge                               test for bootstrapping convergence using autoMRE criterion\n"
@@ -846,6 +871,8 @@ void CommandLineParser::print_help()
             "  --parse                                    parse alignment, compress patterns and create binary MSA file\n"
             "  --start                                    generate parsimony/random starting trees and exit\n"
             "  --rfdist                                   compute pair-wise Robinson-Foulds (RF) distances between trees\n"
+            "  --consense [ STRICT | MR | MR<n> | MRE ]   build strict, majority-rule (MR) or extended MR (MRE) consensus tree (default: MR)\n"
+            "                                             eg: --consense MR75 --tree bsrep.nw\n"
             "\n"
             "Command shortcuts (mutually exclusive):\n"
             "  --search1                                  Alias for: --search --tree rand{1}\n"

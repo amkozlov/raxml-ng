@@ -11,9 +11,15 @@
 class NewickStream : public std::fstream
 {
 public:
-  NewickStream(std::string fname) : std::fstream(fname, std::ios::out) {};
+  NewickStream(std::string fname) : std::fstream(fname, std::ios::out), _brlens(true) {};
   NewickStream(std::string fname, std::ios_base::openmode mode) :
-    std::fstream(fname, mode) {};
+    std::fstream(fname, mode), _brlens(true) {};
+
+  bool brlens() const { return _brlens; }
+  void brlens(bool v) { _brlens = v; }
+
+private:
+  bool _brlens;
 };
 
 class MSAFileStream
@@ -95,7 +101,7 @@ NewickStream& operator<<(NewickStream& stream, const pll_utree_t& tree);
 NewickStream& operator<<(NewickStream& stream, const Tree& tree);
 NewickStream& operator>>(NewickStream& stream, Tree& tree);
 
-NewickStream& operator<<(NewickStream& stream, const BootstrapTree& tree);
+NewickStream& operator<<(NewickStream& stream, const SupportTree& tree);
 //NewickStream& operator>>(NewickStream& stream, BootstrapTree& tree);
 
 PhylipStream& operator>>(PhylipStream& stream, MSA& msa);

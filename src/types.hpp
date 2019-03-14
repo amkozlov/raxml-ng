@@ -35,7 +35,8 @@ enum class Command
   check,
   parse,
   start,
-  rfdist
+  rfdist,
+  consense
 };
 
 enum class FileFormat
@@ -105,6 +106,15 @@ enum class InformationCriterion
   bic
 };
 
+namespace ConsenseCutoff
+{
+  enum ConsenseCutoff : unsigned int
+  {
+    MRE = 0,
+    MR = 50,
+    strict = 100
+  };
+};
 
 const std::string ParamValueNames[] = {"undefined", "equal", "user", "model", "empirical", "ML"};
 

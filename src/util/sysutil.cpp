@@ -378,6 +378,15 @@ bool sysutil_dir_exists(const std::string& dname)
     return false;
 }
 
+void sysutil_file_remove(const std::string& fname, bool must_exist)
+{
+  if (sysutil_file_exists(fname))
+    std::remove(fname.c_str());
+  else if (must_exist)
+    throw runtime_error("File does not exist: " + fname);
+}
+
+
 const SystemTimer& global_timer()
 {
   return systimer;

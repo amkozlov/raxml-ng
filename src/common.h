@@ -48,6 +48,7 @@ std::string sysutil_fmt_time(const time_t& t);
 std::string sysutil_realpath(const std::string& path);
 bool sysutil_file_exists(const std::string& fname, int access_mode = F_OK);
 bool sysutil_dir_exists(const std::string& dname);
+void sysutil_file_remove(const std::string& fname, bool must_exist = false);
 
 /* parsing utils */
 std::vector<std::string> split_string(const std::string& s, char delim);
