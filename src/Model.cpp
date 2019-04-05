@@ -1011,6 +1011,50 @@ unsigned int Model::num_free_params() const
   return free_params;
 }
 
+void Model::init_state_names() const
+{
+  auto map = charmap();
+
+  if (!charmap())
+    return;
+
+  _state_names.resize(_num_states);
+
+  for (size_t i = 0; i < PLL_ASCII_SIZE; ++i)
+  {
+    auto state = map[i];
+    auto popcnt = PLL_STATE_POPCNT(state);
+    if (popcnt > 0 && !_full_state_namemap.count(state))
+    {
+      string state_name;
+      state_name = (char) i;
+
+      _full_state_namemap[state] = state_name;
+
+      if (popcnt == 1)
+      {
+        auto idx = PLL_STATE_CTZ(state);
+        _state_names[idx] = state_name;
+      }
+    }
+  }
+}
+
+const NameList& Model::state_names() const
+{
+  if (_state_names.empty())
+    init_state_names();
+
+  return _state_names;
+}
+
+const StateNameMap& Model::full_state_namemap() const
+{
+  if (_full_state_namemap.empty())
+    init_state_names();
+
+  return _full_state_namemap;
+}
 
 void assign(Model& model, const pll_partition_t * partition)
 {
