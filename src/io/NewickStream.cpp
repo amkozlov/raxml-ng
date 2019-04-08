@@ -91,4 +91,11 @@ NewickStream& operator<<(NewickStream& stream, const SupportTree& tree)
   return stream;
 }
 
+NewickStream& operator<<(NewickStream& stream, const AncestralStates& ancestral)
+{
+  stream << ancestral.tree;
+  return stream;
+}
+
+
 

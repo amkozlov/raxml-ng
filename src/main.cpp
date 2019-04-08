@@ -87,6 +87,7 @@ struct RaxmlInstance
   Tree constraint_tree;
 
   unique_ptr<RFDistCalculator> dist_calculator;
+  AncestralStatesSharedPtr ancestral_states;
 };
 
 void print_banner()
@@ -707,13 +708,29 @@ void check_options(RaxmlInstance& instance)
   }
 
   if (instance.parted_msa->taxon_count() > RAXML_RATESCALERS_TAXA &&
-      !instance.opts.use_rate_scalers)
+      !instance.opts.use_rate_scalers && opts.command != Command::ancestral)
   {
     LOG_INFO << "\nNOTE: Per-rate scalers were automatically enabled to prevent numerical issues "
         "on taxa-rich alignments." << endl;
     LOG_INFO << "NOTE: You can use --force switch to skip this check "
         "and fall back to per-site scalers." << endl << endl;
     instance.opts.use_rate_scalers = true;
+  }
+
+  if (opts.command == Command::ancestral)
+  {
+    if (opts.use_pattern_compression)
+      throw runtime_error("Pattern compression is not supported in ancestral state reconstruction mode!");
+    if (opts.use_repeats)
+      throw runtime_error("Site repeats are not supported in ancestral state reconstruction mode!");
+    if (opts.use_rate_scalers)
+      throw runtime_error("Per-rate scalers are not supported in ancestral state reconstruction mode!");
+    if (ParallelContext::num_threads() > 1)
+      throw runtime_error("PTHREADS parallelization is not supported in ancestral state reconstruction mode!");
+    if (ParallelContext::num_ranks() > 1)
+      throw runtime_error("MPI parallelization is not supported in ancestral state reconstruction mode!");
+    if (instance.parted_msa->part_count() > 1)
+      throw runtime_error("Partitioning is not supported in ancestral state reconstruction mode!");
   }
 }
 
@@ -1687,7 +1704,7 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
   const auto& parted_msa = *instance.parted_msa;
 
   if (opts.command == Command::search || opts.command == Command::all ||
-      opts.command == Command::evaluate)
+      opts.command == Command::evaluate || opts.command == Command::ancestral)
   {
     auto model_log_lvl = parted_msa.part_count() > 1 ? LogLevel::verbose : LogLevel::info;
     auto ckp_models = checkp.best_models.empty() ? checkp.models : checkp.best_models;
@@ -1700,6 +1717,8 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
           parted_msa.part_info(p).name().c_str() << endl;
       RAXML_LOG(model_log_lvl) << ckp_models.at(p);
     }
+
+    RAXML_LOG(model_log_lvl) << endl;
   }
 
   if (opts.command == Command::search || opts.command == Command::all ||
@@ -1892,6 +1911,36 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
     }
   }
 
+  if (opts.command == Command::ancestral)
+  {
+    assert(instance.ancestral_states);
+
+    if (!opts.asr_probs_file().empty())
+    {
+      AncestralProbStream as(opts.asr_probs_file());
+      as.precision(5);
+      as << *instance.ancestral_states;
+
+      LOG_INFO << "Marginal ancestral probabilities saved to: " << sysutil_realpath(opts.asr_probs_file()) << endl;
+    }
+
+    if (!opts.asr_states_file().empty())
+    {
+      AncestralStateStream as(opts.asr_states_file());
+      as << *instance.ancestral_states;
+
+      LOG_INFO << "Reconstructed ancestral sequences saved to: " << sysutil_realpath(opts.asr_states_file()) << endl;
+    }
+
+    if (!opts.asr_tree_file().empty())
+    {
+      NewickStream nw_result(opts.asr_tree_file());
+      nw_result << *instance.ancestral_states;
+
+      LOG_INFO << "Node-labeled tree saved to: " << sysutil_realpath(opts.asr_tree_file()) << endl;
+    }
+  }
+
   if (!opts.log_file().empty())
       LOG_INFO << "\nExecution log saved to: " << sysutil_realpath(opts.log_file()) << endl;
 
@@ -1946,7 +1995,8 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   bool use_ckp_tree = true;
   if ((opts.command == Command::search || opts.command == Command::all ||
-      opts.command == Command::evaluate ) && !instance.start_trees.empty())
+      opts.command == Command::evaluate || opts.command == Command::ancestral) &&
+      !instance.start_trees.empty())
   {
 
     if (opts.command == Command::evaluate)
@@ -1986,7 +2036,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
       treeinfo->set_topology_constraint(instance.constraint_tree);
 
       Optimizer optimizer(opts);
-      if (opts.command == Command::evaluate)
+      if (opts.command == Command::evaluate || opts.command == Command::ancestral)
       {
         // check if we have anything to optimize
         if (opts.optimize_brlen || opts.optimize_model)
@@ -2017,6 +2067,12 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
         (instance.start_trees.size() > 1 ? LOG_RESULT_TS : LOG_INFO_TS) << "ML tree search #"
             << start_tree_num << ", logLikelihood: " << FMT_LH(cm.checkpoint().loglh()) << endl;
         LOG_PROGR << endl;
+      }
+
+      if (opts.command == Command::ancestral)
+      {
+        assert(!opts.use_pattern_compression);
+        instance.ancestral_states = treeinfo->compute_ancestral(master_msa, part_assign);
       }
 
       cm.save_ml_tree();
@@ -2269,6 +2325,7 @@ int internal_main(int argc, char** argv, void* comm)
     case Command::bsmsa:
     case Command::rfdist:
     case Command::consense:
+    case Command::ancestral:
       if (!opts.redo_mode && opts.result_files_exist())
       {
         LOG_ERROR << endl << "ERROR: Result files for the run with prefix `" <<
@@ -2351,6 +2408,7 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::search:
       case Command::bootstrap:
       case Command::all:
+      case Command::ancestral:
       {
         /* init load balancer */
         switch(opts.load_balance_method)

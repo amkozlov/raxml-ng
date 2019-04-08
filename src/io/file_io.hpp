@@ -4,6 +4,7 @@
 #include <fstream>
 
 #include "../Tree.hpp"
+#include "../AncestralStates.hpp"
 #include "../bootstrap/BootstrapTree.hpp"
 #include "../bootstrap/BootstrapGenerator.hpp"
 #include "../PartitionedMSAView.hpp"
@@ -96,13 +97,47 @@ private:
   bool _use_range_string;
 };
 
+class FileIOStream : public std::fstream
+{
+public:
+  FileIOStream(std::string fname, std::ios_base::openmode mode = std::ios::out) :
+    std::fstream(fname, mode), _delim("\t"), _precision(6) {};
+
+  const std::string& delim() { return _delim; };
+  void delim(const std::string& del) { _delim = del; };
+  unsigned int precision() { return _precision; };
+  void precision(unsigned int prec) { _precision = prec; };
+
+protected:
+  std::string _delim;
+  unsigned int _precision;
+};
+
+class AncestralProbStream : public FileIOStream
+{
+public:
+  AncestralProbStream(std::string fname) : FileIOStream(fname) {};
+  AncestralProbStream(std::string fname, std::ios_base::openmode mode) :
+    FileIOStream(fname, mode) {};
+};
+
+class AncestralStateStream : public FileIOStream
+{
+public:
+  AncestralStateStream(std::string fname) : FileIOStream(fname) {};
+  AncestralStateStream(std::string fname, std::ios_base::openmode mode) :
+    FileIOStream(fname, mode) {};
+};
+
 NewickStream& operator<<(NewickStream& stream, const pll_unode_t& root);
 NewickStream& operator<<(NewickStream& stream, const pll_utree_t& tree);
 NewickStream& operator<<(NewickStream& stream, const Tree& tree);
 NewickStream& operator>>(NewickStream& stream, Tree& tree);
 
-NewickStream& operator<<(NewickStream& stream, const SupportTree& tree);
+NewickStream& operator<<(NewickStream& stream, const AncestralStates& ancestral);
 //NewickStream& operator>>(NewickStream& stream, BootstrapTree& tree);
+
+NewickStream& operator<<(NewickStream& stream, const SupportTree& tree);
 
 PhylipStream& operator>>(PhylipStream& stream, MSA& msa);
 FastaStream& operator>>(FastaStream& stream, MSA& msa);
@@ -123,6 +158,9 @@ RaxmlPartitionStream& operator>>(RaxmlPartitionStream& stream, PartitionedMSA& p
 RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const PartitionInfo& part_info);
 RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const PartitionedMSA& parted_msa);
 RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const PartitionedMSAView& parted_msa);
+
+AncestralProbStream& operator<<(AncestralProbStream& stream, const AncestralStates& ancestral);
+AncestralStateStream& operator<<(AncestralStateStream& stream, const AncestralStates& ancestral);
 
 std::string to_newick_string_rooted(const Tree& tree, double root_brlen = 0.0);
 

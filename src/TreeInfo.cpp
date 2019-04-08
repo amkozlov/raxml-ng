@@ -390,6 +390,56 @@ void TreeInfo::set_topology_constraint(const Tree& cons_tree)
   }
 }
 
+AncestralStatesSharedPtr TreeInfo::compute_ancestral(const PartitionedMSA& parted_msa,
+                                                     const PartitionAssignment& part_assign)
+{
+//  pll_utree_show_ascii(_pll_treeinfo->root, PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH |
+//                                       PLL_UTREE_SHOW_CLV_INDEX );
+
+  pllmod_ancestral_t * pll_ancestral = pllmod_treeinfo_compute_ancestral(_pll_treeinfo);
+
+  if (!pll_ancestral)
+    libpll_check_error("Unable to compute ancestral states", true);
+
+  assert(pll_ancestral->partition_count > 0 && pll_ancestral->partition_indices);
+  const PartitionInfo& pinfo = parted_msa.part_info(pll_ancestral->partition_indices[0]);
+
+  // TODO: pthreads parallelization
+  // TODO: multiple partitions
+  // TODO: precision from command line
+  AncestralStatesSharedPtr ancestral = make_shared<AncestralStates>(pll_ancestral->node_count,
+                                                                    pinfo.model().num_states(),
+                                                                    pinfo.msa().num_sites());
+
+  ancestral->state_names = pinfo.model().state_names();
+  ancestral->state_namemap = pinfo.model().full_state_namemap();
+
+  ancestral->tree = Tree(*pll_ancestral->tree);
+
+  size_t anc_span = ancestral->num_sites * ancestral->num_states;
+  for (size_t i = 0; i < pll_ancestral->node_count; ++i)
+  {
+    ancestral->node_names.push_back(pll_ancestral->nodes[i]->label);
+    double * pll_probs = pll_ancestral->probs[i];
+    ancestral->probs.emplace_back(pll_probs, pll_probs + anc_span);
+  }
+
+  //      printf("Node %s: ", node->label);
+  //      for (unsigned int j = 0; j < partition->sites; ++j)
+  //      {
+  //        for (unsigned int k = 0; k < partition->states; ++k)
+  //          printf("%lf ", ancp[j * partition->states + k]);
+  //        printf("\t");
+  //      }
+  //      printf("\n\n");
+
+  assert(ancestral->probs.size() == ancestral->num_nodes);
+
+  pllmod_treeinfo_destroy_ancestral(pll_ancestral);
+
+  return ancestral;
+}
+
 void assign(PartitionedMSA& parted_msa, const TreeInfo& treeinfo)
 {
   const pllmod_treeinfo_t& pll_treeinfo = treeinfo.pll_treeinfo();

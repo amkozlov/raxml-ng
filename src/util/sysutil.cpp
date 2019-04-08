@@ -32,10 +32,12 @@ void sysutil_fatal_libpll()
   sysutil_fatal("ERROR(%d): %s\n", pll_errno, pll_errmsg);
 }
 
-void libpll_check_error(const std::string& errmsg)
+void libpll_check_error(const std::string& errmsg, bool force)
 {
   if (pll_errno)
     throw runtime_error(errmsg +  " (LIBPLL-" + to_string(pll_errno) + "): " + string(pll_errmsg));
+  else if (force)
+    throw runtime_error("Unknown LIBPLL error.");
 }
 
 void libpll_reset_error()

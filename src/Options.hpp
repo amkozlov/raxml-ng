@@ -23,6 +23,9 @@ struct OutputFileNames
   std::string bootstrap_msa;
   std::string rfdist;
   std::string cons_tree;
+  std::string asr_tree;
+  std::string asr_probs;
+  std::string asr_states;
 };
 
 class Options
@@ -132,6 +135,10 @@ public:
   std::string bootstrap_partition_file() const;
   const std::string rfdist_file() const { return outfile_names.rfdist; }
   const std::string cons_tree_file() const { return outfile_names.cons_tree + consense_type_name(); }
+
+  const std::string asr_tree_file() const { return outfile_names.asr_tree; }
+  const std::string asr_probs_file() const { return outfile_names.asr_probs; }
+  const std::string asr_states_file() const { return outfile_names.asr_states; }
 
   void set_default_outfiles();
 

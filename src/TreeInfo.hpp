@@ -4,6 +4,7 @@
 #include "common.h"
 #include "Tree.hpp"
 #include "Options.hpp"
+#include "AncestralStates.hpp"
 #include "loadbalance/PartitionAssignment.hpp"
 
 struct spr_round_params
@@ -58,6 +59,8 @@ public:
   { return optimize_params(PLLMOD_OPT_PARAM_ALL & ~PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE, lh_epsilon); } ;
   double optimize_branches(double lh_epsilon, double brlen_smooth_factor);
   double spr_round(spr_round_params& params);
+  AncestralStatesSharedPtr compute_ancestral(const PartitionedMSA& parted_msa,
+                                             const PartitionAssignment& part_assign);
 
 private:
   pllmod_treeinfo_t * _pll_treeinfo;

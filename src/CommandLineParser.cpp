@@ -73,6 +73,7 @@ static struct option long_options[] =
   {"rfdist",             optional_argument, 0, 0 },  /*  50 */
   {"rf",                 optional_argument, 0, 0 },  /*  51 */
   {"consense",           optional_argument, 0, 0 },  /*  52 */
+  {"ancestral",          optional_argument, 0, 0 },  /*  53 */
 
   { 0, 0, 0, 0 }
 };
@@ -91,14 +92,16 @@ void CommandLineParser::check_options(Options &opts)
   if (opts.command == Command::evaluate || opts.command == Command::search ||
       opts.command == Command::bootstrap || opts.command == Command::all ||
       opts.command == Command::terrace || opts.command == Command::check ||
-      opts.command == Command::parse || opts.command == Command::start)
+      opts.command == Command::parse || opts.command == Command::start ||
+      opts.command == Command::ancestral)
   {
     if (opts.msa_file.empty())
       throw OptionException("You must specify a multiple alignment file with --msa switch");
   }
 
   if (opts.command == Command::evaluate || opts.command == Command::support ||
-      opts.command == Command::terrace || opts.command == Command::rfdist)
+      opts.command == Command::terrace || opts.command == Command::rfdist ||
+      opts.command == Command::ancestral)
   {
     if (opts.tree_file.empty())
       throw OptionException("Please provide a valid Newick file as an argument of --tree option.");
@@ -164,7 +167,8 @@ void CommandLineParser::check_options(Options &opts)
 void CommandLineParser::compute_num_searches(Options &opts)
 {
   if (opts.command == Command::search || opts.command == Command::all ||
-      opts.command == Command::evaluate || opts.command == Command::start)
+      opts.command == Command::evaluate || opts.command == Command::start ||
+      opts.command == Command::ancestral)
   {
     if (opts.start_trees.empty())
     {
@@ -815,6 +819,15 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.consense_cutoff = ConsenseCutoff::MR;
         break;
 
+      case 53: /* ancestral state reconstruction */
+        opts.command = Command::ancestral;
+        opts.use_pattern_compression = false;
+        opts.use_repeats = false;
+        opts.use_tip_inner = false;
+        opts.num_threads = 1;
+        num_commands++;
+        break;
+
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -873,6 +886,7 @@ void CommandLineParser::print_help()
             "  --rfdist                                   compute pair-wise Robinson-Foulds (RF) distances between trees\n"
             "  --consense [ STRICT | MR | MR<n> | MRE ]   build strict, majority-rule (MR) or extended MR (MRE) consensus tree (default: MR)\n"
             "                                             eg: --consense MR75 --tree bsrep.nw\n"
+            "  --ancestral                                ancestral state reconstruction at all inner nodes\n"
             "\n"
             "Command shortcuts (mutually exclusive):\n"
             "  --search1                                  Alias for: --search --tree rand{1}\n"

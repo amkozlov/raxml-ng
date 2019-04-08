@@ -36,7 +36,8 @@ enum class Command
   parse,
   start,
   rfdist,
-  consense
+  consense,
+  ancestral
 };
 
 enum class FileFormat

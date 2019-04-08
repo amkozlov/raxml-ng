@@ -30,7 +30,7 @@ extern "C" {
 /* system utils */
 void sysutil_fatal(const char * format, ...);
 void sysutil_fatal_libpll();
-void libpll_check_error(const std::string& errmsg = "ERROR in libpll");
+void libpll_check_error(const std::string& errmsg = "ERROR in libpll", bool force = false);
 void libpll_reset_error();
 
 double sysutil_gettime();
