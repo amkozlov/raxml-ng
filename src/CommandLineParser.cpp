@@ -823,8 +823,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.command = Command::ancestral;
         opts.use_pattern_compression = false;
         opts.use_repeats = false;
-        opts.use_tip_inner = false;
-        opts.num_threads = 1;
+        opts.use_tip_inner = true;
         num_commands++;
         break;
 

@@ -725,12 +725,8 @@ void check_options(RaxmlInstance& instance)
       throw runtime_error("Site repeats are not supported in ancestral state reconstruction mode!");
     if (opts.use_rate_scalers)
       throw runtime_error("Per-rate scalers are not supported in ancestral state reconstruction mode!");
-    if (ParallelContext::num_threads() > 1)
-      throw runtime_error("PTHREADS parallelization is not supported in ancestral state reconstruction mode!");
     if (ParallelContext::num_ranks() > 1)
       throw runtime_error("MPI parallelization is not supported in ancestral state reconstruction mode!");
-    if (instance.parted_msa->part_count() > 1)
-      throw runtime_error("Partitioning is not supported in ancestral state reconstruction mode!");
   }
 }
 
@@ -1299,6 +1295,17 @@ void generate_bootstraps(RaxmlInstance& instance, const Checkpoint& checkp)
 
       instance.bs_start_trees.emplace_back(move(tree));
     }
+  }
+}
+
+void init_ancestral(RaxmlInstance& instance)
+{
+  if (instance.opts.command == Command::ancestral)
+  {
+    const auto& parted_msa = *instance.parted_msa;
+    const Tree& tree = instance.start_trees.at(0);
+
+    instance.ancestral_states = make_shared<AncestralStates>(tree.num_inner(), parted_msa);
   }
 }
 
@@ -1918,6 +1925,7 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
     if (!opts.asr_probs_file().empty())
     {
       AncestralProbStream as(opts.asr_probs_file());
+//      as.precision(logger().precision(LogElement::other));
       as.precision(5);
       as << *instance.ancestral_states;
 
@@ -2069,18 +2077,19 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
         LOG_PROGR << endl;
       }
 
-      if (opts.command == Command::ancestral)
-      {
-        assert(!opts.use_pattern_compression);
-        instance.ancestral_states = treeinfo->compute_ancestral(master_msa, part_assign);
-      }
-
       cm.save_ml_tree();
       cm.reset_search_state();
     }
   }
 
   ParallelContext::thread_barrier();
+
+  if (opts.command == Command::ancestral)
+  {
+    assert(!opts.use_pattern_compression);
+    treeinfo->compute_ancestral(instance.ancestral_states, part_assign);
+    ParallelContext::thread_barrier();
+  }
 
   if (!instance.bs_reps.empty())
   {
@@ -2246,6 +2255,8 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   /* generate bootstrap replicates */
   generate_bootstraps(instance, cm.checkpoint());
+
+  init_ancestral(instance);
 
   if (ParallelContext::master_rank())
     instance.opts.remove_result_files();
