@@ -4,7 +4,7 @@
 #include <fstream>
 #include <vector>
 #include <memory>
-#include <unordered_map>
+#include <map>
 
 enum class LogLevel
 {
@@ -28,7 +28,7 @@ enum class LogElement
 };
 
 
-typedef std::unordered_map<LogElement, unsigned int> LogElementMap;
+typedef std::map<LogElement, unsigned int> LogElementMap;
 
 struct TimeStamp
 {
