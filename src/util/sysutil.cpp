@@ -402,4 +402,17 @@ string sysutil_fmt_time(const time_t& t)
   return buffer.data();
 }
 
+bool sysutil_isnumber(const std::string& str)
+{
+  if (str.empty())
+    return false;
+  else
+  {
+    const char* s = str.c_str();
+    while (*s)
+      if (!isdigit(*s++)) return false;
+
+    return true;
+  }
+}
 

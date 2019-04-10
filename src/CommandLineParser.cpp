@@ -546,7 +546,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       case 26:  /* number of bootstrap replicates */
         opts.bootstop_criterion = BootstopCriterion::none;
-        if (sysutil_file_exists(optarg))
+        if (sysutil_file_exists(optarg) && !sysutil_isnumber(optarg))
         {
           opts.outfile_names.bootstrap_trees = optarg;
         }

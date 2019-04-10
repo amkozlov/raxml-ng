@@ -50,6 +50,8 @@ bool sysutil_file_exists(const std::string& fname, int access_mode = F_OK);
 bool sysutil_dir_exists(const std::string& dname);
 void sysutil_file_remove(const std::string& fname, bool must_exist = false);
 
+bool sysutil_isnumber(const std::string& s);
+
 /* parsing utils */
 std::vector<std::string> split_string(const std::string& s, char delim);
 
