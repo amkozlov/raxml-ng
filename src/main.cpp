@@ -1925,8 +1925,7 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
     if (!opts.asr_probs_file().empty())
     {
       AncestralProbStream as(opts.asr_probs_file());
-//      as.precision(logger().precision(LogElement::other));
-      as.precision(5);
+      as.precision(logger().precision(LogElement::other));
       as << *instance.ancestral_states;
 
       LOG_INFO << "Marginal ancestral probabilities saved to: " << sysutil_realpath(opts.asr_probs_file()) << endl;
@@ -2360,7 +2359,7 @@ int internal_main(int argc, char** argv, void* comm)
     srand(opts.random_seed);
 
     logger().log_level(instance.opts.log_level);
-    logger().precision(instance.opts.precision, LogElement::all);
+    logger().precision(instance.opts.precision);
 
     /* only master process writes the log file */
     if (ParallelContext::master() && !instance.opts.log_file().empty())

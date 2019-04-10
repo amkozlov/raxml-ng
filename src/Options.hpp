@@ -43,7 +43,7 @@ public:
   num_searches(1), terrace_maxsize(100),
   num_bootstraps(1000), bootstop_criterion(BootstopCriterion::none), bootstop_cutoff(0.03),
   bootstop_interval(RAXML_BOOTSTOP_INTERVAL), bootstop_permutations(RAXML_BOOTSTOP_PERMUTES),
-  precision(RAXML_DEFAULT_PRECISION), tbe_naive(false), consense_cutoff(ConsenseCutoff::MR),
+  tbe_naive(false), consense_cutoff(ConsenseCutoff::MR),
   tree_file(""), constraint_tree_file(""), msa_file(""), model_file(""), outfile_prefix(""),
   num_threads(1), num_ranks(1), simd_arch(PLL_ATTRIB_ARCH_CPU), thread_pinning(false),
   load_balance_method(LoadBalancing::benoit)
@@ -93,7 +93,7 @@ public:
   unsigned int bootstop_interval;
   unsigned int bootstop_permutations;
 
-  unsigned int precision;
+  LogElementMap precision;
   NameList outgroup_taxa;
 
   bool tbe_naive;

@@ -254,9 +254,6 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.optimize_model = true;
   opts.optimize_brlen = true;
 
-  /* data type: default autodetect */
-//  useropt->data_type = RAXML_DATATYPE_AUTO;
-
   /* initialize LH epsilon with default value */
   opts.lh_epsilon = DEF_LH_EPSILON;
 
@@ -680,10 +677,18 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         num_commands++;
         break;
       case 42:  /* precision */
-        if (sscanf(optarg, "%u", &opts.precision) != 1 || opts.precision == 0)
         {
-          throw InvalidOptionValueException("Invalid precision: %s " + string(optarg) +
-                                            ", please provide a positive integer number!");
+          unsigned int prec = 0;
+          if (sscanf(optarg, "%u", &prec) != 1 || prec == 0)
+          {
+            throw InvalidOptionValueException("Invalid precision: " + string(optarg) +
+                                              ", please provide a positive integer number!");
+          }
+          else
+          {
+            opts.precision.clear();
+            opts.precision[LogElement::all] = prec;
+          }
         }
         break;
       case 43:  /* outgroup */
@@ -824,6 +829,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.use_pattern_compression = false;
         opts.use_repeats = false;
         opts.use_tip_inner = true;
+        if (opts.precision.empty())
+          opts.precision[LogElement::other] = 5;
         num_commands++;
         break;
 
