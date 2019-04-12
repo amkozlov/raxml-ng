@@ -72,14 +72,8 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
 
 PhylipStream& operator>>(PhylipStream& stream, MSA& msa)
 {
-  pll_phylip_t * fd = pll_phylip_open(stream.fname().c_str(), pll_map_generic);
-  if (!fd)
-    throw runtime_error(pll_errmsg);
-
-  pll_msa_t * pll_msa = stream.interleaved() ?
-      pll_phylip_parse_interleaved(fd) : pll_phylip_parse_sequential(fd);
-
-  pll_phylip_close(fd);
+  pll_msa_t * pll_msa = pll_phylip_load(stream.fname().c_str(),
+                                        stream.interleaved() ? PLL_TRUE : PLL_FALSE);
 
   if (pll_msa)
   {

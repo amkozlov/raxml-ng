@@ -18,7 +18,7 @@ const unordered_map<DataType,const pll_state_t*,EnumClassHash>  DATATYPE_MAPS {
   {DataType::dna, pll_map_nt},
   {DataType::protein, pll_map_aa},
   {DataType::binary, pll_map_bin},
-  {DataType::diploid10, pll_map_diploid10}
+  {DataType::diploid10, pll_map_gt10}
 };
 
 
