@@ -58,7 +58,7 @@ enum class DataType
   protein,
   binary,
   multistate,
-  diploid10
+  genotype10
 };
 
 enum class ParamValue

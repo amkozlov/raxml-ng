@@ -54,6 +54,6 @@ bool sysutil_isnumber(const std::string& s);
 
 /* parsing utils */
 std::vector<std::string> split_string(const std::string& s, char delim);
-
+bool isprefix(const std::string& s, const std::string& prefix);
 
 #endif /* RAXML_COMMON_H_ */

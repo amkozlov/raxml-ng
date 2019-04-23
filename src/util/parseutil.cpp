@@ -13,3 +13,8 @@ vector<string> split_string(const string& s, char delim)
    }
    return tokens;
 }
+
+bool isprefix(const std::string& s, const std::string& prefix)
+{
+  return s.rfind(prefix, 0) == 0;
+}

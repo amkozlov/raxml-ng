@@ -375,7 +375,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         else if (strcasecmp(optarg, "binary") == 0 || strcasecmp(optarg, "bin") == 0)
           opts.data_type = DataType::binary;
         else if (strcasecmp(optarg, "diploid10") == 0)
-          opts.data_type = DataType::diploid10;
+          opts.data_type = DataType::genotype10;
         else if (strcasecmp(optarg, "multi") == 0)
           opts.data_type = DataType::multistate;
         else if (strcasecmp(optarg, "auto") == 0)

@@ -302,7 +302,7 @@ TEST(ModelTest, genotype)
 
   // tests
   EXPECT_EQ("GTGTR4+FO", model.to_string());
-  EXPECT_EQ(DataType::diploid10, model.data_type());
+  EXPECT_EQ(DataType::genotype10, model.data_type());
   EXPECT_EQ("GTGTR4", model.name());
   EXPECT_EQ(10, model.num_states());
   EXPECT_EQ(PLLMOD_UTIL_MIXTYPE_FIXED, model.ratehet_mode());
@@ -312,5 +312,40 @@ TEST(ModelTest, genotype)
   EXPECT_EQ(model.num_free_params(), 15);
   EXPECT_EQ(list_to_string(model.state_names()), "ACGTMRWSYK");
   EXPECT_EQ(map_to_string(model.full_state_namemap()), "-ACGKMRSTWY");
+}
+
+
+TEST(ModelTest, DNA_usersym)
+{
+  // buildup
+  auto model = Model(DataType::autodetect, "DNA001122");
+
+  // tests
+  EXPECT_EQ(model.to_string(), "DNA001122+FO");
+  EXPECT_EQ(model.data_type(), DataType::dna);
+  EXPECT_EQ(model.name(), "DNA001122");
+  EXPECT_EQ(model.num_states(), 4);
+  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_FIXED);
+  EXPECT_EQ(model.num_ratecats(), 1);
+  EXPECT_EQ(model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES), ParamValue::ML);
+  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_FREQUENCIES);
+  EXPECT_EQ(model.num_free_params(), 5);
+}
+
+TEST(ModelTest, multistate_usersym)
+{
+  // buildup
+  auto model = Model(DataType::autodetect, "MULTI5_USER1234561231+FC+G");
+
+  // tests
+  EXPECT_EQ(model.to_string(), "MULTI5_USER1234561231+FC+G4m");
+  EXPECT_EQ(model.data_type(), DataType::multistate);
+  EXPECT_EQ(model.name(), "MULTI5_USER1234561231");
+  EXPECT_EQ(model.num_states(), 5);
+  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_GAMMA);
+  EXPECT_EQ(model.num_ratecats(), 4);
+  EXPECT_EQ(model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES), ParamValue::ML);
+  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_ALPHA);
+  EXPECT_EQ(model.num_free_params(), 10);
 }
 
