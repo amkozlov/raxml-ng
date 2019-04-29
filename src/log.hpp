@@ -50,7 +50,7 @@ class LogStream
 {
 public:
   LogStream() {};
-  LogStream(const StreamList& streams) { _streams = streams; };
+  LogStream(const StreamList& streams) : _streams(streams) {};
 
   StreamList& streams() { return _streams;};
 

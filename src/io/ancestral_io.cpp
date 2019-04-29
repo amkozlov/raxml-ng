@@ -12,7 +12,7 @@ AncestralProbStream& operator<<(AncestralProbStream& stream, const AncestralStat
   /* print header line */
   stream << "Node";
   if (num_parts > 1)
-    stream << delim << "Part" ;
+    stream << delim << "Part";
   stream << delim << "Site" << delim << "State ";
 
   for (const auto& s: ancestral.state_names)
@@ -38,7 +38,7 @@ AncestralProbStream& operator<<(AncestralProbStream& stream, const AncestralStat
       {
         stream << node_name;
         if (num_parts > 1)
-          stream << delim << (p+1) ;
+          stream << delim << (p+1);
         stream << delim << (j+1) << delim << seq[j];
         for (size_t k = 0; k < ancestral.num_states; ++k)
           stream << delim << *prob++;

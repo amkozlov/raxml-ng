@@ -48,13 +48,10 @@ public:
 
   virtual ~PartitionInfo ();
 
-  PartitionInfo (PartitionInfo&& other)
+  PartitionInfo (PartitionInfo&& other) : _name(std::move(other._name)),
+      _range_string(std::move(other._range_string)),  _model(std::move(other._model)),
+      _msa(std::move(other._msa)), _stats(std::move(other._stats))
   {
-    _name = std::move(other._name);
-    _range_string = std::move(other._range_string);
-    _model = std::move(other._model);
-    _msa = std::move(other._msa);
-    _stats = std::move(other._stats);
     other._stats = PartitionStats();
   }
 

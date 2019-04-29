@@ -426,7 +426,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
 
       case 15:  /* spr-radius = maximum radius for fast SPRs */
-        if (sscanf(optarg, "%u", &opts.spr_radius) != 1)
+        if (sscanf(optarg, "%d", &opts.spr_radius) != 1 || opts.spr_radius <= 0)
         {
           throw InvalidOptionValueException("Invalid SPR radius: " + string(optarg) +
                                             ", please provide a positive integer!");

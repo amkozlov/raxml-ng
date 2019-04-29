@@ -38,8 +38,9 @@ RaxmlPartitionStream& operator>>(RaxmlPartitionStream& stream, PartitionInfo& pa
         if (!model_set)
         {
           string str = strstream.str();
-          std::remove_if(str.begin(), str.end(),
-                                   [](unsigned char x){return std::isspace(x);});
+          str.erase(std::remove_if(str.begin(), str.end(),
+                                   [](unsigned char x){return std::isspace(x);}),
+                     str.end());
           if (str.empty())
             throw empty_line_exception();
           else

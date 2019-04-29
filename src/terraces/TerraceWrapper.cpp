@@ -9,7 +9,7 @@
 using namespace terraces;
 
 LogStream& operator<<(LogStream& s,
-                      const std::pair<const terraces::bitmatrix&, const terraces::name_map&> nbm)
+                      const std::pair<const terraces::bitmatrix&, const terraces::name_map&>& nbm)
 {
   auto bm = nbm.first;
   auto names = nbm.second;

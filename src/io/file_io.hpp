@@ -12,8 +12,8 @@
 class NewickStream : public std::fstream
 {
 public:
-  NewickStream(std::string fname) : std::fstream(fname, std::ios::out), _brlens(true) {};
-  NewickStream(std::string fname, std::ios_base::openmode mode) :
+  NewickStream(const std::string& fname) : std::fstream(fname, std::ios::out), _brlens(true) {};
+  NewickStream(const std::string& fname, std::ios_base::openmode mode) :
     std::fstream(fname, mode), _brlens(true) {};
 
   bool brlens() const { return _brlens; }
@@ -69,10 +69,10 @@ public:
 class RaxmlPartitionStream : public std::fstream
 {
 public:
-  RaxmlPartitionStream(std::string fname, bool use_range_string = false) :
+  RaxmlPartitionStream(const std::string& fname, bool use_range_string = false) :
     std::fstream(fname, std::ios::out), _offset(0), _print_model_params(false),
     _use_range_string(use_range_string) {}
-  RaxmlPartitionStream(std::string fname, std::ios_base::openmode mode) :
+  RaxmlPartitionStream(const std::string& fname, std::ios_base::openmode mode) :
     std::fstream(fname, mode), _offset(0), _print_model_params(false), _use_range_string(false) {}
 
   bool print_model_params() const { return _print_model_params; }
@@ -100,7 +100,7 @@ private:
 class FileIOStream : public std::fstream
 {
 public:
-  FileIOStream(std::string fname, std::ios_base::openmode mode = std::ios::out) :
+  FileIOStream(const std::string& fname, std::ios_base::openmode mode = std::ios::out) :
     std::fstream(fname, mode), _delim("\t"), _precision(6) {};
 
   const std::string& delim() { return _delim; };
@@ -116,16 +116,16 @@ protected:
 class AncestralProbStream : public FileIOStream
 {
 public:
-  AncestralProbStream(std::string fname) : FileIOStream(fname) {};
-  AncestralProbStream(std::string fname, std::ios_base::openmode mode) :
+  AncestralProbStream(const std::string& fname) : FileIOStream(fname) {};
+  AncestralProbStream(const std::string& fname, std::ios_base::openmode mode) :
     FileIOStream(fname, mode) {};
 };
 
 class AncestralStateStream : public FileIOStream
 {
 public:
-  AncestralStateStream(std::string fname) : FileIOStream(fname) {};
-  AncestralStateStream(std::string fname, std::ios_base::openmode mode) :
+  AncestralStateStream(const std::string& fname) : FileIOStream(fname) {};
+  AncestralStateStream(const std::string& fname, std::ios_base::openmode mode) :
     FileIOStream(fname, mode) {};
 };
 

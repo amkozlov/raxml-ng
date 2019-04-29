@@ -43,7 +43,7 @@ PllSplitSharedPtr SupportTree::extract_splits_from_tree(const pll_unode_t& root,
   return splits;
 }
 
-void SupportTree::add_splits_to_hashtable(const PllSplitSharedPtr splits,
+void SupportTree::add_splits_to_hashtable(const PllSplitSharedPtr& splits,
                                           const doubleVector& support, bool update_only)
 {
   _pll_splits_hash = pllmod_utree_split_hashtable_insert(_pll_splits_hash,

@@ -21,7 +21,7 @@ public:
 protected:
   PllSplitSharedPtr extract_splits_from_tree(const pll_unode_t& root,
                                              pll_unode_t ** node_split_map);
-  void add_splits_to_hashtable(const PllSplitSharedPtr splits,
+  void add_splits_to_hashtable(const PllSplitSharedPtr& splits,
                                const doubleVector& support, bool update_only);
   void add_tree(const Tree& tree);
   virtual void add_tree(const pll_unode_t& root) = 0;
