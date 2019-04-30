@@ -55,6 +55,7 @@ public:
   static bool master_rank() { return _rank_id == 0; }
   static bool master_thread() { return _thread_id == 0; }
   static size_t thread_id() { return _thread_id; }
+  static size_t rank_id() { return _rank_id; }
   static size_t proc_id() { return _rank_id * _num_threads + _thread_id; }
 
   static void barrier();

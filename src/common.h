@@ -25,7 +25,7 @@ extern "C" {
 #include "SystemTimer.hpp"
 
 /* used to supress compiler warnings about unused args */
-#define RAXML_UNUSED(expr) PLLMOD_UNUSED(expr)
+#define RAXML_UNUSED(expr) (void)(expr)
 
 /* system utils */
 void sysutil_fatal(const char * format, ...);
