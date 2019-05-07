@@ -74,6 +74,7 @@ static struct option long_options[] =
   {"rf",                 optional_argument, 0, 0 },  /*  51 */
   {"consense",           optional_argument, 0, 0 },  /*  52 */
   {"ancestral",          optional_argument, 0, 0 },  /*  53 */
+  {"nodks",              no_argument, 0, 0 },        /*  54 */
 
   { 0, 0, 0, 0 }
 };
@@ -834,6 +835,11 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.precision[LogElement::other] = 5;
         num_commands++;
         break;
+
+      case 54:
+        opts.dks_off = true;
+        break;
+
 
       default:
         throw  OptionException("Internal error in option parsing");

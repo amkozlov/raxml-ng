@@ -46,7 +46,7 @@ public:
   tbe_naive(false), consense_cutoff(ConsenseCutoff::MR),
   tree_file(""), constraint_tree_file(""), msa_file(""), model_file(""), outfile_prefix(""),
   num_threads(1), num_ranks(1), simd_set(false), simd_arch(PLL_ATTRIB_ARCH_CPU), thread_pinning(false),
-  load_balance_method(LoadBalancing::benoit)
+  load_balance_method(LoadBalancing::benoit), dks_off(false)
   {};
 
   ~Options() = default;
@@ -115,6 +115,7 @@ public:
   unsigned int simd_arch;               /* vector instruction set */
   bool thread_pinning;                     /* pin threads to cores */
   LoadBalancing load_balance_method;
+  bool dks_off;
 
   std::string simd_arch_name() const;
   std::string consense_type_name() const;
