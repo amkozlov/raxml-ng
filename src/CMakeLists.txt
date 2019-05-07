@@ -48,6 +48,7 @@ else()
                   ${RAXML_LOCALDEPS_DIR}/lib/libpll_msa.a
                   ${RAXML_LOCALDEPS_DIR}/lib/libpll_tree.a
                   ${RAXML_LOCALDEPS_DIR}/lib/libpll_util.a
+                  ${RAXML_LOCALDEPS_DIR}/lib/libpll_dks.a
                   ${RAXML_LOCALDEPS_DIR}/lib/libpll.a
                   )
 endif()

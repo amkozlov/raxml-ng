@@ -2202,7 +2202,6 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   load_parted_msa(instance);
   assert(instance.parted_msa);
   auto& parted_msa = *instance.parted_msa;
-
   load_constraint(instance);
 
   check_options(instance);

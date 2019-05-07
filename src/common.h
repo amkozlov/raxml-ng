@@ -17,6 +17,7 @@ extern "C" {
 #include <libpll/pllmod_util.h>
 #include <libpll/pllmod_algorithm.h>
 }
+#include <libpll/dks.h>
 
 #include "types.hpp"
 #include "constants.hpp"
