@@ -463,6 +463,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         }
         break;
       case 20: /* SIMD instruction set */
+        opts.simd_set = true;
         if (strcasecmp(optarg, "none") == 0 || strcasecmp(optarg, "scalar") == 0)
         {
           opts.simd_arch = PLL_ATTRIB_ARCH_CPU;

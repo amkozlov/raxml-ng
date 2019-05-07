@@ -571,6 +571,82 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
   pll_set_pattern_weights(partition, comp_weights.data());
 }
 
+std::vector<std::vector<char>> create_trimmed_msa(const MSA &msa,
+                                                  const uintVector &weights,
+                                                  const IDVector& tip_msa_idmap,
+                                                  size_t start, size_t length,
+                                                  size_t trimmed_length) {
+  std::vector<std::vector<char>> trimmed_msa;
+  trimmed_msa.reserve(msa.size());
+
+  for (size_t tip_id = 0; tip_id < msa.size(); ++tip_id) {
+    trimmed_msa.emplace_back(trimmed_length);
+    auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
+    const char *full_seq = msa.at(seq_id).c_str();
+    size_t pos = 0;
+    for (size_t j = start; j < start + length; ++j) {
+      if (weights[j] > 0)
+        trimmed_msa[tip_id][pos++] = full_seq[j];
+    }
+  }
+
+  return trimmed_msa;
+}
+
+std::vector<std::vector<double>>
+create_trimmed_prob_msa(const MSA &msa, const IDVector &tip_msa_idmap,
+                        size_t start, size_t length, size_t trimmed_length,
+                        size_t states) {
+
+  std::vector<std::vector<double>> trimmed_msa;
+  trimmed_msa.reserve(msa.size());
+
+  auto normalize = !msa.normalized();
+  auto weights_iter = msa.weights().cbegin() + start;
+
+  auto clv_size = trimmed_length * states;
+  for (size_t tip_id = 0; tip_id < msa.size(); ++tip_id) {
+    trimmed_msa.emplace_back(clv_size);
+
+    auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
+    auto probs = msa.probs(seq_id, start);
+
+    auto clvp = trimmed_msa[tip_id].begin();
+    for (size_t i = 0; i < length; ++i) {
+      if (weights_iter[i] > 0) {
+        double sum = 0.;
+        for (size_t j = 0; j < states; ++j)
+          sum += probs[j];
+
+        for (size_t j = 0; j < states; ++j) {
+          if (sum > 0.)
+            clvp[j] = normalize ? probs[j] / sum : probs[j];
+          else
+            clvp[j] = 1.0;
+        }
+
+        clvp += states;
+      }
+
+      /* NB: clv has to be padded, but msa arrays are not! */
+      probs += states;
+    }
+  }
+
+  return trimmed_msa;
+}
+
+uintVector create_trimmed_weights(const uintVector &weights,
+                                  size_t part_length) {
+  uintVector trimmed_weights;
+  trimmed_weights.reserve(part_length);
+  for (size_t i = 0; i < weights.size(); i++) {
+    if (weights[i] > 0)
+      trimmed_weights.push_back(weights[i]);
+  }
+  return trimmed_weights;
+}
+
 pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& pinfo,
                                       const IDVector& tip_msa_idmap,
                                       const PartitionRange& part_region, const uintVector& weights)
@@ -586,13 +662,46 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
                                              { return w > 0; }
                                            );
 
-  unsigned int attrs = opts.simd_arch;
-
+  unsigned int attrs = 0;
+  //TODO: add code to exclude the instruction sets that aren't supported by the
+  //running machine
+  if (opts.simd_set){
+    attrs |= opts.simd_arch;
+  }
   if (opts.use_rate_scalers && model.num_ratecats() > 1)
   {
     attrs |= PLL_ATTRIB_RATE_SCALERS;
   }
+  if (opts.use_repeats)
+  {
+    assert(!(opts.use_prob_msa));
+    attrs |= PLL_ATTRIB_SITE_REPEATS;
+  }
+  else if (opts.use_tip_inner){
+    attrs |= PLL_ATTRIB_PATTERN_TIP;
+  }
 
+  dks::attributes_generator_t gen;
+  gen.enable(attrs);
+  gen.disable(PLL_ATTRIB_ARCH_AVX512);
+
+  auto trimmed_weights = create_trimmed_weights(weights, part_length);
+  if (opts.use_prob_msa && msa.probabilistic()){
+    auto trimmed_msa = create_trimmed_prob_msa(msa, tip_msa_idmap,
+        part_region.start, part_region.length, part_length, msa.states());
+    attrs = dks::select_kernel_auto(trimmed_msa, trimmed_weights,
+        model.num_states(), model.num_states(), gen);
+  }
+  else{
+    auto trimmed_msa = create_trimmed_msa(msa, weights, tip_msa_idmap, 
+        part_region.start, part_region.length, part_length);
+    attrs = dks::select_kernel_auto(trimmed_msa, trimmed_weights, model.charmap(),
+        model.num_states(), model.num_states(), gen);
+  }
+
+
+
+  /*
   if (opts.use_repeats)
   {
     assert(!(opts.use_prob_msa));
@@ -611,6 +720,7 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
         attrs |= PLL_ATTRIB_PATTERN_TIP;
     }
   }
+  */
 
   // NOTE: if partition is split among multiple threads, asc. bias correction must be applied only once!
   if (model.ascbias_type() == AscBiasCorrection::lewis ||
