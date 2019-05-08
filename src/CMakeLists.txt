@@ -101,3 +101,5 @@ else()
 endif()
 
 set_target_properties(raxml_module PROPERTIES PREFIX "")
+
+install(TARGETS raxml_module DESTINATION bin)
