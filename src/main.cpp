@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2017 Alexey Kozlov, Alexandros Stamatakis, Diego Darriba, Tomas Flouri
+    Copyright (C) 2017-2019 Alexey Kozlov, Alexandros Stamatakis, Diego Darriba, Tomas Flouri
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as
@@ -94,8 +94,9 @@ void print_banner()
 {
   LOG_INFO << endl << "RAxML-NG v. " << RAXML_VERSION << " released on " << RAXML_DATE <<
       " by The Exelixis Lab." << endl;
-  LOG_INFO << "Authors: Alexey Kozlov, Alexandros Stamatakis, Diego Darriba, "
-              "Tomas Flouri, Benoit Morel." << endl;
+  LOG_INFO << "Developed by: Alexey M. Kozlov and Alexandros Stamatakis." << endl;
+  LOG_INFO << "Contributors: Diego Darriba, Tomas Flouri, Benoit Morel, "
+              "Sarah Lutteropp, Ben Bettisworth." << endl;
   LOG_INFO << "Latest version: https://github.com/amkozlov/raxml-ng" << endl;
   LOG_INFO << "Questions/problems/suggestions? "
               "Please visit: https://groups.google.com/forum/#!forum/raxml" << endl;
