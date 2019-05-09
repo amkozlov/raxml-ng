@@ -103,12 +103,12 @@ If still in doubt, please feel free to post to the [RAxML google group](https://
 
 The code is currently licensed under the GNU Affero General Public License version 3.
 
-When using RAxML-NG, please cite [this preprint](https://www.biorxiv.org/content/early/2018/10/18/447110):
+When using RAxML-NG, please cite [this paper](https://doi.org/10.1093/bioinformatics/btz305):
 
-Alexey M. Kozlov, Diego Darriba, Tom&aacute;&scaron; Flouri, Benoit Morel, and Alexandros Stamatakis (2018)
+Alexey M. Kozlov, Diego Darriba, Tom&aacute;&scaron; Flouri, Benoit Morel, and Alexandros Stamatakis (2019)
 **RAxML-NG: A fast, scalable, and user-friendly tool for maximum likelihood phylogenetic inference.** 
-*bioRxiv.* 
-doi:[10.1101/447110](https://doi.org/10.1101/447110)
+*Bioinformatics, btz305* 
+doi:[10.1093/bioinformatics/btz305](https://doi.org/10.1093/bioinformatics/btz305)
 
 ## The team
 
@@ -117,6 +117,8 @@ doi:[10.1101/447110](https://doi.org/10.1101/447110)
 * Diego Darriba
 * Tom&aacute;&scaron; Flouri
 * Benoit Morel
+* Ben Bettisworth
+* Sarah Lutteropp
 
 ## References
 
