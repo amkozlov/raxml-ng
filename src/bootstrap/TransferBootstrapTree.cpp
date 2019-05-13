@@ -45,7 +45,7 @@ void TransferBootstrapTree::add_tree(const pll_unode_t& root)
     else
     {
       pllmod_utree_tbe_nature(_ref_splits.get(), splits.get(), (pll_unode_t*) &root,
-                                               _num_tips, support.data(), _split_info);
+                                               _num_tips, support.data(), _split_info, 0, NULL);
     }
 
     add_splits_to_hashtable(_ref_splits, support, 1);
