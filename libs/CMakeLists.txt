@@ -17,7 +17,22 @@ if (USE_LIBPLL_CMAKE)
             ${PLLMOD_SRC}/tree/pll_tree.h
             ${PLLMOD_SRC}/util/pllmod_util.h
             ${LIBPLL_SRC}/pll.h
+            ${PLLMOD_SRC}/dks/benchmark.h
+            ${PLLMOD_SRC}/dks/dks.h
+            ${PLLMOD_SRC}/dks/model.h
+            ${PLLMOD_SRC}/dks/partition.h
+            ${PLLMOD_SRC}/dks/test_case.h
+            ${PLLMOD_SRC}/dks/tree.h
             DESTINATION ${RAXML_LOCALDEPS_DIR}/include/libpll)
+
+          #  file(COPY ${PLLMOD_SRC}/dks/benchmark.h
+          #            ${PLLMOD_SRC}/dks/dks.h
+          #            ${PLLMOD_SRC}/dks/model.h
+          #            ${PLLMOD_SRC}/dks/msa.h
+          #            ${PLLMOD_SRC}/dks/partition.h
+          #            ${PLLMOD_SRC}/dks/test_case.h
+          #            ${PLLMOD_SRC}/dks/tree.h
+          #            DESTINATION ${RAXML_LOCALDEPS_DIR}/include/libpll/dks)
 
 #target_include_directories(raxml_module PRIVATE ${RAXML_LIBPLL_HEADERS})
 
