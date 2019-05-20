@@ -99,8 +99,7 @@ void print_banner()
               "Sarah Lutteropp, Ben Bettisworth." << endl;
   LOG_INFO << "Latest version: https://github.com/amkozlov/raxml-ng" << endl;
   LOG_INFO << "Questions/problems/suggestions? "
-              "Please visit: https://groups.google.com/forum/#!forum/raxml" << endl;
-  LOG_INFO << endl << "WARNING: This is a BETA release, please use at your own risk!" << endl << endl;
+              "Please visit: https://groups.google.com/forum/#!forum/raxml" << endl << endl;
 }
 
 void init_part_info(RaxmlInstance& instance)
