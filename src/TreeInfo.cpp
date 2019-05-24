@@ -28,6 +28,7 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
   _brlen_min = opts.brlen_min;
   _brlen_max = opts.brlen_max;
   _brlen_opt_method = opts.brlen_opt_method;
+  _check_lh_impr = opts.safety_checks.isset(SafetyCheck::model_lh_impr);
   _partition_contributions.resize(parted_msa.part_count());
   double total_weight = 0;
 
@@ -120,6 +121,19 @@ TreeInfo::~TreeInfo ()
     pllmod_treeinfo_destroy(_pll_treeinfo);
   }
 }
+
+void TreeInfo::assert_lh_improvement(double old_lh, double new_lh, const std::string& where)
+{
+  if (_check_lh_impr && !(old_lh - new_lh < -new_lh * RAXML_LOGLH_TOLERANCE))
+  {
+    throw runtime_error((where.empty() ? "" : "[" + where + "] ") +
+                        "Worse log-likelihood after optimization!\n" +
+                        "Old: " + to_string(old_lh) + "\n"
+                        "New: " + to_string(new_lh) + "\n" +
+                        "NOTE: You can disable this check with '--force model_lh_impr'");
+  }
+}
+
 
 Tree TreeInfo::tree() const
 {
@@ -255,7 +269,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
     LOG_DEBUG << "\t - after rates: logLH = " << new_loglh << endl;
 
     libpll_check_error("ERROR in substitution rates optimization");
-    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+    assert_lh_improvement(cur_loglh, new_loglh, "RATES");
     cur_loglh = new_loglh;
   }
 
@@ -272,7 +286,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
     LOG_DEBUG << "\t - after freqs: logLH = " << new_loglh << endl;
 
     libpll_check_error("ERROR in base frequencies optimization");
-    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+    assert_lh_improvement(cur_loglh, new_loglh, "FREQS");
     cur_loglh = new_loglh;
   }
 
@@ -293,7 +307,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
     LOG_DEBUG << "\t - after a+i  : logLH = " << new_loglh << endl;
 
     libpll_check_error("ERROR in alpha/p-inv parameter optimization");
-    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+    assert_lh_improvement(cur_loglh, new_loglh, "ALPHA+PINV");
     cur_loglh = new_loglh;
   }
   else
@@ -310,7 +324,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
      LOG_DEBUG << "\t - after alpha: logLH = " << new_loglh << endl;
 
      libpll_check_error("ERROR in alpha parameter optimization");
-     assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+     assert_lh_improvement(cur_loglh, new_loglh, "ALPHA");
      cur_loglh = new_loglh;
     }
 
@@ -326,7 +340,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
       LOG_DEBUG << "\t - after p-inv: logLH = " << new_loglh << endl;
 
       libpll_check_error("ERROR in p-inv optimization");
-      assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+      assert_lh_improvement(cur_loglh, new_loglh, "PINV");
       cur_loglh = new_loglh;
     }
   }
@@ -349,7 +363,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
 //    LOG_DEBUG << "\t - after freeR/crosscheck: logLH = " << loglh() << endl;
 
     libpll_check_error("ERROR in FreeRate rates/weights optimization");
-    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+    assert_lh_improvement(cur_loglh, new_loglh, "FREE RATES");
     cur_loglh = new_loglh;
   }
 
@@ -357,7 +371,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
   {
     new_loglh = optimize_branches(lh_epsilon, 0.25);
 
-    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+    assert_lh_improvement(cur_loglh, new_loglh, "BRLEN");
     cur_loglh = new_loglh;
   }
 

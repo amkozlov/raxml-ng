@@ -23,8 +23,9 @@ struct SafetyCheck
     model_lg4_freqs      = 1 << 23,
     model_asc_bias       = 1 << 24,
     model_overfit        = 1 << 25,
+    model_lh_impr        = 1 << 26,
     model                = model_zero_freqs | model_invalid_freqs | model_lg4_freqs |
-                           model_asc_bias | model_overfit
+                           model_asc_bias | model_overfit | model_lh_impr
   };
 
 

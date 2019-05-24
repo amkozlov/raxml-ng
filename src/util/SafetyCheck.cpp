@@ -29,6 +29,8 @@ SafetyCheck::Flags SafetyCheck::from_string(const string& s)
     return SafetyCheck::model_asc_bias;
   else if (s == "model_overfit")
     return SafetyCheck::model_overfit;
+  else if (s == "model_lh_impr")
+    return SafetyCheck::model_lh_impr;
   else
     throw runtime_error("Invalid SafetyCheck enum value: " + s);
 }

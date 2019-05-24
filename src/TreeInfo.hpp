@@ -68,11 +68,14 @@ private:
   int _brlen_opt_method;
   double _brlen_min;
   double _brlen_max;
+  bool _check_lh_impr;
   doubleVector _partition_contributions;
 
   void init(const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
             const IDVector& tip_msa_idmap, const PartitionAssignment& part_assign,
             const std::vector<uintVector>& site_weights);
+
+  void assert_lh_improvement(double old_lh, double new_lh, const std::string& where = "");
 };
 
 void assign(PartitionedMSA& parted_msa, const TreeInfo& treeinfo);

@@ -2,7 +2,7 @@
 #define RAXML_CONSTANTS_HPP_
 
 // defaults
-#define RAXML_DOUBLE_TOLERANCE    1e-14
+#define RAXML_LOGLH_TOLERANCE     1e-12
 
 #define DEF_LH_EPSILON            0.1
 #define OPT_LH_EPSILON            0.1
