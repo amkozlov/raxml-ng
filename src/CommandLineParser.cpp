@@ -151,6 +151,14 @@ void CommandLineParser::check_options(Options &opts)
     }
   }
 
+  if (opts.num_bootstraps > 0 && opts.command != Command::bsmsa &&
+      opts.command != Command::bootstrap && opts.command != Command::all)
+  {
+    throw OptionException("You specified the number of bootstrap replicates with --bs-trees option, "
+        "but the current command does not perform bootstrapping.\n"
+        "Did you forget --all option?");
+  }
+
   if (opts.simd_arch > sysutil_simd_autodetect())
   {
     if (opts.force_mode)
