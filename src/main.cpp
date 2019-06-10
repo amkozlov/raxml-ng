@@ -1051,7 +1051,7 @@ void build_parsimony_msa(RaxmlInstance& instance)
   instance.parted_msa_parsimony.reset(new PartitionedMSA(orig_msa.taxon_names()));
   PartitionedMSA& pars_msa = *instance.parted_msa_parsimony.get();
 
-  std::unordered_map<string, PartitionInfo*> datatype_pinfo_map;
+  NameIdMap datatype_pinfo_map;
   for (const auto& pinfo: orig_msa.part_list())
   {
     const auto& model = pinfo.model();
@@ -1063,11 +1063,11 @@ void build_parsimony_msa(RaxmlInstance& instance)
       pars_msa.emplace_part_info(data_type_name, model.data_type(), model.name());
       auto& pars_pinfo = pars_msa.part_list().back();
       pars_pinfo.msa(MSA(pinfo.msa().num_sites()));
-      datatype_pinfo_map[data_type_name] = &pars_pinfo;
+      datatype_pinfo_map[data_type_name] = pars_msa.part_count()-1;
     }
     else
     {
-      auto& msa = iter->second->msa();
+      auto& msa = pars_msa.part_list().at(iter->second).msa();
       msa.num_sites(msa.num_sites() + pinfo.msa().num_sites());
     }
   }
