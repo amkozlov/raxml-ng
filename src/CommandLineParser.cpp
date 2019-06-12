@@ -737,6 +737,15 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.tbe_naive = true;
             else if (eopt == "tbe-nature")
               opts.tbe_naive = false;
+            else if (sscanf(eopt.c_str(), "tbe-cutoff{%lf}", &opts.tbe_extra_cutoff) == 1)
+              void();
+            else if (eopt == "tbe_extra_table")
+            	opts.tbe_extra_table = true;
+            else if (eopt == "tbe_extra_array")
+            	opts.tbe_extra_array = true;
+            else if (eopt == "tbe_extra_tree")
+            	opts.tbe_extra_tree = true;
+            // TODO: put TBE bool flags here
             else
               throw InvalidOptionValueException("Unknown extra option: " + string(optarg));
           }

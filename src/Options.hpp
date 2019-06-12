@@ -17,6 +17,9 @@ struct OutputFileNames
   std::string bootstrap_trees;
   std::string support_tree;
   std::string tbe_support_tree;
+  std::string tbe_extra_table;
+  std::string tbe_extra_array;
+  std::string tbe_extra_tree;
   std::string fbp_support_tree;
   std::string terrace;
   std::string binary_msa;
@@ -40,6 +43,7 @@ public:
   spr_cutoff(1.0),
   brlen_linkage(PLLMOD_COMMON_BRLEN_SCALED), brlen_opt_method(PLLMOD_OPT_BLO_NEWTON_FAST),
   brlen_min(RAXML_BRLEN_MIN), brlen_max(RAXML_BRLEN_MAX),
+  tbe_extra_cutoff(0), tbe_extra_table(false), tbe_extra_array(false), tbe_extra_tree(false),
   num_searches(1), terrace_maxsize(100),
   num_bootstraps(1000), bootstop_criterion(BootstopCriterion::none), bootstop_cutoff(0.03),
   bootstop_interval(RAXML_BOOTSTOP_INTERVAL), bootstop_permutations(RAXML_BOOTSTOP_PERMUTES),
@@ -82,6 +86,10 @@ public:
   int brlen_opt_method;
   double brlen_min;
   double brlen_max;
+  unsigned int tbe_extra_cutoff;
+  bool tbe_extra_table;
+  bool tbe_extra_array;
+  bool tbe_extra_tree;
 
   unsigned int num_searches;
   unsigned long long terrace_maxsize;
@@ -135,6 +143,9 @@ public:
   std::string bootstrap_partition_file() const;
   const std::string rfdist_file() const { return outfile_names.rfdist; }
   const std::string cons_tree_file() const { return outfile_names.cons_tree + consense_type_name(); }
+  const std::string& tbe_extra_table_file() const { return outfile_names.tbe_extra_table; }
+  const std::string& tbe_extra_array_file() const { return outfile_names.tbe_extra_array; }
+  const std::string& tbe_extra_tree_file() const { return outfile_names.tbe_extra_tree; }
 
   const std::string asr_tree_file() const { return outfile_names.asr_tree; }
   const std::string asr_probs_file() const { return outfile_names.asr_probs; }

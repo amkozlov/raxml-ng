@@ -1,6 +1,17 @@
 #include "TransferBootstrapTree.hpp"
 
-TransferBootstrapTree::TransferBootstrapTree(const Tree& tree, bool naive) :
+/*typedef unsigned int TBEFlags;
+
+const unsigned int TBE_DO_TABLE = 1;
+const unsigned int TBE_DO_ARRAY = 2;
+const unsigned int TBE_DO_OTHER = 4;
+
+TransferBootstrapTree bstree(tree, true, 1., TBE_DO_TABLE | TBE_DO_OTHER);
+
+TransferBootstrapTree bstree(tree, true, 1., false, true, false);
+*/
+
+TransferBootstrapTree::TransferBootstrapTree(const Tree& tree, bool naive, unsigned int d = 0, bool doTable = false, bool doArray = false, bool doTree = false) :
    SupportTree (tree), _split_info(nullptr), _naive_method(naive)
 {
   assert(num_splits() > 0);
@@ -13,13 +24,27 @@ TransferBootstrapTree::TransferBootstrapTree(const Tree& tree, bool naive) :
   {
     _split_info = pllmod_utree_tbe_nature_init((pll_unode_t*) &pll_utree_root(), _num_tips,
                                               (const pll_unode_t**) _node_split_map.data());
+    if (doTable || doArray || doTree) {
+      _extra_info = pllmod_tbe_extra_info_create(num_splits(), _num_tips, doTable, doArray, doTree);
+    }
   }
+}
+
+pllmod_tbe_extra_info_t* TransferBootstrapTree::get_extra_info() {
+	return _extra_info;
+}
+
+void TransferBootstrapTree::collect_support() {
+	SupportTree::collect_support();
+	// do the postprocessing of extra info
 }
 
 TransferBootstrapTree::~TransferBootstrapTree()
 {
   if (_split_info)
     free(_split_info);
+  if (_extra_info)
+	pllmod_tbe_extra_info_destroy(_extra_info, num_splits());
 }
 
 void TransferBootstrapTree::add_tree(const pll_unode_t& root)
@@ -45,7 +70,7 @@ void TransferBootstrapTree::add_tree(const pll_unode_t& root)
     else
     {
       pllmod_utree_tbe_nature(_ref_splits.get(), splits.get(), (pll_unode_t*) &root,
-                                               _num_tips, support.data(), _split_info, 0, NULL);
+                                               _num_tips, support.data(), _split_info);
     }
 
     add_splits_to_hashtable(_ref_splits, support, 1);

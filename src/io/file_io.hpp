@@ -6,6 +6,7 @@
 #include "../Tree.hpp"
 #include "../AncestralStates.hpp"
 #include "../bootstrap/BootstrapTree.hpp"
+#include "../bootstrap/TransferBootstrapTree.hpp"
 #include "../bootstrap/BootstrapGenerator.hpp"
 #include "../PartitionedMSAView.hpp"
 
@@ -21,6 +22,30 @@ public:
 
 private:
   bool _brlens;
+};
+
+class TBEExtraTableStream : public std::fstream
+{
+public:
+	TBEExtraTableStream(const std::string& fname) : std::fstream(fname, std::ios::out) {};
+	TBEExtraTableStream(const std::string& fname, std::ios_base::openmode mode) :
+    std::fstream(fname, mode) {};
+};
+
+class TBEExtraArrayStream : public std::fstream
+{
+public:
+	TBEExtraArrayStream(const std::string& fname) : std::fstream(fname, std::ios::out) {};
+	TBEExtraArrayStream(const std::string& fname, std::ios_base::openmode mode) :
+    std::fstream(fname, mode) {};
+};
+
+class TBEExtraTreeStream : public std::fstream
+{
+public:
+	TBEExtraTreeStream(const std::string& fname) : std::fstream(fname, std::ios::out) {};
+	TBEExtraTreeStream(const std::string& fname, std::ios_base::openmode mode) :
+    std::fstream(fname, mode) {};
 };
 
 class MSAFileStream

@@ -30,6 +30,9 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.support_tree, "support");
   set_default_outfile(outfile_names.fbp_support_tree, "supportFBP");
   set_default_outfile(outfile_names.tbe_support_tree, "supportTBE");
+  set_default_outfile(outfile_names.tbe_extra_table, "tbeExtraTable");
+  set_default_outfile(outfile_names.tbe_extra_array, "tbeExtraArray");
+  set_default_outfile(outfile_names.tbe_extra_tree, "tbeExtraTree");
   set_default_outfile(outfile_names.terrace, "terrace");
   set_default_outfile(outfile_names.binary_msa, "rba");
   set_default_outfile(outfile_names.bootstrap_msa, "bootstrapMSA");

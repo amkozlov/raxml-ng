@@ -1364,6 +1364,7 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree, const TreeC
       }
       sup_tree->draw_support(support_in_pct);
 
+
       instance.support_trees[metric] = sup_tree;
   }
 }
@@ -1804,6 +1805,25 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
 
         LOG_INFO << "Best ML tree with " << metric_name << " support values saved to: " <<
             sysutil_realpath(sup_file) << endl;
+
+        if (it.first == BranchSupportMetric::tbe)
+        {
+        	if (opts.tbe_extra_table) {
+        		auto extra_table_file = opts.tbe_extra_table_file();
+        		TBEExtraTableStream tbeExtraTable(extra_table_file);
+        		tbeExtraTable << *it.second;
+        	}
+        	if (opts.tbe_extra_array) {
+        	    auto extra_array_file = opts.tbe_extra_array_file();
+        	    TBEExtraArrayStream tbeExtraArray(extra_array_file);
+        	    tbeExtraArray << *it.second;
+        	}
+        	if (opts.tbe_extra_tree) {
+        	    auto extra_tree_file = opts.tbe_extra_tree_file();
+        	    TBEExtraTreeStream tbeExtraTree(extra_tree_file);
+        	    tbeExtraTree << *it.second;
+        	}
+        }
       }
     }
   }

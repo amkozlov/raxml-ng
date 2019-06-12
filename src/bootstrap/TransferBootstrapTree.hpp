@@ -6,8 +6,11 @@
 class TransferBootstrapTree : public SupportTree
 {
 public:
-  TransferBootstrapTree(const Tree& tree, bool naive = false);
+  TransferBootstrapTree(const Tree& tree, bool naive = false, unsigned int d = 0, bool doTable = false, bool doArray = false, bool doTree = false);
   virtual ~TransferBootstrapTree();
+
+  void postprocess_extra(); //...
+  pllmod_tbe_extra_info_t* get_extra_info();
 
 protected:
   virtual void add_tree(const pll_unode_t& root);
@@ -17,6 +20,7 @@ protected:
 
 private:
   pllmod_tbe_split_info_t * _split_info;
+  pllmod_tbe_extra_info_t * _extra_info;
   bool _naive_method;
 };
 
