@@ -70,13 +70,13 @@ bool ConsensusTree::compute_support()
   pll_utree(_num_tips, *cons_tree->tree);
 
   /* map pll_unodes to splits */
-  _node_split_map.resize(_pll_utree->inner_count);
+  _split_node_map.resize(_pll_utree->inner_count);
   _support.resize(_pll_utree->inner_count);
   for (unsigned int i = 0; i < _pll_utree->inner_count; ++i)
   {
     auto node = _pll_utree->nodes[_pll_utree->tip_count + i];
     assert(node->data);
-    _node_split_map[i] = node;
+    _split_node_map[i] = node;
     _support[i] = ((pll_consensus_data_t *) node->data)->support;
   }
 

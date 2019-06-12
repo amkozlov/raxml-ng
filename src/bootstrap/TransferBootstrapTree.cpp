@@ -11,11 +11,11 @@ TransferBootstrapTree bstree(tree, true, 1., TBE_DO_TABLE | TBE_DO_OTHER);
 TransferBootstrapTree bstree(tree, true, 1., false, true, false);
 */
 
-TransferBootstrapTree::TransferBootstrapTree(const Tree& tree, bool naive, unsigned int d = 0, bool doTable = false, bool doArray = false, bool doTree = false) :
+TransferBootstrapTree::TransferBootstrapTree(const Tree& tree, bool naive, unsigned int d, bool doTable, bool doArray, bool doTree) :
    SupportTree (tree), _split_info(nullptr), _naive_method(naive)
 {
   assert(num_splits() > 0);
-  _node_split_map.resize(num_splits());
+  _split_node_map.resize(num_splits());
 
   /* extract reference tree splits and add them into hashtable */
   add_tree(pll_utree_root());
@@ -23,21 +23,27 @@ TransferBootstrapTree::TransferBootstrapTree(const Tree& tree, bool naive, unsig
   if (!_naive_method)
   {
     _split_info = pllmod_utree_tbe_nature_init((pll_unode_t*) &pll_utree_root(), _num_tips,
-                                              (const pll_unode_t**) _node_split_map.data());
+                                              (const pll_unode_t**) _split_node_map.data());
     if (doTable || doArray || doTree) {
       _extra_info = pllmod_tbe_extra_info_create(num_splits(), _num_tips, doTable, doArray, doTree);
     }
   }
 }
 
-pllmod_tbe_extra_info_t* TransferBootstrapTree::get_extra_info() {
+const std::vector<pll_unode_t*> TransferBootstrapTree::get_split_node_map() const {
+	return _split_node_map;
+}
+
+pllmod_tbe_extra_info_t* TransferBootstrapTree::get_extra_info() const {
 	return _extra_info;
 }
 
+/*
 void TransferBootstrapTree::collect_support() {
 	SupportTree::collect_support();
 	// do the postprocessing of extra info
 }
+*/
 
 TransferBootstrapTree::~TransferBootstrapTree()
 {
@@ -54,7 +60,7 @@ void TransferBootstrapTree::add_tree(const pll_unode_t& root)
 
   if (ref_tree)
   {
-    _ref_splits = extract_splits_from_tree(root, _node_split_map.data());
+    _ref_splits = extract_splits_from_tree(root, _split_node_map.data());
 
     add_splits_to_hashtable(_ref_splits, support, 0);
   }

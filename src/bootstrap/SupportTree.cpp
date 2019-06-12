@@ -121,7 +121,7 @@ void SupportTree::draw_support(bool support_in_pct)
 //    printf("node_id %d, split_id %d\n", _node_split_map[i]->node_index, i);
 //  printf("\n\n");
 
-  pll_unode_t ** node_map = _node_split_map.empty() ? nullptr : _node_split_map.data();
+  pll_unode_t ** node_map = _split_node_map.empty() ? nullptr : _split_node_map.data();
   pllmod_utree_draw_support(_pll_utree.get(), _support.data(), node_map,
                             support_in_pct ? support_fmt_pct : support_fmt_prop);
 

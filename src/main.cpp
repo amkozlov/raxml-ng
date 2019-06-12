@@ -1811,18 +1811,18 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
         	if (opts.tbe_extra_table) {
         		auto extra_table_file = opts.tbe_extra_table_file();
         		TBEExtraTableStream tbeExtraTable(extra_table_file);
-        		tbeExtraTable << *it.second;
+        		tbeExtraTable << *dynamic_cast<const TransferBootstrapTree*>(it.second.get());
         	}
-        	if (opts.tbe_extra_array) {
+        	/*if (opts.tbe_extra_array) {
         	    auto extra_array_file = opts.tbe_extra_array_file();
         	    TBEExtraArrayStream tbeExtraArray(extra_array_file);
-        	    tbeExtraArray << *it.second;
+        	    tbeExtraArray << dynamic_cast<TransferBootstrapTree&>(it.second);
         	}
         	if (opts.tbe_extra_tree) {
         	    auto extra_tree_file = opts.tbe_extra_tree_file();
         	    TBEExtraTreeStream tbeExtraTree(extra_tree_file);
-        	    tbeExtraTree << *it.second;
-        	}
+        	    tbeExtraTree << dynamic_cast<const TransferBootstrapTree&>(*it.second);
+        	}*/
         }
       }
     }

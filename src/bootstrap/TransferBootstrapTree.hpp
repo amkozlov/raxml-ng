@@ -10,7 +10,8 @@ public:
   virtual ~TransferBootstrapTree();
 
   void postprocess_extra(); //...
-  pllmod_tbe_extra_info_t* get_extra_info();
+  pllmod_tbe_extra_info_t* get_extra_info() const;
+  const std::vector<pll_unode_t*> get_split_node_map() const;
 
 protected:
   virtual void add_tree(const pll_unode_t& root);

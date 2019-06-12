@@ -34,7 +34,7 @@ protected:
 protected:
   size_t _num_bs_trees;
   bitv_hashtable_t* _pll_splits_hash;
-  std::vector<pll_unode_t*> _node_split_map;
+  std::vector<pll_unode_t*> _split_node_map;
   doubleVector _support;
 };
 

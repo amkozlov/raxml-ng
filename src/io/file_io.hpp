@@ -187,6 +187,10 @@ RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const Partitioned
 AncestralProbStream& operator<<(AncestralProbStream& stream, const AncestralStates& ancestral);
 AncestralStateStream& operator<<(AncestralStateStream& stream, const AncestralStates& ancestral);
 
+TBEExtraTableStream& operator<<(TBEExtraTableStream& stream, const TransferBootstrapTree& tree);
+TBEExtraArrayStream& operator<<(TBEExtraArrayStream& stream, const TransferBootstrapTree& tree);
+TBEExtraTreeStream& operator<<(TBEExtraTreeStream& stream, const TransferBootstrapTree& tree);
+
 std::string to_newick_string_rooted(const Tree& tree, double root_brlen = 0.0);
 
 #endif /* RAXML_FILE_IO_HPP_ */
