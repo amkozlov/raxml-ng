@@ -1350,7 +1350,7 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree, const TreeC
       }
       else if (metric == BranchSupportMetric::tbe)
       {
-        sup_tree = make_shared<TransferBootstrapTree>(ref_tree, instance.opts.tbe_naive);
+        sup_tree = make_shared<TransferBootstrapTree>(ref_tree, instance.opts.tbe_naive, instance.opts.tbe_extra_cutoff, instance.opts.tbe_extra_table, instance.opts.tbe_extra_array, instance.opts.tbe_extra_tree);
         support_in_pct = false;
       }
       else
@@ -1808,20 +1808,29 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
 
         if (it.first == BranchSupportMetric::tbe)
         {
-        	if (opts.tbe_extra_table) {
-        		auto extra_table_file = opts.tbe_extra_table_file();
-        		TBEExtraTableStream tbeExtraTable(extra_table_file);
-        		tbeExtraTable << *dynamic_cast<const TransferBootstrapTree*>(it.second.get());
-        	}
         	if (opts.tbe_extra_array) {
         	    auto extra_array_file = opts.tbe_extra_array_file();
         	    TBEExtraArrayStream tbeExtraArray(extra_array_file);
         	    tbeExtraArray << *dynamic_cast<const TransferBootstrapTree*>(it.second.get());
+
+        	    LOG_INFO << "TBE extra array saved to: " <<
+        	            		            sysutil_realpath(extra_array_file) << endl;
         	}
+        	if (opts.tbe_extra_table) {
+				auto extra_table_file = opts.tbe_extra_table_file();
+				TBEExtraTableStream tbeExtraTable(extra_table_file);
+				tbeExtraTable << *dynamic_cast<const TransferBootstrapTree*>(it.second.get());
+
+				LOG_INFO << "TBE extra table saved to: " <<
+							sysutil_realpath(extra_table_file) << endl;
+			}
         	if (opts.tbe_extra_tree) {
-        	    auto extra_tree_file = opts.tbe_extra_tree_file();
-        	    TBEExtraTreeStream tbeExtraTree(extra_tree_file);
-        	    tbeExtraTree << *dynamic_cast<const TransferBootstrapTree*>(it.second.get());
+				auto extra_tree_file = opts.tbe_extra_tree_file();
+				TBEExtraTreeStream tbeExtraTree(extra_tree_file);
+				tbeExtraTree << *dynamic_cast<const TransferBootstrapTree*>(it.second.get());
+
+				LOG_INFO << "TBE extra tree saved to: " <<
+											sysutil_realpath(extra_tree_file) << endl;
         	}
         }
       }

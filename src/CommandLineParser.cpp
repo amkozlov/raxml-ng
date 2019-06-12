@@ -745,7 +745,6 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
             	opts.tbe_extra_array = true;
             else if (eopt == "tbe_extra_tree")
             	opts.tbe_extra_tree = true;
-            // TODO: put TBE bool flags here
             else
               throw InvalidOptionValueException("Unknown extra option: " + string(optarg));
           }

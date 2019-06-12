@@ -79,8 +79,8 @@ void TransferBootstrapTree::add_tree(const pll_unode_t& root)
       pllmod_utree_tbe_naive(_ref_splits.get(), splits.get(), _num_tips, support.data());
     else
     {
-      pllmod_utree_tbe_nature(_ref_splits.get(), splits.get(), (pll_unode_t*) &root,
-                                               _num_tips, support.data(), _split_info);
+      pllmod_utree_tbe_nature_extra(_ref_splits.get(), splits.get(), (pll_unode_t*) &root,
+                                               _num_tips, support.data(), _split_info, _extra_info);
     }
 
     add_splits_to_hashtable(_ref_splits, support, 1);
