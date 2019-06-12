@@ -7,6 +7,7 @@ TBEExtraTreeStream& operator<<(TBEExtraTreeStream& stream, const TransferBootstr
 {
   pllmod_tbe_extra_info_t* extra_info = tree.get_extra_info();
   const std::vector<pll_unode_t*> split_node_map = tree.get_split_node_map();
+  pllmod_tbe_split_info_t* split_info = tree.get_split_info();
   //...
 
   tree.pll_utree();

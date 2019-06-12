@@ -11,7 +11,7 @@ TransferBootstrapTree bstree(tree, true, 1., TBE_DO_TABLE | TBE_DO_OTHER);
 TransferBootstrapTree bstree(tree, true, 1., false, true, false);
 */
 
-TransferBootstrapTree::TransferBootstrapTree(const Tree& tree, bool naive, unsigned int d, bool doTable, bool doArray, bool doTree) :
+TransferBootstrapTree::TransferBootstrapTree(const Tree& tree, bool naive, double tbe_cutoff, bool doTable, bool doArray, bool doTree) :
    SupportTree (tree), _split_info(nullptr), _naive_method(naive)
 {
   assert(num_splits() > 0);
@@ -25,7 +25,7 @@ TransferBootstrapTree::TransferBootstrapTree(const Tree& tree, bool naive, unsig
     _split_info = pllmod_utree_tbe_nature_init((pll_unode_t*) &pll_utree_root(), _num_tips,
                                               (const pll_unode_t**) _split_node_map.data());
     if (doTable || doArray || doTree) {
-      _extra_info = pllmod_tbe_extra_info_create(num_splits(), _num_tips, doTable, doArray, doTree);
+      _extra_info = pllmod_tbe_extra_info_create(num_splits(), _num_tips, tbe_cutoff, doTable, doArray, doTree);
     }
   }
 }
@@ -36,6 +36,10 @@ const std::vector<pll_unode_t*> TransferBootstrapTree::get_split_node_map() cons
 
 pllmod_tbe_extra_info_t* TransferBootstrapTree::get_extra_info() const {
 	return _extra_info;
+}
+
+pllmod_tbe_split_info_t* TransferBootstrapTree::get_split_info() const {
+	return _split_info;
 }
 
 /*

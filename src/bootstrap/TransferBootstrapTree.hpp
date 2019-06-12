@@ -6,12 +6,13 @@
 class TransferBootstrapTree : public SupportTree
 {
 public:
-  TransferBootstrapTree(const Tree& tree, bool naive = false, unsigned int d = 0, bool doTable = false, bool doArray = false, bool doTree = false);
+  TransferBootstrapTree(const Tree& tree, bool naive = false, double tbe_cutoff = 0.3, bool doTable = false, bool doArray = false, bool doTree = false);
   virtual ~TransferBootstrapTree();
 
   void postprocess_extra(); //...
   pllmod_tbe_extra_info_t* get_extra_info() const;
   const std::vector<pll_unode_t*> get_split_node_map() const;
+  pllmod_tbe_split_info_t* get_split_info() const;
 
 protected:
   virtual void add_tree(const pll_unode_t& root);

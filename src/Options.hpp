@@ -43,7 +43,7 @@ public:
   spr_cutoff(1.0),
   brlen_linkage(PLLMOD_COMMON_BRLEN_SCALED), brlen_opt_method(PLLMOD_OPT_BLO_NEWTON_FAST),
   brlen_min(RAXML_BRLEN_MIN), brlen_max(RAXML_BRLEN_MAX),
-  tbe_extra_cutoff(0), tbe_extra_table(false), tbe_extra_array(false), tbe_extra_tree(false),
+  tbe_extra_cutoff(0.3), tbe_extra_table(false), tbe_extra_array(false), tbe_extra_tree(false),
   num_searches(1), terrace_maxsize(100),
   num_bootstraps(1000), bootstop_criterion(BootstopCriterion::none), bootstop_cutoff(0.03),
   bootstop_interval(RAXML_BOOTSTOP_INTERVAL), bootstop_permutations(RAXML_BOOTSTOP_PERMUTES),
@@ -86,7 +86,7 @@ public:
   int brlen_opt_method;
   double brlen_min;
   double brlen_max;
-  unsigned int tbe_extra_cutoff;
+  double tbe_extra_cutoff;
   bool tbe_extra_table;
   bool tbe_extra_array;
   bool tbe_extra_tree;
