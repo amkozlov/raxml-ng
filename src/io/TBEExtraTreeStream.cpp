@@ -146,11 +146,10 @@ TBEExtraTreeStream& operator<<(TBEExtraTreeStream& stream, const TransferBootstr
   pllmod_tbe_extra_info_t* extra_info = tree.get_extra_info();
   const std::vector<pll_unode_t*> split_node_map = tree.get_split_node_map();
   pllmod_tbe_split_info_t* split_info = tree.get_split_info();
-  std::vector<unsigned int> node_split_map(split_node_map.size());
+  std::vector<unsigned int> node_split_map(tree.num_nodes());
   for (size_t i = 0; i < split_node_map.size(); ++i) {
 	  node_split_map[split_node_map[i]->clv_index] = i;
   }
-  tree.pll_utree();
 
   char * newick_str = utree_export_newick(&tree.pll_utree_root(), 0, 0, extra_info, split_info, node_split_map);
   if (newick_str)
