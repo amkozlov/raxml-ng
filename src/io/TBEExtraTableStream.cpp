@@ -15,7 +15,7 @@ TBEExtraTableStream& operator<<(TBEExtraTableStream& stream, const TransferBoots
   double divideBy = extra_info->num_bs_trees * tree.num_splits();
   for (size_t i = 0; i < tree.num_tips(); ++i) {
 	  for (size_t j = 0; j < tree.num_splits(); ++j) {
-		  stream << fixed << std::setprecision(10) << (double) (extra_info->extra_taxa_table[j][i]) / divideBy;
+		  stream << fixed << std::setprecision(6) << (double) (extra_info->extra_taxa_table[j][i]) / divideBy;
 		  if (j < tree.num_splits() - 1) {
 			  stream << "\t";
 		  }
