@@ -18,6 +18,8 @@ public:
 
   void draw_support(bool support_in_pct = true);
 
+  const doubleVector& get_support() const;
+
 protected:
   PllSplitSharedPtr extract_splits_from_tree(const pll_unode_t& root,
                                              pll_unode_t ** node_split_map);

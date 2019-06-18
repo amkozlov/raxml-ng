@@ -22,8 +22,10 @@ TBEExtraTableStream& operator<<(TBEExtraTableStream& stream, const TransferBoots
 		  stream << "\n";
 	  }
   }
+
+  auto support = tree.get_support();
   for (size_t i = 0; i < tree.num_splits(); ++i) {
-	  stream << tree.get_split_node_map()[i]->clv_index << "\t" << "???" << "\t";
+	  stream << tree.get_split_node_map()[i]->clv_index << "\t" << fixed << std::setprecision(6) << support[i] << "\t";
 	  for (size_t j = 0; j < tree.num_tips(); ++j) {
 		  stream << fixed << std::setprecision(6) << (double) (extra_info->extra_taxa_table[i][j]) / divideBy;
 		  if (j < tree.num_tips() - 1) {

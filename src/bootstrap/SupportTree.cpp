@@ -127,3 +127,7 @@ void SupportTree::draw_support(bool support_in_pct)
 
   LOG_DEBUG_TS << "Done!" << endl << endl;
 }
+
+const doubleVector& SupportTree::get_support() const {
+	return _support;
+}
