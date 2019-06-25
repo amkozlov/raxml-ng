@@ -25,9 +25,10 @@ Logging& Logging::instance()
   return instance;
 }
 
-LogStream& Logging::logstream(LogLevel level)
+LogStream& Logging::logstream(LogLevel level, bool worker)
 {
-  if (ParallelContext::master() && level <= _log_level)
+  if ((ParallelContext::master() || (ParallelContext::group_master() && worker))
+      && level <= _log_level)
     return _full_stream;
   else
     return _empty_stream;

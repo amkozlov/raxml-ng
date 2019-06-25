@@ -6,6 +6,8 @@
 #include <memory>
 #include <map>
 
+#include "ParallelContext.hpp"
+
 enum class LogLevel
 {
   none = 0,
@@ -68,7 +70,7 @@ public:
   void log_level(LogLevel level);
   LogLevel log_level() const;
 
-  LogStream& logstream(LogLevel level);
+  LogStream& logstream(LogLevel level, bool worker = false);
 
   void set_log_filename(const std::string& fname, std::ios_base::openmode mode = std::ios::out);
   void add_log_stream(std::ostream* stream);
@@ -96,6 +98,7 @@ private:
 Logging& logger();
 
 #define RAXML_LOG(level) logger().logstream(level)
+#define RAXML_LOG_WORKER(level) logger().logstream(level, true)
 
 #define LOG_ERROR RAXML_LOG(LogLevel::error)
 #define LOG_WARN RAXML_LOG(LogLevel::warning)
@@ -105,10 +108,18 @@ Logging& logger();
 #define LOG_PROGR RAXML_LOG(LogLevel::progress)
 #define LOG_VERB RAXML_LOG(LogLevel::verbose)
 
-#define LOG_RESULT_TS LOG_RESULT << "[" << TimeStamp() << "] "
-#define LOG_INFO_TS LOG_INFO << "[" << TimeStamp() << "] "
-#define LOG_VERB_TS LOG_VERB << "[" << TimeStamp() << "] "
-#define LOG_DEBUG_TS LOG_DEBUG << "[" << TimeStamp() << "] "
+#define RAXML_LOG_TIMESTAMP "[" << TimeStamp() << "] "
+#define RAXML_LOG_WORKERID (ParallelContext::num_groups() > 1 ? \
+                            "[worker #" + to_string(ParallelContext::group_id()) + "] " : "")
+
+#define LOG_TS(level) RAXML_LOG(level) << RAXML_LOG_TIMESTAMP
+#define LOG_RESULT_TS LOG_TS(LogLevel::result)
+#define LOG_INFO_TS LOG_TS(LogLevel::info)
+#define LOG_VERB_TS LOG_TS(LogLevel::verbose)
+#define LOG_DEBUG_TS LOG_TS(LogLevel::debug)
+#define LOG_WORKER_TS(level) RAXML_LOG_WORKER(level) << RAXML_LOG_TIMESTAMP \
+                                                     << RAXML_LOG_WORKERID
+
 #define LOG_PROGRESS(loglh) LOG_PROGR << ProgressInfo(loglh)
 
 #define FMT_LH(lh) setprecision(logger().precision(LogElement::loglh)) << lh

@@ -16,6 +16,15 @@ PartitionedMSA& PartitionedMSA::operator=(PartitionedMSA&& other)
    return *this;
 }
 
+ModelCRefMap PartitionedMSA::models() const
+{
+  ModelCRefMap mmap;
+  for (size_t p = 0; p < part_count(); ++p)
+    mmap.emplace(p, _part_list.at(p).model());
+
+  return mmap;
+}
+
 void PartitionedMSA::set_taxon_names(const NameList& taxon_names)
 {
   _taxon_names.assign(taxon_names.cbegin(), taxon_names.cend());

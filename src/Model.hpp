@@ -202,6 +202,10 @@ private:
   void set_user_freqs(doubleVector& freqs);
 };
 
+typedef std::unordered_map<size_t, Model> ModelMap;
+typedef std::unordered_map<size_t, Model&> ModelRefMap;
+typedef std::unordered_map<size_t, const Model&> ModelCRefMap;
+
 void assign(Model& model, const pll_partition_t * partition);
 void assign(pll_partition_t * partition, const Model& model);
 

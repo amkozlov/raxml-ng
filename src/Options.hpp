@@ -31,23 +31,10 @@ struct OutputFileNames
 class Options
 {
 public:
-  Options() : cmdline(""), command(Command::none), use_tip_inner(true),
-  use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false), use_repeats(true),
-  optimize_model(true), optimize_brlen(true), force_mode(false), safety_checks(SafetyCheck::all),
-  redo_mode(false), nofiles_mode(false), log_level(LogLevel::progress),
-  msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
-  random_seed(0), start_trees(), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
-  spr_cutoff(1.0),
-  brlen_linkage(PLLMOD_COMMON_BRLEN_SCALED), brlen_opt_method(PLLMOD_OPT_BLO_NEWTON_FAST),
-  brlen_min(RAXML_BRLEN_MIN), brlen_max(RAXML_BRLEN_MAX),
-  num_searches(1), terrace_maxsize(100),
-  num_bootstraps(1000), bootstop_criterion(BootstopCriterion::none), bootstop_cutoff(0.03),
-  bootstop_interval(RAXML_BOOTSTOP_INTERVAL), bootstop_permutations(RAXML_BOOTSTOP_PERMUTES),
-  tbe_naive(false), consense_cutoff(ConsenseCutoff::MR),
-  tree_file(""), constraint_tree_file(""), msa_file(""), model_file(""), outfile_prefix(""),
-  num_threads(1), num_ranks(1), simd_arch(PLL_ATTRIB_ARCH_CPU), thread_pinning(false),
-  load_balance_method(LoadBalancing::benoit)
-  {};
+  Options();
+
+  Options(const Options& other) = default;
+  Options& operator=(const Options& other) = default;
 
   ~Options() = default;
 
@@ -111,9 +98,12 @@ public:
   /* parallelization stuff */
   unsigned int num_threads;             /* number of threads */
   unsigned int num_ranks;               /* number of MPI ranks */
+  unsigned int num_workers;             /* number of parallel tree searches */
   unsigned int simd_arch;               /* vector instruction set */
-  bool thread_pinning;                     /* pin threads to cores */
+  bool thread_pinning;                  /* pin threads to cores */
   LoadBalancing load_balance_method;
+
+  bool coarse() const { return num_workers > 1; };
 
   std::string simd_arch_name() const;
   std::string consense_type_name() const;

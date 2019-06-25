@@ -17,6 +17,7 @@ public:
   const MSA& full_msa() const { return (part_count() == 1) ? _part_list.at(0).msa() : _full_msa; };
   const PartitionInfo& part_info(size_t index) const { return _part_list.at(index); };
   const Model& model(size_t index) const { return _part_list.at(index).model(); };
+  ModelCRefMap models() const;
   const std::vector<PartitionInfo>& part_list() const { return _part_list; };
   std::vector<PartitionInfo>& part_list() { return _part_list; };
   const NameList& taxon_names()  const { return _taxon_names; };

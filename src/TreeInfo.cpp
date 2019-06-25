@@ -39,7 +39,7 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
   libpll_check_error("ERROR creating treeinfo structure");
   assert(_pll_treeinfo);
 
-  if (ParallelContext::num_procs() > 1)
+  if (ParallelContext::threads_per_group() > 1)
   {
     pllmod_treeinfo_set_parallel_context(_pll_treeinfo, (void *) nullptr,
                                          ParallelContext::parallel_reduce_cb);

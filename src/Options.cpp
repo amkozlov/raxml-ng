@@ -3,6 +3,24 @@
 
 using namespace std;
 
+Options::Options() : cmdline(""), command(Command::none), use_tip_inner(true),
+use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false), use_repeats(true),
+optimize_model(true), optimize_brlen(true), force_mode(false), safety_checks(SafetyCheck::all),
+redo_mode(false), nofiles_mode(false), log_level(LogLevel::progress),
+msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
+random_seed(0), start_trees(), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
+spr_cutoff(1.0),
+brlen_linkage(PLLMOD_COMMON_BRLEN_SCALED), brlen_opt_method(PLLMOD_OPT_BLO_NEWTON_FAST),
+brlen_min(RAXML_BRLEN_MIN), brlen_max(RAXML_BRLEN_MAX),
+num_searches(1), terrace_maxsize(100),
+num_bootstraps(1000), bootstop_criterion(BootstopCriterion::none), bootstop_cutoff(0.03),
+bootstop_interval(RAXML_BOOTSTOP_INTERVAL), bootstop_permutations(RAXML_BOOTSTOP_PERMUTES),
+tbe_naive(false), consense_cutoff(ConsenseCutoff::MR),
+tree_file(""), constraint_tree_file(""), msa_file(""), model_file(""), outfile_prefix(""),
+num_threads(1), num_ranks(1), num_workers(1), simd_arch(PLL_ATTRIB_ARCH_CPU), thread_pinning(false),
+load_balance_method(LoadBalancing::benoit)
+{}
+
 string Options::output_fname(const string& suffix) const
 {
   if (nofiles_mode)
@@ -347,6 +365,18 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   if (!opts.constraint_tree_file.empty())
     stream << "  topological constraint: " << opts.constraint_tree_file << endl;
 
+  if (!opts.outgroup_taxa.empty())
+  {
+    stream << "  outgroup taxa: ";
+    for (auto it = opts.outgroup_taxa.cbegin(); it != opts.outgroup_taxa.cend(); ++it)
+    {
+      if (it != opts.outgroup_taxa.cbegin())
+        stream << ",";
+      stream << *it;
+    }
+    stream << endl;
+  }
+
   stream << "  random seed: " << opts.random_seed << endl;
 
   if (opts.command == Command::bootstrap || opts.command == Command::all ||
@@ -411,6 +441,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   stream << "  SIMD kernels: " << opts.simd_arch_name() << endl;
 
   stream << "  parallelization: ";
+  if (opts.coarse())
+    stream << "coarse-grained (" << opts.num_workers << " workers), " ;
+
   if (opts.num_ranks > 1 && opts.num_threads > 1)
   {
     stream << "hybrid MPI+PTHREADS (" << opts.num_ranks <<  " ranks x " <<

@@ -39,6 +39,7 @@ struct TreeTopology
   const_iterator cbegin() { return edges.cbegin(); }
   const_iterator cend() { return edges.cend(); }
 
+  size_t vroot_node_id;
   edge_container edges;
   std::vector<doubleVector> brlens;
 };
@@ -58,7 +59,7 @@ public:
   virtual size_t num_inner() const { return _num_tips - 2; };
   virtual size_t num_nodes() const { return num_tips() + num_inner(); };
   virtual size_t num_subnodes() const { return num_branches() * 2; };
-  virtual size_t num_branches() const { return _num_tips + _num_tips - 3; };
+  virtual size_t num_branches() const { return _num_tips ? _num_tips + _num_tips - 3 : 0; };
   virtual size_t num_splits() const { return num_branches() - _num_tips; };
 
 protected:
@@ -142,31 +143,32 @@ protected:
 };
 
 typedef std::vector<Tree> TreeList;
+typedef std::vector<TreeTopology> TreeTopologyList;
 
 typedef std::pair<double, TreeTopology> ScoredTopology;
 
-class TreeCollection
+class ScoredTopologyMap
 {
 public:
-  typedef std::vector<ScoredTopology> container_type;
+  typedef std::map<size_t, ScoredTopology> container_type;
   typedef container_type::const_iterator const_iterator;
   typedef container_type::value_type value_type;
 
   size_t size() const { return  _trees.size(); }
   bool empty() const { return  _trees.empty(); }
   const_iterator best() const;
-  value_type::first_type best_score() const { return best()->first; }
-  const value_type::second_type& best_topology() const { return best()->second; }
+  double best_score() const { return best()->second.first; }
+  const TreeTopology& best_topology() const { return best()->second.second; }
 
   const_iterator begin() const { return _trees.cbegin(); }
   const_iterator end() const { return _trees.cend(); }
 
   void clear() { _trees.clear(); };
-  void push_back(double score, const Tree& tree);
-  void push_back(double score, TreeTopology&& topol);
+  void insert(size_t index, const ScoredTopology& t) { _trees[index] = t; };
 
 private:
   container_type _trees;
 };
+
 
 #endif /* RAXML_TREE_HPP_ */

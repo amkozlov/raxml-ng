@@ -75,6 +75,8 @@ static struct option long_options[] =
   {"consense",           optional_argument, 0, 0 },  /*  52 */
   {"ancestral",          optional_argument, 0, 0 },  /*  53 */
 
+  {"workers",            required_argument, 0, 0 },  /*  54 */
+
   { 0, 0, 0, 0 }
 };
 
@@ -169,6 +171,14 @@ void CommandLineParser::check_options(Options &opts)
                             " instruction set on your system. If you are absolutely sure "
                             "it is supported, please use --force option to disable this check.");
     }
+  }
+
+  if (opts.num_workers > opts.num_threads)
+  {
+    throw OptionException("The specified number of parallel tree searches (" +
+                          to_string(opts.num_workers) +
+                          ") is higher than the number of available threads (" +
+                          to_string(opts.num_threads) + ")");
   }
 }
 
@@ -842,6 +852,14 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         num_commands++;
         break;
 
+      case 54:  /* number of workers (=parallel tree searches) */
+        if (sscanf(optarg, "%u", &opts.num_workers) != 1 || opts.num_workers == 0)
+        {
+          throw InvalidOptionValueException("Invalid number of workers: " + string(optarg) +
+                                            ", please provide a positive integer number!");
+        }
+        break;
+
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -927,6 +945,7 @@ void CommandLineParser::print_help()
             "  --tip-inner    on | off                    tip-inner case optimization (default: OFF)\n"
             "  --site-repeats on | off                    use site repeats optimization, 10%-60% faster than tip-inner (default: ON)\n" <<
             "  --threads      VALUE                       number of parallel threads to use (default: " << sysutil_get_cpu_cores() << ")\n" <<
+            "  --workers      VALUE                       number of tree searches to run in parallel (default: 1)\n" <<
             "  --simd         none | sse3 | avx | avx2    vector instruction set to use (default: auto-detect).\n"
             "  --rate-scalers on | off                    use individual CLV scalers for each rate category (default: ON for >2000 taxa)\n"
             "  --force        [ <CHECKS> ]                disable safety checks (please think twice!)\n"

@@ -1,6 +1,7 @@
 #include "RaxmlTest.hpp"
 
 #include "src/CommandLineParser.hpp"
+#include "src/io/binary_io.hpp"
 
 using namespace std;
 
@@ -39,6 +40,22 @@ void parse_options(string &cmd, CommandLineParser &parser, Options &opts,
     EXPECT_TRUE(except_throw) << "Exception: " << e.what() << std::endl;
   }
   mutx.Unlock();
+}
+
+void compare_opts(const Options& opts1, const Options& opts2)
+{
+  EXPECT_EQ(opts1.command, opts2.command);
+  EXPECT_EQ(opts1.outfile_prefix, opts2.outfile_prefix);
+  EXPECT_EQ(opts1.outfile_prefix, opts2.outfile_prefix);
+  EXPECT_EQ(opts1.cmdline, opts2.cmdline);
+  EXPECT_EQ(opts1.num_threads, opts2.num_threads);
+
+  std::stringstream s1, s2;
+
+  s1 << opts1;
+  s2 << opts2;
+
+  EXPECT_EQ(s1.str(), s2.str());
 }
 
 TEST(CommandLineParserTest, help)
@@ -205,4 +222,46 @@ TEST(CommandLineParserTest, eval_complex)
   EXPECT_FALSE(options.optimize_brlen);
   EXPECT_DOUBLE_EQ(0.02, options.lh_epsilon);
 }
+
+
+TEST(CommandLineParserTest, options_copy)
+{
+  // buildup
+  CommandLineParser parser;
+  Options opts;
+
+  string cmd = "raxml-ng --all --msa data.fa --model GTR --tree rand{10},pars{5} --bs-metric fbp,tbe "
+      "--outgroup taxon1,taxon2 --prefix test --threads 2";
+  parse_options(cmd, parser, opts, false);
+
+  Options opts2 = opts;
+
+  compare_opts(opts, opts2);
+}
+
+TEST(CommandLineParserTest, options_serialize)
+{
+  // buildup
+  CommandLineParser parser;
+  Options opts, opts2;
+  const std::string fname = "tmpfile";
+
+  string cmd = "raxml-ng --all --msa data.fa --model GTR --tree rand{10},pars{5} --bs-metric fbp,tbe "
+      "--outgroup taxon1,taxon2 --prefix test --threads 2";
+  parse_options(cmd, parser, opts, false);
+
+  {
+    BinaryFileStream bos(fname, ios::out);
+    bos << opts;
+  }
+
+  {
+    BinaryFileStream bis(fname, ios::in);
+    bis >> opts2;
+    sysutil_file_remove(fname);
+  }
+
+  compare_opts(opts, opts2);
+}
+
 
