@@ -51,6 +51,17 @@ public:
   static void mpi_gather_custom(std::function<int(void*,int)> prepare_send_cb,
                                 std::function<void(void*,int)> process_recv_cb);
 
+  // WARNING: This function is like a private parking lot. Only the transfer bootstrap computation is allowed to use it. Wrongdoers will be punished. PLEASE REFACTOR ME.
+  static void pll_lock(bool b)
+  {
+    static std::mutex mtx;
+    if (b) {
+    	mtx.lock();
+    } else {
+    	mtx.unlock();
+    }
+  }
+
   static bool master() { return proc_id() == 0; }
   static bool master_rank() { return _rank_id == 0; }
   static bool master_thread() { return _thread_id == 0; }
