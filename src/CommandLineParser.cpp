@@ -6,6 +6,10 @@
 #include <thread>
 #endif
 
+#if defined(_OPENMP)
+#include <omp.h>
+#endif
+
 using namespace std;
 
 static struct option long_options[] =
@@ -846,6 +850,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         throw  OptionException("Internal error in option parsing");
     }
   }
+
+#if defined(_OPENMP)
+  omp_set_num_threads(opts.num_threads);
+#endif
 
   if (c != -1)
     exit(EXIT_FAILURE);
