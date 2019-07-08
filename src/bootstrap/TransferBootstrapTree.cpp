@@ -12,7 +12,7 @@ TransferBootstrapTree bstree(tree, true, 1., false, true, false);
 */
 
 TransferBootstrapTree::TransferBootstrapTree(const Tree& tree, bool naive, double tbe_cutoff, bool doTable, bool doArray, bool doTree) :
-   SupportTree (tree), _split_info(nullptr), _naive_method(naive)
+   SupportTree (tree), _split_info(nullptr), _extra_info(nullptr), _naive_method(naive)
 {
   assert(num_splits() > 0);
   _split_node_map.resize(num_splits());
