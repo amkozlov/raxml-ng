@@ -14,8 +14,9 @@ TBEExtraTableStream& operator<<(TBEExtraTableStream& stream, const TransferBoots
   }
   double divideBy = extra_info->num_bs_trees * tree.num_splits();
   stream << "Edge\tSupport\t";
+  auto tip_labels_list = tree.tip_labels_list();
   for (size_t i = 0; i < tree.num_tips(); ++i) {
-          stream << tree.tip_labels_list()[i];
+          stream << tip_labels_list[i];
           if (i < tree.num_tips() - 1) {
                   stream << "\t";
           } else {
