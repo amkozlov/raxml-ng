@@ -276,11 +276,22 @@ CATGStream& operator>>(CATGStream& stream, MSA& msa)
   return stream;
 }
 
+//#define _RAXML_VCF
+//#define _RAXML_VCF_DEBUG
 VCFStream& operator>>(VCFStream& stream, MSA& msa)
 {
 #ifndef _RAXML_VCF
   throw runtime_error("RAxML-NG was build without VCF support");
 #else
+  enum class VCFUncertainty
+  {
+    none = 0,
+    g10 = 1,
+    pl = 2,
+    fpl = 3
+  };
+  static const char vcf_unc_name[][5] = {"NONE", "G10", "PL", "FPL"};
+
   const auto fname = stream.fname().c_str();
   htsFile *fp    = hts_open(fname, "rb");
 
@@ -294,6 +305,25 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
 
   bcf_hdr_t *hdr = bcf_hdr_read(fp);
   bcf1_t *rec    = bcf_init1();
+
+  // detect genotype likelihood fields
+  VCFUncertainty lh_type = VCFUncertainty::none;
+  {
+    bcf_hrec_t * hrec = NULL;
+    if ((hrec = bcf_hdr_get_hrec(hdr, BCF_HL_FMT, "ID", "G10", NULL)) != NULL)
+      lh_type = VCFUncertainty::g10;
+    else if ((hrec = bcf_hdr_get_hrec(hdr, BCF_HL_FMT, "ID", "PL", NULL)) != NULL)
+      lh_type = VCFUncertainty::pl;
+    else if ((hrec = bcf_hdr_get_hrec(hdr, BCF_HL_FMT, "ID", "FPL", NULL)) != NULL)
+      lh_type = VCFUncertainty::fpl;
+    else
+      lh_type = VCFUncertainty::none;
+
+    LOG_DEBUG << "VCF: uncertainty type = " <<  vcf_unc_name[(int) lh_type] << endl;
+
+//    if (hrec)
+//      bcf_hrec_destroy(hrec);
+  }
 
   size_t taxa_count = bcf_hdr_nsamples(hdr);
 
@@ -343,6 +373,10 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
                                       /* AA AC AG AT CC CG CT GG GT TT */
   static const int vcf_to_rax_map[10] = {0, 4, 5, 6, 1, 7, 8, 2, 9, 3 };
 
+#ifdef _RAXML_VCF_DEBUG
+  static const char gt_inv_map[][3] = {"AA", "CC", "GG", "TT", "AC", "AG", "AT", "CG", "CT", "GT"};
+#endif
+
   char gt_to_char[4][4];
   for (size_t i = 0; i < 4; ++i)
   {
@@ -353,12 +387,16 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
   }
 
   int gl_num = 0;
-  float * gt_pl = NULL;
+  float * gt_g10 = NULL;
+  int * gt_pl = NULL;
+  int * gt_fpl = NULL;
 
   size_t j = 0;
   while ( bcf_read1(fp, hdr, rec)>=0 )
     {
       bcf_unpack(rec, BCF_UN_ALL);
+
+      assert(rec->n_allele <= 4);
 
       assert(strlen(rec->d.allele[0]) == 1 && strlen(rec->d.allele[1]));
 
@@ -368,59 +406,171 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
 
 //      printf("alleles: %c %c %c %c\n", als[0], als[1], als[2], als[3]);
 
-      int cals[4] = {0};
+      pll_state_t cals[4] = {0};
       for (size_t i = 0; i < rec->n_allele; ++i)
         cals[i] = pll_map_nt[als[i]];
 
-//      printf("encoded alleles: %d %d %d %d\n", cals[0], cals[1], cals[2], cals[3]);
+      auto s_ref = cals[0];
+      auto s_alt = cals[1];
+      auto s_het = s_ref | s_alt;
+
+      assert((s_ref & s_alt) == 0);
+
+      int d10_ref = PLL_STATE_CTZ(s_ref);
+      int d10_alt = PLL_STATE_CTZ(s_alt);
+      int d10_het = PLL_STATE_CTZ(pll_map_diploid10[(int) gt_to_char[d10_ref][d10_alt]]);
+
+      assert(d10_ref >= 0 && d10_alt >= 0 && d10_het >= 0);
+
+#ifdef _RAXML_VCF_DEBUG
+      printf("snv: %u, ref/alt/het: %s %s %s\n", j,
+             gt_inv_map[d10_ref], gt_inv_map[d10_alt], gt_inv_map[d10_het]);
+#endif
 
       bcf_fmt_t * gt = bcf_get_fmt(hdr, rec, "GT");
 
       assert(gt);
 
-//      bcf_fmt_t * gl = bcf_get_fmt(hdr, rec, "GL");
-      bcf_fmt_t * gl10 = bcf_get_fmt(hdr, rec, "G10");
+      switch (lh_type)
+      {
+        case VCFUncertainty::g10:
+        {
+          //      bcf_fmt_t * gl = bcf_get_fmt(hdr, rec, "GL");
+          bcf_fmt_t * gl10 = bcf_get_fmt(hdr, rec, "G10");
 
-      /* assume 10 genotypes for now */
-      assert(gl10->n == 10);
+          if (!gl10)
+            throw runtime_error("Invalid VCF file format: field G10 not found in SNV # " + to_string(j+1));
 
-      if (!bcf_get_format_float(hdr, rec ,"G10", &gt_pl, &gl_num))
-        throw runtime_error("Invalid VCF file format: field GL not found");
+          /* assume 10 genotypes for now */
+          assert(gl10->n == 10);
 
-      assert(gl_num == (int) taxa_count * gl10->n);
+          if (!bcf_get_format_float(hdr, rec ,"G10", &gt_g10, &gl_num))
+            throw runtime_error("Invalid VCF file format: field GL not found");
+
+          assert(gl_num == (int) taxa_count * gl10->n);
+        }
+        break;
+        case VCFUncertainty::pl:
+        {
+          bcf_fmt_t * pl = bcf_get_fmt(hdr, rec, "PL");
+
+          if (!pl)
+            throw runtime_error("Invalid VCF file format: field PL not found in SNV # " + to_string(j+1));
+
+  #ifdef _RAXML_VCF_DEBUG
+          LOG_DEBUG << "Found PL field with " << pl->n << " genotypes..." << endl;
+  #endif
+
+          assert(pl->n == 3);
+
+          if (!bcf_get_format_int32(hdr, rec ,"PL", &gt_pl, &gl_num))
+            throw runtime_error("Invalid VCF file format: field PL has invalid format");
+
+  #ifdef _RAXML_VCF_DEBUG
+          LOG_DEBUG << "Loaded PL: " << gl_num << " entries" << endl;
+  #endif
+
+          if (gl_num !=  (int) taxa_count * pl->n)
+            throw runtime_error("Malformed VCF file: Invalid PL format");
+        }
+        break;
+        case VCFUncertainty::fpl:
+        {
+          bcf_fmt_t * fpl = bcf_get_fmt(hdr, rec, "FPL");
+
+          if (!fpl)
+            throw runtime_error("Invalid VCF file format: field FPL not found in SNV # " + to_string(j+1));
+
+          assert(fpl->n == 4);
+
+          if (!bcf_get_format_int32(hdr, rec ,"FPL", &gt_fpl, &gl_num))
+            throw runtime_error("Invalid VCF file format: field PL has invalid format");
+
+          if (gl_num !=  (int) taxa_count * fpl->n)
+            throw runtime_error("Malformed VCF file: Invalid FPL format");
+        }
+        case VCFUncertainty::none:
+          break;
+      }
 
       for (size_t i = 0; i < taxa_count; ++i)
       {
         const int al1 = bcf_gt_allele(gt->p[i * 2]);
         const int al2 = bcf_gt_allele(gt->p[i * 2 + 1]);
 
+        auto gt1 = PLL_STATE_CTZ(cals[al1]);
+        auto gt2 = PLL_STATE_CTZ(cals[al2]);
+
         char c = '-';
         if (al1 >= 0 && al2 >= 0)
-        {
-          auto gt1 = PLL_CTZ32(cals[al1]);
-          auto gt2 = PLL_CTZ32(cals[al2]);
           c = gt_to_char[gt1][gt2];
-        }
 
         msa[i][j] = c;
 
-//        if (!i)
-//          printf("als: %d %d, char: %c\n", al1, al2, c);
+//        printf("taxon: %u, als: %d %d, char: %c\n", i, al1, al2, c);
 
         /* probs */
         auto site_probs = msa.probs(i, j);
 
         if (al1 >= 0 && al2 >= 0)
         {
-          for (unsigned int k = 0; k < 10; ++k)
+          if (gt_g10)
           {
-            // TODO remap
-            auto pl = gt_pl[i * 10 + k];
-            auto s = vcf_to_rax_map[k];
-            site_probs[s] = isfinite(pl) ? exp10(pl) : 0.;
-//            site_probs[k] = isfinite(pl) ? exp10(-0.1 * pl) : 0.;
-//            if (!i)
-//              printf("prob %u: %lf / %f \n", s, site_probs[s], pl);
+            /* G10 field: all 10 genotype likelihoods are defined */
+            for (unsigned int k = 0; k < 10; ++k)
+            {
+                auto pl = gt_g10[i * 10 + k];
+                auto s = vcf_to_rax_map[k];
+                site_probs[s] = isfinite(pl) ? exp10(pl) : 0.;
+            }
+          }
+          else if (gt_pl)
+          {
+            /* PL field: only 3 genotype likelihoods are defined (REF/REF, ALT/ALT, REF/ALT) */
+
+            for (unsigned int k = 0; k < 10; ++k)
+              site_probs[k] = 0.;
+
+            double p_ref = exp10(-0.1 * gt_pl[i * 3]);
+            double p_het = exp10(-0.1 * gt_pl[i * 3 + 1]);
+            double p_alt = exp10(-0.1 * gt_pl[i * 3 + 2]);
+
+            site_probs[d10_ref] = p_ref;
+            site_probs[d10_het] = p_het;
+            site_probs[d10_alt] = p_alt;
+
+            if (d10_ref < 0 || d10_alt < 0 || d10_het < 0)
+            {
+//              printf("snp: %u, size: %d, p_len: %d\n", j, pl->size, pl->p_len);
+              printf("%llu %llu %llu\n", s_ref, s_het, s_alt);
+              printf("%u %u %u\n", d10_ref, d10_het, d10_alt);
+              printf("%u %u %u\n", gt_pl[i * 3], gt_pl[i * 3 + 1], gt_pl[i * 3 + 2]);
+              printf("%f %f %f\n\n", p_ref, p_het, p_alt);
+            }
+          }
+          else if (gt_fpl)
+          {
+            /* PL field: only 3 genotype likelihoods are defined (REF/REF, ALT/ALT, REF/ALT) */
+
+            for (unsigned int k = 0; k < 10; ++k)
+              site_probs[k] = 0.;
+
+            double pl_ref = std::max(gt_fpl[i * 3], gt_fpl[i * 3 + 1]);
+            double p_ref = exp10(-0.1 * pl_ref);
+            double p_het = exp10(-0.1 * gt_fpl[i * 3 + 2]);
+            double p_alt = exp10(-0.1 * gt_fpl[i * 3 + 3]);
+
+            site_probs[d10_ref] = p_ref;
+            site_probs[d10_het] = p_het;
+            site_probs[d10_alt] = p_alt;
+          }
+          else
+          {
+            // no uncertainty specified, called genotype gets likelihood 1.0
+            pll_state_t ml_state =  pll_map_diploid10[(int) c];
+            pll_state_t state = 1;
+            for (unsigned int k = 0; k < 10; ++k, state <<= 1)
+              site_probs[k] = (state & ml_state) ? 1.0 : 0.0;
           }
         }
         else
@@ -431,6 +581,16 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
             site_probs[k] = 1.;
           }
         }
+
+#ifdef _RAXML_VCF_DEBUG
+        if (!i)
+        {
+          printf("gt: %c  probs: ", c);
+          for (unsigned int k = 0; k < 10; ++k)
+            printf("%s=%lf ", gt_inv_map[k], site_probs[k]);
+          printf("\n");
+        }
+#endif
       }
 
       j++;
@@ -441,7 +601,10 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
 
   assert(j == site_count);
 
-  free(gt_pl);
+  if (gt_g10)
+    free(gt_g10);
+  if (gt_pl)
+    free(gt_pl);
   bcf_hdr_destroy(hdr);
 
   int ret;
