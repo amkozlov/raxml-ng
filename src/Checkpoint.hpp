@@ -5,8 +5,8 @@
 #include "TreeInfo.hpp"
 #include "io/binary_io.hpp"
 
-constexpr int CKP_VERSION = 1;
-constexpr int CKP_MIN_SUPPORTED_VERSION = 1;
+constexpr int RAXML_CKP_VERSION = 1;
+constexpr int RAXML_CKP_MIN_SUPPORTED_VERSION = 1;
 
 typedef std::unordered_map<size_t, Model> ModelMap;
 
@@ -38,7 +38,7 @@ struct SearchState
 
 struct Checkpoint
 {
-  Checkpoint() : version(CKP_VERSION), elapsed_seconds(0.), search_state(), tree(), models() {}
+  Checkpoint() : version(RAXML_CKP_VERSION), elapsed_seconds(0.), search_state(), tree(), models() {}
 
   Checkpoint(const Checkpoint&) = delete;
   Checkpoint& operator=(const Checkpoint&) = delete;

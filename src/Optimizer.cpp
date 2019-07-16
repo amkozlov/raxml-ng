@@ -30,10 +30,9 @@ double Optimizer::optimize_model(TreeInfo& treeinfo, double lh_epsilon)
     new_loglh = treeinfo.loglh();
 
 //      printf("old: %f, new: %f\n", cur_loglh, new_loglh);
-    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
 
     iter_num++;
-//    LOG_PROGRESS(new_loglh) << "Iteration %d: logLH = %f\n", iter_num, new_loglh);
+    LOG_DEBUG << "Iteration " << iter_num <<  ": logLH = " << new_loglh << endl;
   }
   while (new_loglh - cur_loglh > lh_epsilon);
 

@@ -34,7 +34,10 @@ enum class Command
   terrace,
   check,
   parse,
-  start
+  start,
+  rfdist,
+  consense,
+  ancestral
 };
 
 enum class FileFormat
@@ -55,7 +58,7 @@ enum class DataType
   protein,
   binary,
   multistate,
-  diploid10
+  genotype10
 };
 
 enum class ParamValue
@@ -104,6 +107,15 @@ enum class InformationCriterion
   bic
 };
 
+namespace ConsenseCutoff
+{
+  enum ConsenseCutoff : unsigned int
+  {
+    MRE = 0,
+    MR = 50,
+    strict = 100
+  };
+};
 
 const std::string ParamValueNames[] = {"undefined", "equal", "user", "model", "empirical", "ML"};
 

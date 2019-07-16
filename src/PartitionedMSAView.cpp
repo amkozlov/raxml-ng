@@ -123,7 +123,7 @@ void PartitionedMSAView::site_weights(size_t part_id, const WeightVector& weight
   _site_weights[part_id] = weights;
 }
 
-void PartitionedMSAView::map_taxon_name(std::string orig_name, std::string new_name)
+void PartitionedMSAView::map_taxon_name(const std::string& orig_name, const std::string& new_name)
 {
   _taxon_name_map[orig_name] = new_name;
 }

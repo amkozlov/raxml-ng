@@ -67,6 +67,25 @@ bool Tree::binary() const
   return _pll_utree ? _pll_utree->binary : BasicTree::binary();
 }
 
+pll_utree_t * Tree::pll_utree_copy() const
+{
+  return _pll_utree ? pll_utree_clone(_pll_utree.get()) : nullptr;
+}
+
+void Tree::pll_utree(const pll_utree_t& tree)
+{
+  _num_tips = tree.tip_count;
+  _pll_utree.reset(pll_utree_clone(&tree));
+  _pll_utree_tips.clear();
+}
+
+void Tree::pll_utree(unsigned int tip_count, const pll_unode_t& root)
+{
+  _num_tips = tip_count;
+  _pll_utree.reset(pll_utree_wraptree_multi(pll_utree_graph_clone(&root), _num_tips, 0));
+  _pll_utree_tips.clear();
+}
+
 Tree Tree::buildRandom(size_t num_tips, const char * const* tip_labels,
                        unsigned int random_seed)
 {
@@ -209,6 +228,34 @@ PllNodeVector const& Tree::tip_nodes() const
  }
 
  return _pll_utree_tips;
+}
+
+std::vector<const char*> Tree::tip_labels_cstr() const
+{
+  std::vector<const char*> result;
+
+  if (!empty())
+  {
+    result.resize(_num_tips, nullptr);
+    for (auto const& node: tip_nodes())
+      result[node->clv_index] =  node->label;
+  }
+
+  return result;
+}
+
+NameList Tree::tip_labels_list() const
+{
+  NameList result;
+
+  if (!empty())
+  {
+    result.resize(_num_tips);
+    for (auto const& node: tip_nodes())
+      result[node->clv_index] =  string(node->label);
+  }
+
+  return result;
 }
 
 IdNameVector Tree::tip_labels() const

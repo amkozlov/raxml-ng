@@ -11,7 +11,7 @@
 #include <chrono>
 #include <thread>
 
-#include "common.h"
+#include "../common.h"
 
 using namespace std;
 
@@ -32,10 +32,12 @@ void sysutil_fatal_libpll()
   sysutil_fatal("ERROR(%d): %s\n", pll_errno, pll_errmsg);
 }
 
-void libpll_check_error(const std::string& errmsg = "ERROR in libpll")
+void libpll_check_error(const std::string& errmsg, bool force)
 {
   if (pll_errno)
     throw runtime_error(errmsg +  " (LIBPLL-" + to_string(pll_errno) + "): " + string(pll_errmsg));
+  else if (force)
+    throw runtime_error("Unknown LIBPLL error.");
 }
 
 void libpll_reset_error()
@@ -157,6 +159,62 @@ static void get_cpuid(int32_t out[4], int32_t x)
 #endif
 }
 
+static std::string build_path(size_t cpu_number)
+{
+  return "/sys/devices/system/cpu/cpu" + to_string(cpu_number) + "/topology/";
+}
+
+size_t read_id_from_file(const std::string &filename)
+{
+  ifstream f(filename);
+  if (f.good())
+  {
+    size_t id;
+    f >> id;
+    return id;
+  }
+  else
+    throw runtime_error("couldn't open sys files");
+}
+
+size_t get_numa_node_id(const std::string &cpu_path)
+{
+  // this is ugly, but should be reliable -> please blame Linux kernel developers & Intel!
+  string node_path = cpu_path + "../node";
+  for (size_t i = 0; i < 1000; ++i)
+  {
+    if (sysutil_dir_exists(node_path + to_string(i)))
+      return i;
+  }
+
+  // fallback solution: return socket_id which is often identical to numa id
+  return read_id_from_file(cpu_path + "physical_package_id");
+}
+
+size_t get_core_id(const std::string &cpu_path)
+{
+  return read_id_from_file(cpu_path + "core_id");
+}
+
+int get_physical_core_count(size_t n_cpu)
+{
+#if defined(__linux__)
+  unordered_set<size_t> cores;
+  for (size_t i = 0; i < n_cpu; ++i)
+  {
+    string cpu_path = build_path(i);
+    size_t core_id = get_core_id(cpu_path);
+    size_t node_id = get_numa_node_id(cpu_path);
+    size_t uniq_core_id = (node_id << 16) + core_id;
+    cores.insert(uniq_core_id);
+  }
+  return cores.size();
+#else
+  RAXML_UNUSED(n_cpu);
+  throw std::runtime_error("This function only supports linux");
+#endif
+}
+
 static bool ht_enabled()
 {
   int32_t info[4];
@@ -169,9 +227,16 @@ static bool ht_enabled()
 unsigned int sysutil_get_cpu_cores()
 {
   auto lcores = std::thread::hardware_concurrency();
-  auto threads_per_core = ht_enabled() ? 2 : 1;
+  try
+  {
+    return get_physical_core_count(lcores);
+  }
+  catch (const std::runtime_error&)
+  {
+    auto threads_per_core = ht_enabled() ? 2 : 1;
 
-  return lcores / threads_per_core;
+    return lcores / threads_per_core;
+  }
 }
 
 unsigned long sysutil_get_cpu_features()
@@ -315,6 +380,15 @@ bool sysutil_dir_exists(const std::string& dname)
     return false;
 }
 
+void sysutil_file_remove(const std::string& fname, bool must_exist)
+{
+  if (sysutil_file_exists(fname))
+    std::remove(fname.c_str());
+  else if (must_exist)
+    throw runtime_error("File does not exist: " + fname);
+}
+
+
 const SystemTimer& global_timer()
 {
   return systimer;
@@ -328,4 +402,17 @@ string sysutil_fmt_time(const time_t& t)
   return buffer.data();
 }
 
+bool sysutil_isnumber(const std::string& str)
+{
+  if (str.empty())
+    return false;
+  else
+  {
+    const char* s = str.c_str();
+    while (*s)
+      if (!isdigit(*s++)) return false;
+
+    return true;
+  }
+}
 

@@ -89,7 +89,7 @@ private:
 class BinaryFileStream : public BasicBinaryStream
 {
 public:
-  BinaryFileStream(const std::string fname, std::ios_base::openmode mode) :
+  BinaryFileStream(const std::string& fname, std::ios_base::openmode mode) :
     _fstream(fname, std::ios::binary | mode) {}
 
 public:

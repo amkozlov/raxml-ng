@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "PartitionedMSA.hpp"
+#include "util/SafetyCheck.hpp"
 
 struct OutputFileNames
 {
@@ -20,6 +21,11 @@ struct OutputFileNames
   std::string terrace;
   std::string binary_msa;
   std::string bootstrap_msa;
+  std::string rfdist;
+  std::string cons_tree;
+  std::string asr_tree;
+  std::string asr_probs;
+  std::string asr_states;
 };
 
 class Options
@@ -27,8 +33,8 @@ class Options
 public:
   Options() : cmdline(""), command(Command::none), use_tip_inner(true),
   use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false), use_repeats(true),
-  optimize_model(true), optimize_brlen(true), redo_mode(false), force_mode(false),
-  nofiles_mode(false),  log_level(LogLevel::progress),
+  optimize_model(true), optimize_brlen(true), force_mode(false), safety_checks(SafetyCheck::all),
+  redo_mode(false), nofiles_mode(false), log_level(LogLevel::progress),
   msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
   random_seed(0), start_trees(), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
   spr_cutoff(1.0),
@@ -37,7 +43,7 @@ public:
   num_searches(1), terrace_maxsize(100),
   num_bootstraps(1000), bootstop_criterion(BootstopCriterion::none), bootstop_cutoff(0.03),
   bootstop_interval(RAXML_BOOTSTOP_INTERVAL), bootstop_permutations(RAXML_BOOTSTOP_PERMUTES),
-  precision(RAXML_DEFAULT_PRECISION),
+  tbe_naive(false), consense_cutoff(ConsenseCutoff::MR),
   tree_file(""), constraint_tree_file(""), msa_file(""), model_file(""), outfile_prefix(""),
   num_threads(1), num_ranks(1), simd_arch(PLL_ATTRIB_ARCH_CPU), thread_pinning(false),
   load_balance_method(LoadBalancing::benoit)
@@ -58,8 +64,10 @@ public:
   bool optimize_model;
   bool optimize_brlen;
 
-  bool redo_mode;
   bool force_mode;
+  SafetyCheck safety_checks;
+
+  bool redo_mode;
   bool nofiles_mode;
 
   LogLevel log_level;
@@ -85,8 +93,12 @@ public:
   unsigned int bootstop_interval;
   unsigned int bootstop_permutations;
 
-  unsigned int precision;
+  LogElementMap precision;
   NameList outgroup_taxa;
+
+  bool tbe_naive;
+
+  unsigned int consense_cutoff;
 
   /* I/O */
   std::string tree_file;
@@ -104,6 +116,7 @@ public:
   LoadBalancing load_balance_method;
 
   std::string simd_arch_name() const;
+  std::string consense_type_name() const;
 
   std::string output_fname(const std::string& suffix) const;
 
@@ -120,6 +133,12 @@ public:
   const std::string& binary_msa_file() const { return outfile_names.binary_msa; }
   std::string bootstrap_msa_file(size_t bsnum) const;
   std::string bootstrap_partition_file() const;
+  const std::string rfdist_file() const { return outfile_names.rfdist; }
+  const std::string cons_tree_file() const { return outfile_names.cons_tree + consense_type_name(); }
+
+  const std::string asr_tree_file() const { return outfile_names.asr_tree; }
+  const std::string asr_probs_file() const { return outfile_names.asr_probs; }
+  const std::string asr_states_file() const { return outfile_names.asr_states; }
 
   void set_default_outfiles();
 

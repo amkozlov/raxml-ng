@@ -47,6 +47,7 @@ public:
   static void thread_broadcast(size_t source_id, void * data, size_t size);
   void thread_send_master(size_t source_id, void * data, size_t size) const;
 
+  static void mpi_broadcast(void * data, size_t size);
   static void mpi_gather_custom(std::function<int(void*,int)> prepare_send_cb,
                                 std::function<void(void*,int)> process_recv_cb);
 
@@ -54,6 +55,7 @@ public:
   static bool master_rank() { return _rank_id == 0; }
   static bool master_thread() { return _thread_id == 0; }
   static size_t thread_id() { return _thread_id; }
+  static size_t rank_id() { return _rank_id; }
   static size_t proc_id() { return _rank_id * _num_threads + _thread_id; }
 
   static void barrier();

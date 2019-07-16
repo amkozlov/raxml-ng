@@ -72,14 +72,8 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
 
 PhylipStream& operator>>(PhylipStream& stream, MSA& msa)
 {
-  pll_phylip_t * fd = pll_phylip_open(stream.fname().c_str(), pll_map_generic);
-  if (!fd)
-    throw runtime_error(pll_errmsg);
-
-  pll_msa_t * pll_msa = stream.interleaved() ?
-      pll_phylip_parse_interleaved(fd) : pll_phylip_parse_sequential(fd);
-
-  pll_phylip_close(fd);
+  pll_msa_t * pll_msa = pll_phylip_load(stream.fname().c_str(),
+                                        stream.interleaved() ? PLL_TRUE : PLL_FALSE);
 
   if (pll_msa)
   {
@@ -418,7 +412,7 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
 
       int d10_ref = PLL_STATE_CTZ(s_ref);
       int d10_alt = PLL_STATE_CTZ(s_alt);
-      int d10_het = PLL_STATE_CTZ(pll_map_diploid10[(int) gt_to_char[d10_ref][d10_alt]]);
+      int d10_het = PLL_STATE_CTZ(pll_map_gt10[(int) gt_to_char[d10_ref][d10_alt]]);
 
       assert(d10_ref >= 0 && d10_alt >= 0 && d10_het >= 0);
 
@@ -567,7 +561,7 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
           else
           {
             // no uncertainty specified, called genotype gets likelihood 1.0
-            pll_state_t ml_state =  pll_map_diploid10[(int) c];
+            pll_state_t ml_state =  pll_map_gt10[(int) c];
             pll_state_t state = 1;
             for (unsigned int k = 0; k < 10; ++k, state <<= 1)
               site_probs[k] = (state & ml_state) ? 1.0 : 0.0;

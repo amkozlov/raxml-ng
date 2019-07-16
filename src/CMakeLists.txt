@@ -1,8 +1,10 @@
 file(GLOB RAXML_SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp 
+                        ${PROJECT_SOURCE_DIR}/src/util/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/io/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/bootstrap/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/autotune/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/loadbalance/*.cpp
+                        ${PROJECT_SOURCE_DIR}/src/topology/*.cpp
                         )
 
 if(USE_TERRAPHAST)
@@ -107,3 +109,5 @@ else()
 endif()
 
 set_target_properties(raxml_module PROPERTIES PREFIX "")
+
+install(TARGETS raxml_module DESTINATION bin)

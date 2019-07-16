@@ -6,6 +6,8 @@
 #include "common.h"
 #include "ErrorModel.hpp"
 
+typedef std::unordered_map<pll_state_t,std::string> StateNameMap;
+
 class SubstitutionModel
 {
 public:
@@ -112,6 +114,9 @@ public:
   std::string name() const { return _name; };
 
   const pll_state_t* charmap() const;
+  const NameList& state_names() const;            // non-ambiguous states only, eg A C G T
+  const StateNameMap& full_state_namemap() const; // + ambiguous states, eg A C G T M R W S Y K -
+
   const SubstitutionModel submodel(size_t i) const { return _submodels.at(i); };
 
   unsigned int ratehet_mode() const { return _rate_het; };
@@ -171,6 +176,8 @@ private:
   DataType _data_type;
   unsigned int _num_states;
   std::shared_ptr<pll_state_t> _custom_charmap;
+  mutable NameList _state_names;
+  mutable StateNameMap _full_state_namemap;
 
   unsigned int _rate_het;
   unsigned int _num_ratecats;
@@ -197,6 +204,9 @@ private:
   void autodetect_data_type(const std::string& model_name);
   pllmod_mixture_model_t * init_mix_model(const std::string& model_name);
   void init_model_opts(const std::string& model_opts, const pllmod_mixture_model_t& mix_model);
+  void init_state_names() const;
+  void set_user_srates(doubleVector& srates, bool normalize = true);
+  void set_user_freqs(doubleVector& freqs);
 };
 
 void assign(Model& model, const pll_partition_t * partition);

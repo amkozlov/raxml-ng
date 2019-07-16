@@ -4,12 +4,14 @@
 #include <fstream>
 #include <vector>
 #include <memory>
+#include <map>
 
 enum class LogLevel
 {
   none = 0,
   error,
   warning,
+  result,
   info,
   progress,
   verbose,
@@ -21,9 +23,12 @@ enum class LogElement
   all = 0,
   loglh,
   model,
-  brlen
+  brlen,
+  other
 };
 
+
+typedef std::map<LogElement, unsigned int> LogElementMap;
 
 struct TimeStamp
 {
@@ -45,7 +50,7 @@ class LogStream
 {
 public:
   LogStream() {};
-  LogStream(const StreamList& streams) { _streams = streams; };
+  LogStream(const StreamList& streams) : _streams(streams) {};
 
   StreamList& streams() { return _streams;};
 
@@ -68,6 +73,7 @@ public:
   void set_log_filename(const std::string& fname, std::ios_base::openmode mode = std::ios::out);
   void add_log_stream(std::ostream* stream);
 
+  void precision(const LogElementMap& prec);
   void precision(unsigned int prec, LogElement elem = LogElement::all);
   unsigned int precision(LogElement elem) const;
 
@@ -84,10 +90,7 @@ private:
   std::ofstream _logfile;
   LogStream _empty_stream;
   LogStream _full_stream;
-
-  unsigned int _precision_loglh;
-  unsigned int _precision_model;
-  unsigned int _precision_brlen;
+  LogElementMap _precision;
 };
 
 Logging& logger();
@@ -96,11 +99,13 @@ Logging& logger();
 
 #define LOG_ERROR RAXML_LOG(LogLevel::error)
 #define LOG_WARN RAXML_LOG(LogLevel::warning)
+#define LOG_RESULT RAXML_LOG(LogLevel::result)
 #define LOG_INFO RAXML_LOG(LogLevel::info)
 #define LOG_DEBUG RAXML_LOG(LogLevel::debug)
 #define LOG_PROGR RAXML_LOG(LogLevel::progress)
 #define LOG_VERB RAXML_LOG(LogLevel::verbose)
 
+#define LOG_RESULT_TS LOG_RESULT << "[" << TimeStamp() << "] "
 #define LOG_INFO_TS LOG_INFO << "[" << TimeStamp() << "] "
 #define LOG_VERB_TS LOG_VERB << "[" << TimeStamp() << "] "
 #define LOG_DEBUG_TS LOG_DEBUG << "[" << TimeStamp() << "] "
@@ -110,6 +115,8 @@ Logging& logger();
 #define FMT_MOD(p) setprecision(logger().precision(LogElement::model)) << p
 #define FMT_BL(bl) setprecision(logger().precision(LogElement::brlen)) << bl
 #define FMT_PREC3(val) setprecision(3) << val
+#define FMT_PREC6(val) setprecision(6) << val
+#define FMT_PREC9(val) setprecision(9) << val
 
 template <class T>
 LogStream& operator<<(LogStream& logstream, const T& object)

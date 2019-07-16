@@ -31,7 +31,8 @@ std::string to_newick_string_rooted(const Tree& tree, double root_brlen)
 
 NewickStream& operator<<(NewickStream& stream, const pll_unode_t& root)
 {
-  char * newick_str = pll_utree_export_newick(&root, newick_print_cb);
+  auto print_cb = stream.brlens() ? newick_print_cb : newick_name_cb;
+  char * newick_str = pll_utree_export_newick(&root, print_cb);
   if (newick_str)
   {
     stream << newick_str << std::endl;
@@ -84,10 +85,17 @@ NewickStream& operator>>(NewickStream& stream, Tree& tree)
   return stream;
 }
 
-NewickStream& operator<<(NewickStream& stream, const BootstrapTree& tree)
+NewickStream& operator<<(NewickStream& stream, const SupportTree& tree)
 {
   stream << tree.pll_utree_root();
   return stream;
 }
+
+NewickStream& operator<<(NewickStream& stream, const AncestralStates& ancestral)
+{
+  stream << ancestral.tree;
+  return stream;
+}
+
 
 

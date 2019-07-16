@@ -29,7 +29,7 @@ public:
   size_t part_sites(size_t part_id) const;
   std::string part_sequence(size_t taxon_id, size_t part_id, bool uncompress = false) const;
 
-  void map_taxon_name(std::string orig_name, std::string new_name);
+  void map_taxon_name(const std::string& orig_name, const std::string& new_name);
   void exclude_taxon(size_t taxon_id);
 
   void exclude_site(size_t part_id, size_t site_id);

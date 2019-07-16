@@ -33,6 +33,11 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.terrace, "terrace");
   set_default_outfile(outfile_names.binary_msa, "rba");
   set_default_outfile(outfile_names.bootstrap_msa, "bootstrapMSA");
+  set_default_outfile(outfile_names.rfdist, "rfDistances");
+  set_default_outfile(outfile_names.cons_tree, "consensusTree");
+  set_default_outfile(outfile_names.asr_tree, "ancestralTree");
+  set_default_outfile(outfile_names.asr_probs, "ancestralProbs");
+  set_default_outfile(outfile_names.asr_states, "ancestralStates");
 }
 
 const std::string& Options::support_tree_file(BranchSupportMetric bsm) const
@@ -88,6 +93,13 @@ bool Options::result_files_exist() const
     case Command::bsmsa:
       return sysutil_file_exists(bootstrap_msa_file(1)) ||
              sysutil_file_exists(bootstrap_partition_file());
+    case Command::rfdist:
+      return sysutil_file_exists(rfdist_file());
+    case Command::consense:
+      return sysutil_file_exists(cons_tree_file());
+    case Command::ancestral:
+      return sysutil_file_exists(asr_tree_file()) || sysutil_file_exists(asr_probs_file()) ||
+             sysutil_file_exists(asr_states_file());
     default:
       return false;
   }
@@ -140,6 +152,20 @@ void Options::remove_result_files() const
     if (sysutil_file_exists(bootstrap_partition_file()))
       std::remove(bootstrap_partition_file().c_str());
   }
+
+  if (command == Command::rfdist)
+    sysutil_file_remove(rfdist_file());
+
+  if (command == Command::consense)
+    sysutil_file_remove(cons_tree_file());
+
+  if (command == Command::consense)
+  {
+    sysutil_file_remove(asr_tree_file());
+    sysutil_file_remove(asr_probs_file());
+    sysutil_file_remove(asr_states_file());
+  }
+
 }
 
 string Options::simd_arch_name() const
@@ -163,6 +189,24 @@ string Options::simd_arch_name() const
       break;
     default:
       return "UNKNOWN";
+  }
+}
+
+string Options::consense_type_name() const
+{
+  switch(consense_cutoff)
+  {
+    case 0:
+      return "MRE";
+      break;
+    case 50:
+      return "MR";
+      break;
+    case 100:
+      return "STRICT";
+      break;
+    default:
+      return "MR" + to_string(consense_cutoff);
   }
 }
 
@@ -209,6 +253,15 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     case Command::start:
       stream << "Starting tree generation";
       break;
+    case Command::rfdist:
+      stream << "RF distance computation";
+      break;
+    case Command::consense:
+      stream << "Build consensus tree";
+      break;
+    case Command::ancestral:
+      stream << "Ancestral state reconstruction";
+      break;
     default:
       break;
   }
@@ -233,6 +286,13 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     }
     stream << ")";
   }
+
+  if (opts.command == Command::consense)
+  {
+    stream << " (" << opts.consense_type_name() << ")";
+  }
+
+  /* end of run mode line */
   stream << endl;
 
   stream << "  start tree(s): ";
@@ -288,59 +348,65 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     stream << "  topological constraint: " << opts.constraint_tree_file << endl;
 
   stream << "  random seed: " << opts.random_seed << endl;
-  stream << "  tip-inner: " << (opts.use_tip_inner ? "ON" : "OFF") << endl;
-  stream << "  pattern compression: " << (opts.use_pattern_compression ? "ON" : "OFF") << endl;
-  stream << "  per-rate scalers: " << (opts.use_rate_scalers ? "ON" : "OFF") << endl;
-  stream << "  site repeats: " << (opts.use_repeats ? "ON" : "OFF") << endl;
 
-  if (opts.command == Command::search)
+  if (opts.command == Command::bootstrap || opts.command == Command::all ||
+      opts.command == Command::search || opts.command == Command::evaluate ||
+      opts.command == Command::parse || opts.command == Command::ancestral)
   {
-    if (opts.spr_radius > 0)
-      stream << "  fast spr radius: " << opts.spr_radius << endl;
-    else
-      stream << "  fast spr radius: AUTO" << endl;
+    stream << "  tip-inner: " << (opts.use_tip_inner ? "ON" : "OFF") << endl;
+    stream << "  pattern compression: " << (opts.use_pattern_compression ? "ON" : "OFF") << endl;
+    stream << "  per-rate scalers: " << (opts.use_rate_scalers ? "ON" : "OFF") << endl;
+    stream << "  site repeats: " << (opts.use_repeats ? "ON" : "OFF") << endl;
 
-    if (opts.spr_cutoff > 0.)
-      stream << "  spr subtree cutoff: " << opts.spr_cutoff << endl;
-    else
-      stream << "  spr subtree cutoff: OFF" << endl;
-  }
-
-  stream << "  branch lengths: ";
-  if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_SCALED)
-    stream << "proportional";
-  else if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED)
-    stream << "unlinked";
-  else
-    stream << "linked";
-
-  stream << " (";
-
-  if (opts.optimize_brlen)
-  {
-    stream << "ML estimate, algorithm: ";
-    switch(opts.brlen_opt_method)
+    if (opts.command == Command::search)
     {
-      case PLLMOD_OPT_BLO_NEWTON_FAST:
-        stream << "NR-FAST";
-        break;
-      case PLLMOD_OPT_BLO_NEWTON_SAFE:
-        stream << "NR-SAFE";
-        break;
-      case PLLMOD_OPT_BLO_NEWTON_GLOBAL:
-        stream << "NR-GLOBAL";
-        break;
-      case PLLMOD_OPT_BLO_NEWTON_OLDFAST:
-        stream << "legacy NR-FAST";
-        break;
-      case PLLMOD_OPT_BLO_NEWTON_OLDSAFE:
-        stream << "legacy NR-SAFE";
-        break;
+      if (opts.spr_radius > 0)
+        stream << "  fast spr radius: " << opts.spr_radius << endl;
+      else
+        stream << "  fast spr radius: AUTO" << endl;
+
+      if (opts.spr_cutoff > 0.)
+        stream << "  spr subtree cutoff: " << opts.spr_cutoff << endl;
+      else
+        stream << "  spr subtree cutoff: OFF" << endl;
     }
+
+    stream << "  branch lengths: ";
+    if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_SCALED)
+      stream << "proportional";
+    else if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED)
+      stream << "unlinked";
+    else
+      stream << "linked";
+
+    stream << " (";
+
+    if (opts.optimize_brlen)
+    {
+      stream << "ML estimate, algorithm: ";
+      switch(opts.brlen_opt_method)
+      {
+        case PLLMOD_OPT_BLO_NEWTON_FAST:
+          stream << "NR-FAST";
+          break;
+        case PLLMOD_OPT_BLO_NEWTON_SAFE:
+          stream << "NR-SAFE";
+          break;
+        case PLLMOD_OPT_BLO_NEWTON_GLOBAL:
+          stream << "NR-GLOBAL";
+          break;
+        case PLLMOD_OPT_BLO_NEWTON_OLDFAST:
+          stream << "legacy NR-FAST";
+          break;
+        case PLLMOD_OPT_BLO_NEWTON_OLDSAFE:
+          stream << "legacy NR-SAFE";
+          break;
+      }
+    }
+    else
+      stream << "user-specified";
+    stream << ")" << endl;
   }
-  else
-    stream << "user-specified";
-  stream << ")" << endl;
 
   stream << "  SIMD kernels: " << opts.simd_arch_name() << endl;
 

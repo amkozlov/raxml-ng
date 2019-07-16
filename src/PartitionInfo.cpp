@@ -106,7 +106,8 @@ const PartitionStats& PartitionInfo::stats() const
 
     _stats.site_count = _msa.num_sites();
     _stats.pattern_count = _msa.num_patterns();
-    _stats.inv_count = pll_stats->inv_cols_count;
+    _stats.inv_prop = pll_stats->inv_prop;
+
     _stats.gap_prop = pll_stats->gap_prop;
     _stats.gap_seqs.assign(pll_stats->gap_seqs, pll_stats->gap_seqs + pll_stats->gap_seqs_count);
 
@@ -165,11 +166,11 @@ void assign(Model& model, const PartitionStats& stats)
   switch (model.param_mode(PLLMOD_OPT_PARAM_PINV))
   {
     case ParamValue::empirical:
-      model.pinv(stats.inv_prop());
+      model.pinv(stats.inv_prop);
       break;
     case ParamValue::ML:
       /* use half of empirical pinv as a starting value */
-      model.pinv(stats.inv_prop() / 2);
+      model.pinv(stats.inv_prop / 2);
       break;
     case ParamValue::user:
     case ParamValue::undefined:

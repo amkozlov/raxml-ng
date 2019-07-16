@@ -62,6 +62,10 @@ PartitionAssignmentList KassianLoadBalancer::compute_assignments(const Partition
     }
   }
 
+  /* all partitions have been assigned during phase 1 -> return result immediately */
+  if (curr_part == sorted_partitions.size())
+    return bins;
+
   stack<PartitionAssignment *> qlow_;
   stack<PartitionAssignment *> *qlow = &qlow_; // hack to assign qhigh to qlow when qlow is empty
   stack<PartitionAssignment *> qhigh;

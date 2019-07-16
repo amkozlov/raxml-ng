@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2017 Alexey Kozlov, Alexandros Stamatakis, Diego Darriba, Tomas Flouri
+    Copyright (C) 2017-2019 Alexey Kozlov, Alexandros Stamatakis, Diego Darriba, Tomas Flouri
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as
@@ -39,8 +39,10 @@
 #include "bootstrap/BootstrapGenerator.hpp"
 #include "bootstrap/BootstopCheck.hpp"
 #include "bootstrap/TransferBootstrapTree.hpp"
+#include "bootstrap/ConsensusTree.hpp"
 #include "autotune/ResourceEstimator.hpp"
 #include "ICScoreCalculator.hpp"
+#include "topology/RFDistCalculator.hpp"
 
 #ifdef _RAXML_TERRAPHAST
 #include "terraces/TerraceWrapper.hpp"
@@ -48,7 +50,6 @@
 
 using namespace std;
 
-typedef vector<Tree> TreeList;
 struct RaxmlInstance
 {
   Options opts;
@@ -59,7 +60,8 @@ struct RaxmlInstance
   TreeList bs_start_trees;
   PartitionAssignmentList proc_part_assign;
   unique_ptr<LoadBalancer> load_balancer;
-  map<BranchSupportMetric, shared_ptr<BootstrapTree> > support_trees;
+  map<BranchSupportMetric, shared_ptr<SupportTree> > support_trees;
+  shared_ptr<ConsensusTree> consens_tree;
 
   // bootstopping convergence test, only autoMRE is supported for now
   unique_ptr<BootstopCheckMRE> bootstop_checker;
@@ -83,18 +85,21 @@ struct RaxmlInstance
 
   /* topological constraint */
   Tree constraint_tree;
+
+  unique_ptr<RFDistCalculator> dist_calculator;
+  AncestralStatesSharedPtr ancestral_states;
 };
 
 void print_banner()
 {
   LOG_INFO << endl << "RAxML-NG v. " << RAXML_VERSION << " released on " << RAXML_DATE <<
       " by The Exelixis Lab." << endl;
-  LOG_INFO << "Authors: Alexey Kozlov, Alexandros Stamatakis, Diego Darriba, "
-              "Tomas Flouri, Benoit Morel." << endl;
+  LOG_INFO << "Developed by: Alexey M. Kozlov and Alexandros Stamatakis." << endl;
+  LOG_INFO << "Contributors: Diego Darriba, Tomas Flouri, Benoit Morel, "
+              "Sarah Lutteropp, Ben Bettisworth." << endl;
   LOG_INFO << "Latest version: https://github.com/amkozlov/raxml-ng" << endl;
   LOG_INFO << "Questions/problems/suggestions? "
-              "Please visit: https://groups.google.com/forum/#!forum/raxml" << endl;
-  LOG_INFO << endl << "WARNING: This is a BETA release, please use at your own risk!" << endl << endl;
+              "Please visit: https://groups.google.com/forum/#!forum/raxml" << endl << endl;
 }
 
 void init_part_info(RaxmlInstance& instance)
@@ -219,14 +224,59 @@ void print_reduced_msa(const RaxmlInstance& instance, const PartitionedMSAView& 
   }
 }
 
+bool check_msa_global(const MSA& msa)
+{
+  bool msa_valid = true;
+
+  /* check taxa count */
+  if (msa.size() < 4)
+  {
+    LOG_ERROR << "\nERROR: Your alignment contains less than 4 sequences! " << endl;
+    msa_valid = false;
+  }
+
+  /* check for duplicate taxon names */
+  unsigned long stats_mask = PLLMOD_MSA_STATS_DUP_TAXA;
+
+  pllmod_msa_stats_t * stats = pllmod_msa_compute_stats(msa.pll_msa(),
+                                                        4,
+                                                        pll_map_nt, // map is not used here
+                                                        NULL,
+                                                        stats_mask);
+
+  libpll_check_error("ERROR computing MSA stats");
+  assert(stats);
+
+  if (stats->dup_taxa_pairs_count > 0)
+  {
+    LOG_ERROR << endl;
+    for (unsigned long c = 0; c < stats->dup_taxa_pairs_count; ++c)
+    {
+      auto id1 = stats->dup_taxa_pairs[c*2];
+      auto id2 = stats->dup_taxa_pairs[c*2+1];
+      LOG_ERROR << "ERROR: Sequences " << id1+1 << " and "
+                << id2+1 << " have identical name: "
+                << msa.label(id1) << endl;
+    }
+    LOG_ERROR << "\nERROR: Duplicate sequence names found: "
+              << stats->dup_taxa_pairs_count << endl;
+
+    msa_valid = false;
+  }
+
+  pllmod_msa_destroy_stats(stats);
+
+  return msa_valid;
+}
+
 bool check_msa(RaxmlInstance& instance)
 {
   LOG_VERB_TS << "Checking the alignment...\n";
 
+  const auto& opts = instance.opts;
   auto& parted_msa = *instance.parted_msa;
   const auto& full_msa = parted_msa.full_msa();
   const auto pll_msa = full_msa.pll_msa();
-  const auto taxon_count = parted_msa.taxon_count();
 
   bool msa_valid = true;
   bool msa_corrected = false;
@@ -236,55 +286,47 @@ bool check_msa(RaxmlInstance& instance)
   vector<pair<size_t,size_t> > dup_seqs;
   std::set<size_t> gap_seqs;
 
-  /* check taxa count */
-  if (taxon_count < 4)
+  /* check taxon names for invalid characters */
+  if (opts.safety_checks.isset(SafetyCheck::msa_names))
   {
-    LOG_ERROR << "\nERROR: Your alignment contains less than 4 sequences! " << endl;
-    return false;
-  }
-
-  /* check taxon names */
-  const string invalid_chars = "(),;:' \t\n";
-  for (const auto& taxon: parted_msa.taxon_names())
-  {
-    if (taxon.find_first_of(invalid_chars) != std::string::npos)
+    const string invalid_chars = "(),;:' \t\n";
+    for (const auto& taxon: parted_msa.taxon_names())
     {
-      size_t i = 0;
-      auto fixed_name = taxon;
-      while ((i = fixed_name.find_first_of(invalid_chars, i)) != std::string::npos)
-        fixed_name[i++] = '_';
-      parted_msa_view.map_taxon_name(taxon, fixed_name);
+      if (taxon.find_first_of(invalid_chars) != std::string::npos)
+      {
+        size_t i = 0;
+        auto fixed_name = taxon;
+        while ((i = fixed_name.find_first_of(invalid_chars, i)) != std::string::npos)
+          fixed_name[i++] = '_';
+        parted_msa_view.map_taxon_name(taxon, fixed_name);
+      }
     }
+
+    msa_valid &= parted_msa_view.taxon_name_map().empty();
   }
 
-  msa_valid &= parted_msa_view.taxon_name_map().empty();
-
-  unsigned long stats_mask = PLLMOD_MSA_STATS_DUP_TAXA | PLLMOD_MSA_STATS_DUP_SEQS;
-
-  pllmod_msa_stats_t * stats = pllmod_msa_compute_stats(pll_msa,
-                                                        4,
-                                                        pll_map_nt, // map is not used here
-                                                        NULL,
-                                                        stats_mask);
-
-  libpll_check_error("ERROR computing MSA stats");
-  assert(stats);
-
-  for (unsigned long c = 0; c < stats->dup_taxa_pairs_count; ++c)
+  /* check for duplicate sequences */
+  if (opts.safety_checks.isset(SafetyCheck::msa_dups))
   {
-    dup_taxa.emplace_back(stats->dup_taxa_pairs[c*2],
-                          stats->dup_taxa_pairs[c*2+1]);
+    unsigned long stats_mask = PLLMOD_MSA_STATS_DUP_SEQS;
+
+    pllmod_msa_stats_t * stats = pllmod_msa_compute_stats(pll_msa,
+                                                          4,
+                                                          pll_map_nt, // map is not used here
+                                                          NULL,
+                                                          stats_mask);
+
+    libpll_check_error("ERROR computing MSA stats");
+    assert(stats);
+
+    for (unsigned long c = 0; c < stats->dup_seqs_pairs_count; ++c)
+    {
+      dup_seqs.emplace_back(stats->dup_seqs_pairs[c*2],
+                            stats->dup_seqs_pairs[c*2+1]);
+    }
+
+    pllmod_msa_destroy_stats(stats);
   }
-
-  msa_valid &= dup_taxa.empty();
-
-  for (unsigned long c = 0; c < stats->dup_seqs_pairs_count; ++c)
-  {
-    dup_seqs.emplace_back(stats->dup_seqs_pairs[c*2],
-                          stats->dup_seqs_pairs[c*2+1]);
-  }
-
-  pllmod_msa_destroy_stats(stats);
 
   size_t total_gap_cols = 0;
   size_t part_num = 0;
@@ -315,36 +357,40 @@ bool check_msa(RaxmlInstance& instance)
       libpll_check_error("MSA check failed");
 
 
-    stats_mask = PLLMOD_MSA_STATS_GAP_SEQS | PLLMOD_MSA_STATS_GAP_COLS;
-
-    pllmod_msa_stats_t * stats = pinfo.compute_stats(stats_mask);
-
-    if (stats->gap_cols_count > 0)
+    /* Check for all-gap columns and sequences */
+    if (opts.safety_checks.isset(SafetyCheck::msa_allgaps))
     {
-      total_gap_cols += stats->gap_cols_count;
-      std::vector<size_t> gap_cols(stats->gap_cols, stats->gap_cols + stats->gap_cols_count);
-      pinfo.msa().remove_sites(gap_cols);
-//      parted_msa_view.exclude_sites(part_num, gap_cols);
-    }
+      unsigned long stats_mask = PLLMOD_MSA_STATS_GAP_SEQS | PLLMOD_MSA_STATS_GAP_COLS;
 
-    std::set<size_t> cur_gap_seq(stats->gap_seqs, stats->gap_seqs + stats->gap_seqs_count);
+      pllmod_msa_stats_t * stats = pinfo.compute_stats(stats_mask);
 
-    if (!part_num)
-    {
-      gap_seqs = cur_gap_seq;
-    }
-    else
-    {
-      for(auto it = gap_seqs.begin(); it != gap_seqs.end();)
+      if (stats->gap_cols_count > 0)
       {
-        if(cur_gap_seq.find(*it) == cur_gap_seq.end())
-          it = gap_seqs.erase(it);
-        else
-          ++it;
+        total_gap_cols += stats->gap_cols_count;
+        std::vector<size_t> gap_cols(stats->gap_cols, stats->gap_cols + stats->gap_cols_count);
+        pinfo.msa().remove_sites(gap_cols);
+  //      parted_msa_view.exclude_sites(part_num, gap_cols);
       }
-    }
 
-    pllmod_msa_destroy_stats(stats);
+      std::set<size_t> cur_gap_seq(stats->gap_seqs, stats->gap_seqs + stats->gap_seqs_count);
+
+      if (!part_num)
+      {
+        gap_seqs = cur_gap_seq;
+      }
+      else
+      {
+        for(auto it = gap_seqs.begin(); it != gap_seqs.end();)
+        {
+          if(cur_gap_seq.find(*it) == cur_gap_seq.end())
+            it = gap_seqs.erase(it);
+          else
+            ++it;
+        }
+      }
+
+      pllmod_msa_destroy_stats(stats);
+    }
 
     part_num++;
   }
@@ -391,17 +437,6 @@ bool check_msa(RaxmlInstance& instance)
     print_reduced_msa(instance, parted_msa_view);
   }
 
-  if (!dup_taxa.empty())
-  {
-    for (const auto& p: dup_seqs)
-    {
-      LOG_ERROR << "ERROR: Sequences " << p.first+1 << " and "
-                << p.second+1 << " have identical name: "
-                << parted_msa.taxon_names().at(p.first) << endl;
-    }
-    LOG_ERROR << "\nERROR: Duplicate sequence names found: " << dup_taxa.size() << endl;
-  }
-
   if (!parted_msa_view.taxon_name_map().empty())
   {
     LOG_ERROR << endl;
@@ -441,61 +476,78 @@ size_t total_free_params(const RaxmlInstance& instance)
 
 void check_models(const RaxmlInstance& instance)
 {
+  const auto& opts = instance.opts;
+  bool zero_freqs = false;
+
   for (const auto& pinfo: instance.parted_msa->part_list())
   {
     auto stats = pinfo.stats();
     auto model = pinfo.model();
 
     // check for non-recommended model combinations
-    if ((model.name() == "LG4X" || model.name() == "LG4M") &&
-        model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) != ParamValue::model)
+    if (opts.safety_checks.isset(SafetyCheck::model_lg4_freqs))
     {
-      throw runtime_error("Partition \"" + pinfo.name() +
-                          "\": You specified LG4M or LG4X model with shared stationary based frequencies (" +
-                          model.to_string(false) + ").\n"
-                          "Please be warned, that this is against the idea of LG4 models and hence it's not recommended!" + "\n"
-                          "If you know what you're doing, you can add --force command line switch to disable this safety check.");
+      if ((model.name() == "LG4X" || model.name() == "LG4M") &&
+          model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) != ParamValue::model)
+      {
+        throw runtime_error("Partition \"" + pinfo.name() +
+                            "\": You specified LG4M or LG4X model with shared stationary based frequencies (" +
+                            model.to_string(false) + ").\n"
+                            "Please be warned, that this is against the idea of LG4 models and hence it's not recommended!" + "\n"
+                            "If you know what you're doing, you can add --force command line switch to disable this safety check.");
+      }
     }
 
     // check for zero state frequencies
-    if (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::empirical)
+    if (opts.safety_checks.isset(SafetyCheck::model_zero_freqs))
     {
-      const auto& freqs = stats.emp_base_freqs;
-      for (unsigned int i = 0; i < freqs.size(); ++i)
+      if (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::empirical)
       {
-        if (!(freqs[i] > 0.))
+        const auto& freqs = stats.emp_base_freqs;
+        for (unsigned int i = 0; i < freqs.size(); ++i)
         {
-          LOG_ERROR << "\nBase frequencies: ";
-          for (unsigned int j = 0; j < freqs.size(); ++j)
-            LOG_ERROR << freqs[j] <<  " ";
-          LOG_ERROR << endl;
+          if (freqs[i] < PLL_EIGEN_MINFREQ)
+          {
+            if (!zero_freqs)
+            {
+              LOG_WARN << endl;
+              zero_freqs = true;
+            }
 
-          throw runtime_error("Frequency of state " + to_string(i) +
-                              " in partition " + pinfo.name() + " is 0!\n"
-                              "Please either change your partitioning scheme or "
-                              "use model state frequencies for this partition!");
+            LOG_WARN << "WARNING: State " << to_string(i) <<
+                (instance.parted_msa->part_count() > 1 ? " in partition " + pinfo.name() : "") <<
+                " has very low frequency (" << FMT_PREC9(freqs[i]) << ")!" << endl;
+
+            LOG_VERB << "Base frequencies: ";
+            for (unsigned int j = 0; j < freqs.size(); ++j)
+              LOG_VERB << FMT_PREC9(freqs[j]) <<  " ";
+            LOG_VERB << endl;
+          }
         }
       }
     }
 
     // check for user-defined state frequencies which do not sum up to one
-    if (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::user)
+    if (opts.safety_checks.isset(SafetyCheck::model_invalid_freqs))
     {
-      const auto& freqs = model.base_freqs(0);
-      double sum = 0.;
-      for (unsigned int i = 0; i < freqs.size(); ++i)
-        sum += freqs[i];
-
-      if (fabs(sum - 1.0) > 0.01)
+      if (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::user)
       {
-        LOG_ERROR << "\nBase frequencies: ";
-        for (unsigned int j = 0; j < freqs.size(); ++j)
-          LOG_ERROR << freqs[j] <<  " ";
-        LOG_ERROR << endl;
+        const auto& freqs = model.base_freqs(0);
+        double sum = 0.;
+        for (unsigned int i = 0; i < freqs.size(); ++i)
+          sum += freqs[i];
 
-        throw runtime_error("User-specified stationary base frequencies"
-                            " in partition " + pinfo.name() + " do not sum up to 1.0!\n"
-                            "Please provide normalized frequencies.");
+        if (fabs(sum - 1.0) > 0.01)
+        {
+          LOG_ERROR << "\nBase frequencies: ";
+          for (unsigned int j = 0; j < freqs.size(); ++j)
+            LOG_ERROR << FMT_PREC9(freqs[j]) <<  " ";
+          LOG_ERROR << endl;
+
+          throw runtime_error("User-specified stationary base frequencies"
+                              " in partition " + pinfo.name() + " do not sum up to 1.0!\n"
+                              "Please provide normalized frequencies.");
+        }
       }
     }
 
@@ -508,30 +560,50 @@ void check_models(const RaxmlInstance& instance)
     }
 
     // check partitions which contain invariant sites and have ascertainment bias enabled
-    if (model.ascbias_type() != AscBiasCorrection::none && stats.inv_count > 0)
+    if (opts.safety_checks.isset(SafetyCheck::model_asc_bias))
     {
-      throw runtime_error("You enabled ascertainment bias correction for partition " +
-                           pinfo.name() + ", but it contains " +
-                           to_string(stats.inv_count) + " invariant sites.\n"
-                          "This is not allowed! Please either remove invariant sites or "
-                          "disable ascertainment bias correction.");
+      if (model.ascbias_type() != AscBiasCorrection::none && stats.inv_count() > 0)
+      {
+        throw runtime_error("You enabled ascertainment bias correction for partition " +
+                             pinfo.name() + ", but it contains " +
+                             to_string(stats.inv_count()) + " invariant sites.\n"
+                            "This is not allowed! Please either remove invariant sites or "
+                            "disable ascertainment bias correction.");
+      }
     }
   }
 
+  if (zero_freqs)
+  {
+    LOG_WARN << endl << "WARNING: Some states have very low frequencies, "
+        "which might lead to numerical issues!" << endl;
+  }
 
   /* Check for extreme cases of overfitting (K >= n) */
-  if (instance.parted_msa->part_count() > 1)
+  if (opts.safety_checks.isset(SafetyCheck::model_overfit))
   {
-    size_t free_params = total_free_params(instance);
-    size_t sample_size = instance.parted_msa->total_sites();
-    if (free_params >= sample_size)
+    if (instance.parted_msa->part_count() > 1)
     {
-      throw runtime_error("Number of free parameters (K=" + to_string(free_params) +
-                          ") is larger than alignment size (n=" + to_string(sample_size) + ").\n" +
-                          "       This might lead to overfitting and compromise tree inference results!\n" +
-                          "       Please consider revising your partitioning scheme, conducting formal model selection\n" +
-                          "       and/or using linked/scaled branch lengths across partitions.\n" +
-                          "NOTE:  You can disable this check by adding the --force option.\n");
+      size_t model_free_params = instance.parted_msa->total_free_model_params();
+      size_t free_params = total_free_params(instance);
+      size_t sample_size = instance.parted_msa->total_sites();
+      string errmsg = "Number of free parameters (K=" + to_string(free_params) +
+          ") is larger than alignment size (n=" + to_string(sample_size) + ").\n" +
+          "       This might lead to overfitting and compromise tree inference results!\n" +
+          "       Please consider revising your partitioning scheme, conducting formal model selection\n" +
+          "       and/or using linked/scaled branch lengths across partitions.\n" +
+          "NOTE:  You can disable this check by adding the --force option.\n";
+
+      if (free_params >= sample_size)
+      {
+        if (model_free_params >= sample_size ||
+            instance.opts.brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED)
+        {
+          throw runtime_error(errmsg);
+        }
+        else
+          LOG_WARN << endl << "WARNING: " << errmsg << endl;
+      }
     }
   }
 }
@@ -603,47 +675,58 @@ void check_options(RaxmlInstance& instance)
     }
   }
 
-  /* following "soft" checks will be ignored in the --force mode */
-  if (opts.force_mode)
-    return;
-
   /* check that we have enough patterns per thread */
-  if (ParallelContext::master_rank() && ParallelContext::num_procs() > 1)
+  if (opts.safety_checks.isset(SafetyCheck::perf_threads))
   {
-    StaticResourceEstimator resEstimator(*instance.parted_msa, instance.opts);
-    auto res = resEstimator.estimate();
-    if (ParallelContext::num_procs() > res.num_threads_response)
+    if (ParallelContext::master_rank() && ParallelContext::num_procs() > 1)
     {
-      LOG_WARN << endl;
-      LOG_WARN << "WARNING: You might be using too many threads (" << ParallelContext::num_procs()
-               <<  ") for your alignment with "
-               << (opts.use_pattern_compression ?
-                      to_string(instance.parted_msa->total_patterns()) + " unique patterns." :
-                      to_string(instance.parted_msa->total_sites()) + " alignment sites.")
-               << endl;
-      LOG_WARN << "NOTE:    For the optimal throughput, please consider using fewer threads " << endl;
-      LOG_WARN << "NOTE:    and parallelize across starting trees/bootstrap replicates." << endl;
-      LOG_WARN << "NOTE:    As a general rule-of-thumb, please assign at least 200-1000 "
-          "alignment patterns per thread." << endl << endl;
-
-      if (ParallelContext::num_procs() > 2 * res.num_threads_response)
+      StaticResourceEstimator resEstimator(*instance.parted_msa, instance.opts);
+      auto res = resEstimator.estimate();
+      if (ParallelContext::num_procs() > res.num_threads_response)
       {
-        throw runtime_error("Too few patterns per thread! "
-                            "RAxML-NG will terminate now to avoid wasting resources.\n"
-                            "NOTE:  Please reduce the number of threads (see guidelines above).\n"
-                            "NOTE:  This check can be disabled with the '--force' option.");
+        LOG_WARN << endl;
+        LOG_WARN << "WARNING: You might be using too many threads (" << ParallelContext::num_procs()
+                 <<  ") for your alignment with "
+                 << (opts.use_pattern_compression ?
+                        to_string(instance.parted_msa->total_patterns()) + " unique patterns." :
+                        to_string(instance.parted_msa->total_sites()) + " alignment sites.")
+                 << endl;
+        LOG_WARN << "NOTE:    For the optimal throughput, please consider using fewer threads " << endl;
+        LOG_WARN << "NOTE:    and parallelize across starting trees/bootstrap replicates." << endl;
+        LOG_WARN << "NOTE:    As a general rule-of-thumb, please assign at least 200-1000 "
+            "alignment patterns per thread." << endl << endl;
+
+        if (ParallelContext::num_procs() > 2 * res.num_threads_response)
+        {
+          throw runtime_error("Too few patterns per thread! "
+                              "RAxML-NG will terminate now to avoid wasting resources.\n"
+                              "NOTE:  Please reduce the number of threads (see guidelines above).\n"
+                              "NOTE:  This check can be disabled with the '--force' option.");
+        }
       }
     }
   }
 
   if (instance.parted_msa->taxon_count() > RAXML_RATESCALERS_TAXA &&
-      !instance.opts.use_rate_scalers)
+      !instance.opts.use_rate_scalers && opts.command != Command::ancestral)
   {
     LOG_INFO << "\nNOTE: Per-rate scalers were automatically enabled to prevent numerical issues "
         "on taxa-rich alignments." << endl;
     LOG_INFO << "NOTE: You can use --force switch to skip this check "
         "and fall back to per-site scalers." << endl << endl;
     instance.opts.use_rate_scalers = true;
+  }
+
+  if (opts.command == Command::ancestral)
+  {
+    if (opts.use_pattern_compression)
+      throw runtime_error("Pattern compression is not supported in ancestral state reconstruction mode!");
+    if (opts.use_repeats)
+      throw runtime_error("Site repeats are not supported in ancestral state reconstruction mode!");
+    if (opts.use_rate_scalers)
+      throw runtime_error("Per-rate scalers are not supported in ancestral state reconstruction mode!");
+    if (ParallelContext::num_ranks() > 1)
+      throw runtime_error("MPI parallelization is not supported in ancestral state reconstruction mode!");
   }
 }
 
@@ -672,6 +755,9 @@ void load_msa(RaxmlInstance& instance)
   else
     instance.opts.use_prob_msa = false;
 
+  if (!check_msa_global(msa))
+    throw runtime_error("Alignment check failed (see details above)!");
+
   parted_msa.full_msa(std::move(msa));
 
   LOG_VERB_TS << "Extracting partitions... " << endl;
@@ -679,12 +765,8 @@ void load_msa(RaxmlInstance& instance)
   parted_msa.split_msa();
 
   /* check alignment */
-  if (!opts.force_mode)
-  {
-    LOG_VERB_TS << "Validating alignment... " << endl;
-    if (!check_msa(instance))
-      throw runtime_error("Alignment check failed (see details above)!");
-  }
+  if (!check_msa(instance))
+    throw runtime_error("Alignment check failed (see details above)!");
 
   if (opts.use_pattern_compression)
   {
@@ -702,8 +784,7 @@ void load_msa(RaxmlInstance& instance)
 
   parted_msa.set_model_empirical_params();
 
-  if (!opts.force_mode)
-    check_models(instance);
+  check_models(instance);
 
   LOG_INFO << endl;
 
@@ -891,9 +972,13 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
 void load_constraint(RaxmlInstance& instance)
 {
   const auto& parted_msa = *instance.parted_msa;
+  const auto& opts = instance.opts;
 
   if (!instance.opts.constraint_tree_file.empty())
   {
+    if (!sysutil_file_exists(opts.constraint_tree_file))
+      throw runtime_error("Constraint tree file not found: " + opts.constraint_tree_file);
+
     NewickStream nw_cons(instance.opts.constraint_tree_file, std::ios::in);
     Tree& cons_tree = instance.constraint_tree;
     nw_cons >> cons_tree;
@@ -921,6 +1006,9 @@ void load_constraint(RaxmlInstance& instance)
         throw runtime_error(ss.str());
       }
     }
+
+//    /* branch lengths in constraint tree can be misleading, so just reset them to default value */
+//    cons_tree.reset_brlens();
 
     if (cons_tree.num_tips() < parted_msa.taxon_count())
     {
@@ -964,7 +1052,7 @@ void build_parsimony_msa(RaxmlInstance& instance)
   instance.parted_msa_parsimony.reset(new PartitionedMSA(orig_msa.taxon_names()));
   PartitionedMSA& pars_msa = *instance.parted_msa_parsimony.get();
 
-  std::unordered_map<string, PartitionInfo*> datatype_pinfo_map;
+  NameIdMap datatype_pinfo_map;
   for (const auto& pinfo: orig_msa.part_list())
   {
     const auto& model = pinfo.model();
@@ -976,11 +1064,11 @@ void build_parsimony_msa(RaxmlInstance& instance)
       pars_msa.emplace_part_info(data_type_name, model.data_type(), model.name());
       auto& pars_pinfo = pars_msa.part_list().back();
       pars_pinfo.msa(MSA(pinfo.msa().num_sites()));
-      datatype_pinfo_map[data_type_name] = &pars_pinfo;
+      datatype_pinfo_map[data_type_name] = pars_msa.part_count()-1;
     }
     else
     {
-      auto& msa = iter->second->msa();
+      auto& msa = pars_msa.part_list().at(iter->second).msa();
       msa.num_sites(msa.num_sites() + pinfo.msa().num_sites());
     }
   }
@@ -1211,6 +1299,17 @@ void generate_bootstraps(RaxmlInstance& instance, const Checkpoint& checkp)
   }
 }
 
+void init_ancestral(RaxmlInstance& instance)
+{
+  if (instance.opts.command == Command::ancestral)
+  {
+    const auto& parted_msa = *instance.parted_msa;
+    const Tree& tree = instance.start_trees.at(0);
+
+    instance.ancestral_states = make_shared<AncestralStates>(tree.num_inner(), parted_msa);
+  }
+}
+
 void reroot_tree_with_outgroup(const Options& opts, Tree& tree, bool add_root_node)
 {
   if (!opts.outgroup_taxa.empty())
@@ -1242,7 +1341,7 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree, const TreeC
 
   for (auto metric: instance.opts.bs_metrics)
   {
-      shared_ptr<BootstrapTree> sup_tree;
+      shared_ptr<SupportTree> sup_tree;
       bool support_in_pct = false;
 
       if (metric == BranchSupportMetric::fbp)
@@ -1252,7 +1351,7 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree, const TreeC
       }
       else if (metric == BranchSupportMetric::tbe)
       {
-        sup_tree = make_shared<TransferBootstrapTree>(ref_tree);
+        sup_tree = make_shared<TransferBootstrapTree>(ref_tree, instance.opts.tbe_naive);
         support_in_pct = false;
       }
       else
@@ -1262,9 +1361,9 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree, const TreeC
       for (auto bs: bs_trees)
       {
         tree.topology(bs.second);
-        sup_tree->add_bootstrap_tree(tree);
+        sup_tree->add_replicate_tree(tree);
       }
-      sup_tree->calc_support(support_in_pct);
+      sup_tree->draw_support(support_in_pct);
 
       instance.support_trees[metric] = sup_tree;
   }
@@ -1335,15 +1434,21 @@ bool check_bootstop(const RaxmlInstance& instance, const TreeCollection& bs_tree
   return converged;
 }
 
-TreeCollection read_bootstrap_trees(const RaxmlInstance& instance, Tree& ref_tree)
+TreeCollection read_newick_trees(Tree& ref_tree,
+                                 const std::string& fname, const std::string& tree_kind)
 {
   NameIdMap ref_tip_ids;
-  const auto& opts = instance.opts;
-  NewickStream boots(opts.bootstrap_trees_file(), std::ios::in);
   TreeCollection bs_trees;
   unsigned int bs_num = 0;
 
-  LOG_INFO << "Reading bootstrap trees from file: " << opts.bootstrap_trees_file() << endl;
+  if (!sysutil_file_exists(fname))
+    throw runtime_error("File not found: " + fname);
+
+  NewickStream boots(fname, std::ios::in);
+  auto tree_kind_cap = tree_kind;
+  tree_kind_cap[0] = toupper(tree_kind_cap[0]);
+
+  LOG_INFO << "Reading " << tree_kind << " trees from file: " << fname << endl;
 
   while (boots.peek() != EOF)
   {
@@ -1363,7 +1468,7 @@ TreeCollection read_bootstrap_trees(const RaxmlInstance& instance, Tree& ref_tre
     {
       LOG_DEBUG << "REF #branches: " << ref_tree.num_branches()
                 << ", BS #branches: " << tree.num_branches() << endl;
-      throw runtime_error("Bootstrap tree #" + to_string(bs_num+1) +
+      throw runtime_error(tree_kind_cap + " tree #" + to_string(bs_num+1) +
                           " contains multifurcations!");
     }
 
@@ -1373,19 +1478,27 @@ TreeCollection read_bootstrap_trees(const RaxmlInstance& instance, Tree& ref_tre
     }
     catch (out_of_range& e)
     {
-      throw runtime_error("Bootstrap tree #" + to_string(bs_num+1) +
+      throw runtime_error(tree_kind_cap + " tree #" + to_string(bs_num+1) +
                           " contains incompatible taxon name(s)!");
     }
     catch (invalid_argument& e)
     {
-      throw runtime_error("Bootstrap tree #" + to_string(bs_num+1) +
+      throw runtime_error(tree_kind_cap + " tree #" + to_string(bs_num+1) +
                           " has wrong number of tips: " + to_string(tree.num_tips()));
     }
     bs_trees.push_back(0, tree);
     bs_num++;
   }
 
-  LOG_INFO << "Bootstrap trees found: " << bs_trees.size() << endl << endl;
+  LOG_INFO << "Loaded " << bs_trees.size() << " trees with "
+           << ref_tree.num_tips() << " taxa." << endl << endl;
+
+  return bs_trees;
+}
+
+TreeCollection read_bootstrap_trees(const RaxmlInstance& instance, Tree& ref_tree)
+{
+  auto bs_trees = read_newick_trees(ref_tree, instance.opts.bootstrap_trees_file(), "bootstrap");
 
   if (bs_trees.size() < 2)
   {
@@ -1393,6 +1506,28 @@ TreeCollection read_bootstrap_trees(const RaxmlInstance& instance, Tree& ref_tre
   }
 
   return bs_trees;
+}
+
+void read_multiple_tree_files(RaxmlInstance& instance)
+{
+  const auto& opts = instance.opts;
+
+  vector<string> fname_list;
+  if (sysutil_file_exists(opts.tree_file))
+    fname_list.push_back(opts.tree_file);
+  else
+    fname_list = split_string(opts.tree_file, ',');
+
+  for (const auto& fname: fname_list)
+  {
+    auto topos = read_newick_trees(instance.random_tree, fname, "input");
+    Tree ref_tree = instance.random_tree;
+    for (const auto& t: topos)
+    {
+      ref_tree.topology(t.second);
+      instance.start_trees.emplace_back(ref_tree);
+    }
+  }
 }
 
 void command_bootstop(RaxmlInstance& instance)
@@ -1424,6 +1559,47 @@ void command_support(RaxmlInstance& instance)
   check_bootstop(instance, bs_trees, true);
 }
 
+void command_rfdist(RaxmlInstance& instance)
+{
+  const auto& opts = instance.opts;
+
+  if (opts.start_trees.count(StartingTree::random) +
+      opts.start_trees.count(StartingTree::parsimony) > 0)
+  {
+    /* generate random/parsimony trees -> we need an MSA for this */
+    assert(!opts.msa_file.empty());
+    load_parted_msa(instance);
+    build_start_trees(instance, 0);
+  }
+  else
+  {
+    /* load trees from Newick file(s) */
+    read_multiple_tree_files(instance);
+  }
+
+  if (instance.start_trees.size() < 2)
+    throw runtime_error("Cannot compute RF distances since tree file contains fewer than 2 trees!");
+
+  instance.dist_calculator.reset(new RFDistCalculator(instance.start_trees));
+}
+
+void command_consense(RaxmlInstance& instance)
+{
+  const auto& opts = instance.opts;
+
+  /* load trees from Newick file(s) */
+  read_multiple_tree_files(instance);
+
+  if (instance.start_trees.size() < 2)
+    throw runtime_error("Cannot consensus tree since tree file contains fewer than 2 trees!");
+
+  instance.consens_tree.reset(new ConsensusTree(instance.start_trees, opts.consense_cutoff));
+  if (instance.consens_tree)
+    instance.consens_tree->draw_support();
+  else
+    runtime_error("Cannot create consensus tree!");
+}
+
 void command_bsmsa(RaxmlInstance& instance, const Checkpoint& checkp)
 {
   load_parted_msa(instance);
@@ -1449,12 +1625,20 @@ void check_terrace(const RaxmlInstance& instance, const Tree& tree)
         if (!instance.opts.terrace_file().empty())
         {
           ofstream fs(instance.opts.terrace_file());
-          terrace_wrapper.print_terrace(fs);
+          terrace_wrapper.print_terrace_compressed(fs);
           LOG_INFO << "Tree terrace (in compressed Newick format) was saved to: "
-              << sysutil_realpath(instance.opts.terrace_file()) << endl << endl;
+              << sysutil_realpath(instance.opts.terrace_file()) << endl;
 
-          // TODO partial prints to multiline newick?
-          // if (terrace_size <= instance.opts.terrace_maxsize)
+          if (terrace_size <= instance.opts.terrace_maxsize)
+          {
+            auto nwk_fname = instance.opts.terrace_file() + "Newick";
+            ofstream fsn(nwk_fname);
+            terrace_wrapper.print_terrace_newick(fsn);
+            LOG_INFO << "Tree terrace (in multi-line Newick format) was saved to: "
+                << sysutil_realpath(nwk_fname) << endl;
+          }
+
+          LOG_INFO << endl;
         }
       }
       else
@@ -1528,12 +1712,12 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
   const auto& parted_msa = *instance.parted_msa;
 
   if (opts.command == Command::search || opts.command == Command::all ||
-      opts.command == Command::evaluate)
+      opts.command == Command::evaluate || opts.command == Command::ancestral)
   {
     auto model_log_lvl = parted_msa.part_count() > 1 ? LogLevel::verbose : LogLevel::info;
     auto ckp_models = checkp.best_models.empty() ? checkp.models : checkp.best_models;
 
-    RAXML_LOG(model_log_lvl) << "\nOptimized model parameters:" << endl;
+    RAXML_LOG(model_log_lvl) << "Optimized model parameters:" << endl;
 
     for (size_t p = 0; p < parted_msa.part_count(); ++p)
     {
@@ -1541,6 +1725,8 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
           parted_msa.part_info(p).name().c_str() << endl;
       RAXML_LOG(model_log_lvl) << ckp_models.at(p);
     }
+
+    RAXML_LOG(model_log_lvl) << endl;
   }
 
   if (opts.command == Command::search || opts.command == Command::all ||
@@ -1549,24 +1735,11 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
     auto best = checkp.ml_trees.best();
     auto best_loglh = best->first;
 
-    LOG_INFO << "\nFinal LogLikelihood: " << FMT_LH(best_loglh) << endl << endl;
+    LOG_INFO << endl;
+    LOG_RESULT << "Final LogLikelihood: " << FMT_LH(best_loglh) << endl;
+    LOG_INFO << endl;
 
     print_ic_scores(instance, best_loglh);
-  }
-
-  if (opts.command == Command::evaluate)
-  {
-    if (!opts.ml_trees_file().empty())
-    {
-      save_ml_trees(opts, checkp);
-
-      LOG_INFO << "\nAll optimized tree(s) saved to: " << sysutil_realpath(opts.ml_trees_file()) << endl;
-    }
-  }
-
-  if (opts.command == Command::search || opts.command == Command::all)
-  {
-    auto best = checkp.ml_trees.best();
 
     Tree best_tree = checkp.tree;
 
@@ -1579,13 +1752,6 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
 //    pll_utree_show_ascii(&best_tree.pll_utree_root(),
 //                         PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH | PLL_UTREE_SHOW_CLV_INDEX );
 //    printf("\n\n");
-
-    if (checkp.ml_trees.size() > 1 && !opts.ml_trees_file().empty())
-    {
-      save_ml_trees(opts, checkp);
-
-      LOG_INFO << "All ML trees saved to: " << sysutil_realpath(opts.ml_trees_file()) << endl;
-    }
 
     if (!opts.best_tree_file().empty())
     {
@@ -1607,6 +1773,13 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
 
       LOG_INFO << "Best per-partition ML trees saved to: " <<
           sysutil_realpath(opts.partition_trees_file()) << endl;
+    }
+
+    if (checkp.ml_trees.size() > 1 && !opts.ml_trees_file().empty())
+    {
+      save_ml_trees(opts, checkp);
+
+      LOG_INFO << "All ML trees saved to: " << sysutil_realpath(opts.ml_trees_file()) << endl;
     }
   }
 
@@ -1633,6 +1806,22 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
         LOG_INFO << "Best ML tree with " << metric_name << " support values saved to: " <<
             sysutil_realpath(sup_file) << endl;
       }
+    }
+  }
+
+  if (opts.command == Command::consense)
+  {
+    assert(instance.consens_tree);
+
+    auto cons_file = opts.cons_tree_file();
+    if (!cons_file.empty())
+    {
+      NewickStream nw(cons_file, std::ios::out);
+      nw.brlens(false);
+      nw << *instance.consens_tree;
+
+      LOG_INFO << opts.consense_type_name() << " consensus tree saved to: " <<
+          sysutil_realpath(cons_file) << endl;
     }
   }
 
@@ -1711,6 +1900,55 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
     }
   }
 
+  if (opts.command == Command::rfdist)
+  {
+    assert(instance.dist_calculator);
+
+    const auto& rfcalc = *instance.dist_calculator;
+
+    LOG_RESULT << "Average absolute RF distance in this tree set: " << rfcalc.avg_rf() << endl;
+    LOG_RESULT << "Average relative RF distance in this tree set: " << rfcalc.avg_rrf() << endl;
+    LOG_RESULT << "Number of unique topologies in this tree set: "  << rfcalc.num_uniq_trees() << endl;
+
+    if (!opts.rfdist_file().empty())
+    {
+      fstream fs(opts.rfdist_file(), ios::out);
+      fs << rfcalc;
+
+      LOG_INFO << "\nPairwise RF distances saved to: " << sysutil_realpath(opts.rfdist_file()) << endl;
+    }
+  }
+
+  if (opts.command == Command::ancestral)
+  {
+    assert(instance.ancestral_states);
+
+    if (!opts.asr_probs_file().empty())
+    {
+      AncestralProbStream as(opts.asr_probs_file());
+      as.precision(logger().precision(LogElement::other));
+      as << *instance.ancestral_states;
+
+      LOG_INFO << "Marginal ancestral probabilities saved to: " << sysutil_realpath(opts.asr_probs_file()) << endl;
+    }
+
+    if (!opts.asr_states_file().empty())
+    {
+      AncestralStateStream as(opts.asr_states_file());
+      as << *instance.ancestral_states;
+
+      LOG_INFO << "Reconstructed ancestral sequences saved to: " << sysutil_realpath(opts.asr_states_file()) << endl;
+    }
+
+    if (!opts.asr_tree_file().empty())
+    {
+      NewickStream nw_result(opts.asr_tree_file());
+      nw_result << *instance.ancestral_states;
+
+      LOG_INFO << "Node-labeled tree saved to: " << sysutil_realpath(opts.asr_tree_file()) << endl;
+    }
+  }
+
   if (!opts.log_file().empty())
       LOG_INFO << "\nExecution log saved to: " << sysutil_realpath(opts.log_file()) << endl;
 
@@ -1765,19 +2003,22 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   bool use_ckp_tree = true;
   if ((opts.command == Command::search || opts.command == Command::all ||
-      opts.command == Command::evaluate ) && !instance.start_trees.empty())
+      opts.command == Command::evaluate || opts.command == Command::ancestral) &&
+      !instance.start_trees.empty())
   {
 
     if (opts.command == Command::evaluate)
     {
       LOG_INFO << "\nEvaluating " << opts.num_searches <<
-          " trees" << endl << endl;
+          " trees" << endl;
     }
     else
     {
       LOG_INFO << "\nStarting ML tree search with " << opts.num_searches <<
-          " distinct starting trees" << endl << endl;
+          " distinct starting trees" << endl;
     }
+
+    (instance.start_trees.size() > 1 ? LOG_RESULT : LOG_INFO) << endl;
 
     size_t start_tree_num = cm.checkpoint().ml_trees.size();
     use_ckp_tree = use_ckp_tree && cm.checkpoint().search_state.step != CheckpointStep::start;
@@ -1803,19 +2044,15 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
       treeinfo->set_topology_constraint(instance.constraint_tree);
 
       Optimizer optimizer(opts);
-      if (opts.command == Command::evaluate)
+      if (opts.command == Command::evaluate || opts.command == Command::ancestral)
       {
         // check if we have anything to optimize
-        LOG_INFO_TS << "Tree #" << start_tree_num <<
-            ", initial LogLikelihood: " << FMT_LH(treeinfo->loglh()) << endl;
         if (opts.optimize_brlen || opts.optimize_model)
         {
+          LOG_INFO_TS << "Tree #" << start_tree_num <<
+              ", initial LogLikelihood: " << FMT_LH(treeinfo->loglh()) << endl;
           LOG_PROGR << endl;
           optimizer.evaluate(*treeinfo, cm);
-          LOG_PROGR << endl;
-          LOG_INFO_TS << "Tree #" << start_tree_num <<
-              ", final logLikelihood: " << FMT_LH(cm.checkpoint().loglh()) << endl;
-          LOG_PROGR << endl;
         }
         else
         {
@@ -1825,13 +2062,18 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
           cm.update_and_write(*treeinfo);
         }
+
+        LOG_PROGR << endl;
+        (instance.start_trees.size() > 1 ? LOG_RESULT_TS : LOG_INFO_TS) << "Tree #"
+            << start_tree_num << ", final logLikelihood: " << FMT_LH(cm.checkpoint().loglh()) << endl;
+        LOG_PROGR << endl;
       }
       else
       {
         optimizer.optimize_topology(*treeinfo, cm);
         LOG_PROGR << endl;
-        LOG_INFO_TS << "ML tree search #" << start_tree_num <<
-            ", logLikelihood: " << FMT_LH(cm.checkpoint().loglh()) << endl;
+        (instance.start_trees.size() > 1 ? LOG_RESULT_TS : LOG_INFO_TS) << "ML tree search #"
+            << start_tree_num << ", logLikelihood: " << FMT_LH(cm.checkpoint().loglh()) << endl;
         LOG_PROGR << endl;
       }
 
@@ -1841,6 +2083,13 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
   }
 
   ParallelContext::thread_barrier();
+
+  if (opts.command == Command::ancestral)
+  {
+    assert(!opts.use_pattern_compression);
+    treeinfo->compute_ancestral(instance.ancestral_states, part_assign);
+    ParallelContext::thread_barrier();
+  }
 
   if (!instance.bs_reps.empty())
   {
@@ -1933,6 +2182,8 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
   assert(bs_start_tree == instance.bs_start_trees.cend());
 
   ParallelContext::thread_barrier();
+
+  (instance.start_trees.size() > 1 ? LOG_RESULT : LOG_INFO) << endl;
 }
 
 void master_main(RaxmlInstance& instance, CheckpointManager& cm)
@@ -2004,6 +2255,8 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   /* generate bootstrap replicates */
   generate_bootstraps(instance, cm.checkpoint());
+
+  init_ancestral(instance);
 
   if (ParallelContext::master_rank())
     instance.opts.remove_result_files();
@@ -2081,6 +2334,9 @@ int internal_main(int argc, char** argv, void* comm)
     case Command::start:
     case Command::terrace:
     case Command::bsmsa:
+    case Command::rfdist:
+    case Command::consense:
+    case Command::ancestral:
       if (!opts.redo_mode && opts.result_files_exist())
       {
         LOG_ERROR << endl << "ERROR: Result files for the run with prefix `" <<
@@ -2099,9 +2355,12 @@ int internal_main(int argc, char** argv, void* comm)
   /* now get to the real stuff */
   try
   {
+    // make sure all MPI ranks use the same random seed
+    ParallelContext::mpi_broadcast(&opts.random_seed, sizeof(long));
     srand(opts.random_seed);
+
     logger().log_level(instance.opts.log_level);
-    logger().precision(instance.opts.precision, LogElement::all);
+    logger().precision(instance.opts.precision);
 
     /* only master process writes the log file */
     if (ParallelContext::master() && !instance.opts.log_file().empty())
@@ -2132,8 +2391,10 @@ int internal_main(int argc, char** argv, void* comm)
 
     if (opts.force_mode)
     {
-      LOG_WARN << "WARNING: Running in FORCE mode: all safety checks are disabled!"
-          << endl << endl;
+      LOG_WARN << "WARNING: Running in FORCE mode: "
+               << (opts.safety_checks.isnone() ? "all" : "some")
+               << " safety checks are disabled!"
+               << endl << endl;
     }
 
     /* init bootstopping */
@@ -2158,6 +2419,7 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::search:
       case Command::bootstrap:
       case Command::all:
+      case Command::ancestral:
       {
         /* init load balancer */
         switch(opts.load_balance_method)
@@ -2240,6 +2502,16 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::bsmsa:
       {
         command_bsmsa(instance, cm.checkpoint());
+        break;
+      }
+      case Command::rfdist:
+      {
+        command_rfdist(instance);
+        break;
+      }
+      case Command::consense:
+      {
+        command_consense(instance);
         break;
       }
       case Command::none:
