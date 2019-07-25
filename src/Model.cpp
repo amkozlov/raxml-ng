@@ -785,8 +785,20 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
         }
         break;
       case 'E':
+      {
+        string err_model = "E" + read_option(ss);
+        if (err_model.substr(0, 4) == "ERR_")
+          err_model.erase(0, 4);
+
         if (_data_type == DataType::genotype10)
-          _error_model.reset(new GenotypeErrorModel());
+        {
+         if (err_model == "E" || err_model == "P17")
+          _error_model.reset(new P17GenotypeErrorModel());
+         else if (err_model == "PT19")
+           _error_model.reset(new PT19GenotypeErrorModel());
+         else
+           throw runtime_error("Unknown error model: " + err_model);
+        }
         else
           _error_model.reset(new UniformErrorModel(_num_states, 0.01));
 
@@ -808,7 +820,8 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
         {
           throw runtime_error(string("Invalid error model specification: ") + s);
         }
-        break;
+      }
+      break;
       default:
         throw runtime_error("Wrong model specification: " + model_opts);
     }
@@ -1009,7 +1022,7 @@ std::string Model::to_string(bool print_params, unsigned int precision) const
 
   if (_error_model)
   {
-    model_string << "+E";
+    model_string << "+ERR_" << _error_model->name();
     if (out_param_mode.at(_error_model->param_ids().at(0)) == ParamValue::user)
     {
       print_param(model_string, _error_model->params());

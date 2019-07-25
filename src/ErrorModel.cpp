@@ -20,15 +20,16 @@ static const char mut_dist[10][10] = {  {  0, 2, 2, 2, 1, 1, 1, 2, 2, 2 },   /* 
 
 LogStream& operator<<(LogStream& stream, const ErrorModel& m)
 {
+  stream << m.name();
+
+  // print model parameters
   auto names = m.param_names();
   auto values = m.params();
   assert(names.size() == values.size());
 
   for (size_t i = 0; i < names.size(); ++i)
   {
-    stream << names[i] << ": " << values[i];
-    if (i < names.size() - 1)
-      stream << ",  ";
+    stream << ",  " << names[i] << ": " << values[i];
   }
 
   return stream;
@@ -123,8 +124,8 @@ void GenotypeErrorModel::params(const doubleVector& pv)
     _dropout_rate = pv[1];
 }
 
-void GenotypeErrorModel::compute_state_probs(unsigned int state,
-                                             doubleVector::iterator &clvp) const
+void P17GenotypeErrorModel::compute_state_probs(unsigned int state,
+                                                doubleVector::iterator &clvp) const
 {
   unsigned int state_id = __builtin_ctz(state);
   static const double one_3 = 1. / 3.;
@@ -177,4 +178,70 @@ void GenotypeErrorModel::compute_state_probs(unsigned int state,
 //      clvp[k] /= sum_lh;
 //  }
 }
+
+void PT19GenotypeErrorModel::compute_state_probs(unsigned int state,
+                                                doubleVector::iterator &clvp) const
+{
+  unsigned int state_id = __builtin_ctz(state);
+  static const double one_3 = 1. / 3.;
+  static const double one_6 = 1. / 6.;
+  static const double one_8 = 1. / 8.;
+  static const double three_8 = 3. / 8.;
+  static const double one_12 = 1. / 12.;
+
+  // TODO: move it out of here
+  unsigned int undef_state = (unsigned int) (pow(2, _states)) - 1;
+
+  double sum_lh = 0.;
+
+  for (size_t k = 0; k < _states; ++k)
+  {
+    if (state == undef_state)
+      clvp[k] = 1.;
+    else
+    {
+      if (k == state_id)
+      {
+        /* 0 letters away */
+        if (HOMO(state_id))
+          clvp[k] = 1. - _seq_error_rate + 0.5 * _seq_error_rate * _dropout_rate;
+        else
+          clvp[k] =  (1. - _dropout_rate ) * (1. - _seq_error_rate) + one_12 * _seq_error_rate * _dropout_rate;
+      }
+      else if (mut_dist[state_id][k] == 1)
+      {
+        /* 1 letter away */
+        if (HOMO(k))
+        {
+          clvp[k] = one_12 * _seq_error_rate * _dropout_rate +
+                    one_3  * (1. - _dropout_rate) * _seq_error_rate;
+        }
+        else
+        {
+          if (HOMO(state_id))
+          {
+            clvp[k] = 0.5 * _dropout_rate + one_6 * _seq_error_rate -
+                      three_8 * _seq_error_rate * _dropout_rate;
+          }
+          else
+          {
+            clvp[k] = one_6 * _seq_error_rate -
+                      one_8 * _seq_error_rate * _dropout_rate;
+          }
+        }
+      }
+      else
+      {
+        /* 2 letters away */
+        if (HOMO(state_id))
+          clvp[k] = one_12 * _seq_error_rate * _dropout_rate;
+        else
+          clvp[k] = 0.;
+      }
+
+      sum_lh += clvp[k];
+    }
+  }
+}
+
 
