@@ -6,9 +6,9 @@ Greetings! If you are not here for parallel computation of TBE support or comput
 
 ## Computing TBE support with extra information
 
-Here is one example call which computes TBE support scores as well as the extra table and the extra array. It uses the cutoff value 0.3 for that:
+Here is one example call which computes TBE support scores as well as the extra table and the extra array. It uses the cutoff value 0.3 for that. It uses 10 threads:
 ```
-./raxml-ng --support --tree REF.nw --bs-trees BS.nw --bs-metric TBE --extra tbe_extra_table,tbe_extra_array,tbe-cutoff{0.3}
+./raxml-ng --support --tree REF.nw --bs-trees BS.nw --bs-metric TBE --extra tbe_extra_table,tbe_extra_array,tbe-cutoff{0.3} --threads 10
 ```
 
 If you don't understand what this is, please read our paper at (TODO: Insert DOI) and its supplementary text (TODO: Insert DOI).
