@@ -93,8 +93,6 @@ void MSA::append(const string& sequence, const string& header)
     _length = sequence.length();
     if (!_num_sites)
       _num_sites = _length;
-    if (_weights.empty())
-      _weights.assign(_length, 1.);
   }
 
   _dirty = true;
