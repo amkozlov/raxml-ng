@@ -808,8 +808,9 @@ void load_msa(RaxmlInstance& instance)
 
   LOG_INFO << endl;
 
-  LOG_INFO << "Alignment comprises " << parted_msa.part_count() << " partitions and " <<
-      parted_msa.total_length() << " patterns\n" << endl;
+  LOG_INFO << "Alignment comprises " << parted_msa.part_count() << " partitions and "
+           << parted_msa.total_length() << (opts.use_pattern_compression ? " patterns" : " sites")
+           << endl << endl;
 
   LOG_INFO << parted_msa;
 

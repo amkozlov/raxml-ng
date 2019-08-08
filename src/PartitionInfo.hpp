@@ -66,7 +66,7 @@ public:
   pllmod_msa_stats_t * compute_stats(unsigned long stats_mask) const;
 
   /* given in elements (NOT in bytes) */
-  size_t taxon_clv_size() const { return _msa.num_patterns() * _model.clv_entry_size(); }
+  size_t taxon_clv_size() const;
 
   // setters
   void msa(MSA&& msa) { _msa = std::move(msa); };
