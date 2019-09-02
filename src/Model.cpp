@@ -57,8 +57,8 @@ static bool read_param(istringstream& s, string& val)
     // consume the opening bracket
     s.get();
 
-    char str[1024];
-    if (!s.getline(str, 1024, delim))
+    string str;
+    if (!std::getline(s, str, delim))
       throw parse_error();
     val = str;
 
@@ -119,8 +119,8 @@ static bool read_param_file(istringstream& s, std::vector<T>& vec)
     // consume the opening bracket
     s.get();
 
-    char fname[1024];
-    s.getline(fname, 1024, delim);
+    string fname;
+    std::getline(s, fname, delim);
     if (sysutil_file_exists(fname))
     {
       ifstream fs(fname);

@@ -1,2 +1,2 @@
 #define RAXML_VERSION "0.9.0git"
-#define RAXML_DATE "08.08.2019"
+#define RAXML_DATE "02.09.2019"
