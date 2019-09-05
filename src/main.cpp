@@ -67,6 +67,7 @@ struct RaxmlInstance
 
   // bootstopping convergence test, only autoMRE is supported for now
   unique_ptr<BootstopCheckMRE> bootstop_checker;
+  bool bs_converged;
 
   // mapping taxon name -> tip_id/clv_id in the tree
   NameIdMap tip_id_map;
@@ -2147,7 +2148,6 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
   size_t bs_num = cm.checkp_file().bs_trees.size();
   auto bs_start_tree = instance.bs_start_trees.cbegin();
   use_ckp_tree = use_ckp_tree && cm.checkpoint().search_state.step != CheckpointStep::start;
-  bool bs_converged = false;
   for (const auto& bs: instance.bs_reps)
   {
     ++bs_num;
@@ -2207,22 +2207,24 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
     ++bs_start_tree;
 
     /* check bootstrapping convergence */
-    if (instance.bootstop_checker && ParallelContext::master_thread())
+    if (instance.bootstop_checker && ParallelContext::group_master_thread())
     {
-      // TODO: add support for coarse-grained
-      assert(ParallelContext::num_groups() == 1);
+      ParallelContext::UniqueLock lock;
 
       instance.bootstop_checker->add_bootstrap_tree(cm.checkpoint().tree);
 
-      if (bs_num % opts.bootstop_interval == 0 || bs_num == opts.num_bootstraps)
+      auto num_bs_trees = cm.checkp_file().bs_trees.size();
+      if (num_bs_trees % opts.bootstop_interval == 0 || num_bs_trees == opts.num_bootstraps)
       {
-        bs_converged = instance.bootstop_checker->converged(rand());
+        instance.bs_converged = instance.bootstop_checker->converged(rand());
       }
+
+      if (instance.bs_converged)
+        LOG_INFO_TS << "Bootstrapping converged after " << num_bs_trees << " replicates." << endl;
     }
-    ParallelContext::thread_broadcast(0, &bs_converged, sizeof(bool));
-    if (bs_converged)
+    ParallelContext::thread_barrier();
+    if (instance.bs_converged)
     {
-      LOG_INFO_TS << "Bootstrapping converged after " << bs_num << " replicates." << endl;
       bs_start_tree = instance.bs_start_trees.cend();
       break;
     }
@@ -2263,6 +2265,8 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
                                      parted_msa.part_count() * ParallelContext::num_threads());
   LOG_DEBUG << "Parallel reduction buffer size: " << reduce_buffer_size/1024 << " KB\n\n";
   ParallelContext::resize_buffer(reduce_buffer_size);
+
+  instance.bs_converged = false;
 
   /* init template tree */
   instance.random_tree = generate_tree(instance, StartingTree::random);
