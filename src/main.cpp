@@ -992,6 +992,18 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
       load_start_trees(instance, cm);
     }
 
+    // NB: consider BS trees from the previous run when performing bootstopping test
+    if (instance.bootstop_checker)
+    {
+      auto bs_tree = instance.random_tree;
+      for (auto it: ckp.bs_trees)
+      {
+        bs_tree.topology(it.second);
+
+        instance.bootstop_checker->add_bootstrap_tree(bs_tree);
+      }
+    }
+
     LOG_INFO_TS << "NOTE: Resuming execution from checkpoint " <<
         "(logLH: " << cm.checkpoint().loglh() <<
         ", ML trees: " << ckp.ml_trees.size() <<
