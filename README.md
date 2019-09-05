@@ -11,7 +11,8 @@ Here is one example call which computes TBE support scores as well as the extra 
 ./raxml-ng --support --tree REF.nw --bs-trees BS.nw --bs-metric TBE --extra tbe_extra_table,tbe_extra_array,tbe-cutoff{0.3} --threads 10
 ```
 
-If you don't understand what this is, please read our paper at (TODO: Insert DOI) and its supplementary text (TODO: Insert DOI).
+If you don't understand what this is, please read our paper at https://www.biorxiv.org/content/10.1101/734848v2
+<!-- (TODO: Insert DOI) and its supplementary text (TODO: Insert DOI). -->
 
 ## Installation instructions
 
