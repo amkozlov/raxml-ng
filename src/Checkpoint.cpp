@@ -142,7 +142,7 @@ void CheckpointManager::update_and_write(const TreeInfo& treeinfo)
   if (ParallelContext::num_ranks() > 1)
     gather_model_params();
 
-  if (ParallelContext::master())
+  if (ParallelContext::master_thread())
   {
     assign_tree(_checkp, treeinfo);
     write();
