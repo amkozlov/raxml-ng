@@ -45,8 +45,8 @@ struct Checkpoint
 {
   Checkpoint() : search_state(), tree(), models() {}
 
-  Checkpoint(const Checkpoint&) = delete;
-  Checkpoint& operator=(const Checkpoint&) = delete;
+  Checkpoint(const Checkpoint&) = default;
+  Checkpoint& operator=(const Checkpoint&) = default;
   Checkpoint(Checkpoint&&) = default;
   Checkpoint& operator=(Checkpoint&&) = default;
 
@@ -99,7 +99,7 @@ public:
   SearchState& search_state();
   void reset_search_state();
 
-  void init_models(const ModelCRefMap& models);
+  void init_checkpoints(const Tree& tree, const ModelCRefMap& models);
 
   void enable() { _active = true; }
   void disable() { _active = false; }

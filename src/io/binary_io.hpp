@@ -215,6 +215,7 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, std::tuple<const Model&
 
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, Model& m);
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::tuple<Model&, ModelBinaryFmt> bm);
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, ModelMap& m);
 
 /**
  * Partition I/O

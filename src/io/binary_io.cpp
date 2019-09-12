@@ -236,6 +236,20 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::tuple<Model&, Mode
   return stream;
 }
 
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, ModelMap& m)
+{
+  size_t num_models, part_id;
+  stream >> num_models;
+  assert(num_models == m.size());
+  for (size_t i = 0; i < num_models; ++i)
+  {
+    stream >> part_id;
+    stream >> m[part_id];
+  }
+
+  return stream;
+}
+
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const TreeTopology& t)
 {
   stream << t.vroot_node_id;

@@ -156,6 +156,7 @@ public:
 
   size_t size() const { return  _trees.size(); }
   bool empty() const { return  _trees.empty(); }
+  bool contains(size_t index) const { return  _trees.count(index) > 0; }
   const_iterator best() const;
   double best_score() const { return best()->second.first; }
   const TreeTopology& best_topology() const { return best()->second.second; }

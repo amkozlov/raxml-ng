@@ -107,13 +107,17 @@ Checkpoint& CheckpointManager::checkpoint()
 //  _checkp_file.checkp_list.at(ckp_id) = ckp;
 //}
 
-void CheckpointManager::init_models(const ModelCRefMap& models)
+void CheckpointManager::init_checkpoints(const Tree& tree, const ModelCRefMap& models)
 {
   for (auto& ckp: _checkp_file.checkp_list)
   {
+    ckp.tree = tree;
     for (auto it: models)
       ckp.models[it.first] = it.second;
   }
+
+  for (auto it: models)
+    _checkp_file.best_models[it.first] = it.second;
 }
 
 void CheckpointManager::write(const std::string& ckp_fname) const
@@ -313,13 +317,7 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Checkpoint& ckp)
 
   stream << ckp.tree.topology();
 
-  stream << ckp.models.size();
-  for (const auto& m: ckp.models)
-    stream << m.first << m.second;
-
-//  stream << ckp.ml_trees;
-//
-//  stream << ckp.bs_trees;
+  stream << ckp.models;
 
   return stream;
 }
@@ -328,24 +326,9 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, Checkpoint& ckp)
 {
   stream >> ckp.search_state;
 
-//  auto topol = fs.get<TreeTopology>();
-//
-//  printf("READ topology size: %u\n", topol.size());
-
   ckp.tree.topology(stream.get<TreeTopology>());
 
-  size_t num_models, part_id;
-  stream >> num_models;
-  assert(num_models == ckp.models.size());
-  for (size_t m = 0; m < num_models; ++m)
-  {
-    stream >> part_id;
-    stream >> ckp.models[part_id];
-  }
-
-//  stream >> ckp.ml_trees;
-//
-//  stream >> ckp.bs_trees;
+  stream >> ckp.models;
 
   return stream;
 }
@@ -383,7 +366,21 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, CheckpointFile& ckpfile
 
   stream >> ckpfile.opts;
 
-  stream >> ckpfile.checkp_list;
+  {
+    // we should take special care in case number of workers has been changed after restart:
+    // - if #workers increased, "extra" workers will start tree search from scratch
+    // - if #workers decreased, "extra" checkpoints in file will be ignored (not optimal, but simpler)
+    size_t num_ckp_in_file = stream.get<size_t>();
+    size_t num_ckp_to_load = std::min(num_ckp_in_file, ckpfile.checkp_list.size());
+    auto dummy_ckp = (num_ckp_to_load < num_ckp_in_file) ? ckpfile.checkp_list[0] : Checkpoint();
+    for (size_t i = 0; i < num_ckp_in_file; ++i)
+    {
+      if (i < num_ckp_to_load)
+        stream >> ckpfile.checkp_list[i];
+      else
+        stream >> dummy_ckp;
+    }
+  }
 
   stream >> ckpfile.best_models;
 
