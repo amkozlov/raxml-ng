@@ -709,7 +709,7 @@ void check_options(RaxmlInstance& instance)
     {
       StaticResourceEstimator resEstimator(*instance.parted_msa, instance.opts);
       auto res = resEstimator.estimate();
-      if (ParallelContext::num_procs() > res.num_threads_response)
+      if (ParallelContext::threads_per_group() > res.num_threads_response)
       {
         LOG_WARN << endl;
         LOG_WARN << "WARNING: You might be using too many threads (" << ParallelContext::num_procs()
@@ -723,7 +723,7 @@ void check_options(RaxmlInstance& instance)
         LOG_WARN << "NOTE:    As a general rule-of-thumb, please assign at least 200-1000 "
             "alignment patterns per thread." << endl << endl;
 
-        if (ParallelContext::num_procs() > 2 * res.num_threads_response)
+        if (ParallelContext::threads_per_group() > 2 * res.num_threads_response)
         {
           throw runtime_error("Too few patterns per thread! "
                               "RAxML-NG will terminate now to avoid wasting resources.\n"
