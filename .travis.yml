@@ -52,6 +52,7 @@ before_install:
   - autoheader && autoconf 
   - ./configure  --prefix=$HTSINSTALL
   - make && make install
+  - cd ..
 
 script:
   - PATH=$(pwd)/bin/:$PATH
