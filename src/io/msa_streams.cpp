@@ -272,6 +272,12 @@ CATGStream& operator>>(CATGStream& stream, MSA& msa)
 
 //#define _RAXML_VCF
 //#define _RAXML_VCF_DEBUG
+
+#ifdef __APPLE__
+#define EXP10(x) pow(10, x)
+#else
+#define EXP10(x) exp10(x)
+#endif
 VCFStream& operator>>(VCFStream& stream, MSA& msa)
 {
 #ifndef _RAXML_VCF
@@ -549,7 +555,7 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
             {
                 auto pl = gt_g10[i * 10 + k];
                 auto s = vcf_to_rax_map[k];
-                site_probs[s] = isfinite(pl) ? exp10(pl) : 0.;
+                site_probs[s] = isfinite(pl) ? EXP10(pl) : 0.;
             }
           }
           else if (gt_pl)
@@ -559,9 +565,9 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
             for (unsigned int k = 0; k < 10; ++k)
               site_probs[k] = 0.;
 
-            double p_ref = exp10(-0.1 * gt_pl[i * 3]);
-            double p_het = exp10(-0.1 * gt_pl[i * 3 + 1]);
-            double p_alt = exp10(-0.1 * gt_pl[i * 3 + 2]);
+            double p_ref = EXP10(-0.1 * gt_pl[i * 3]);
+            double p_het = EXP10(-0.1 * gt_pl[i * 3 + 1]);
+            double p_alt = EXP10(-0.1 * gt_pl[i * 3 + 2]);
 
             site_probs[d10_ref] = p_ref;
             site_probs[d10_het] = p_het;
@@ -584,9 +590,9 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
               site_probs[k] = 0.;
 
             double pl_ref = std::max(gt_fpl[i * 3], gt_fpl[i * 3 + 1]);
-            double p_ref = exp10(-0.1 * pl_ref);
-            double p_het = exp10(-0.1 * gt_fpl[i * 3 + 2]);
-            double p_alt = exp10(-0.1 * gt_fpl[i * 3 + 3]);
+            double p_ref = EXP10(-0.1 * pl_ref);
+            double p_het = EXP10(-0.1 * gt_fpl[i * 3 + 2]);
+            double p_alt = EXP10(-0.1 * gt_fpl[i * 3 + 3]);
 
             site_probs[d10_ref] = p_ref;
             site_probs[d10_het] = p_het;
