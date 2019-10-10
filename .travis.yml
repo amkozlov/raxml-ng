@@ -65,7 +65,7 @@ before_install:
   - if [ -n "${CXX_COMPILER}" ]; then export CXX="${CXX_COMPILER}"; fi
   - git clone https://github.com/samtools/htslib htslib
   - cd htslib
-  - mkdir install
+  - mkdir -p install
   - export HTSINSTALL=`cd install && pwd`
   - autoheader && autoconf 
   - ./configure --disable-libcurl --prefix=$HTSINSTALL
