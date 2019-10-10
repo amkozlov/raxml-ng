@@ -10,7 +10,7 @@ set(PLLMOD_DEBUG OFF CACHE BOOL "Debug pll-modules (tons of console output!)")
 
 set (USE_PTHREADS ON CACHE BOOL "Enable multi-threading support (PTHREADS)")
 set (USE_MPI OFF CACHE BOOL "Enable MPI support")
-set (USE_VCF OFF CACHE BOOL "Enable VCF support")
+set (USE_VCF ON CACHE BOOL "Enable VCF support")
 
 set(HTSLIB_DIR "" CACHE STRING "Path to htslib")
 

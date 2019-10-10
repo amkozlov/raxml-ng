@@ -60,15 +60,19 @@ if(USE_TERRAPHAST)
 endif()
 
 if(USE_VCF)
-  set(RAXML_LIBS ${HTSLIB_DIR}/lib/libhts.a z ${RAXML_LIBS})
-  set(RAXML_INCLUDES ${HTSLIB_DIR}/include ${RAXML_INCLUDES})
+  find_path(HTSLIB_INCLUDE_DIR NAMES htslib/vcf.h HINTS "${HTSLIB_DIR}/include")
+  find_library(HTSLIB_LIBRARY NAMES libhts.a hts HINTS "${HTSLIB_DIR}/lib")
+  find_library(HTSLIB_LZMA NAMES lzma)
+  find_library(HTSLIB_BZ2 NAMES bz2)
+  set(RAXML_LIBS ${HTSLIB_LIBRARY} z ${HTSLIB_LZMA} ${HTSLIB_BZ2} ${RAXML_LIBS})
+  set(RAXML_INCLUDES ${HTSLIB_INCLUDE_DIR} ${RAXML_INCLUDES})
 endif()
 
 # export to the parent dir to use in GTest makefile
 set(RAXML_INCLUDES ${RAXML_INCLUDES} PARENT_SCOPE)
 set(RAXML_LIBS ${RAXML_LIBS} PARENT_SCOPE)
 
-#message(STATUS "Libs: ${RAXML_LIBS}")
+message(STATUS "Libs: ${RAXML_LIBS}")
 message(STATUS "Includes: ${RAXML_INCLUDES}")
 
 target_include_directories(raxml_module PRIVATE ${RAXML_INCLUDES})

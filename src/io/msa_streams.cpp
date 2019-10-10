@@ -390,7 +390,12 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
     {
       bcf_unpack(rec, BCF_UN_ALL);
 
-      assert(rec->n_allele <= 4);
+      auto chr = rec->rid+1;
+      auto pos = rec->pos+1;
+      string err_coord = "[chr " + to_string(chr) + ", pos " + to_string(pos) +  "] ";
+
+      if (rec->n_allele > 4)
+        throw runtime_error(err_coord + "Wrong number of alleles (" + to_string(rec->n_allele) + ")");
 
       assert(strlen(rec->d.allele[0]) == 1 && strlen(rec->d.allele[1]));
 
@@ -408,7 +413,8 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
       auto s_alt = cals[1];
       auto s_het = s_ref | s_alt;
 
-      assert((s_ref & s_alt) == 0);
+      if ((s_ref & s_alt) != 0)
+        throw runtime_error(err_coord + "Wrong REF/ALT alleles: " + char(als[0]) + " / " + char(als[1]));
 
       int d10_ref = PLL_STATE_CTZ(s_ref);
       int d10_alt = PLL_STATE_CTZ(s_alt);
@@ -417,13 +423,14 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
       assert(d10_ref >= 0 && d10_alt >= 0 && d10_het >= 0);
 
 #ifdef _RAXML_VCF_DEBUG
-      printf("snv: %u, ref/alt/het: %s %s %s\n", j,
-             gt_inv_map[d10_ref], gt_inv_map[d10_alt], gt_inv_map[d10_het]);
+      printf("snv: %lu, chrom: %u, pos: %u, ref/alt/het: %s %s %s\n",
+             j, chr, pos, gt_inv_map[d10_ref], gt_inv_map[d10_alt], gt_inv_map[d10_het]);
 #endif
 
       bcf_fmt_t * gt = bcf_get_fmt(hdr, rec, "GT");
 
-      assert(gt);
+      if (!gt)
+        throw runtime_error(err_coord + "Field GT not found");
 
       switch (lh_type)
       {
@@ -433,15 +440,24 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
           bcf_fmt_t * gl10 = bcf_get_fmt(hdr, rec, "G10");
 
           if (!gl10)
-            throw runtime_error("Invalid VCF file format: field G10 not found in SNV # " + to_string(j+1));
+            throw runtime_error(err_coord + "Field G10 not found");
 
           /* assume 10 genotypes for now */
-          assert(gl10->n == 10);
+          if (gl10->n != 10)
+          {
+            throw runtime_error(err_coord + "Invalid number size of G10 format: " +
+                                to_string(gl10->n) + " (expected: 10)");
+          }
 
           if (!bcf_get_format_float(hdr, rec ,"G10", &gt_g10, &gl_num))
-            throw runtime_error("Invalid VCF file format: field GL not found");
+            throw runtime_error(err_coord + "Field G10 not found");
 
-          assert(gl_num == (int) taxa_count * gl10->n);
+          if (gl_num != (int) taxa_count * gl10->n)
+          {
+            throw runtime_error(err_coord + "Invalid number of entries in G10 field: " +
+                                to_string(gl_num) + " (expected:  " +
+                                to_string(taxa_count * gl10->n) + ")");
+          }
         }
         break;
         case VCFUncertainty::pl:
@@ -449,23 +465,32 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
           bcf_fmt_t * pl = bcf_get_fmt(hdr, rec, "PL");
 
           if (!pl)
-            throw runtime_error("Invalid VCF file format: field PL not found in SNV # " + to_string(j+1));
+            throw runtime_error(err_coord + "Field PL not found ");
 
   #ifdef _RAXML_VCF_DEBUG
           LOG_DEBUG << "Found PL field with " << pl->n << " genotypes..." << endl;
   #endif
 
-          assert(pl->n == 3);
+          /* assume 3 genotypes for now: REF/REF, REF/ALT, ALT/ALT */
+          if (pl->n != 3)
+          {
+            throw runtime_error(err_coord + "Invalid number size of PL format: " +
+                                to_string(pl->n) + " (expected: 3)");
+          }
 
           if (!bcf_get_format_int32(hdr, rec ,"PL", &gt_pl, &gl_num))
-            throw runtime_error("Invalid VCF file format: field PL has invalid format");
+            throw runtime_error(err_coord + "Field PL has invalid format");
 
   #ifdef _RAXML_VCF_DEBUG
           LOG_DEBUG << "Loaded PL: " << gl_num << " entries" << endl;
   #endif
 
-          if (gl_num !=  (int) taxa_count * pl->n)
-            throw runtime_error("Malformed VCF file: Invalid PL format");
+          if (gl_num != (int) taxa_count * pl->n)
+          {
+            throw runtime_error(err_coord + "Invalid number of entries in PL field: " +
+                                to_string(gl_num) + " (expected:  " +
+                                to_string(taxa_count * pl->n) + ")");
+          }
         }
         break;
         case VCFUncertainty::fpl:
@@ -473,16 +498,25 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
           bcf_fmt_t * fpl = bcf_get_fmt(hdr, rec, "FPL");
 
           if (!fpl)
-            throw runtime_error("Invalid VCF file format: field FPL not found in SNV # " + to_string(j+1));
+            throw runtime_error(err_coord + "Field FPL not found");
 
-          assert(fpl->n == 4);
+          if (fpl->n != 4)
+          {
+            throw runtime_error(err_coord + "Invalid number size of FPL format: " +
+                                to_string(fpl->n) + " (expected: 4)");
+          }
 
           if (!bcf_get_format_int32(hdr, rec ,"FPL", &gt_fpl, &gl_num))
-            throw runtime_error("Invalid VCF file format: field PL has invalid format");
+            throw runtime_error(err_coord + "Field PL has invalid format");
 
-          if (gl_num !=  (int) taxa_count * fpl->n)
-            throw runtime_error("Malformed VCF file: Invalid FPL format");
+          if (gl_num != (int) taxa_count * fpl->n)
+          {
+            throw runtime_error(err_coord + "Invalid number of entries in FPL field: " +
+                                to_string(gl_num) + " (expected:  " +
+                                to_string(taxa_count * fpl->n) + ")");
+          }
         }
+        break;
         case VCFUncertainty::none:
           break;
       }
