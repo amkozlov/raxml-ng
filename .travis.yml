@@ -41,7 +41,8 @@ matrix:
 
 env:
   global:
-    - HTSDIR=./htslib
+    - mkdir htslib
+    - HTSDIR=`cd htslib && pwd`
     - HTSINSTALL=$HTSDIR/install
 
 before_install:
