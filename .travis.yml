@@ -39,21 +39,17 @@ matrix:
     - os: osx
       osx_image: xcode8.3
 
-env:
-  global:
-    - mkdir htslib
-    - HTSDIR=`cd htslib && pwd`
-    - HTSINSTALL=$HTSDIR/install
-
 before_install:
   - echo "PATH = $PATH"
   - echo "HOME = $HOME"
   # We need to re-export CC and CXX here, because travis exports CXX=g++ or clang++ AFTER we set CXX.
   - if [ -n "${C_COMPILER}" ]; then export CC="${C_COMPILER}"; fi
   - if [ -n "${CXX_COMPILER}" ]; then export CXX="${CXX_COMPILER}"; fi
-  - git clone https://github.com/samtools/htslib $HTSDIR
-  - mkdir -p $HTSINSTALL
-  - cd $HTSDIR && autoheader && autoconf 
+  - git clone https://github.com/samtools/htslib htslib
+  - cd htslib
+  - mkdir install
+  - export HTSINSTALL=`cd install && pwd`
+  - autoheader && autoconf 
   - ./configure  --prefix=$HTSINSTALL
   - make && make install
 
