@@ -14,6 +14,12 @@ matrix:
           packages:
           - g++-6
           - pandoc
+          - perl
+          - zlib1g-dev 
+          - libbz2-dev
+          - liblzma-dev 
+          - libcurl4-gnutls-dev 
+          - libssl-dev
     - os: linux
       dist: trusty
       env: CXX_COMPILER=g++-7
@@ -24,6 +30,12 @@ matrix:
           packages:
           - g++-7
           - pandoc
+          - perl 
+          - zlib1g-dev 
+          - libbz2-dev 
+          - liblzma-dev 
+          - libcurl4-gnutls-dev 
+          - libssl-dev
     - os: linux
       dist: trusty
       compiler: clang++
@@ -34,6 +46,12 @@ matrix:
           packages:
           - g++-7
           - pandoc
+          - perl 
+          - zlib1g-dev 
+          - libbz2-dev 
+          - liblzma-dev 
+          - libcurl4-gnutls-dev 
+          - libssl-dev
     - os: osx
       osx_image: xcode9.2
     - os: osx
