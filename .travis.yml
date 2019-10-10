@@ -68,7 +68,7 @@ before_install:
   - mkdir install
   - export HTSINSTALL=`cd install && pwd`
   - autoheader && autoconf 
-  - ./configure  --prefix=$HTSINSTALL
+  - ./configure --disable-libcurl --prefix=$HTSINSTALL
   - make && make install
   - cd ..
 
