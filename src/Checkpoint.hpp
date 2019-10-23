@@ -118,6 +118,9 @@ public:
   void backup() const;
   void remove_backup() const;
 
+  void gather_ml_trees();
+  void gather_bs_trees();
+
 private:
   bool _active;
   std::string _ckp_fname;

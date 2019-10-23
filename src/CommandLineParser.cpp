@@ -173,12 +173,12 @@ void CommandLineParser::check_options(Options &opts)
     }
   }
 
-  if (opts.num_workers > opts.num_threads)
+  if (opts.num_workers > ParallelContext::num_procs())
   {
     throw OptionException("The specified number of parallel tree searches (" +
                           to_string(opts.num_workers) +
                           ") is higher than the number of available threads (" +
-                          to_string(opts.num_threads) + ")");
+                          to_string(ParallelContext::num_procs()) + ")");
   }
 }
 

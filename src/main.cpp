@@ -702,6 +702,13 @@ void check_options(RaxmlInstance& instance)
     }
   }
 
+  /* check for unsupported coarse-grained topology */
+  if (opts.coarse() && ParallelContext::ranks_per_group() > 1)
+  {
+    throw runtime_error("Unsupported parallelization topology!\n"
+                        "NOTE:  Multiple MPI ranks per worker are not allowed in coarse-grained mode.\n");
+  }
+
   /* check that we have enough patterns per thread */
   if (opts.safety_checks.isset(SafetyCheck::perf_threads))
   {
@@ -2063,7 +2070,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   /* wait until master thread prepares all global data */
 //  printf("WORKER: %u, LOCAL_THREAD: %u\n", ParallelContext::group_id(), ParallelContext::local_proc_id());
-  ParallelContext::global_thread_barrier();
+  ParallelContext::global_barrier();
 
   auto& worker = instance.get_worker();
   auto const& master_msa = *instance.parted_msa;
@@ -2152,6 +2159,11 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
     }
   }
 
+  ParallelContext::global_barrier();
+
+  if (ParallelContext::group_master_thread())
+    cm.gather_ml_trees();
+
   ParallelContext::global_thread_barrier();
 
   if (opts.command == Command::ancestral)
@@ -2176,6 +2188,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   /* infer bootstrap trees if needed */
   use_ckp_tree = use_ckp_tree && cm.checkpoint().search_state.step != CheckpointStep::start;
+//  size_t bs_batch_size = instance.bootstop_checker ? opts.bootstop_interval : opts.num_bootstraps;
   for (auto bs_num: worker.bs_trees)
   {
     const auto& bs_start_tree = instance.bs_start_trees.at(bs_num);
@@ -2238,7 +2251,10 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
       break;
   }
 
-  ParallelContext::global_thread_barrier();
+  if (ParallelContext::group_master_thread())
+    cm.gather_bs_trees();
+
+  ParallelContext::global_barrier();
 
   (instance.start_trees.size() > 1 ? LOG_RESULT : LOG_INFO) << endl;
 }
@@ -2288,12 +2304,12 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
     {
       /* only master MPI rank generates starting trees (doesn't work with constrained search) */
       build_start_trees(instance, 0);
-      ParallelContext::mpi_barrier();
+      ParallelContext::global_mpi_barrier();
     }
     else
     {
       /* non-master ranks load starting trees from a file */
-      ParallelContext::mpi_barrier();
+      ParallelContext::global_mpi_barrier();
       load_start_trees(instance, cm);
     }
   }

@@ -62,6 +62,7 @@ public:
   static size_t num_groups() { return _num_groups; }
   static size_t ranks_per_node() { return _num_ranks / _num_nodes; }
   static size_t threads_per_group() { return num_procs() / _num_groups; }
+  static size_t ranks_per_group() { return _num_ranks / _num_groups; }
 
   static void parallel_reduce_cb(void * context, double * data, size_t size, int op);
   static void thread_reduce(double * data, size_t size, int op);
@@ -89,9 +90,11 @@ public:
   static bool group_master_thread() { return _local_thread_id == 0; }
 
   static void barrier();
+  static void global_barrier();
   static void thread_barrier();
   static void global_thread_barrier();
   static void mpi_barrier();
+  static void global_mpi_barrier();
 
   /* static singleton, no instantiation/copying/moving */
   ParallelContext() = delete;

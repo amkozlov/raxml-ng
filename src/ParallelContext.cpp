@@ -101,8 +101,11 @@ void ParallelContext::init_pthreads(const Options& opts, const std::function<voi
   _num_groups = std::max(opts.num_workers, 1u);
   _parallel_buf.reserve(PARALLEL_BUF_SIZE);
 
+  _local_rank_id = _num_ranks > _num_groups ? _rank_id : 0;
+
   /* init thread groups */
-  size_t group_size = opts.num_threads / _num_groups;
+  size_t groups_per_rank = _num_groups > 1 ? _num_groups / _num_ranks : 0;
+  size_t group_size = opts.num_threads / std::max(groups_per_rank, 1lu);
   for (size_t i = 0; i < _num_groups; ++i)
   {
     _thread_groups.emplace_back(i, group_size);
@@ -114,8 +117,8 @@ void ParallelContext::init_pthreads(const Options& opts, const std::function<voi
 #ifdef _RAXML_PTHREADS
 
   /* init master thread */
-  auto grp = _thread_groups.begin();
-  _thread_group = &_thread_groups[0];
+  auto grp = _thread_groups.begin() + _rank_id * groups_per_rank;
+  _thread_group = &(*grp);
   _local_thread_id = 0;
 
   if (opts.thread_pinning && _num_threads > 1)
@@ -229,13 +232,34 @@ void ParallelContext::barrier()
 #endif
 }
 
-void ParallelContext::mpi_barrier()
+void ParallelContext::global_barrier()
+{
+#ifdef _RAXML_MPI
+  global_mpi_barrier();
+#endif
+
+#ifdef _RAXML_PTHREADS
+  global_thread_barrier();
+#endif
+}
+
+void ParallelContext::global_mpi_barrier()
 {
 #ifdef _RAXML_MPI
   if (_thread_id == 0 && _num_ranks > 1)
     MPI_Barrier(_comm);
 #endif
 }
+
+void ParallelContext::mpi_barrier()
+{
+#ifdef _RAXML_MPI
+  // TODO: support multiple ranks per worker
+  if (_thread_id == 0 && _num_ranks > _num_groups)
+    MPI_Barrier(_comm);
+#endif
+}
+
 
 void ParallelContext::global_thread_barrier()
 {
@@ -340,7 +364,7 @@ void ParallelContext::parallel_reduce(double * data, size_t size, int op)
 #endif
 
 #ifdef _RAXML_MPI
-  if (_num_ranks > 1)
+  if (_num_ranks > _num_groups)
   {
     thread_barrier();
 
@@ -365,7 +389,7 @@ void ParallelContext::parallel_reduce(double * data, size_t size, int op)
 #endif
     }
 
-    if (_num_threads > 1)
+    if (_thread_group->num_threads > 1)
       thread_broadcast(0, data, size * sizeof(double));
   }
 #endif

@@ -192,7 +192,7 @@ void CheckpointManager::reset_search_state()
 {
   ParallelContext::thread_barrier();
 
-  if (ParallelContext::group_master())
+  if (ParallelContext::group_master_thread())
   {
     if (_active)
       checkpoint().reset_search_state();
@@ -268,7 +268,7 @@ void CheckpointManager::update_and_write(const TreeInfo& treeinfo)
 
   ParallelContext::barrier();
 
-  if (ParallelContext::num_ranks() > 1)
+  if (ParallelContext::ranks_per_group() > 1)
     gather_model_params();
 
   if (ParallelContext::group_master())
@@ -306,6 +306,71 @@ void CheckpointManager::gather_model_params()
          // read parameter estimates from binary stream
          bs >> checkpoint().models[part_id];
        }
+     };
+
+  ParallelContext::mpi_gather_custom(worker_cb, master_cb);
+}
+
+void CheckpointManager::gather_ml_trees()
+{
+  if (ParallelContext::num_ranks() == 1 || ParallelContext::num_groups() == 1)
+    return;
+
+  /* send callback -> worker ranks */
+  auto worker_cb = [this](void * buf, size_t buf_size) -> int
+      {
+        BinaryStream bs((char*) buf, buf_size);
+
+        bs << _checkp_file.ml_trees;
+
+        bs << _checkp_file.best_models;
+
+        printf("after worker: %u\n", bs.pos());
+
+        return (int) bs.pos();
+      };
+
+  /* receive callback -> master rank */
+  auto master_cb = [this](void * buf, size_t buf_size)
+     {
+       double old_score = _checkp_file.ml_trees.best_score();
+       BinaryStream bs((char*) buf, buf_size);
+
+       bs >>  _checkp_file.ml_trees;
+
+       if (_checkp_file.ml_trees.best_score() > old_score)
+         bs >> _checkp_file.best_models;
+     };
+
+  ParallelContext::mpi_gather_custom(worker_cb, master_cb);
+}
+
+void CheckpointManager::gather_bs_trees()
+{
+  if (ParallelContext::num_ranks() == 1 || ParallelContext::num_groups() == 1)
+    return;
+
+  /* send callback -> worker ranks */
+  auto worker_cb = [this](void * buf, size_t buf_size) -> int
+      {
+        BinaryStream bs((char*) buf, buf_size);
+
+        bs << _checkp_file.bs_trees;
+
+        printf("after worker: %u\n", bs.pos());
+
+        // clear this batch of BS trees from the worker, since they will now be stored by master
+        _checkp_file.bs_trees.clear();
+
+        return (int) bs.pos();
+      };
+
+  /* receive callback -> master rank */
+  auto master_cb = [this](void * buf, size_t buf_size)
+     {
+       BinaryStream bs((char*) buf, buf_size);
+
+       bs >>  _checkp_file.bs_trees;
      };
 
   ParallelContext::mpi_gather_custom(worker_cb, master_cb);
