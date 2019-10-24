@@ -325,7 +325,7 @@ void CheckpointManager::gather_ml_trees()
 
         bs << _checkp_file.best_models;
 
-        printf("after worker: %u\n", bs.pos());
+//        printf("after worker: %u\n", bs.pos());
 
         return (int) bs.pos();
       };
@@ -357,7 +357,7 @@ void CheckpointManager::gather_bs_trees()
 
         bs << _checkp_file.bs_trees;
 
-        printf("after worker: %u\n", bs.pos());
+//        printf("after worker: %u\n", bs.pos());
 
         // clear this batch of BS trees from the worker, since they will now be stored by master
         _checkp_file.bs_trees.clear();

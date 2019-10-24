@@ -153,6 +153,7 @@ public:
   typedef std::map<size_t, ScoredTopology> container_type;
   typedef container_type::const_iterator const_iterator;
   typedef container_type::value_type value_type;
+  typedef container_type::mapped_type mapped_type;
 
   size_t size() const { return  _trees.size(); }
   bool empty() const { return  _trees.empty(); }
@@ -160,6 +161,8 @@ public:
   const_iterator best() const;
   double best_score() const { return best()->second.first; }
   const TreeTopology& best_topology() const { return best()->second.second; }
+
+  const mapped_type& at(size_t index) const { return _trees.at(index); }
 
   const_iterator begin() const { return _trees.cbegin(); }
   const_iterator end() const { return _trees.cend(); }

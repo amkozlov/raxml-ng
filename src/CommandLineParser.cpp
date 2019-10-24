@@ -172,14 +172,6 @@ void CommandLineParser::check_options(Options &opts)
                             "it is supported, please use --force option to disable this check.");
     }
   }
-
-  if (opts.num_workers > ParallelContext::num_procs())
-  {
-    throw OptionException("The specified number of parallel tree searches (" +
-                          to_string(opts.num_workers) +
-                          ") is higher than the number of available threads (" +
-                          to_string(ParallelContext::num_procs()) + ")");
-  }
 }
 
 void CommandLineParser::compute_num_searches(Options &opts)

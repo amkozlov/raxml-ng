@@ -702,6 +702,14 @@ void check_options(RaxmlInstance& instance)
     }
   }
 
+  if (opts.num_workers > ParallelContext::num_procs())
+  {
+    throw OptionException("The specified number of parallel tree searches (" +
+                          to_string(opts.num_workers) +
+                          ") is higher than the number of available threads (" +
+                          to_string(ParallelContext::num_procs()) + ")");
+  }
+
   /* check for unsupported coarse-grained topology */
   if (opts.coarse() && ParallelContext::ranks_per_group() > 1)
   {
@@ -2188,11 +2196,20 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   /* infer bootstrap trees if needed */
   use_ckp_tree = use_ckp_tree && cm.checkpoint().search_state.step != CheckpointStep::start;
-//  size_t bs_batch_size = instance.bootstop_checker ? opts.bootstop_interval : opts.num_bootstraps;
-  for (auto bs_num: worker.bs_trees)
+  unsigned int bs_batch_start = instance.bootstop_checker ?
+                               instance.bootstop_checker->num_bs_trees() : 0;
+  auto bs_batch_offset = bs_batch_start % opts.bootstop_interval;
+  unsigned int  bs_batch_end = instance.bootstop_checker ?
+                               bs_batch_start - bs_batch_offset + opts.bootstop_interval :
+                               opts.num_bootstraps;
+  auto bs_num = worker.bs_trees.cbegin();
+
+  ParallelContext::global_thread_barrier();
+
+  while (!instance.bs_converged && bs_num != worker.bs_trees.cend())
   {
-    const auto& bs_start_tree = instance.bs_start_trees.at(bs_num);
-    auto bs_rep = instance.bs_reps.at(bs_num);
+    const auto& bs_start_tree = instance.bs_start_trees.at(*bs_num);
+    auto bs_rep = instance.bs_reps.at(*bs_num);
 
     // rebalance sites
     if (ParallelContext::group_master_thread())
@@ -2223,36 +2240,51 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
     optimizer.optimize_topology(*treeinfo, cm);
 
     LOG_PROGR << endl;
-    LOG_WORKER_TS(LogLevel::info) << "Bootstrap tree #" << bs_num+1 <<
+    LOG_WORKER_TS(LogLevel::info) << "Bootstrap tree #" << (*bs_num)+1 <<
                                      ", logLikelihood: " << FMT_LH(cm.checkpoint().loglh()) << endl;
     LOG_PROGR << endl;
 
-    cm.save_bs_tree(bs_num);
+    cm.save_bs_tree(*bs_num);
     cm.reset_search_state();
 
-    /* check bootstrapping convergence */
-    if (instance.bootstop_checker && ParallelContext::group_master_thread())
+    bs_num++;
+
+    if (bs_num == worker.bs_trees.cend() || *bs_num >= bs_batch_end)
     {
-      ParallelContext::UniqueLock lock;
+      ParallelContext::global_thread_barrier();
 
-      instance.bootstop_checker->add_bootstrap_tree(cm.checkpoint().tree);
+      if (ParallelContext::group_master_thread())
+        cm.gather_bs_trees();
 
-      auto num_bs_trees = cm.checkp_file().bs_trees.size();
-      if (num_bs_trees % opts.bootstop_interval == 0 || num_bs_trees == opts.num_bootstraps)
+      /* check bootstrapping convergence */
+      if (instance.bootstop_checker && ParallelContext::master())
       {
-        instance.bs_converged = instance.bootstop_checker->converged(rand());
+        Tree tree = instance.random_tree;
+        for (unsigned int  i = bs_batch_start; i < bs_batch_end; ++i)
+        {
+          tree.topology(cm.checkp_file().bs_trees.at(i).second);
+
+          instance.bootstop_checker->add_bootstrap_tree(tree);
+        }
+
+        instance.bs_converged = instance.bootstop_checker->converged(opts.random_seed);
+
+        if (instance.bs_converged)
+        {
+          auto num_bs_trees = cm.checkp_file().bs_trees.size();
+          LOG_INFO_TS << "Bootstrapping converged after " << num_bs_trees << " replicates." << endl;
+        }
       }
 
-      if (instance.bs_converged)
-        LOG_INFO_TS << "Bootstrapping converged after " << num_bs_trees << " replicates." << endl;
+      ParallelContext::mpi_broadcast(&instance.bs_converged, sizeof(bool));
+
+      ParallelContext::global_thread_barrier();
+
+      bs_batch_start = bs_batch_end;
+      bs_batch_end = std::min(opts.num_bootstraps, bs_batch_end+opts.bootstop_interval);
     }
     ParallelContext::thread_barrier();
-    if (instance.bs_converged)
-      break;
   }
-
-  if (ParallelContext::group_master_thread())
-    cm.gather_bs_trees();
 
   ParallelContext::global_barrier();
 
@@ -2291,6 +2323,7 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   instance.bs_converged = false;
 
   /* init template tree */
+  srand(instance.opts.random_seed);
   instance.random_tree = generate_tree(instance, StartingTree::random);
 
   /* load checkpoint */
