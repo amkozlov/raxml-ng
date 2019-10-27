@@ -36,6 +36,29 @@ public:
   virtual void write(const void *data, size_t size) = 0;
 };
 
+class BinaryNullStream : public BasicBinaryStream
+{
+public:
+  BinaryNullStream(): _pos(0) {}
+
+  size_t pos() const { return _pos; }
+  void reset() { _pos = 0; }
+
+  void write(const void * /* data */, size_t size)
+  {
+    _pos += size;
+  }
+
+  virtual void read(void *data, size_t size)
+  {
+    memset(data, 0, size);
+    _pos += size;
+  }
+
+private:
+  size_t _pos;
+};
+
 class BinaryStream : public BasicBinaryStream
 {
 public:
@@ -48,18 +71,20 @@ public:
 
   ~BinaryStream() {}
 
-//  template<typename T>
-//  T get()
-//  {
-//    T tmp;
-//    *this >> tmp;
-//    return tmp;
-//  }
-
   const char* buf() { return _buf; }
   size_t size() const { return _size; }
   size_t pos() const { return _ptr - _buf;}
   char* reset() { _ptr = _buf; return _buf; }
+
+  template<typename T>
+  static size_t serialized_size(const T& obj)
+  {
+    BinaryNullStream bs;
+
+    bs << obj;
+
+    return bs.pos();
+  }
 
 public:
   void write(const void *data, size_t size)

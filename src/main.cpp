@@ -976,14 +976,6 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
   /* init checkpoint and set to the manager */
   cm.init_checkpoints(instance.random_tree, instance.parted_msa->models());
 
-//    if (instance.opts.coarse())
-//    {
-//      LOG_INFO_TS << "NOTE: Checkpointing is not yet supported with coarse-grained parallelization "
-//                     "and has been disabled." << endl;
-//
-//      return;
-//    }
-
   if (!instance.opts.redo_mode && cm.read())
   {
     const auto& ckp = cm.checkp_file();
@@ -2072,6 +2064,40 @@ void print_resources(const RaxmlInstance& instance)
       << endl << endl;
 }
 
+void init_parallel_buffers(const RaxmlInstance& instance)
+{
+  auto const& parted_msa = *instance.parted_msa;
+  auto const& opts = instance.opts;
+
+  // we need 2 doubles for each partition AND threads to perform parallel reduction,
+  // so resize the buffer accordingly
+  const size_t reduce_buffer_size = std::max(1024lu, 2 * sizeof(double) *
+                                     parted_msa.part_count() * ParallelContext::num_threads());
+
+  size_t worker_buf_size = 0;
+  if (ParallelContext::num_ranks() > 1)
+  {
+    auto model_size = BinaryStream::serialized_size(parted_msa.models());
+    auto tree_size = BinaryStream::serialized_size(instance.random_tree.topology());
+
+    // buffer needs enough space to store serialized model parameters
+    worker_buf_size = model_size;
+
+    // for coarse-grained, add extra space to store ML/BS trees sent from workers to master
+    if (ParallelContext::num_groups() > 1)
+      worker_buf_size += (opts.bootstop_interval / ParallelContext::num_groups() + 1) * tree_size;
+
+    // add some reserve
+    worker_buf_size *= 1.2;
+  }
+
+  LOG_INFO << "Parallel reduction/worker buffer size: " << reduce_buffer_size/1024 <<  " KB  / "
+            <<  worker_buf_size/1024 << " KB\n\n";
+
+  ParallelContext::resize_buffers(reduce_buffer_size, worker_buf_size);
+}
+
+
 void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 {
   unique_ptr<TreeInfo> treeinfo;
@@ -2092,7 +2118,6 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
       opts.command == Command::evaluate || opts.command == Command::ancestral) &&
       !instance.start_trees.empty())
   {
-
     if (opts.command == Command::evaluate)
     {
       LOG_INFO << "\nEvaluating " << opts.num_searches <<
@@ -2107,6 +2132,8 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
     (instance.start_trees.size() > 1 ? LOG_RESULT : LOG_INFO) << endl;
 
     use_ckp_tree = use_ckp_tree && cm.checkpoint().search_state.step != CheckpointStep::start;
+    unsigned int batch_id = (cm.checkp_file().ml_trees.size() / opts.bootstop_interval) + 1;
+    //TODO broadcast?
     for (auto start_tree_num: worker.start_trees)
     {
       const auto& tree = instance.start_trees.at(start_tree_num);
@@ -2164,15 +2191,22 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
       cm.save_ml_tree(start_tree_num);
       cm.reset_search_state();
+
+      // coarse: collect ML trees from MPI workers
+      if (opts.coarse() && ParallelContext::num_ranks() > 1 &&
+          (start_tree_num == worker.start_trees.back() ||
+           start_tree_num >= batch_id * opts.bootstop_interval))
+      {
+        ParallelContext::global_barrier();
+
+        if (ParallelContext::group_master_thread())
+          cm.gather_ml_trees();
+
+        ParallelContext::global_thread_barrier();
+        batch_id++;
+      }
     }
   }
-
-  ParallelContext::global_barrier();
-
-  if (ParallelContext::group_master_thread())
-    cm.gather_ml_trees();
-
-  ParallelContext::global_thread_barrier();
 
   if (opts.command == Command::ancestral)
   {
@@ -2197,11 +2231,9 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
   /* infer bootstrap trees if needed */
   use_ckp_tree = use_ckp_tree && cm.checkpoint().search_state.step != CheckpointStep::start;
   unsigned int bs_batch_start = instance.bootstop_checker ?
-                               instance.bootstop_checker->num_bs_trees() : 0;
+                                instance.bootstop_checker->num_bs_trees() : cm.checkp_file().bs_trees.size();
   auto bs_batch_offset = bs_batch_start % opts.bootstop_interval;
-  unsigned int  bs_batch_end = instance.bootstop_checker ?
-                               bs_batch_start - bs_batch_offset + opts.bootstop_interval :
-                               opts.num_bootstraps;
+  unsigned int  bs_batch_end = bs_batch_start - bs_batch_offset + opts.bootstop_interval;
   auto bs_num = worker.bs_trees.cbegin();
 
   ParallelContext::global_thread_barrier();
@@ -2257,26 +2289,28 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
         cm.gather_bs_trees();
 
       /* check bootstrapping convergence */
-      if (instance.bootstop_checker && ParallelContext::master())
+      if (instance.bootstop_checker)
       {
-        Tree tree = instance.random_tree;
-        for (unsigned int  i = bs_batch_start; i < bs_batch_end; ++i)
+        if (ParallelContext::master())
         {
-          tree.topology(cm.checkp_file().bs_trees.at(i).second);
+          Tree tree = instance.random_tree;
+          for (unsigned int  i = bs_batch_start; i < bs_batch_end; ++i)
+          {
+            tree.topology(cm.checkp_file().bs_trees.at(i).second);
 
-          instance.bootstop_checker->add_bootstrap_tree(tree);
+            instance.bootstop_checker->add_bootstrap_tree(tree);
+          }
+
+          instance.bs_converged = instance.bootstop_checker->converged(opts.random_seed);
+
+          if (instance.bs_converged)
+          {
+            auto num_bs_trees = cm.checkp_file().bs_trees.size();
+            LOG_INFO_TS << "Bootstrapping converged after " << num_bs_trees << " replicates." << endl;
+          }
         }
-
-        instance.bs_converged = instance.bootstop_checker->converged(opts.random_seed);
-
-        if (instance.bs_converged)
-        {
-          auto num_bs_trees = cm.checkp_file().bs_trees.size();
-          LOG_INFO_TS << "Bootstrapping converged after " << num_bs_trees << " replicates." << endl;
-        }
+        ParallelContext::mpi_broadcast(&instance.bs_converged, sizeof(bool));
       }
-
-      ParallelContext::mpi_broadcast(&instance.bs_converged, sizeof(bool));
 
       ParallelContext::global_thread_barrier();
 
@@ -2313,18 +2347,13 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   check_options(instance);
 
-  // we need 2 doubles for each partition AND threads to perform parallel reduction,
-  // so resize the buffer accordingly
-  const size_t reduce_buffer_size = std::max(1024lu, 2 * sizeof(double) *
-                                     parted_msa.part_count() * ParallelContext::num_threads());
-  LOG_DEBUG << "Parallel reduction buffer size: " << reduce_buffer_size/1024 << " KB\n\n";
-  ParallelContext::resize_buffer(reduce_buffer_size);
-
   instance.bs_converged = false;
 
   /* init template tree */
   srand(instance.opts.random_seed);
   instance.random_tree = generate_tree(instance, StartingTree::random);
+
+  init_parallel_buffers(instance);
 
   /* load checkpoint */
   load_checkpoint(instance, cm);

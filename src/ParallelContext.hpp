@@ -51,7 +51,7 @@ class ParallelContext
 public:
   static void init_mpi(int argc, char * argv[], void * comm);
   static void init_pthreads(const Options& opts, const std::function<void()>& thread_main);
-  static void resize_buffer(size_t size);
+  static void resize_buffers(size_t reduce_buf_size, size_t worker_buf_size = 0);
 
   static void finalize(bool force = false);
 

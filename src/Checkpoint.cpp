@@ -327,6 +327,9 @@ void CheckpointManager::gather_ml_trees()
 
 //        printf("after worker: %u\n", bs.pos());
 
+        // clear this batch of ML trees from the worker, since they will now be stored by master
+        _checkp_file.ml_trees.clear();
+
         return (int) bs.pos();
       };
 

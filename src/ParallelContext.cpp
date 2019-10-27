@@ -186,11 +186,11 @@ void ParallelContext::detect_num_nodes()
 #endif
 }
 
-void ParallelContext::resize_buffer(size_t size)
+void ParallelContext::resize_buffers(size_t reduce_buf_size, size_t worker_buf_size)
 {
-  _parallel_buf.reserve(size);
+  _parallel_buf.reserve(worker_buf_size);
   for (auto& grp: _thread_groups)
-    grp.reduction_buf.reserve(size);
+    grp.reduction_buf.reserve(reduce_buf_size);
 }
 
 void ParallelContext::finalize(bool force)
