@@ -67,7 +67,13 @@ public:
 class VCFStream : public MSAFileStream
 {
 public:
-  VCFStream(const std::string& fname) : MSAFileStream(fname) {}
+  VCFStream(const std::string& fname, bool normalized_gl = false) :
+    MSAFileStream(fname), _use_normalized_gl(normalized_gl) {}
+
+  bool use_normalized_gl() const { return _use_normalized_gl; }
+
+private:
+  bool _use_normalized_gl;
 };
 
 
@@ -156,7 +162,7 @@ PhylipStream& operator>>(PhylipStream& stream, MSA& msa);
 FastaStream& operator>>(FastaStream& stream, MSA& msa);
 CATGStream& operator>>(CATGStream& stream, MSA& msa);
 VCFStream& operator>>(VCFStream& stream, MSA& msa);
-MSA msa_load_from_file(const std::string &filename, const FileFormat format);
+MSA msa_load_from_file(const std::string &filename, const FileFormat format, const Options& opts);
 
 PhylipStream& operator<<(PhylipStream& stream, const MSA& msa);
 PhylipStream& operator<<(PhylipStream& stream, const PartitionedMSA& msa);

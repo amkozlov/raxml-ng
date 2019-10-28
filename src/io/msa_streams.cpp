@@ -3,6 +3,7 @@
 #include <map>
 
 #include "file_io.hpp"
+#include "../Options.hpp"
 
 using namespace std;
 
@@ -308,9 +309,15 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
 
   // detect genotype likelihood fields
   VCFUncertainty lh_type = VCFUncertainty::none;
+  auto g10_field = "G10";
   {
     bcf_hrec_t * hrec = NULL;
-    if ((hrec = bcf_hdr_get_hrec(hdr, BCF_HL_FMT, "ID", "G10", NULL)) != NULL)
+    if (stream.use_normalized_gl() && (hrec = bcf_hdr_get_hrec(hdr, BCF_HL_FMT, "ID", "G10N", NULL)) != NULL)
+    {
+      lh_type = VCFUncertainty::g10;
+      g10_field = "G10N";
+    }
+    else if ((hrec = bcf_hdr_get_hrec(hdr, BCF_HL_FMT, "ID", "G10", NULL)) != NULL)
       lh_type = VCFUncertainty::g10;
     else if ((hrec = bcf_hdr_get_hrec(hdr, BCF_HL_FMT, "ID", "PL", NULL)) != NULL)
       lh_type = VCFUncertainty::pl;
@@ -443,7 +450,7 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
         case VCFUncertainty::g10:
         {
           //      bcf_fmt_t * gl = bcf_get_fmt(hdr, rec, "GL");
-          bcf_fmt_t * gl10 = bcf_get_fmt(hdr, rec, "G10");
+          bcf_fmt_t * gl10 = bcf_get_fmt(hdr, rec, g10_field);
 
           if (!gl10)
             throw runtime_error(err_coord + "Field G10 not found");
@@ -455,13 +462,13 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
                                 to_string(gl10->n) + " (expected: 10)");
           }
 
-          if (!bcf_get_format_float(hdr, rec ,"G10", &gt_g10, &gl_num))
-            throw runtime_error(err_coord + "Field G10 not found");
+          if (!bcf_get_format_float(hdr, rec ,g10_field, &gt_g10, &gl_num))
+            throw runtime_error(err_coord + "Field " + g10_field + " not found");
 
           if (gl_num != (int) taxa_count * gl10->n)
           {
-            throw runtime_error(err_coord + "Invalid number of entries in G10 field: " +
-                                to_string(gl_num) + " (expected:  " +
+            throw runtime_error(err_coord + "Invalid number of entries in " + g10_field +
+                                " field: " + to_string(gl_num) + " (expected:  " +
                                 to_string(taxa_count * gl10->n) + ")");
           }
         }
@@ -654,7 +661,7 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
   return stream;
 }
 
-MSA msa_load_from_file(const std::string &filename, const FileFormat format)
+MSA msa_load_from_file(const std::string &filename, const FileFormat format, const Options& opts)
 {
   MSA msa;
 
@@ -709,7 +716,7 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format)
         }
         case FileFormat::vcf:
         {
-          VCFStream s(filename);
+          VCFStream s(filename, opts.vcf_normalized_gl);
           s >> msa;
           return msa;
           break;

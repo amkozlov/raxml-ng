@@ -745,6 +745,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.tbe_naive = true;
             else if (eopt == "tbe-nature")
               opts.tbe_naive = false;
+            else if (eopt == "vcf-normgl")
+              opts.vcf_normalized_gl = true;
             else
               throw InvalidOptionValueException("Unknown extra option: " + string(optarg));
           }
