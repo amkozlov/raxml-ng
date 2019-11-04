@@ -21,7 +21,7 @@ set (ENABLE_PLLMOD_SIMD OFF CACHE BOOL "Enable SIMD instructions in pll-modules 
 set(STATIC_BUILD OFF CACHE BOOL "Build static binary")
 
 set(USE_TERRAPHAST ON CACHE BOOL "Use phylogentic terraces library (terraphast) ")
-set(USE_GMP OFF CACHE BOOL "Use Gnu Muliple precision (GMP) library ")
+set(USE_GMP OFF CACHE BOOL "Use GNU Multiple precision (GMP) library ")
 
 set(ENABLE_PTHREADS ${USE_PTHREADS})
 

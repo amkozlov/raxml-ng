@@ -962,7 +962,7 @@ void load_start_trees(RaxmlInstance& instance, CheckpointManager& cm)
 
   if (instance.opts.start_trees.count(StartingTree::user) > 0)
   {
-    // in case of user startitng trees, we do not know num_searches
+    // in case of user starting trees, we do not know num_searches
     // until we read trees from the file. that's why we update num_searches here.
     assert(i >= instance.opts.num_searches);
     instance.opts.num_searches = i;
