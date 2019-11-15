@@ -279,10 +279,10 @@ TEST(ModelTest, multistate)
 TEST(ModelTest, multistate_custom)
 {
   // buildup
-  auto model = Model(DataType::autodetect, "MULTI6_GTR+M{ABCDEF}{X-?}");
+  auto model = Model(DataType::autodetect, "MULTI6_GTR+M{AbCDef}{X-?}");
 
   // tests
-  EXPECT_EQ("MULTI6_GTR+FO", model.to_string());
+  EXPECT_EQ("MULTI6_GTR+FO+M{AbCDef}{X-?}", model.to_string());
   EXPECT_EQ(DataType::multistate, model.data_type());
   EXPECT_EQ("MULTI6_GTR", model.name());
   EXPECT_EQ(6, model.num_states());
@@ -291,8 +291,21 @@ TEST(ModelTest, multistate_custom)
   EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_FREQUENCIES);
   EXPECT_NE(nullptr, model.charmap());
   EXPECT_EQ(model.num_free_params(), 19);
-  EXPECT_EQ(list_to_string(model.state_names()), "ABCDEF");
-  EXPECT_EQ(map_to_string(model.full_state_namemap()), "-ABCDEF");
+  EXPECT_EQ(list_to_string(model.state_names()), "AbCDef");
+  EXPECT_EQ(map_to_string(model.full_state_namemap()), "-ACDbef");
+
+  model = Model(DataType::autodetect, "MULTI5_MK+Mi{AbCdF}+F+G+I");
+  EXPECT_EQ("MULTI5_MK+FC+I+G4m+Mi{AbCdF}", model.to_string());
+  EXPECT_EQ(DataType::multistate, model.data_type());
+  EXPECT_EQ("MULTI5_MK", model.name());
+  EXPECT_EQ(5, model.num_states());
+  EXPECT_EQ(PLLMOD_UTIL_MIXTYPE_GAMMA, model.ratehet_mode());
+  EXPECT_EQ(4, model.num_ratecats());
+  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_ALPHA | PLLMOD_OPT_PARAM_PINV);
+  EXPECT_NE(nullptr, model.charmap());
+  EXPECT_EQ(6, model.num_free_params());
+  EXPECT_EQ(list_to_string(model.state_names()), "ABCDF");
+  EXPECT_EQ(map_to_string(model.full_state_namemap()), "ABCDF");
 }
 
 TEST(ModelTest, genotype)

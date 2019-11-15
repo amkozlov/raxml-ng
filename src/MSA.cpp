@@ -108,9 +108,8 @@ void MSA::compress_patterns(const pll_state_t * charmap)
                                                       charmap,
                                                       _pll_msa->count,
                                                       &(_pll_msa->length));
-
   if (!w)
-    throw runtime_error("Pattern compression failed!");
+    libpll_check_error("Pattern compression failed: ", true);
 
   _length = _pll_msa->length;
   _weights = WeightVector(w, w + _pll_msa->length);
