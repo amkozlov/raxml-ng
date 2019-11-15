@@ -1073,7 +1073,7 @@ void build_parsimony_msa(RaxmlInstance& instance)
     auto iter = datatype_pinfo_map.find(data_type_name);
     if (iter == datatype_pinfo_map.end())
     {
-      pars_msa.emplace_part_info(data_type_name, model.data_type(), model.name());
+      pars_msa.emplace_part_info(data_type_name, model.data_type(), model.to_string());
       auto& pars_pinfo = pars_msa.part_list().back();
       pars_pinfo.msa(MSA(pinfo.msa().num_sites()));
       datatype_pinfo_map[data_type_name] = pars_msa.part_count()-1;

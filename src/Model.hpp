@@ -171,6 +171,10 @@ private:
   std::string _name;
   DataType _data_type;
   unsigned int _num_states;
+
+  std::string _custom_states;
+  std::string _custom_gaps;
+  bool _custom_case_sensitive;
   std::shared_ptr<pll_state_t> _custom_charmap;
   mutable NameList _state_names;
   mutable StateNameMap _full_state_namemap;
