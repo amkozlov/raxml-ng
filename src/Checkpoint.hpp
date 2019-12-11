@@ -5,8 +5,8 @@
 #include "TreeInfo.hpp"
 #include "io/binary_io.hpp"
 
-constexpr int RAXML_CKP_VERSION = 2;
-constexpr int RAXML_CKP_MIN_SUPPORTED_VERSION = 2;
+constexpr int RAXML_CKP_VERSION = 3;
+constexpr int RAXML_CKP_MIN_SUPPORTED_VERSION = 3;
 
 struct MLTree
 {
@@ -43,7 +43,7 @@ struct SearchState
 
 struct Checkpoint
 {
-  Checkpoint() : search_state(), tree(), models() {}
+  Checkpoint() : search_state(), tree_index(0), tree(), models() {}
 
   Checkpoint(const Checkpoint&) = default;
   Checkpoint& operator=(const Checkpoint&) = default;
@@ -52,19 +52,13 @@ struct Checkpoint
 
   SearchState search_state;
 
+  size_t tree_index;
   Tree tree;
   ModelMap models;
-//  ModelMap best_models;  /* model parameters for the best-scoring ML tree */
-//
-//  TreeCollection ml_trees;
-//  TreeCollection bs_trees;
 
   double loglh() const { return search_state.loglh; }
 
   void reset_search_state();
-
-//  void save_ml_tree();
-//  void save_bs_tree();
 };
 
 struct CheckpointFile
@@ -92,8 +86,8 @@ public:
 
   const CheckpointFile& checkp_file() const { return _checkp_file;  }
 
-  const Checkpoint& checkpoint() const;
-  Checkpoint& checkpoint();
+  const Checkpoint& checkpoint(size_t ckp_id = ParallelContext::local_group_id()) const;
+  Checkpoint& checkpoint(size_t ckp_id = ParallelContext::local_group_id());
 
   //TODO: this is not very elegant, but should do the job for now
   SearchState& search_state();
@@ -106,8 +100,8 @@ public:
 
   void update_and_write(const TreeInfo& treeinfo);
 
-  void save_ml_tree(size_t index);
-  void save_bs_tree(size_t index);
+  void save_ml_tree();
+  void save_bs_tree();
 
   bool read() { return read(_ckp_fname); }
   bool read(const std::string& ckp_fname);

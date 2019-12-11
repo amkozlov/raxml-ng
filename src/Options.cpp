@@ -58,6 +58,15 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.asr_states, "ancestralStates");
 }
 
+std::string Options::checkp_file() const
+{
+  if (coarse() && ParallelContext::num_ranks() > 1)
+    return outfile_names.checkpoint + "." + to_string(ParallelContext::rank_id());
+  else
+    return outfile_names.checkpoint;
+}
+
+
 const std::string& Options::support_tree_file(BranchSupportMetric bsm) const
 {
   if (bs_metrics.size() < 2)

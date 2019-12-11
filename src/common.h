@@ -24,7 +24,7 @@ extern "C" {
 #include "log.hpp"
 #include "SystemTimer.hpp"
 
-/* used to supress compiler warnings about unused args */
+/* used to suppress compiler warnings about unused args */
 #define RAXML_UNUSED(expr) (void)(expr)
 
 /* system utils */

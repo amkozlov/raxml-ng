@@ -111,7 +111,7 @@ public:
   std::string output_fname(const std::string& suffix) const;
 
   const std::string& log_file() const { return outfile_names.log; }
-  const std::string& checkp_file() const { return outfile_names.checkpoint; }
+  std::string checkp_file() const;
   const std::string& start_tree_file() const { return outfile_names.start_tree; }
   const std::string& best_tree_file() const { return outfile_names.best_tree; }
   const std::string& best_model_file() const { return outfile_names.best_model; }

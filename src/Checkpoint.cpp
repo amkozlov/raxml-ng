@@ -11,55 +11,6 @@ void Checkpoint::reset_search_state()
   search_state = SearchState();
 };
 
-//void Checkpoint::save_ml_tree()
-//{
-//  if (ml_trees.empty() || loglh() > ml_trees.best_score())
-//    best_models = models;
-//  ml_trees.push_back(loglh(), tree);
-//}
-//
-//void Checkpoint::save_bs_tree()
-//{
-//  bs_trees.push_back(loglh(), tree);
-//}
-
-#if 0
-MLTree CheckpointFile::best_tree() const
-{
-  double best_lh = -INFINITY;
-  auto best_ckp = checkp_list.cend();
-  for (const auto& ckp: checkp_list)
-  {
-    if (ckp.ml_trees.empty())
-      continue;
-
-    double lh = ckp.ml_trees.best_score();
-    if (lh > best_lh)
-    {
-      best_ckp = ckp;
-      best_lh = lh;
-    }
-  }
-
-  MLTree result;
-  result.loglh = best_lh;
-
-  if (best_ckp != checkp_list.cend())
-  {
-    result.tree = best_ckp->tree;
-    result.tree.topology(best_ckp->ml_trees.best_topology());
-  }
-  else
-    result.tree = Tree();
-
-  result.models = best_ckp->best_models.empty() ? best_ckp->models :
-                                                  best_ckp->best_models;
-
-  return result;
-}
-
-#else
-
 // TOOD: fix!
 Tree CheckpointFile::tree() const
 {
@@ -77,38 +28,28 @@ MLTree CheckpointFile::best_tree() const
   return result;
 }
 
-#endif
-
 CheckpointManager::CheckpointManager(const Options& opts) :
     _active(true), _ckp_fname(opts.checkp_file())
 {
   _checkp_file.opts = opts;
-
-  /* create one checkpoint per worker */
-  for (size_t i = 0; i < opts.num_workers; ++i)
-    _checkp_file.checkp_list.emplace_back();
 }
 
-const Checkpoint& CheckpointManager::checkpoint() const
+const Checkpoint& CheckpointManager::checkpoint(size_t ckp_id) const
 {
-  size_t ckp_id = ParallelContext::group_id();
   return _checkp_file.checkp_list.at(ckp_id);
 }
 
-Checkpoint& CheckpointManager::checkpoint()
+Checkpoint& CheckpointManager::checkpoint(size_t ckp_id)
 {
-  size_t ckp_id = ParallelContext::group_id();
   return _checkp_file.checkp_list.at(ckp_id);
 }
-
-//void CheckpointManager::checkpoint(Checkpoint&& ckp)
-//{
-//  size_t ckp_id = ParallelContext::group_id();
-//  _checkp_file.checkp_list.at(ckp_id) = ckp;
-//}
 
 void CheckpointManager::init_checkpoints(const Tree& tree, const ModelCRefMap& models)
 {
+  /* create one checkpoint per *local* worker */
+  for (size_t i = 0; i < ParallelContext::num_local_groups(); ++i)
+    _checkp_file.checkp_list.emplace_back();
+
   for (auto& ckp: _checkp_file.checkp_list)
   {
     ckp.tree = tree;
@@ -122,19 +63,19 @@ void CheckpointManager::init_checkpoints(const Tree& tree, const ModelCRefMap& m
 
 void CheckpointManager::write(const std::string& ckp_fname) const
 {
-  /* for now, only master thread in master MPI rank will write ckp file */
-  if (!ParallelContext::master())
-    return;
+  if (ParallelContext::master() ||
+      (ParallelContext::group_master() && ParallelContext::num_groups() > 1))
+  {
+  //  printf("write ckp rank=%lu\n", ParallelContext::rank_id());
 
-//  printf("write ckp rank=%lu\n", ParallelContext::rank_id());
+    backup();
 
-  backup();
+    BinaryFileStream fs(ckp_fname, std::ios::out);
 
-  BinaryFileStream fs(ckp_fname, std::ios::out);
+    fs << _checkp_file;
 
-  fs << _checkp_file;
-
-  remove_backup();
+    remove_backup();
+  }
 }
 
 bool CheckpointManager::read(const std::string& ckp_fname)
@@ -203,7 +144,7 @@ void CheckpointManager::reset_search_state()
   ParallelContext::thread_barrier();
 };
 
-void CheckpointManager::save_ml_tree(size_t index)
+void CheckpointManager::save_ml_tree()
 {
   if (ParallelContext::group_master())
   {
@@ -219,14 +160,14 @@ void CheckpointManager::save_ml_tree(size_t index)
     if (ml_trees.empty() || ckp.loglh() > ml_trees.best_score())
       _checkp_file.best_models = ckp.models;
 
-    ml_trees.insert(index, ScoredTopology(ckp.loglh(), ckp.tree.topology()));
+    ml_trees.insert(ckp.tree_index, ScoredTopology(ckp.loglh(), ckp.tree.topology()));
 
     if (_active)
       write();
   }
 }
 
-void CheckpointManager::save_bs_tree(size_t index)
+void CheckpointManager::save_bs_tree()
 {
   if (ParallelContext::group_master())
   {
@@ -238,7 +179,7 @@ void CheckpointManager::save_bs_tree(size_t index)
 //    printf("WORKER %u: save BS tree # %u index loglh = %lf\n",
 //           ParallelContext::group_id(), index, ckp.loglh());
 
-    _checkp_file.bs_trees.insert(index, ScoredTopology(ckp.loglh(), ckp.tree.topology()));
+    _checkp_file.bs_trees.insert(ckp.tree_index, ScoredTopology(ckp.loglh(), ckp.tree.topology()));
 
     if (_active)
       write();
@@ -383,6 +324,8 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Checkpoint& ckp)
 {
   stream << ckp.search_state;
 
+  stream << ckp.tree_index;
+
   stream << ckp.tree.topology();
 
   stream << ckp.models;
@@ -393,6 +336,8 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Checkpoint& ckp)
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, Checkpoint& ckp)
 {
   stream >> ckp.search_state;
+
+  stream >> ckp.tree_index;
 
   ckp.tree.topology(stream.get<TreeTopology>());
 

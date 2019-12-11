@@ -29,6 +29,13 @@ MPI_Comm ParallelContext::_comm = MPI_COMM_WORLD;
 bool ParallelContext::_owns_comm = true;
 #endif
 
+ThreadGroup& ParallelContext::thread_group(size_t id)
+{
+  if (id < _thread_groups.size())
+    return _thread_groups[id];
+  else
+    throw runtime_error("Invalid thread group id: " + to_string(id));
+}
 
 void ParallelContext::init_mpi(int argc, char * argv[], void * comm)
 {
@@ -104,28 +111,18 @@ void ParallelContext::init_pthreads(const Options& opts, const std::function<voi
   _local_rank_id = _num_ranks > _num_groups ? _rank_id : 0;
 
   /* init thread groups */
-  size_t groups_per_rank = _num_groups > 1 ? _num_groups / _num_ranks : 0;
+  size_t groups_per_rank = _num_groups > 1 ? _num_groups / _num_ranks : 1;
   size_t group_size = opts.num_threads / std::max(groups_per_rank, 1lu);
-  for (size_t i = 0; i < _num_groups; ++i)
-  {
-    _thread_groups.emplace_back(i, group_size);
-    _thread_groups.back().reduction_buf.reserve(PARALLEL_BUF_SIZE);
-  }
+  auto start_grp_id = _num_groups > 1 ? _rank_id * groups_per_rank : 0;
+  for (size_t i = 0; i < groups_per_rank; ++i)
+    _thread_groups.emplace_back(start_grp_id + i, i, group_size, PARALLEL_BUF_SIZE);
 
   assert(!_thread_groups.empty());
 
 #ifdef _RAXML_PTHREADS
-
-  /* init master thread */
-  auto grp = _thread_groups.begin() + _rank_id * groups_per_rank;
-  _thread_group = &(*grp);
-  _local_thread_id = 0;
-
-  if (opts.thread_pinning && _num_threads > 1)
-    pin_thread(0, pthread_self());
-
-  /* Launch remaining threads */
-  for (size_t i = 1, local_id = 1; i < _num_threads; ++i, ++local_id)
+  /* Launch/init threads */
+  auto grp = _thread_groups.begin();
+  for (size_t i = 0, local_id = 0; i < _num_threads; ++i, ++local_id)
   {
     if (local_id >= grp->num_threads)
     {
@@ -133,10 +130,20 @@ void ParallelContext::init_pthreads(const Options& opts, const std::function<voi
       grp++;
     }
 
-    _threads.emplace_back(ParallelContext::start_thread, i, local_id, std::ref(*grp), thread_main);
+    if (i == 0)
+    {
+      /* init master thread */
+      _local_thread_id = local_id;
+      _thread_group = &(*grp);
+    }
+    else
+      _threads.emplace_back(ParallelContext::start_thread, i, local_id, std::ref(*grp), thread_main);
 
-    if (opts.thread_pinning)
-      pin_thread(i, _threads.back().native_handle());
+    if (opts.thread_pinning && _num_threads > 1)
+    {
+      auto handle = i > 0 ? _threads.back().native_handle() : pthread_self();
+      pin_thread(i, handle);
+    }
   }
 #endif
 }
@@ -350,9 +357,6 @@ void ParallelContext::thread_reduce(double * data, size_t size, int op)
       break;
     }
   }
-
-  //needed?
-//  parallel_barrier(useropt);
 }
 
 

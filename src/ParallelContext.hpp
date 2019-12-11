@@ -2,10 +2,14 @@
 #define RAXML_PARALLELCONTEXT_HPP_
 
 #include <vector>
+#include <set>
 #include <unordered_map>
 #include <memory>
 
 #include <functional>
+
+#include "io/BinaryStream.hpp"
+
 
 #ifdef _RAXML_MPI
 #include <mpi.h>
@@ -29,21 +33,23 @@ class Options;
 
 struct ThreadGroup
 {
-  size_t group_id;
+  size_t group_id;           /* global ID */
+  size_t local_group_id;     /* ID within MPI rank */
   size_t num_threads;
-  MutexType mtx;
   std::vector<char> reduction_buf;
 
+  MutexType mtx;
   volatile unsigned int barrier_counter;
   volatile int proceed;
 
-  ThreadGroup(size_t id, size_t size) :
-    group_id(id), num_threads(size), mtx(), barrier_counter(0), proceed(0) {}
+  ThreadGroup(size_t id, size_t local_id, size_t size, size_t bufsize = 0) :
+    group_id(id), local_group_id(local_id), num_threads(size), reduction_buf(bufsize),
+    mtx(), barrier_counter(0), proceed(0) {}
 
   ThreadGroup(ThreadGroup&& other):
-    group_id(other.group_id), num_threads(other.num_threads), mtx(),
-    reduction_buf(std::move(other.reduction_buf)),
-    barrier_counter(other.barrier_counter), proceed(other.proceed) {}
+    group_id(other.group_id), local_group_id(other.local_group_id),
+    num_threads(other.num_threads), reduction_buf(std::move(other.reduction_buf)),
+    mtx(), barrier_counter(other.barrier_counter), proceed(other.proceed) {}
 };
 
 class ParallelContext
@@ -60,6 +66,7 @@ public:
   static size_t num_ranks() { return _num_ranks; }
   static size_t num_nodes() { return _num_nodes; }
   static size_t num_groups() { return _num_groups; }
+  static size_t num_local_groups() { return _thread_groups.size(); }
   static size_t ranks_per_node() { return _num_ranks / _num_nodes; }
   static size_t threads_per_group() { return num_procs() / _num_groups; }
   static size_t ranks_per_group() { return _num_ranks / _num_groups; }
@@ -70,6 +77,22 @@ public:
   void thread_send_master(size_t source_id, void * data, size_t size) const;
 
   static void mpi_broadcast(void * data, size_t size);
+  template<typename T> static void mpi_broadcast(T& obj)
+  {
+    if (_num_ranks > 1)
+    {
+      size_t size = master() ?
+          BinaryStream::serialize(_parallel_buf.data(), _parallel_buf.capacity(), obj) : 0;
+      mpi_broadcast((void *) &size, sizeof(size_t));
+      mpi_broadcast((void *) _parallel_buf.data(), size);
+      if (!master())
+      {
+        BinaryStream bs(_parallel_buf.data(), size);
+        bs >> obj;
+      }
+    }
+  }
+
   static void mpi_gather_custom(std::function<int(void*,int)> prepare_send_cb,
                                 std::function<void(void*,int)> process_recv_cb);
 
@@ -79,15 +102,18 @@ public:
   static size_t thread_id() { return _thread_id; }
   static size_t rank_id() { return _rank_id; }
   static size_t proc_id() { return _rank_id * _num_threads + _thread_id; }
+  static size_t group_id() { return _thread_group->group_id; }
 
   static size_t local_thread_id() { return _local_thread_id; }
   static size_t local_rank_id() { return _local_rank_id; }
   static size_t local_proc_id() { return _local_rank_id * _num_threads + _local_thread_id; }
-  static size_t group_id() { return _thread_group->group_id; }
+  static size_t local_group_id() { return _thread_group->local_group_id; }
 
   static bool group_master() { return local_proc_id() == 0; }
   static bool group_master_rank() { return _local_rank_id == 0; }
   static bool group_master_thread() { return _local_thread_id == 0; }
+
+  static ThreadGroup& thread_group(size_t id);
 
   static void barrier();
   static void global_barrier();
