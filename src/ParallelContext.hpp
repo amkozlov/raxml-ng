@@ -93,6 +93,8 @@ public:
     }
   }
 
+  static void global_master_broadcast(void * data, size_t size);
+
   static void mpi_gather_custom(std::function<int(void*,int)> prepare_send_cb,
                                 std::function<void(void*,int)> process_recv_cb);
 

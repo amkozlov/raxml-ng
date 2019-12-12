@@ -414,7 +414,7 @@ void ParallelContext::thread_broadcast(size_t source_id, void * data, size_t siz
   }
 
   /* synchronize */
-  thread_barrier();
+  global_thread_barrier();
 
 //  pthread_barrier_wait(&barrier);
   __sync_synchronize();
@@ -425,7 +425,7 @@ void ParallelContext::thread_broadcast(size_t source_id, void * data, size_t siz
     memcpy(data, (void *) _parallel_buf.data(), size);
   }
 
-  thread_barrier();
+  global_thread_barrier();
 }
 
 void ParallelContext::mpi_broadcast(void * data, size_t size)
@@ -437,6 +437,14 @@ void ParallelContext::mpi_broadcast(void * data, size_t size)
   RAXML_UNUSED(data);
   RAXML_UNUSED(size);
 #endif
+}
+
+void ParallelContext::global_master_broadcast(void * data, size_t size)
+{
+  if (master_thread())
+    mpi_broadcast(data, size);
+  global_thread_barrier();
+  thread_broadcast(0, data, size);
 }
 
 void ParallelContext::thread_send_master(size_t source_id, void * data, size_t size) const

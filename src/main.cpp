@@ -803,6 +803,9 @@ void check_options(RaxmlInstance& instance)
         "and fall back to per-site scalers." << endl << endl;
     instance.opts.use_rate_scalers = true;
   }
+
+  /* make sure we do not check for convergence too often in coarse-grained parallelization mode */
+  instance.opts.bootstop_interval = std::max(opts.bootstop_interval, opts.num_workers*2);
 }
 
 void load_msa(RaxmlInstance& instance)
@@ -1023,23 +1026,23 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
       {
         load_start_trees(instance);
       }
-
-      // NB: consider BS trees from the previous run when performing bootstopping test
-      if (instance.bootstop_checker)
-      {
-        auto bs_tree = instance.random_tree;
-        for (auto it: ckpfile.bs_trees)
-        {
-          bs_tree.topology(it.second.second);
-
-          instance.bootstop_checker->add_bootstrap_tree(bs_tree);
-        }
-      }
     }
 
     /* collect all trees inferred so far at master rank */
     cm.gather_ml_trees();
     cm.gather_bs_trees();
+
+    // NB: consider BS trees from the previous run when performing bootstopping test
+    if (instance.bootstop_checker)
+    {
+      auto bs_tree = instance.random_tree;
+      for (auto it: ckpfile.bs_trees)
+      {
+        bs_tree.topology(it.second.second);
+
+        instance.bootstop_checker->add_bootstrap_tree(bs_tree);
+      }
+    }
 
     /* determine if we are in ML tree search or in bootstrapping phase */
     instance.run_phase = (ckpfile.ml_trees.size() >= instance.opts.num_searches) ?
@@ -2206,6 +2209,20 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
 
   unique_ptr<TreeInfo> treeinfo;
 
+  auto gather_ml_trees = [&instance, &cm](unsigned int& batch_id) -> void
+    {
+      if (instance.opts.coarse() && ParallelContext::num_ranks() > 1)
+      {
+        ParallelContext::global_barrier();
+
+        if (ParallelContext::group_master_thread())
+          cm.gather_ml_trees();
+
+        ParallelContext::global_thread_barrier();
+        batch_id++;
+      }
+    };
+
   /* get partitions assigned to the current thread */
   auto const& part_assign = instance.proc_part_assign.at(ParallelContext::local_proc_id());
 
@@ -2223,7 +2240,6 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
   (instance.start_trees.size() > 1 ? LOG_RESULT : LOG_INFO) << endl;
 
   unsigned int batch_id = (instance.done_ml_trees.size() / opts.bootstop_interval) + 1;
-  //TODO broadcast?
 
   auto ckp_tree_index = instance.run_phase == RaxmlRunPhase::mlsearch ? checkp.tree_index : 0;
   ParallelContext::thread_barrier();
@@ -2287,19 +2303,11 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
     cm.reset_search_state();
 
     // coarse: collect ML trees from MPI workers
-    if (opts.coarse() && ParallelContext::num_ranks() > 1 &&
-        (start_tree_num == worker.start_trees.back() ||
-         start_tree_num > batch_id * opts.bootstop_interval))
-    {
-      ParallelContext::global_barrier();
-
-      if (ParallelContext::group_master_thread())
-        cm.gather_ml_trees();
-
-      ParallelContext::global_thread_barrier();
-      batch_id++;
-    }
+    if (start_tree_num > batch_id * opts.bootstop_interval)
+      gather_ml_trees(batch_id);
   }
+
+  gather_ml_trees(batch_id);
 
   if (opts.command == Command::ancestral)
   {
@@ -2318,6 +2326,45 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
 
   unique_ptr<TreeInfo> treeinfo;
 
+  auto gather_bs_trees = [&instance, &opts, &cm](unsigned int& batch_start, unsigned int& batch_end) -> void
+    {
+      ParallelContext::global_thread_barrier();
+
+      if (ParallelContext::group_master_thread())
+        cm.gather_bs_trees();
+
+      /* check bootstrapping convergence */
+      if (instance.bootstop_checker)
+      {
+        if (ParallelContext::master())
+        {
+          Tree tree = instance.random_tree;
+          for (unsigned int  i = batch_start; i < batch_end; ++i)
+          {
+            tree.topology(cm.checkp_file().bs_trees.at(i+1).second);
+
+            instance.bootstop_checker->add_bootstrap_tree(tree);
+          }
+
+          instance.bs_converged = instance.bootstop_checker->converged(opts.random_seed);
+
+          if (instance.bs_converged)
+          {
+            auto num_bs_trees = cm.checkp_file().bs_trees.size();
+            LOG_INFO_TS << "Bootstrapping converged after " << num_bs_trees << " replicates." << endl;
+          }
+        }
+
+        if (ParallelContext::master_thread())
+          ParallelContext::mpi_broadcast(&instance.bs_converged, sizeof(bool));
+      }
+
+      ParallelContext::global_thread_barrier();
+
+      batch_start = batch_end;
+      batch_end = std::min(opts.num_bootstraps, batch_end+opts.bootstop_interval);
+    };
+
   if (!instance.bs_reps.empty())
   {
     if (opts.command == Command::all)
@@ -2334,6 +2381,9 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
   /* infer bootstrap trees if needed */
   unsigned int bs_batch_start = instance.bootstop_checker ?
                                 instance.bootstop_checker->num_bs_trees() : cm.checkp_file().bs_trees.size();
+
+  ParallelContext::global_master_broadcast(&bs_batch_start, sizeof(unsigned int));
+
   auto bs_batch_offset = bs_batch_start % opts.bootstop_interval;
   unsigned int  bs_batch_end = bs_batch_start - bs_batch_offset + opts.bootstop_interval;
   auto bs_num = worker.bs_trees.cbegin();
@@ -2387,45 +2437,14 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
     bs_num++;
 
     if (bs_num == worker.bs_trees.cend() || *bs_num > bs_batch_end)
-    {
-      ParallelContext::global_thread_barrier();
+      gather_bs_trees(bs_batch_start, bs_batch_end);
 
-      if (ParallelContext::group_master_thread())
-        cm.gather_bs_trees();
-
-      /* check bootstrapping convergence */
-      if (instance.bootstop_checker)
-      {
-        if (ParallelContext::master())
-        {
-          Tree tree = instance.random_tree;
-          for (unsigned int  i = bs_batch_start; i < bs_batch_end; ++i)
-          {
-            tree.topology(cm.checkp_file().bs_trees.at(i+1).second);
-
-            instance.bootstop_checker->add_bootstrap_tree(tree);
-          }
-
-          instance.bs_converged = instance.bootstop_checker->converged(opts.random_seed);
-
-          if (instance.bs_converged)
-          {
-            auto num_bs_trees = cm.checkp_file().bs_trees.size();
-            LOG_INFO_TS << "Bootstrapping converged after " << num_bs_trees << " replicates." << endl;
-          }
-        }
-
-        if (ParallelContext::master_thread())
-          ParallelContext::mpi_broadcast(&instance.bs_converged, sizeof(bool));
-      }
-
-      ParallelContext::global_thread_barrier();
-
-      bs_batch_start = bs_batch_end;
-      bs_batch_end = std::min(opts.num_bootstraps, bs_batch_end+opts.bootstop_interval);
-    }
     ParallelContext::thread_barrier();
   }
+
+  /* special case: if this worker has no bsreps to infer, it still must synchronize! */
+  if (worker.bs_trees.empty())
+    gather_bs_trees(bs_batch_start, bs_batch_end);
 }
 
 

@@ -488,3 +488,12 @@ ScoredTopologyMap::const_iterator ScoredTopologyMap::best() const
                           { return a.second.first < b.second.first; }
                          );
 }
+
+const ScoredTopologyMap::mapped_type& ScoredTopologyMap::at(size_t index) const
+{
+  if (_trees.count(index))
+    return _trees.at(index);
+  else
+    throw runtime_error("ScoredTopologyMap: Invalid tree id: " + to_string(index));
+}
+
