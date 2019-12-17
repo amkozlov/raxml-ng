@@ -8,6 +8,12 @@ PartitionInfo::~PartitionInfo ()
 {
 }
 
+size_t PartitionInfo::length() const
+{
+  const auto& st = stats();
+  return st.pattern_count ? st.pattern_count : st.site_count;
+}
+
 size_t PartitionInfo::taxon_clv_size() const
 {
   return _model.clv_entry_size() * (_msa.num_patterns() ? _msa.num_patterns() : _msa.num_sites());

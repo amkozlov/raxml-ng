@@ -3,6 +3,8 @@
 
 #include <cstring>
 #include <fstream>
+#include <stdexcept>
+
 
 class BasicBinaryStream
 {
@@ -18,8 +20,9 @@ public:
     return tmp;
   }
 
-  void get(void *data, size_t size) { read(data, size); };
-  void put(const void *data, size_t size) { write(data, size); };
+  void get(void *data, size_t size) { read(data, size); }
+  void put(const void *data, size_t size) { write(data, size); }
+  void skip(size_t size) { read(nullptr, size); }
 
 public:
   virtual void read(void *data, size_t size) = 0;
@@ -101,7 +104,8 @@ public:
     if (_ptr + size > _buf + _size)
       throw std::out_of_range("BinaryStream::get");
 
-    memcpy(data, _ptr, size);
+    if (data)
+      memcpy(data, _ptr, size);
     _ptr += size;
   }
 
@@ -119,7 +123,13 @@ public:
 
 public:
   void write(const void *data, size_t size) { _fstream.write((char*) data, size); }
-  void read(void *data, size_t size) { _fstream.read((char*) data, size); }
+  void read(void *data, size_t size)
+  {
+    if (data)
+      _fstream.read((char*) data, size);
+    else
+      _fstream.seekg(size, std::ios_base::cur);
+  }
 
 private:
   std::fstream _fstream;

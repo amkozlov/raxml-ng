@@ -61,6 +61,16 @@ public:
 class RBAStream : public MSAFileStream
 {
 public:
+  enum class RBAElement
+  {
+    all = 0,
+    metadata,
+    seqdata
+  };
+
+  typedef std::tuple<PartitionedMSA&, RBAElement, PartitionAssignment*> RBAOutput;
+
+public:
   RBAStream(const std::string& fname) : MSAFileStream(fname) {}
 
   static bool rba_file(const std::string& fname, bool check_version = false);
@@ -151,6 +161,7 @@ PhylipStream& operator<<(PhylipStream& stream, const BootstrapMSA& bs_msa);
 
 RBAStream& operator<<(RBAStream& stream, const PartitionedMSA& part_msa);
 RBAStream& operator>>(RBAStream& stream, PartitionedMSA& part_msa);
+RBAStream& operator>>(RBAStream& stream, RBAStream::RBAOutput out);
 
 RaxmlPartitionStream& operator>>(RaxmlPartitionStream& stream, PartitionInfo& part_info);
 RaxmlPartitionStream& operator>>(RaxmlPartitionStream& stream, PartitionedMSA& parted_msa);

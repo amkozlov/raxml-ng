@@ -148,7 +148,7 @@ size_t PartitionedMSA::total_length() const
 
   for (const auto& pinfo: _part_list)
   {
-    sum += pinfo.msa().length();
+    sum += pinfo.length();
   }
 
   return sum;

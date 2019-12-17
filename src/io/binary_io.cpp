@@ -305,7 +305,6 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const MSA& m)
   return stream;
 }
 
-
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, MSA& m)
 {
   auto taxa_count = stream.get<size_t>();
@@ -325,6 +324,63 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, MSA& m)
   return stream;
 }
 
+template<class T>
+void read_vector_range(BasicBinaryStream& stream, T* dest, const RangeList& rl, size_t total_len)
+{
+  auto dptr = dest;
+  size_t pos = 0;
+  for (auto r: rl)
+  {
+    stream.skip((r.start - pos) * sizeof(T));
+    stream.read(dptr, r.length * sizeof(T));
+    pos = r.start + r.length;
+    dptr += r.length;
+  }
+  stream.skip((total_len - pos) * sizeof(T));
+}
+
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, MSARange mr)
+{
+  auto& m = mr.first;
+
+  m = MSA(mr.second);
+
+  const auto& rl = m.local_seq_ranges();
+  const auto local_len = m.num_sites();
+
+  auto taxa_count = stream.get<size_t>();
+  auto pat_count = stream.get<size_t>();
+  auto weight_count = stream.get<size_t>();
+
+  assert(local_len <= pat_count);
+  assert(local_len <= weight_count);
+
+  WeightVector w(local_len);
+  read_vector_range(stream, &w[0], rl, pat_count);
+
+  m.weights(std::move(w));
+
+  std::string seq(local_len, 0);
+  for (size_t i = 0; i < taxa_count; ++i)
+  {
+    read_vector_range(stream, &seq[0], rl, pat_count);
+    m.append(seq);
+  }
+
+  return stream;
+}
+
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, NullMSA)
+{
+  auto taxa_count = stream.get<size_t>();
+  auto pat_count = stream.get<size_t>();
+
+  WeightVector v;
+  stream >> v;
+  stream.skip(taxa_count * pat_count);
+
+  return stream;
+}
 
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const PartitionStats& ps)
 {
@@ -357,7 +413,7 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Options& o)
   stream << o.command;
 
   stream << o.use_tip_inner << o.use_pattern_compression << o.use_prob_msa << o.use_rate_scalers;
-  stream << o.use_repeats << o.optimize_model << o.optimize_brlen;
+  stream << o.use_repeats << o.use_rba_partload << o.optimize_model << o.optimize_brlen;
 
   stream << o.force_mode << o.safety_checks.flags();
 
@@ -397,7 +453,7 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, Options& o)
   stream >> o.command;
 
   stream >> o.use_tip_inner >> o.use_pattern_compression >> o.use_prob_msa >> o.use_rate_scalers;
-  stream >> o.use_repeats >> o.optimize_model >> o.optimize_brlen;
+  stream >> o.use_repeats >> o.use_rba_partload >> o.optimize_model >> o.optimize_brlen;
 
   stream >> o.force_mode >> o.safety_checks;
 

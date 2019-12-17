@@ -6,6 +6,16 @@
 typedef std::vector<double> ProbVector;
 typedef std::vector<ProbVector> ProbVectorList;
 
+struct Range
+{
+  size_t start;
+  size_t length;
+
+  Range(size_t s, size_t l) : start(s), length(l) {}
+};
+
+typedef std::vector<Range> RangeList;
+
 class MSA
 {
 public:
@@ -17,6 +27,8 @@ public:
   MSA() : _length(0), _num_sites(0), _states(0), _pll_msa(NULL), _dirty(false) {};
   MSA(const unsigned int num_sites) : _length(0), _num_sites(num_sites),
       _states(0), _pll_msa(nullptr), _dirty(false) {};
+  MSA(const RangeList& rl);
+
   MSA(const pll_msa_t * pll_msa);
   MSA(MSA&& other);
   MSA(const MSA& other) = delete;
@@ -63,6 +75,9 @@ public:
 
   void remove_sites(const std::vector<size_t>& site_indices);
 
+  const RangeList& local_seq_ranges() const;
+  size_t get_local_offset(size_t global_offset) const;
+
   //Iterator Compatibility
   iterator begin() { return _sequences.begin(); }
   iterator end() { return _sequences.end(); }
@@ -83,6 +98,7 @@ private:
   NameIdMap _label_id_map;
   WeightVector _weights;
   ProbVectorList _probs;
+  RangeList _local_seq_ranges;
   size_t _states;
   mutable pll_msa_t * _pll_msa;
   mutable bool _dirty;
@@ -91,6 +107,8 @@ private:
   void free_pll_msa() noexcept;
 
   void update_num_sites();
+
+  void local_seq_ranges(const RangeList& rl);
 };
 
 #endif /* RAXML_MSA_HPP_ */

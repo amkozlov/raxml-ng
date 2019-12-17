@@ -163,6 +163,8 @@ void init_part_info(RaxmlInstance& instance)
   if (opts.msa_format == FileFormat::binary ||
       (opts.msa_format == FileFormat::autodetect && RBAStream::rba_file(opts.msa_file)))
   {
+    opts.msa_format = FileFormat::binary;
+
     if (!opts.model_file.empty())
     {
       LOG_WARN <<
@@ -176,8 +178,9 @@ void init_part_info(RaxmlInstance& instance)
 
     LOG_INFO_TS << "Loading binary alignment from file: " << opts.msa_file << endl;
 
+    auto rba_elem = opts.use_rba_partload ? RBAStream::RBAElement::metadata : RBAStream::RBAElement::all;
     RBAStream bs(opts.msa_file);
-    bs >> parted_msa;
+    bs >> RBAStream::RBAOutput(parted_msa, rba_elem, nullptr);
 
     // binary probMSAs are not supported yet
     instance.opts.use_prob_msa = false;
@@ -735,6 +738,15 @@ void check_options_early(Options& opts)
     if (opts.num_ranks > 1)
       throw runtime_error("MPI parallelization is not supported in ancestral state reconstruction mode!");
   }
+
+  /* autodetect if we can use partial RBA loading */
+  opts.use_rba_partload &= (opts.num_ranks > 1 && !opts.coarse());                // only useful for fine-grain MPI runs
+  opts.use_rba_partload &= (!opts.start_trees.count(StartingTree::parsimony));    // does not work with parsimony
+  opts.use_rba_partload &= (opts.command == Command::search ||                    // currently doesn't work with bootstrap
+                            opts.command == Command::evaluate ||
+                            opts.command == Command::ancestral);
+
+  LOG_DEBUG << "RBA partial loading: " << (opts.use_rba_partload ? "ON" : "OFF") << endl;
 }
 
 void check_options(RaxmlInstance& instance)
@@ -897,7 +909,7 @@ void load_parted_msa(RaxmlInstance& instance)
 
   assert(instance.parted_msa);
 
-  if (instance.parted_msa->part_info(0).msa().empty())
+  if (instance.opts.msa_format != FileFormat::binary)
     load_msa(instance);
 
   // use MSA sequences IDs as "normalized" tip IDs in all trees
@@ -1336,7 +1348,7 @@ void balance_load(RaxmlInstance& instance)
   size_t i = 0;
   for (auto const& pinfo: instance.parted_msa->part_list())
   {
-    part_sizes.assign_sites(i, 0, pinfo.msa().length(), pinfo.model().clv_entry_size());
+    part_sizes.assign_sites(i, 0, pinfo.length(), pinfo.model().clv_entry_size());
     ++i;
   }
 
@@ -2541,6 +2553,28 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   /* run load balancing algorithm */
   balance_load(instance);
+
+  /* lazy-load part of the alignment assigned to the current MPI rank */
+  if (opts.use_rba_partload)
+  {
+    // doesn't work with coarse-grained parallelization!
+    assert(ParallelContext::num_groups() == 1);
+
+    // collect PartitionAssignments from all worker threads
+    PartitionAssignment local_part_ranges;
+    for (size_t i = 0; i < opts.num_threads; ++i)
+    {
+      auto thread_ranges = instance.proc_part_assign.at(ParallelContext::local_proc_id() + i);
+      for (auto& r: thread_ranges)
+      {
+        local_part_ranges.assign_sites(r.part_id, r.start, r.length);
+      }
+    }
+
+    LOG_DEBUG << "Loading MSA segments from RBA file..." << endl;
+    RBAStream bs(opts.msa_file);
+    bs >> RBAStream::RBAOutput(parted_msa, RBAStream::RBAElement::seqdata, &local_part_ranges);
+  }
 
   // TEMP WORKAROUND: here we reset random seed once again to make sure that BS replicates
   // are not affected by the number of ML search starting trees that has been generated before

@@ -15,6 +15,10 @@ enum class ModelBinaryFmt
 
 typedef std::tuple<const Model&, ModelBinaryFmt> BinaryModel;
 
+struct NullMSA {};
+
+typedef std::pair<MSA&,RangeList&> MSARange;
+
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const std::string& s);
 
 template<typename T>
@@ -166,6 +170,8 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, PartitionStats& ps);
  */
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const MSA& m);
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, MSA& m);
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, MSARange mr);
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, NullMSA);
 
 /**
  * TreeTopology I/O

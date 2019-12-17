@@ -492,9 +492,14 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
                         const PartitionRange& part_region,
                         pll_partition_t* partition, const pll_state_t * charmap)
 {
+  /* get "true" sequence offset considering that MSA can be partially loaded */
+  auto seq_offset = msa.get_local_offset(part_region.start);
+
+//  printf("\n\n rank %lu, GLOBAL OFFSET %lu, LOCAL OFFSET %lu \n\n", ParallelContext::proc_id(), part_region.start, seq_offset);
+
   /* set pattern weights */
   if (!msa.weights().empty())
-    pll_set_pattern_weights(partition, msa.weights().data() + part_region.start);
+    pll_set_pattern_weights(partition, msa.weights().data() + seq_offset);
 
   if (opts.use_prob_msa && msa.probabilistic())
   {
@@ -502,7 +507,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
     assert(partition->states == msa.states());
 
     auto normalize = !msa.normalized();
-    auto weights_start = msa.weights().cbegin() + part_region.start;
+    auto weights_start = msa.weights().cbegin() + seq_offset;
 
     // we need a libpll function for that!
     auto clv_size = partition->sites * partition->states;
@@ -510,7 +515,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
     for (size_t tip_id = 0; tip_id < partition->tips; ++tip_id)
     {
       auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
-      auto prob_start = msa.probs(seq_id, part_region.start);
+      auto prob_start = msa.probs(seq_id, seq_offset);
       build_clv(prob_start, partition->sites, weights_start, partition, normalize, tmp_clv);
       pll_set_tip_clv(partition, tip_id, tmp_clv.data(), PLL_FALSE);
     }
@@ -520,7 +525,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
     for (size_t tip_id = 0; tip_id < partition->tips; ++tip_id)
     {
       auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
-      pll_set_tip_states(partition, tip_id, charmap, msa.at(seq_id).c_str() + part_region.start);
+      pll_set_tip_states(partition, tip_id, charmap, msa.at(seq_id).c_str() + seq_offset);
     }
   }
 }
@@ -532,8 +537,9 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
 {
   assert(!weights.empty());
 
-  const auto pstart = part_region.start;
-  const auto pend = part_region.start + part_region.length;
+  const auto pstart = msa.get_local_offset(part_region.start);
+  const auto plen = part_region.length;
+  const auto pend = pstart + plen;
 
   /* compress weights array by removing all zero entries */
   uintVector comp_weights;
@@ -550,22 +556,22 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
     assert(partition->states == msa.states());
 
     auto normalize = !msa.normalized();
-    auto weights_start = msa.weights().cbegin() + part_region.start;
+    auto weights_start = msa.weights().cbegin() + pstart;
 
     // we need a libpll function for that!
-    auto clv_size = part_region.length * partition->states;
+    auto clv_size = plen * partition->states;
     std::vector<double> tmp_clv(clv_size);
     for (size_t tip_id = 0; tip_id < partition->tips; ++tip_id)
     {
       auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
-      auto prob_start = msa.probs(seq_id, part_region.start);
-      build_clv(prob_start, part_region.length, weights_start, partition, normalize, tmp_clv);
+      auto prob_start = msa.probs(seq_id, pstart);
+      build_clv(prob_start, plen, weights_start, partition, normalize, tmp_clv);
       pll_set_tip_clv(partition, tip_id, tmp_clv.data(), PLL_FALSE);
     }
   }
   else
   {
-    std::vector<char> bs_seq(part_region.length);
+    std::vector<char> bs_seq(plen);
     for (size_t tip_id = 0; tip_id < partition->tips; ++tip_id)
     {
       auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
@@ -591,11 +597,14 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
 {
   const MSA& msa = pinfo.msa();
   const Model& model = pinfo.model();
+  const auto pstart = msa.get_local_offset(part_region.start);
+
+//  printf("\n\n rank %lu, GLOBAL OFFSET %lu, LOCAL OFFSET %lu \n\n", ParallelContext::proc_id(), part_region.start, pstart);
 
   /* part_length doesn't include columns with zero weight */
   const size_t part_length = weights.empty() ? part_region.length :
-                             std::count_if(weights.begin() + part_region.start,
-                                           weights.begin() + part_region.start + part_region.length,
+                             std::count_if(weights.begin() + pstart,
+                                           weights.begin() + pstart + part_region.length,
                                            [](uintVector::value_type w) -> bool
                                              { return w > 0; }
                                            );

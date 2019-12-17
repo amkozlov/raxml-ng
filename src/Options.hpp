@@ -47,6 +47,7 @@ public:
   bool use_prob_msa;
   bool use_rate_scalers;
   bool use_repeats;
+  bool use_rba_partload;
 
   bool optimize_model;
   bool optimize_brlen;

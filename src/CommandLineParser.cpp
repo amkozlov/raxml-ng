@@ -260,6 +260,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* use probabilistic MSA _if available_ (e.g. CATG file was provided) */
   opts.use_prob_msa = true;
 
+  /* use RBA partial loading whenever appropriate/possible */
+  opts.use_rba_partload = true;
+
   /* optimize model and branch lengths */
   opts.optimize_model = true;
   opts.optimize_brlen = true;
@@ -751,6 +754,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.tbe_naive = true;
             else if (eopt == "tbe-nature")
               opts.tbe_naive = false;
+            else if (eopt == "rba-nopartload")
+              opts.use_rba_partload = false;
             else
               throw InvalidOptionValueException("Unknown extra option: " + string(optarg));
           }
