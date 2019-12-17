@@ -14,9 +14,10 @@ size_t PartitionInfo::length() const
   return st.pattern_count ? st.pattern_count : st.site_count;
 }
 
-size_t PartitionInfo::taxon_clv_size() const
+size_t PartitionInfo::taxon_clv_size(bool partial) const
 {
-  return _model.clv_entry_size() * (_msa.num_patterns() ? _msa.num_patterns() : _msa.num_sites());
+  auto sites = partial ? (_msa.num_patterns() ? _msa.num_patterns() : _msa.num_sites()) : length();
+  return _model.clv_entry_size() * sites;
 }
 
 size_t PartitionInfo::mark_partition_sites(unsigned int part_num, std::vector<unsigned int>& site_part) const

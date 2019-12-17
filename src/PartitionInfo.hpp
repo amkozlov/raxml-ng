@@ -68,7 +68,7 @@ public:
   size_t length() const;
 
   /* given in elements (NOT in bytes) */
-  size_t taxon_clv_size() const;
+  size_t taxon_clv_size(bool partial = false) const;
 
   // setters
   void msa(MSA&& msa) { _msa = std::move(msa); };
