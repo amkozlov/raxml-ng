@@ -2849,12 +2849,11 @@ int internal_main(int argc, char** argv, void* comm)
 
     /* finalize */
     if (ParallelContext::master_rank())
-    {
       print_final_output(instance, cm.checkp_file());
 
-      /* analysis finished successfully, remove checkpoint file */
+    /* analysis finished successfully, remove checkpoint file */
+    if (ParallelContext::group_master_rank())
       cm.remove();
-    }
   }
   catch(exception& e)
   {
