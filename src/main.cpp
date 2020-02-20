@@ -1104,11 +1104,19 @@ void build_parsimony_msa(RaxmlInstance& instance)
         const auto w = pinfo.msa().weights();
         const auto s = pinfo.msa().at(j);
 
-        for (size_t k = 0; k < w.size(); ++k)
+        if (w.empty())
         {
-          auto wk = w[k];
-          while(wk-- > 0)
+          for (size_t k = 0; k < s.size(); ++k)
             sequence[offset++] = s[k];
+        }
+        else
+        {
+          for (size_t k = 0; k < w.size(); ++k)
+          {
+            auto wk = w[k];
+            while(wk-- > 0)
+              sequence[offset++] = s[k];
+          }
         }
       }
 
