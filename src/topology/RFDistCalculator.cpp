@@ -40,7 +40,7 @@ void RFDistCalculator::add_tree_splits(size_t tree_idx, const Tree& tree,
                                                                        splits[i],
                                                                        1.0);
     if (!e)
-      libpll_check_error("Cannot add a split into hashtable: ");
+      libpll_check_error("Cannot add a split into hashtable: ", true);
 
     assert(e->bip_number <= _split_occurence.size());
 

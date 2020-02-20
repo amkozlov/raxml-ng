@@ -286,6 +286,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.brlen_min = RAXML_BRLEN_MIN;
   opts.brlen_max = RAXML_BRLEN_MAX;
 
+  opts.num_threads = 0;
+
   /* use all available cores per default */
 #if !defined(_RAXML_PTHREADS)
   opts.num_threads = 1;
