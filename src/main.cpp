@@ -2565,7 +2565,7 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   balance_load(instance);
 
   /* lazy-load part of the alignment assigned to the current MPI rank */
-  if (opts.use_rba_partload)
+  if (opts.msa_format == FileFormat::binary && opts.use_rba_partload)
   {
     // doesn't work with coarse-grained parallelization!
     assert(ParallelContext::num_groups() == 1);
