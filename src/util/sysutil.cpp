@@ -5,6 +5,7 @@
 #include <sys/resource.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/sysctl.h>
 #include <stdarg.h>
 #include <limits.h>
 
