@@ -163,5 +163,6 @@ AncestralProbStream& operator<<(AncestralProbStream& stream, const AncestralStat
 AncestralStateStream& operator<<(AncestralStateStream& stream, const AncestralStates& ancestral);
 
 std::string to_newick_string_rooted(const Tree& tree, double root_brlen = 0.0);
+void to_newick_file(const pll_utree_t& tree, const std::string& fname);
 
 #endif /* RAXML_FILE_IO_HPP_ */
