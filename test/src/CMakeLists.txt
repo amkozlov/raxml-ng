@@ -14,6 +14,7 @@ file (GLOB_RECURSE RAXML_TEST_SOURCES ${PROJECT_SOURCE_DIR}/test/src/*.cpp ${RAX
 list(REMOVE_ITEM RAXML_TEST_SOURCES "${PROJECT_SOURCE_DIR}/src/main.cpp")
 
 include_directories (${PROJECT_SOURCE_DIR})
+include_directories (${GTEST_INCLUDE_DIRS})
 
 set (EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/test/bin)
 

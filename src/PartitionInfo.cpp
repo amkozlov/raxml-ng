@@ -8,6 +8,11 @@ PartitionInfo::~PartitionInfo ()
 {
 }
 
+size_t PartitionInfo::taxon_clv_size() const
+{
+  return _model.clv_entry_size() * (_msa.num_patterns() ? _msa.num_patterns() : _msa.num_sites());
+}
+
 size_t PartitionInfo::mark_partition_sites(unsigned int part_num, std::vector<unsigned int>& site_part) const
 {
   size_t start, end, stride;

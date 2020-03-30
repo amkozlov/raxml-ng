@@ -788,8 +788,9 @@ void load_msa(RaxmlInstance& instance)
 
   LOG_INFO << endl;
 
-  LOG_INFO << "Alignment comprises " << parted_msa.part_count() << " partitions and " <<
-      parted_msa.total_length() << " patterns\n" << endl;
+  LOG_INFO << "Alignment comprises " << parted_msa.part_count() << " partitions and "
+           << parted_msa.total_length() << (opts.use_pattern_compression ? " patterns" : " sites")
+           << endl << endl;
 
   LOG_INFO << parted_msa;
 
@@ -960,6 +961,18 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
       load_start_trees(instance, cm);
     }
 
+    // NB: consider BS trees from the previous run when performing bootstopping test
+    if (instance.bootstop_checker)
+    {
+      auto bs_tree = instance.random_tree;
+      for (auto it: ckp.bs_trees)
+      {
+        bs_tree.topology(it.second);
+
+        instance.bootstop_checker->add_bootstrap_tree(bs_tree);
+      }
+    }
+
     LOG_INFO_TS << "NOTE: Resuming execution from checkpoint " <<
         "(logLH: " << ckp.loglh() <<
         ", ML trees: " << ckp.ml_trees.size() <<
@@ -1061,7 +1074,7 @@ void build_parsimony_msa(RaxmlInstance& instance)
     auto iter = datatype_pinfo_map.find(data_type_name);
     if (iter == datatype_pinfo_map.end())
     {
-      pars_msa.emplace_part_info(data_type_name, model.data_type(), model.name());
+      pars_msa.emplace_part_info(data_type_name, model.data_type(), model.to_string());
       auto& pars_pinfo = pars_msa.part_list().back();
       pars_pinfo.msa(MSA(pinfo.msa().num_sites()));
       datatype_pinfo_map[data_type_name] = pars_msa.part_count()-1;
@@ -1092,11 +1105,19 @@ void build_parsimony_msa(RaxmlInstance& instance)
         const auto w = pinfo.msa().weights();
         const auto s = pinfo.msa().at(j);
 
-        for (size_t k = 0; k < w.size(); ++k)
+        if (w.empty())
         {
-          auto wk = w[k];
-          while(wk-- > 0)
+          for (size_t k = 0; k < s.size(); ++k)
             sequence[offset++] = s[k];
+        }
+        else
+        {
+          for (size_t k = 0; k < w.size(); ++k)
+          {
+            auto wk = w[k];
+            while(wk-- > 0)
+              sequence[offset++] = s[k];
+          }
         }
       }
 

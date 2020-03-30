@@ -93,8 +93,6 @@ void MSA::append(const string& sequence, const string& header)
     _length = sequence.length();
     if (!_num_sites)
       _num_sites = _length;
-    if (_weights.empty())
-      _weights.assign(_length, 1.);
   }
 
   _dirty = true;
@@ -110,9 +108,8 @@ void MSA::compress_patterns(const pll_state_t * charmap)
                                                       charmap,
                                                       _pll_msa->count,
                                                       &(_pll_msa->length));
-
   if (!w)
-    throw runtime_error("Pattern compression failed!");
+    libpll_check_error("Pattern compression failed: ", true);
 
   _length = _pll_msa->length;
   _weights = WeightVector(w, w + _pll_msa->length);

@@ -57,6 +57,7 @@ set(RAXML_LIBS ${LIBPLL_LIBS} m)
 
 if(USE_TERRAPHAST)
   set(RAXML_LIBS ${RAXML_LOCALDEPS_DIR}/lib/libterraces.a ${RAXML_LIBS})
+  add_dependencies(raxml_module terraces)
 endif()
 
 if(USE_VCF)

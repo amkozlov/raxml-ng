@@ -125,7 +125,8 @@ void check_vmsa_part(PartitionedMSA& pmsa, PartitionedMSAView& vmsa, size_t p,
     {
       if (vmsa.excluded_site_count() == 0 || vmsa.exclude_sites(p).count(s) == 0)
       {
-        auto w = weights.empty() ? msa.weights().at(s) : weights.at(s);
+        auto w = !weights.empty() ? weights.at(s) :
+                   (!msa.weights().empty() ? msa.weights().at(s) : 1);
         for (size_t i = 0; i < w; ++i)
           ss << seq[s];
       }

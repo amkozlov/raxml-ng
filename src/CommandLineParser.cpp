@@ -281,6 +281,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.brlen_min = RAXML_BRLEN_MIN;
   opts.brlen_max = RAXML_BRLEN_MAX;
 
+  opts.num_threads = 0;
+
   /* use all available cores per default */
 #if defined(_RAXML_PTHREADS) && !defined(_RAXML_MPI)
   opts.num_threads = std::max(1u, sysutil_get_cpu_cores());
@@ -656,6 +658,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
                                             string(optarg) +
                                             ", please provide a positive real number.");
         }
+        if (opts.precision.empty() && opts.brlen_min < 1.)
+          opts.precision[LogElement::brlen] = ceil(-1 * log10(opts.brlen_min));
         break;
       case 37: /* max brlen */
         if(sscanf(optarg, "%lf", &opts.brlen_max) != 1 || opts.brlen_max <= 0.)

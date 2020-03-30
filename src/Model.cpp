@@ -59,8 +59,8 @@ static bool read_param(istringstream& s, string& val)
     // consume the opening bracket
     s.get();
 
-    char str[1024];
-    if (!s.getline(str, 1024, delim))
+    string str;
+    if (!std::getline(s, str, delim))
       throw parse_error();
     val = str;
 
@@ -121,8 +121,8 @@ static bool read_param_file(istringstream& s, std::vector<T>& vec)
     // consume the opening bracket
     s.get();
 
-    char fname[1024];
-    s.getline(fname, 1024, delim);
+    string fname;
+    std::getline(s, fname, delim);
     if (sysutil_file_exists(fname))
     {
       ifstream fs(fname);
@@ -674,26 +674,26 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
       case 'M':
         try
         {
-          std::string state_chars, gap_chars;
-          int case_sensitive = 1;
           if (tolower(ss.peek()) == 'i')
           {
             ss.get();
-            case_sensitive = 0;
+            _custom_case_sensitive = false;
           }
+          else
+            _custom_case_sensitive = true;
 
-          if (!read_param(ss, state_chars))
+          if (!read_param(ss, _custom_states))
             throw parse_error();
 
-          read_param(ss, gap_chars);
+          read_param(ss, _custom_gaps);
 
-          if (sysutil_file_exists(state_chars) && gap_chars.empty())
+          if (sysutil_file_exists(_custom_states) && _custom_gaps.empty())
           {
             /* read custom character map from a file */
             _custom_charmap = shared_ptr<pll_state_t>(
                 pllmod_util_charmap_parse(_num_states,
-                                          state_chars.c_str(),
-                                          case_sensitive,
+                                          _custom_states.c_str(),
+                                          _custom_case_sensitive ? 1 : 0,
                                           nullptr),
                 free);
           }
@@ -701,9 +701,9 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
           {
             _custom_charmap = shared_ptr<pll_state_t>(
                 pllmod_util_charmap_create(_num_states,
-                                           state_chars.c_str(),
-                                           gap_chars.c_str(),
-                                           case_sensitive),
+                                           _custom_states.c_str(),
+                                           _custom_gaps.c_str(),
+                                           _custom_case_sensitive ? 1 : 0),
                 free);
           }
 
@@ -1027,6 +1027,14 @@ std::string Model::to_string(bool print_params, unsigned int precision) const
     {
       print_param(model_string, _error_model->params());
     }
+  }
+
+  if (!_custom_states.empty())
+  {
+    model_string << "+M" << (_custom_case_sensitive ? "" : "i");
+    model_string << "{" << _custom_states << "}";
+    if (!_custom_gaps.empty())
+      model_string << "{" << _custom_gaps << "}";
   }
 
   return model_string.str();
