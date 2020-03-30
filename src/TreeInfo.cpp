@@ -351,13 +351,10 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
     new_loglh = -1 * pllmod_algo_opt_rates_weights_treeinfo (_pll_treeinfo,
                                                           RAXML_FREERATE_MIN,
                                                           RAXML_FREERATE_MAX,
+                                                          _brlen_min,
+                                                          _brlen_max,
                                                           RAXML_BFGS_FACTOR,
                                                           RAXML_PARAM_EPSILON);
-
-    /* normalize scalers and scale the branches accordingly */
-    if (_pll_treeinfo->brlen_linkage == PLLMOD_COMMON_BRLEN_SCALED &&
-        _pll_treeinfo->partition_count > 1)
-      pllmod_treeinfo_normalize_brlen_scalers(_pll_treeinfo);
 
     LOG_DEBUG << "\t - after freeR: logLH = " << new_loglh << endl;
 //    LOG_DEBUG << "\t - after freeR/crosscheck: logLH = " << loglh() << endl;
