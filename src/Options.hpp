@@ -26,6 +26,8 @@ struct OutputFileNames
   std::string asr_tree;
   std::string asr_probs;
   std::string asr_states;
+  std::string mut_map_tree;
+  std::string mut_map_list;
 };
 
 class Options
@@ -140,6 +142,8 @@ public:
   const std::string asr_tree_file() const { return outfile_names.asr_tree; }
   const std::string asr_probs_file() const { return outfile_names.asr_probs; }
   const std::string asr_states_file() const { return outfile_names.asr_states; }
+  const std::string mut_maptree_file() const { return outfile_names.mut_map_tree; }
+  const std::string mut_maplist_file() const { return outfile_names.mut_map_list; }
 
   void set_default_outfiles();
 

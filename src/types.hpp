@@ -37,7 +37,8 @@ enum class Command
   start,
   rfdist,
   consense,
-  ancestral
+  ancestral,
+  mutmap
 };
 
 enum class FileFormat

@@ -90,6 +90,14 @@ std::string AncestralStates::ml_state(size_t node_idx, size_t site_idx, size_t p
     return state_names[mstate];  // TviODO: check for gap
 }
 
+std::string AncestralStates::ml_state_seq(const std::string& node_name, size_t part_idx) const
+{
+  if (node_namemap.count(node_name))
+    return ml_state_seq(node_namemap.at(node_name), part_idx);
+  else
+    throw runtime_error("AncestralStates: Internal node not found: " + node_name);
+}
+
 std::string AncestralStates::ml_state_seq(size_t node_idx, size_t part_idx) const
 {
   string s;
@@ -117,7 +125,11 @@ void assign_tree(AncestralStates& ancestral, const pllmod_ancestral_t& pll_ances
   ancestral.tree = Tree(*pll_ancestral.tree);
   ancestral.node_names.clear();
   for (size_t i = 0; i < pll_ancestral.node_count; ++i)
-    ancestral.node_names.push_back(pll_ancestral.nodes[i]->label);
+  {
+    auto name = pll_ancestral.nodes[i]->label;
+    ancestral.node_namemap[name] = ancestral.node_names.size();
+    ancestral.node_names.push_back(name);
+  }
 }
 
 void assign_probs(AncestralStates& ancestral, const pllmod_ancestral_t& pll_ancestral,

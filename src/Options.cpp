@@ -38,6 +38,8 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.asr_tree, "ancestralTree");
   set_default_outfile(outfile_names.asr_probs, "ancestralProbs");
   set_default_outfile(outfile_names.asr_states, "ancestralStates");
+  set_default_outfile(outfile_names.mut_map_tree, "mutationMapTree");
+  set_default_outfile(outfile_names.mut_map_list, "mutationMapList");
 }
 
 const std::string& Options::support_tree_file(BranchSupportMetric bsm) const
@@ -100,6 +102,8 @@ bool Options::result_files_exist() const
     case Command::ancestral:
       return sysutil_file_exists(asr_tree_file()) || sysutil_file_exists(asr_probs_file()) ||
              sysutil_file_exists(asr_states_file());
+    case Command::mutmap:
+      return sysutil_file_exists(mut_maplist_file()) || sysutil_file_exists(mut_maptree_file());
     default:
       return false;
   }
@@ -159,11 +163,17 @@ void Options::remove_result_files() const
   if (command == Command::consense)
     sysutil_file_remove(cons_tree_file());
 
-  if (command == Command::consense)
+  if (command == Command::ancestral)
   {
     sysutil_file_remove(asr_tree_file());
     sysutil_file_remove(asr_probs_file());
     sysutil_file_remove(asr_states_file());
+  }
+
+  if (command == Command::mutmap)
+  {
+    sysutil_file_remove(mut_maplist_file());
+    sysutil_file_remove(mut_maptree_file());
   }
 
 }
@@ -261,6 +271,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       break;
     case Command::ancestral:
       stream << "Ancestral state reconstruction";
+      break;
+    case Command::mutmap:
+      stream << "Mutation mapping";
       break;
     default:
       break;

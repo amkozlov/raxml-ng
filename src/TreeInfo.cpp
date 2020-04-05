@@ -642,14 +642,14 @@ void assign(Model& model, const TreeInfo& treeinfo, size_t partition_id)
 }
 
 void build_clv(ProbVector::const_iterator probs, size_t sites, WeightVector::const_iterator weights,
-               pll_partition_t* partition, bool normalize, std::vector<double>& clv)
+               pll_partition_t* partition, bool normalize, bool weighted, std::vector<double>& clv)
 {
   const auto states = partition->states;
   auto clvp = clv.begin();
 
   for (size_t i = 0; i < sites; ++i)
   {
-    if (weights[i] > 0)
+    if (!weighted || weights[i] > 0)
     {
       double sum = 0.;
       for (size_t j = 0; j < states; ++j)
@@ -696,7 +696,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
     {
       auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
       auto prob_start = msa.probs(seq_id, part_region.start);
-      build_clv(prob_start, partition->sites, weights_start, partition, normalize, tmp_clv);
+      build_clv(prob_start, partition->sites, weights_start, partition, normalize, false, tmp_clv);
       pll_set_tip_clv(partition, tip_id, tmp_clv.data(), PLL_FALSE);
     }
   }
@@ -735,7 +735,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
     assert(partition->states == msa.states());
 
     auto normalize = !msa.normalized();
-    auto weights_start = msa.weights().cbegin() + part_region.start;
+    auto weights_start = weights.cbegin() + part_region.start;
 
     // we need a libpll function for that!
     auto clv_size = part_region.length * partition->states;
@@ -744,7 +744,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
     {
       auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
       auto prob_start = msa.probs(seq_id, part_region.start);
-      build_clv(prob_start, part_region.length, weights_start, partition, normalize, tmp_clv);
+      build_clv(prob_start, part_region.length, weights_start, partition, normalize, true, tmp_clv);
       pll_set_tip_clv(partition, tip_id, tmp_clv.data(), PLL_FALSE);
     }
   }

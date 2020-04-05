@@ -20,6 +20,19 @@ char * newick_print_cb(const pll_unode_t * node)
   return newick;
 }
 
+char * newick_pmat_cb(const pll_unode_t * node)
+{
+  const unsigned int precision = logger().precision(LogElement::brlen);
+
+  char * newick;
+  if (asprintf(&newick, "%s:%.*lf[%u]",
+           node->label ? node->label : "" , precision,
+           node->length, node->pmatrix_index) < 0)
+    return NULL;
+
+  return newick;
+}
+
 std::string to_newick_string_rooted(const Tree& tree, double root_brlen)
 {
   char * newick_str = pll_utree_export_newick_rooted(&tree.pll_utree_root(),
@@ -40,7 +53,8 @@ void to_newick_file(const pll_utree_t& tree, const std::string& fname)
 
 NewickStream& operator<<(NewickStream& stream, const pll_unode_t& root)
 {
-  auto print_cb = stream.brlens() ? newick_print_cb : newick_name_cb;
+  auto print_cb = stream.brlabs() ? newick_pmat_cb :
+      (stream.brlens() ? newick_print_cb : newick_name_cb);
   char * newick_str = pll_utree_export_newick(&root, print_cb);
   if (newick_str)
   {
@@ -106,5 +120,14 @@ NewickStream& operator<<(NewickStream& stream, const AncestralStates& ancestral)
   return stream;
 }
 
+NewickStream& operator<<(NewickStream& stream, const MutationMap& mutmap)
+{
+  auto old_brlabs = stream.brlabs();
+  stream.brlabs(true);
+  stream << mutmap.tree;
+  stream.brlabs(old_brlabs);
+
+  return stream;
+}
 
 

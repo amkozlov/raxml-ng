@@ -410,6 +410,11 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
       if (rec->n_allele > 4)
         throw runtime_error(err_coord + "Wrong number of alleles (" + to_string(rec->n_allele) + ")");
 
+      string snv_name = strlen(rec->d.id) > 1 ? rec->d.id : to_string(chr) + ":" + to_string(pos);
+//      LOG_DEBUG << "SNV: " << snv_name << endl;
+
+      msa.site_name(j, snv_name);
+
       assert(strlen(rec->d.allele[0]) == 1 && strlen(rec->d.allele[1]));
 
       int als[4] = {'-'};

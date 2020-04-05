@@ -74,6 +74,7 @@ static struct option long_options[] =
   {"rf",                 optional_argument, 0, 0 },  /*  51 */
   {"consense",           optional_argument, 0, 0 },  /*  52 */
   {"ancestral",          optional_argument, 0, 0 },  /*  53 */
+  {"mutmap",             optional_argument, 0, 0 },  /*  54 */
 
   { 0, 0, 0, 0 }
 };
@@ -176,7 +177,7 @@ void CommandLineParser::compute_num_searches(Options &opts)
 {
   if (opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate || opts.command == Command::start ||
-      opts.command == Command::ancestral)
+      opts.command == Command::ancestral || opts.command == Command::mutmap)
   {
     if (opts.start_trees.empty())
     {
@@ -848,6 +849,14 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         num_commands++;
         break;
 
+      case 54: /* mutation mapping */
+        opts.command = Command::mutmap;
+        opts.use_pattern_compression = false;
+        opts.use_repeats = false;
+        opts.use_tip_inner = true;
+        num_commands++;
+        break;
+
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -907,6 +916,7 @@ void CommandLineParser::print_help()
             "  --consense [ STRICT | MR | MR<n> | MRE ]   build strict, majority-rule (MR) or extended MR (MRE) consensus tree (default: MR)\n"
             "                                             eg: --consense MR75 --tree bsrep.nw\n"
             "  --ancestral                                ancestral state reconstruction at all inner nodes\n"
+            "  --mutmap                                   map mutations to the tree branches\n"
             "\n"
             "Command shortcuts (mutually exclusive):\n"
             "  --search1                                  Alias for: --search --tree rand{1}\n"

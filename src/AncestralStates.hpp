@@ -17,6 +17,7 @@ struct AncestralStates
   NameList state_names;
   StateNameMap state_namemap;
   NameList node_names;
+  NameIdMap node_namemap;
   std::vector<PartitionAncestralProbs> probs;
 
   bool ambiguity;
@@ -28,7 +29,8 @@ struct AncestralStates
   void allocate_probs();
 
   size_t num_parts() const;
-  std::string ml_state_seq(size_t node_idx, size_t part_idx = 0) const ;
+  std::string ml_state_seq(size_t node_idx, size_t part_idx = 0) const;
+  std::string ml_state_seq(const std::string& node_name, size_t part_idx = 0) const;
   std::string ml_state(size_t node_idx, size_t site_idx, size_t part_idx = 0) const;
 };
 

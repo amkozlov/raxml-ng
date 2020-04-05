@@ -69,3 +69,25 @@ AncestralStateStream& operator<<(AncestralStateStream& stream, const AncestralSt
   }
   return stream;
 }
+
+MutationMapListStream& operator<<(MutationMapListStream& stream, const MutationMap& mutmap)
+{
+  auto delim = stream.delim();
+  stream << fixed << setprecision(stream.precision());
+
+  for (size_t i = 0; i < mutmap.mut_list.size(); ++i)
+  {
+    const auto& branch_muts = mutmap.mut_list[i];
+    stream << i << delim;
+    for (size_t j = 0; j < branch_muts.size(); ++j)
+    {
+      auto m = branch_muts[j];
+      string mut_name = mutmap.mut_names.empty() ? to_string(m+1) : mutmap.mut_names[m];
+      stream << mut_name;
+      if (j < branch_muts.size()-1)
+        stream << ",";
+    }
+    stream << endl;
+  }
+  return stream;
+}

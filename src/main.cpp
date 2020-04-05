@@ -708,7 +708,8 @@ void check_options(RaxmlInstance& instance)
   }
 
   if (instance.parted_msa->taxon_count() > RAXML_RATESCALERS_TAXA &&
-      !instance.opts.use_rate_scalers && opts.command != Command::ancestral)
+      !instance.opts.use_rate_scalers &&
+      opts.command != Command::ancestral && opts.command != Command::mutmap)
   {
     LOG_INFO << "\nNOTE: Per-rate scalers were automatically enabled to prevent numerical issues "
         "on taxa-rich alignments." << endl;
@@ -717,7 +718,7 @@ void check_options(RaxmlInstance& instance)
     instance.opts.use_rate_scalers = true;
   }
 
-  if (opts.command == Command::ancestral)
+  if (opts.command == Command::ancestral || opts.command == Command::mutmap)
   {
     if (opts.use_pattern_compression)
       throw runtime_error("Pattern compression is not supported in ancestral state reconstruction mode!");
@@ -748,6 +749,8 @@ void load_msa(RaxmlInstance& instance)
     instance.opts.use_pattern_compression = false;
     instance.opts.use_tip_inner = false;
     instance.opts.use_repeats = false;
+    instance.opts.safety_checks.unset(SafetyCheck::msa_dups);
+    instance.opts.safety_checks.unset(SafetyCheck::msa_allgaps);
 
     if (parted_msa.part_count() > 1)
       throw runtime_error("Partitioned probabilistic alignments are not supported yet, sorry...");
@@ -1322,8 +1325,10 @@ void generate_bootstraps(RaxmlInstance& instance, const Checkpoint& checkp)
 
 void init_ancestral(RaxmlInstance& instance)
 {
-  if (instance.opts.command == Command::ancestral)
+  if (instance.opts.command == Command::ancestral || instance.opts.command == Command::mutmap)
   {
+    assert(!instance.start_trees.empty());
+
     const auto& parted_msa = *instance.parted_msa;
     const Tree& tree = instance.start_trees.at(0);
 
@@ -1733,7 +1738,8 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
   const auto& parted_msa = *instance.parted_msa;
 
   if (opts.command == Command::search || opts.command == Command::all ||
-      opts.command == Command::evaluate || opts.command == Command::ancestral)
+      opts.command == Command::evaluate || opts.command == Command::ancestral ||
+      opts.command == Command::mutmap)
   {
     auto model_log_lvl = parted_msa.part_count() > 1 ? LogLevel::verbose : LogLevel::info;
     auto ckp_models = checkp.best_models.empty() ? checkp.models : checkp.best_models;
@@ -1970,6 +1976,26 @@ void print_final_output(const RaxmlInstance& instance, const Checkpoint& checkp)
     }
   }
 
+  if (opts.command == Command::mutmap)
+  {
+    MutationMap mmap(*instance.ancestral_states, *instance.parted_msa);
+    if (!opts.mut_maptree_file().empty())
+    {
+      NewickStream mts(opts.mut_maptree_file());
+      mts << mmap;
+
+      LOG_INFO << "Branch-labeled tree saved to: " << sysutil_realpath(opts.mut_maptree_file()) << endl;
+    }
+
+    if (!opts.mut_maplist_file().empty())
+    {
+      MutationMapListStream mls(opts.mut_maplist_file());
+      mls << mmap;
+
+      LOG_INFO << "Per-branch mutation list saved to: " << sysutil_realpath(opts.mut_maplist_file()) << endl;
+    }
+  }
+
   if (!opts.log_file().empty())
       LOG_INFO << "\nExecution log saved to: " << sysutil_realpath(opts.log_file()) << endl;
 
@@ -2024,7 +2050,8 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   bool use_ckp_tree = true;
   if ((opts.command == Command::search || opts.command == Command::all ||
-      opts.command == Command::evaluate || opts.command == Command::ancestral) &&
+      opts.command == Command::evaluate || opts.command == Command::ancestral ||
+      opts.command == Command::mutmap) &&
       !instance.start_trees.empty())
   {
 
@@ -2065,7 +2092,8 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
       treeinfo->set_topology_constraint(instance.constraint_tree);
 
       Optimizer optimizer(opts);
-      if (opts.command == Command::evaluate || opts.command == Command::ancestral)
+      if (opts.command == Command::evaluate || opts.command == Command::ancestral ||
+          opts.command == Command::mutmap)
       {
         // check if we have anything to optimize
         if (opts.optimize_brlen || opts.optimize_model)
@@ -2105,7 +2133,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   ParallelContext::thread_barrier();
 
-  if (opts.command == Command::ancestral)
+  if (opts.command == Command::ancestral || opts.command == Command::mutmap)
   {
     assert(!opts.use_pattern_compression);
     treeinfo->compute_ancestral(instance.ancestral_states, part_assign);
@@ -2358,6 +2386,7 @@ int internal_main(int argc, char** argv, void* comm)
     case Command::rfdist:
     case Command::consense:
     case Command::ancestral:
+    case Command::mutmap:
       if (!opts.redo_mode && opts.result_files_exist())
       {
         LOG_ERROR << endl << "ERROR: Result files for the run with prefix `" <<
@@ -2441,6 +2470,7 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::bootstrap:
       case Command::all:
       case Command::ancestral:
+      case Command::mutmap:
       {
         /* init load balancer */
         switch(opts.load_balance_method)

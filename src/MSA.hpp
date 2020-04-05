@@ -57,6 +57,9 @@ public:
 
   doubleVector state_freqs() const;
 
+  void site_name(size_t index, const std::string& name);
+  const NameList& site_names() const { return _site_names; }
+
   void num_sites(const unsigned int sites) { _num_sites = sites; }
   void weights(const WeightVector& v) { _weights = v; update_num_sites(); }
   void weights(WeightVector&& v) { _weights = std::move(v); update_num_sites(); }
@@ -81,6 +84,7 @@ private:
   container _sequences;
   container _labels;
   NameIdMap _label_id_map;
+  NameList _site_names;
   WeightVector _weights;
   ProbVectorList _probs;
   size_t _states;
