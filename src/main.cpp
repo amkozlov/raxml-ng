@@ -1091,16 +1091,19 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
          };
 
       ParallelContext::mpi_gather_custom(worker_cb, master_cb);
+    }
 
-      if (ParallelContext::master())
-      {
-        for (const auto& p: ckpfile.ml_trees)
-          instance.done_ml_trees.insert(p.first);
+    if (ParallelContext::master())
+    {
+      for (const auto& p: ckpfile.ml_trees)
+        instance.done_ml_trees.insert(p.first);
 
-        for (const auto& p: ckpfile.bs_trees)
-          instance.done_bs_trees.insert(p.first);
-      }
+      for (const auto& p: ckpfile.bs_trees)
+        instance.done_bs_trees.insert(p.first);
+    }
 
+    if (ParallelContext::num_ranks() > 1)
+    {
       ParallelContext::global_mpi_barrier();
 
       // broadcast done_start_trees + done_bs_trees
@@ -1108,7 +1111,7 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
       ParallelContext::mpi_broadcast(instance.done_bs_trees);
     }
 
-    if (!instance.done_ml_trees.empty())
+    if (!instance.done_ml_trees.empty() || !instance.done_bs_trees.empty())
     {
       LOG_INFO_TS << "NOTE: Resuming execution from checkpoint " <<
           "(logLH: " << cm.checkpoint().loglh() <<
@@ -2617,11 +2620,12 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
       draw_bootstrap_support(instance, instance.ml_tree.tree, bs_trees);
     }
 
-    const auto& ml_models = instance.ml_tree.models;
-    assert(ml_models.size() == parted_msa.part_count());
-    for (size_t p = 0; p < parted_msa.part_count(); ++p)
+    if (!instance.ml_tree.models.empty())
     {
-      parted_msa.model(p, ml_models.at(p));
+      const auto& ml_models = instance.ml_tree.models;
+      assert(ml_models.size() == parted_msa.part_count());
+      for (size_t p = 0; p < parted_msa.part_count(); ++p)
+        parted_msa.model(p, ml_models.at(p));
     }
   }
 }

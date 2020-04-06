@@ -20,11 +20,19 @@ Tree CheckpointFile::tree() const
 MLTree CheckpointFile::best_tree() const
 {
   MLTree result;
-  auto best = ml_trees.best()->second;
-  result.loglh = best.first;
-  result.tree = tree();
-  result.tree.topology(best.second);
-  result.models = best_models;
+  if (!ml_trees.empty())
+  {
+    auto best = ml_trees.best()->second;
+    result.loglh = best.first;
+    result.tree = tree();
+    result.tree.topology(best.second);
+    result.models = best_models;
+  }
+  else
+  {
+    result.loglh = -INFINITY;
+    result.tree = tree();
+  }
   return result;
 }
 
@@ -162,6 +170,8 @@ void CheckpointManager::save_ml_tree()
 
     ml_trees.insert(ckp.tree_index, ScoredTopology(ckp.loglh(), ckp.tree.topology()));
 
+    ckp.tree_index = 0;
+
     if (_active)
       write();
   }
@@ -180,6 +190,8 @@ void CheckpointManager::save_bs_tree()
 //           ParallelContext::group_id(), index, ckp.loglh());
 
     _checkp_file.bs_trees.insert(ckp.tree_index, ScoredTopology(ckp.loglh(), ckp.tree.topology()));
+
+    ckp.tree_index = 0;
 
     if (_active)
       write();
