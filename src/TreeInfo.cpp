@@ -738,7 +738,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
     auto weights_start = weights.cbegin() + part_region.start;
 
     // we need a libpll function for that!
-    auto clv_size = part_region.length * partition->states;
+    auto clv_size = partition->sites * partition->states;
     std::vector<double> tmp_clv(clv_size);
     for (size_t tip_id = 0; tip_id < partition->tips; ++tip_id)
     {
