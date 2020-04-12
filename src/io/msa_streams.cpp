@@ -274,6 +274,8 @@ CATGStream& operator>>(CATGStream& stream, MSA& msa)
 //#define _RAXML_VCF
 //#define _RAXML_VCF_DEBUG
 
+#define _RAXML_VCF_MINGL -13
+
 #ifdef __APPLE__
 #define EXP10(x) pow(10, x)
 #else
@@ -399,6 +401,7 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
   int * gt_fpl = NULL;
 
   size_t j = 0;
+  size_t gtlh_below = 0;
   while ( bcf_read1(fp, hdr, rec)>=0 )
     {
       bcf_unpack(rec, BCF_UN_ALL);
@@ -563,11 +566,22 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
           if (gt_g10)
           {
             /* G10 field: all 10 genotype likelihoods are defined */
+            int below = 1;
             for (unsigned int k = 0; k < 10; ++k)
             {
-                auto pl = gt_g10[i * 10 + k];
+                auto gl = gt_g10[i * 10 + k];
                 auto s = vcf_to_rax_map[k];
-                site_probs[s] = isfinite(pl) ? EXP10(pl) : 0.;
+                site_probs[s] = isfinite(gl) ? EXP10(gl) : 0.;
+                below &= (gl < _RAXML_VCF_MINGL);
+            }
+
+            /* if *all* genotype likelihoods are below threshold, convert this SNV to gap */
+            if (below)
+            {
+              gtlh_below++;
+              for (size_t k = 0; k < 10; ++k)
+                site_probs[k] = 1.;
+              msa[i][j] = '-';
             }
           }
           else if (gt_pl)
@@ -646,6 +660,12 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
     }
 
   assert(j == site_count);
+
+  if (gtlh_below > 0)
+  {
+    LOG_WARN << endl << "WARNING: Some low-confidence SNVs were converted to gaps to prevent underflow: " << gtlh_below
+             << " (" << (100.*gtlh_below/(site_count*taxa_count)) << "%)" << endl << endl;
+  }
 
   if (gt_g10)
     free(gt_g10);
