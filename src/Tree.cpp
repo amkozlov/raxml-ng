@@ -36,11 +36,11 @@ Tree& Tree::operator=(Tree&& other)
   {
     _num_tips = 0;
     _pll_utree_tips.clear();
-    _pll_utree.release();
     _partition_brlens.clear();
 
+    _pll_utree.reset(other._pll_utree.release());
+
     swap(_num_tips, other._num_tips);
-    swap(_pll_utree, other._pll_utree);
     swap(_pll_utree_tips, other._pll_utree_tips);
     swap(_partition_brlens, other._partition_brlens);
   }
