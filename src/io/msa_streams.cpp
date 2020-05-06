@@ -274,7 +274,7 @@ CATGStream& operator>>(CATGStream& stream, MSA& msa)
 //#define _RAXML_VCF
 //#define _RAXML_VCF_DEBUG
 
-#define _RAXML_VCF_MINGL -13
+#define _RAXML_VCF_MINGL -75
 
 #ifdef __APPLE__
 #define EXP10(x) pow(10, x)
@@ -578,6 +578,13 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
             /* if *all* genotype likelihoods are below threshold, convert this SNV to gap */
             if (below)
             {
+  #ifdef _RAXML_VCF_DEBUG
+              printf("taxon: %s, SNV: %u, GL: ", msa.label(i).c_str(), j);
+              for (size_t k = 0; k < 10; ++k)
+                printf("%lf ", gt_g10[i * 10 + k]);
+              printf("\n");
+  #endif
+
               gtlh_below++;
               for (size_t k = 0; k < 10; ++k)
                 site_probs[k] = 1.;
@@ -645,7 +652,7 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
 #ifdef _RAXML_VCF_DEBUG
         if (!i)
         {
-          printf("gt: %c  probs: ", c);
+          printf("site: %u, gt: %c  probs: ", j, c);
           for (unsigned int k = 0; k < 10; ++k)
             printf("%s=%lf ", gt_inv_map[k], site_probs[k]);
           printf("\n");
