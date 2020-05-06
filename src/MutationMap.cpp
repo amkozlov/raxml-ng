@@ -31,7 +31,7 @@ void MutationMap::init(const AncestralStates& ancestral, const PartitionedMSA& p
       assert(seq1.length() == seq2.length());
       for (size_t j = 0; j < seq1.length(); ++j)
       {
-        if (seq1[j] != seq2[j])
+        if (seq1[j] != '-' && seq2[j] != '-' && seq1[j] != seq2[j])
           mut_list[branch_id].push_back(j);
       }
     }

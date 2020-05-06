@@ -79,6 +79,7 @@ MutationMapListStream& operator<<(MutationMapListStream& stream, const MutationM
   {
     const auto& branch_muts = mutmap.mut_list[i];
     stream << i << delim;
+    stream << branch_muts.size() << delim;
     for (size_t j = 0; j < branch_muts.size(); ++j)
     {
       auto m = branch_muts[j];
