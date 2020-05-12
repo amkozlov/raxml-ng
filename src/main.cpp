@@ -1329,10 +1329,8 @@ void init_ancestral(RaxmlInstance& instance)
   {
     assert(!instance.start_trees.empty());
 
-    const auto& parted_msa = *instance.parted_msa;
     const Tree& tree = instance.start_trees.at(0);
-
-    instance.ancestral_states = make_shared<AncestralStates>(tree.num_inner(), parted_msa);
+    instance.ancestral_states = make_shared<AncestralStates>(tree.num_inner(), instance.parted_msa);
   }
 }
 

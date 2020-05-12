@@ -9,15 +9,15 @@ AncestralStates::AncestralStates(size_t nodes, size_t states, size_t sites) :
   prob_eps = num_states > 0 ? 0.5 / num_states : 0.1;
 }
 
-AncestralStates::AncestralStates(size_t nodes, const PartitionedMSA& part_msa) :
-    num_nodes(nodes), ambiguity(true)
+AncestralStates::AncestralStates(size_t nodes, const std::shared_ptr<PartitionedMSA>& part_msa) :
+    parted_msa(part_msa), num_nodes(nodes), ambiguity(true)
 {
-  const Model& model = part_msa.part_info(0).model();
+  const Model& model = part_msa->part_info(0).model();
   num_states = model.num_states();
   state_names = model.state_names();
   state_namemap = model.full_state_namemap();
 
-  for (const auto& pinfo: part_msa.part_list())
+  for (const auto& pinfo: part_msa->part_list())
   {
     part_num_sites.push_back(pinfo.msa().num_sites());
     if (pinfo.model().data_type() != model.data_type())
@@ -49,22 +49,8 @@ size_t AncestralStates::num_parts() const
   return part_num_sites.size();
 }
 
-std::string AncestralStates::ml_state(size_t node_idx, size_t site_idx, size_t part_idx) const
+std::string AncestralStates::ml_state(doubleVector::const_iterator& prob) const
 {
-  if (part_idx >= part_num_sites.size())
-    throw runtime_error("AncestralStates: Partition index out of bounds");
-
-  if (node_idx >= num_nodes)
-    throw runtime_error("AncestralStates: Node index out of bounds");
-
-  if (site_idx >= part_num_sites[part_idx])
-    throw runtime_error("AncestralStates: Site index out of bounds");
-
-  const auto& probvec = probs.at(part_idx).at(node_idx);
-
-  assert(probvec.size() == part_num_sites[part_idx] * num_states);
-
-  auto prob = probvec.cbegin() + site_idx * num_states;
   size_t mstate = 0;
   for (size_t k = 1; k < num_states; ++k)
   {
@@ -88,6 +74,31 @@ std::string AncestralStates::ml_state(size_t node_idx, size_t site_idx, size_t p
     return PLL_STATE_POPCNT(astate) > 1 ? "-" : state_names[mstate];
 }
 
+const doubleVector& AncestralStates::node_prob_vector(size_t node_idx, size_t part_idx) const
+{
+  if (part_idx >= part_num_sites.size())
+    throw runtime_error("AncestralStates: Partition index out of bounds: " + to_string(part_idx));
+
+  if (node_idx >= num_nodes)
+    throw runtime_error("AncestralStates: Node index out of bounds");
+
+  const auto& probvec = probs.at(part_idx).at(node_idx);
+
+  assert(probvec.size() == part_num_sites[part_idx] * num_states);
+
+  return probvec;
+}
+
+std::string AncestralStates::ml_state(size_t node_idx, size_t site_idx, size_t part_idx) const
+{
+  if (site_idx >= part_num_sites[part_idx])
+    throw runtime_error("AncestralStates: Site index out of bounds");
+
+  const auto& probvec = node_prob_vector(node_idx, part_idx);
+  auto prob = probvec.cbegin() + site_idx * num_states;
+  return ml_state(prob);
+}
+
 std::string AncestralStates::ml_state_seq(const std::string& node_name, size_t part_idx) const
 {
   if (node_namemap.count(node_name))
@@ -98,15 +109,47 @@ std::string AncestralStates::ml_state_seq(const std::string& node_name, size_t p
 
 std::string AncestralStates::ml_state_seq(size_t node_idx, size_t part_idx) const
 {
-  string s;
+  const auto& probvec = node_prob_vector(node_idx, part_idx);
   auto num_sites = part_num_sites[part_idx];
 
-  s.reserve(num_sites);
+  return ml_state_seq(probvec, num_sites);
+}
 
+std::string AncestralStates::ml_state_seq(const doubleVector& probvec, size_t num_sites) const
+{
+  string s;
+  s.resize(num_sites);
+
+  auto prob = probvec.cbegin();
   for (size_t k = 0; k < num_sites; ++k)
-    s += ml_state(node_idx, k, part_idx);
+  {
+    s[k] = ml_state(prob)[0];
+    prob += num_states;
+  }
 
   return s;
+}
+
+std::string AncestralStates::ml_state_tipseq(const std::string& tip_name, size_t part_idx) const
+{
+  if (part_idx >= parted_msa->part_count())
+    throw runtime_error("AncestralStates: Partition index out of bounds: " + to_string(part_idx));
+
+  if (!parted_msa->taxon_id_map().count(tip_name))
+    throw runtime_error("AncestralStates: tip node not found: " + tip_name);
+
+  size_t taxon_id = parted_msa->taxon_id_map().at(tip_name);
+  const auto& pinfo = parted_msa->part_info(part_idx);
+  const auto& errm = pinfo.model().error_model();
+
+  if (errm)
+  {
+    doubleVector tmp_clv;
+    pinfo.fill_tip_clv(taxon_id, tmp_clv);
+    return ml_state_seq(tmp_clv, part_num_sites[part_idx]);
+  }
+  else
+    return pinfo.msa().at(taxon_id);
 }
 
 void assign_tree(AncestralStates& ancestral, const pllmod_ancestral_t& pll_ancestral)
@@ -160,6 +203,7 @@ void assign_probs(AncestralStates& ancestral, const pllmod_ancestral_t& pll_ance
     {
       double * probs = part_probs.at(n).data() + prob_offset;
       double * pll_probs = pll_ancestral.probs[n] + pll_offset;
+
       memcpy(probs, pll_probs, anc_span * sizeof(double));
     }
     pll_offset += anc_span;
