@@ -72,22 +72,20 @@ std::string AncestralStates::ml_state(size_t node_idx, size_t site_idx, size_t p
       mstate = k;
   }
 
-  if (ambiguity)
+  pll_state_t astate = 0;
+  pll_state_t state = 1;
+
+  for (size_t k = 0; k < num_states; ++k)
   {
-    pll_state_t astate = 0;
-    pll_state_t state = 1;
-
-    for (size_t k = 0; k < num_states; ++k)
-    {
-      if (prob[k] + prob_eps > prob[mstate])
-        astate |= state;
-      state <<= 1;
-    }
-
-    return state_namemap.count(astate) ? state_namemap.at(astate) : state_names[mstate];
+    if (prob[k] + prob_eps > prob[mstate])
+      astate |= state;
+    state <<= 1;
   }
+
+  if (ambiguity)
+    return state_namemap.count(astate) ? state_namemap.at(astate) : state_names[mstate];
   else
-    return state_names[mstate];  // TviODO: check for gap
+    return PLL_STATE_POPCNT(astate) > 1 ? "-" : state_names[mstate];
 }
 
 std::string AncestralStates::ml_state_seq(size_t node_idx, size_t part_idx) const
