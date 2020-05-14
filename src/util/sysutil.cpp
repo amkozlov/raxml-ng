@@ -337,6 +337,45 @@ unsigned int sysutil_simd_autodetect()
     return PLL_ATTRIB_ARCH_CPU;
 }
 
+static string get_cpuinfo(const string& key)
+{
+  string value = "(not found)";
+  ifstream fs("/proc/cpuinfo");
+  if (fs.good())
+  {
+    string line;
+    while (!fs.eof())
+    {
+      std::getline(fs, line, '\n');
+      if (strncmp(line.c_str(), key.c_str(), key.length()) == 0)
+      {
+        size_t offset = key.length();
+        while ((isspace(line[offset]) || line[offset] == ':') && offset < line.length())
+          offset++;
+        value = line.c_str() + offset;
+        break;
+      }
+    }
+  }
+
+  return value;
+}
+
+string sysutil_get_cpu_model()
+{
+  string model = "unknown CPU";
+#if defined(__linux__)
+  model = get_cpuinfo("model name");
+#elif defined(__APPLE__)
+  char str[256];
+  size_t len = 256;
+  if (sysctlbyname("machdep.cpu.brand_string", &str, &len, NULL, 0) == 0)
+    model = str;
+#endif
+  return model;
+}
+
+
 std::string sysutil_realpath(const std::string& path)
 {
   char * real_path = realpath(path.c_str(), NULL);

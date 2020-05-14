@@ -147,6 +147,11 @@ void print_banner()
   LOG_INFO << "Latest version: https://github.com/amkozlov/raxml-ng" << endl;
   LOG_INFO << "Questions/problems/suggestions? "
               "Please visit: https://groups.google.com/forum/#!forum/raxml" << endl << endl;
+
+  LOG_INFO << "System: " << sysutil_get_cpu_model() << ", ";
+  LOG_INFO << sysutil_get_cpu_cores() << " cores, ";
+  LOG_INFO << sysutil_get_memtotal() / (1024*1024*1024) << " GB RAM";
+  LOG_INFO << endl << endl;
 }
 
 void init_part_info(RaxmlInstance& instance)
