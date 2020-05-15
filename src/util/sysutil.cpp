@@ -114,7 +114,7 @@ unsigned long sysutil_get_memused()
 #endif
 }
 
-unsigned long sysutil_get_memtotal()
+unsigned long sysutil_get_memtotal(bool ignore_errors)
 {
 #if defined(_SC_PHYS_PAGES) && defined(_SC_PAGESIZE)
 
@@ -122,7 +122,12 @@ unsigned long sysutil_get_memtotal()
   long pagesize = sysconf(_SC_PAGESIZE);
 
   if ((phys_pages == -1) || (pagesize == -1))
-    sysutil_fatal("Cannot determine amount of RAM");
+  {
+    if (ignore_errors)
+      return 0;
+    else
+      throw runtime_error("Cannot determine amount of RAM");
+  }
 
   // sysconf(3) notes that pagesize * phys_pages can overflow, such as
   // when long is 32-bits and there's more than 4GB RAM.  Since vsearch
@@ -140,14 +145,24 @@ unsigned long sysutil_get_memtotal()
   int64_t ram = 0;
   size_t length = sizeof(ram);
   if(-1 == sysctl(mib, 2, &ram, &length, NULL, 0))
-    sysutil_fatal("Cannot determine amount of RAM");
+  {
+    if (ignore_errors)
+      return 0;
+    else
+      throw runtime_error("Cannot determine amount of RAM");
+  }
   return ram;
 
 #else
 
   struct sysinfo si;
   if (sysinfo(&si))
-    sysutil_fatal("Cannot determine amount of RAM");
+  {
+    if (ignore_errors)
+      return 0;
+    else
+      throw runtime_error("Cannot determine amount of RAM");
+  }
   return si.totalram * si.mem_unit;
 
 #endif

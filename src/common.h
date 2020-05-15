@@ -36,7 +36,7 @@ void libpll_reset_error();
 double sysutil_gettime();
 void sysutil_show_rusage();
 unsigned long sysutil_get_memused();
-unsigned long sysutil_get_memtotal();
+unsigned long sysutil_get_memtotal(bool ignore_errors = true);
 
 std::string sysutil_get_cpu_model();
 unsigned int sysutil_get_cpu_cores();
