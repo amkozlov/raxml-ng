@@ -118,6 +118,7 @@ public:
   const pll_unode_t& pll_utree_root() const { return *_pll_utree->vroot; }
   bool empty() const { return _num_tips == 0; }
 
+  void fix_outbound_brlens(double min_brlen, double max_brlen);
   void fix_missing_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
   void reset_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
   void apply_partition_brlens(size_t partition_idx);

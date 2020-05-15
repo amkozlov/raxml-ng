@@ -314,6 +314,13 @@ void Tree::reset_tip_ids(const NameIdMap& label_id_map)
   }
 }
 
+void Tree::fix_outbound_brlens(double min_brlen, double max_brlen)
+{
+  for (auto n: subnodes())
+  {
+    n->length = std::max(min_brlen, std::min(n->length, max_brlen));
+  }
+}
 
 void Tree::fix_missing_brlens(double new_brlen)
 {

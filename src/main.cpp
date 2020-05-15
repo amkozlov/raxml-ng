@@ -925,8 +925,9 @@ void load_parted_msa(RaxmlInstance& instance)
 
 void prepare_tree(const RaxmlInstance& instance, Tree& tree)
 {
-  /* fix missing branch lengths */
+  /* fix missing & outbound branch lengths */
   tree.fix_missing_brlens();
+  tree.fix_outbound_brlens(instance.opts.brlen_min, instance.opts.brlen_max);
 
   /* make sure tip indices are consistent between MSA and pll_tree */
   assert(!instance.parted_msa->taxon_id_map().empty());
