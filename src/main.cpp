@@ -807,7 +807,7 @@ void check_options(RaxmlInstance& instance)
           throw runtime_error("Too few patterns per thread! "
                               "RAxML-NG will terminate now to avoid wasting resources.\n"
                               "NOTE:  Please reduce the number of threads (see guidelines above).\n"
-                              "NOTE:  This check can be disabled with the '--force' option.");
+                              "NOTE:  This check can be disabled with the '--force perf_threads' option.");
         }
       }
     }
@@ -825,6 +825,35 @@ void check_options(RaxmlInstance& instance)
 
   /* make sure we do not check for convergence too often in coarse-grained parallelization mode */
   instance.opts.bootstop_interval = std::max(opts.bootstop_interval, opts.num_workers*2);
+}
+
+void check_oversubscribe(RaxmlInstance& instance)
+{
+  const auto& opts = instance.opts;
+  if (opts.safety_checks.isset(SafetyCheck::perf_threads))
+  {
+    size_t iters = 100;
+    auto start = global_timer().elapsed_seconds();
+    for (size_t i = 0; i < iters; ++i)
+       ParallelContext::global_barrier();
+
+    if (ParallelContext::master())
+    {
+      double sync_time = 1000. * (global_timer().elapsed_seconds() - start) / iters;
+
+      LOG_DEBUG << endl << "BARRIER time: " << FMT_PREC6(sync_time) << " ms" << endl;
+
+      /* empirical threshold: >5ms per barrier looks suspicious */
+      if (sync_time > 5. + 0.1 * log2(ParallelContext::num_nodes()))
+      {
+          throw runtime_error("CPU core oversubscription detected! "
+                              "RAxML-NG will terminate now to avoid wasting resources.\n"
+                              "NOTE:  Details: https://github.com/amkozlov/raxml-ng/wiki/Parallelization#core-oversubscription\n"
+                              "NOTE:  You can use '--force perf_threads' to disable this check, "
+                              "but ONLY if you are 200% sure this is a false alarm!");
+      }
+    }
+  }
 }
 
 void load_msa(RaxmlInstance& instance)
@@ -2486,6 +2515,8 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
   ParallelContext::global_barrier();
 
   auto const& opts = instance.opts;
+
+  check_oversubscribe(instance);
 
   if ((opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate || opts.command == Command::ancestral) &&

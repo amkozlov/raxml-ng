@@ -71,6 +71,7 @@ public:
   static size_t threads_per_group() { return num_procs() / _num_groups; }
   static size_t ranks_per_group() { return _num_ranks / _num_groups; }
 
+  static void parallel_reduce(double * data, size_t size, int op);
   static void parallel_reduce_cb(void * context, double * data, size_t size, int op);
   static void thread_reduce(double * data, size_t size, int op);
   static void thread_broadcast(size_t source_id, void * data, size_t size);
@@ -173,7 +174,6 @@ private:
   static void start_thread(size_t thread_id, size_t local_thread_id,
                            ThreadGroup& thread_grp,
                            const std::function<void()>& thread_main);
-  static void parallel_reduce(double * data, size_t size, int op);
   static void detect_num_nodes();
 };
 
