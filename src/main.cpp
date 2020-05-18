@@ -2927,7 +2927,10 @@ extern "C" int dll_main(int argc, char** argv, void* comm)
 
 int main(int argc, char** argv)
 {
-  return internal_main(argc, argv, 0);
+  auto old_wh = sysutil_get_energy();
+  auto retval = internal_main(argc, argv, 0);
+  LOG_INFO << "Energy consumed: " << sysutil_get_energy() - old_wh << " Wh" << endl;
+  return retval;
 }
 
 #endif

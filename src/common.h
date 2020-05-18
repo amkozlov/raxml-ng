@@ -43,6 +43,8 @@ unsigned int sysutil_get_cpu_cores();
 unsigned long sysutil_get_cpu_features();
 unsigned int sysutil_simd_autodetect();
 
+double sysutil_get_energy();
+
 const SystemTimer& global_timer();
 std::string sysutil_fmt_time(const time_t& t);
 

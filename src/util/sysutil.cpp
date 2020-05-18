@@ -390,6 +390,33 @@ string sysutil_get_cpu_model()
   return model;
 }
 
+double sysutil_get_energy()
+{
+  double energy = 0;
+  size_t max_packages = 32;
+  try
+  {
+    for(size_t i = 0; i < max_packages; i++)
+    {
+      double pkg_energy;
+      auto fname = "/sys/class/powercap/intel-rapl/intel-rapl:" + to_string(i) + "/energy_uj";
+      if (!sysutil_file_exists(fname))
+        break;
+      ifstream fs(fname);
+      fs >> pkg_energy;
+      energy += pkg_energy;
+    }
+    energy /= 1e6; // convert to Joules
+    energy /= 3600; // convert to Wh
+    return energy;
+  }
+  catch(const std::runtime_error& e)
+  {
+    printf("Error getting energy: %s\n", e.what());
+    return 0;
+  }
+}
+
 
 std::string sysutil_realpath(const std::string& path)
 {
