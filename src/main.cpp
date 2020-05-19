@@ -734,6 +734,10 @@ void check_options_early(Options& opts)
                         "NOTE:  Multiple MPI ranks per worker are not allowed in coarse-grained mode.\n");
   }
 
+  /* writing interim result files is not supported in coarse+MPI mode -> too much hassle */
+  if (opts.coarse() && opts.num_ranks > 1)
+    opts.write_interim_results = false;
+
   if (opts.command == Command::ancestral)
   {
     if (opts.use_pattern_compression)
@@ -2762,6 +2766,9 @@ int internal_main(int argc, char** argv, void* comm)
     {
       LOG_WARN << "WARNING: Running in REDO mode: existing checkpoints are ignored, "
           "and all result files will be overwritten!" << endl << endl;
+
+      if (ParallelContext::master())
+        opts.remove_tmp_files();
     }
 
     if (opts.force_mode)
@@ -2902,9 +2909,12 @@ int internal_main(int argc, char** argv, void* comm)
     if (ParallelContext::master_rank())
       print_final_output(instance, cm.checkp_file());
 
-    /* analysis finished successfully, remove checkpoint file */
+    /* analysis finished successfully, remove checkpoint and temp files */
     if (ParallelContext::group_master_rank())
+    {
       cm.remove();
+      opts.remove_tmp_files();
+    }
   }
   catch(exception& e)
   {
@@ -2929,7 +2939,9 @@ int main(int argc, char** argv)
 {
   auto old_wh = sysutil_get_energy();
   auto retval = internal_main(argc, argv, 0);
-  LOG_INFO << "Energy consumed: " << sysutil_get_energy() - old_wh << " Wh" << endl;
+  auto used_wh = sysutil_get_energy() - old_wh;
+  if (used_wh > 0.)
+    LOG_INFO << "Energy consumed: " << sysutil_get_energy() - old_wh << " Wh" << endl;
   return retval;
 }
 

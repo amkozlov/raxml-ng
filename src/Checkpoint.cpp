@@ -20,20 +20,58 @@ Tree CheckpointFile::tree() const
 MLTree CheckpointFile::best_tree() const
 {
   MLTree result;
+  result.loglh = -INFINITY;
+  result.tree = tree();
+  for (const auto& ckp: checkp_list)
+  {
+    if (ckp.tree_index > 0 && ckp.loglh() > result.loglh)
+    {
+      result.loglh = ckp.loglh();
+      result.tree = ckp.tree;
+    }
+  }
+
   if (!ml_trees.empty())
   {
     auto best = ml_trees.best()->second;
-    result.loglh = best.first;
-    result.tree = tree();
-    result.tree.topology(best.second);
-    result.models = best_models;
-  }
-  else
-  {
-    result.loglh = -INFINITY;
-    result.tree = tree();
+    if (best.first > result.loglh)
+    {
+      result.loglh = best.first;
+      result.tree.topology(best.second);
+      result.models = best_models;
+    }
   }
   return result;
+}
+
+void CheckpointFile::write_tmp_tree(const Tree& tree, const std::string fname, bool append) const
+{
+  if (ParallelContext::master())
+  {
+    if (opts.write_interim_results)
+    {
+      auto mode = ios::out;
+      if (append)
+        mode |= ios::app;
+      NewickStream ns(fname, mode);
+      ns << tree;
+    }
+  }
+}
+
+void CheckpointFile::write_tmp_best_tree() const
+{
+  write_tmp_tree(best_tree().tree, opts.tmp_best_tree_file());
+}
+
+void CheckpointFile::write_tmp_ml_tree(const Tree& tree) const
+{
+  write_tmp_tree(tree, opts.tmp_ml_trees_file(), true);
+}
+
+void CheckpointFile::write_tmp_bs_tree(const Tree& tree) const
+{
+  write_tmp_tree(tree, opts.tmp_bs_trees_file(), true);
 }
 
 CheckpointManager::CheckpointManager(const Options& opts) :
@@ -174,6 +212,8 @@ void CheckpointManager::save_ml_tree()
 
     if (_active)
       write();
+
+    _checkp_file.write_tmp_ml_tree(ckp.tree);
   }
 }
 
@@ -195,6 +235,8 @@ void CheckpointManager::save_bs_tree()
 
     if (_active)
       write();
+
+    _checkp_file.write_tmp_bs_tree(ckp.tree);
   }
 }
 
@@ -229,6 +271,8 @@ void CheckpointManager::update_and_write(const TreeInfo& treeinfo)
     assign_tree(ckp, treeinfo);
     if (_active)
       write();
+
+    _checkp_file.write_tmp_best_tree();
   }
 }
 

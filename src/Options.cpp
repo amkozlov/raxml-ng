@@ -7,7 +7,7 @@ Options::Options() : cmdline(""), command(Command::none), use_tip_inner(true),
 use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false), use_repeats(true),
 use_rba_partload(true),
 optimize_model(true), optimize_brlen(true), force_mode(false), safety_checks(SafetyCheck::all),
-redo_mode(false), nofiles_mode(false), log_level(LogLevel::progress),
+redo_mode(false), nofiles_mode(false), write_interim_results(true), log_level(LogLevel::progress),
 msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
 random_seed(0), start_trees(), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
 spr_cutoff(1.0),
@@ -57,6 +57,9 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.asr_tree, "ancestralTree");
   set_default_outfile(outfile_names.asr_probs, "ancestralProbs");
   set_default_outfile(outfile_names.asr_states, "ancestralStates");
+  set_default_outfile(outfile_names.tmp_best_tree, "lastTree.TMP");
+  set_default_outfile(outfile_names.tmp_ml_trees, "mlTrees.TMP");
+  set_default_outfile(outfile_names.tmp_bs_trees, "bootstraps.TMP");
 }
 
 std::string Options::checkp_file() const
@@ -138,36 +141,23 @@ void Options::remove_result_files() const
   if (command == Command::search || command == Command::all ||
       command == Command::evaluate)
   {
-    if (sysutil_file_exists(best_tree_file()))
-      std::remove(best_tree_file().c_str());
-    if (sysutil_file_exists(best_model_file()))
-      std::remove(best_model_file().c_str());
-    if (sysutil_file_exists(partition_trees_file()))
-      std::remove(partition_trees_file().c_str());
+    sysutil_file_remove(best_tree_file());
+    sysutil_file_remove(best_model_file());
+    sysutil_file_remove(partition_trees_file());
+    sysutil_file_remove(ml_trees_file());
   }
 
   if (command == Command::bootstrap || command == Command::all)
-  {
-    if (sysutil_file_exists(bootstrap_trees_file()))
-      std::remove(bootstrap_trees_file().c_str());
-  }
+    sysutil_file_remove(bootstrap_trees_file());
+
   if (command == Command::support || command == Command::all)
-  {
-    if (sysutil_file_exists(support_tree_file()))
-      std::remove(support_tree_file().c_str());
-  }
+    sysutil_file_remove(support_tree_file());
 
   if (command == Command::terrace)
-  {
-    if (sysutil_file_exists(terrace_file()))
-      std::remove(terrace_file().c_str());
-  }
+    sysutil_file_remove(terrace_file());
 
   if (command == Command::start)
-  {
-    if (sysutil_file_exists(start_tree_file()))
-      std::remove(start_tree_file().c_str());
-  }
+    sysutil_file_remove(start_tree_file());
 
   if (command == Command::bsmsa)
   {
@@ -177,8 +167,7 @@ void Options::remove_result_files() const
       std::remove(bootstrap_msa_file(bsnum).c_str());
       bsnum++;
     }
-    if (sysutil_file_exists(bootstrap_partition_file()))
-      std::remove(bootstrap_partition_file().c_str());
+    sysutil_file_remove(bootstrap_partition_file());
   }
 
   if (command == Command::rfdist)
@@ -193,7 +182,13 @@ void Options::remove_result_files() const
     sysutil_file_remove(asr_probs_file());
     sysutil_file_remove(asr_states_file());
   }
+}
 
+void Options::remove_tmp_files() const
+{
+  sysutil_file_remove(tmp_best_tree_file());
+  sysutil_file_remove(tmp_ml_trees_file());
+  sysutil_file_remove(tmp_bs_trees_file());
 }
 
 string Options::simd_arch_name() const

@@ -57,7 +57,7 @@ static struct option long_options[] =
   {"blmax",              required_argument, 0, 0 },  /*  37 */
 
   {"tree-constraint",    required_argument, 0, 0 },  /*  38 */
-  {"nofiles",            no_argument,       0, 0 },  /*  39 */
+  {"nofiles",            optional_argument, 0, 0 },  /*  39 */
   {"start",              no_argument,       0, 0 },  /*  40 */
   {"loglh",              no_argument,       0, 0 },  /*  41 */
   {"precision",          required_argument, 0, 0 },  /*  42 */
@@ -680,7 +680,21 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.constraint_tree_file = optarg;
         break;
       case 39: /* no output files (only console output) */
-        opts.nofiles_mode = true;
+        if (!optarg || strlen(optarg) == 0)
+        {
+          opts.nofiles_mode = true;
+        }
+        else
+        {
+          auto files = split_string(optarg, ',');
+          for (const auto& f: files)
+          {
+            if (f == "interim")
+              opts.write_interim_results = false;
+            else
+              throw InvalidOptionValueException("Invalid --nofiles option: " + f);
+          }
+        }
         break;
       case 40: /* start tree generation */
         opts.command = Command::start;
@@ -759,7 +773,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
             else if (eopt == "rba-nopartload")
               opts.use_rba_partload = false;
             else
-              throw InvalidOptionValueException("Unknown extra option: " + string(optarg));
+              throw InvalidOptionValueException("Unknown extra option: " + string(eopt));
           }
         }
         break;

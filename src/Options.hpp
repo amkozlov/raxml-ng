@@ -26,6 +26,9 @@ struct OutputFileNames
   std::string asr_tree;
   std::string asr_probs;
   std::string asr_states;
+  std::string tmp_best_tree;
+  std::string tmp_ml_trees;
+  std::string tmp_bs_trees;
 };
 
 class Options
@@ -57,6 +60,7 @@ public:
 
   bool redo_mode;
   bool nofiles_mode;
+  bool write_interim_results;
 
   LogLevel log_level;
   FileFormat msa_format;
@@ -131,10 +135,15 @@ public:
   const std::string asr_probs_file() const { return outfile_names.asr_probs; }
   const std::string asr_states_file() const { return outfile_names.asr_states; }
 
+  const std::string tmp_best_tree_file() const { return outfile_names.tmp_best_tree; }
+  const std::string tmp_ml_trees_file() const { return outfile_names.tmp_ml_trees; }
+  const std::string tmp_bs_trees_file() const { return outfile_names.tmp_bs_trees; }
+
   void set_default_outfiles();
 
   bool result_files_exist() const;
   void remove_result_files() const;
+  void remove_tmp_files() const;
 
 private:
   void set_default_outfile(std::string& fname, const std::string& suffix);

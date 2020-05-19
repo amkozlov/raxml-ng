@@ -77,6 +77,11 @@ struct CheckpointFile
 
   MLTree best_tree() const;
   Tree tree() const;
+
+  void write_tmp_tree(const Tree& tree, const std::string fname, bool append = false) const;
+  void write_tmp_best_tree() const;
+  void write_tmp_ml_tree(const Tree& tree) const;
+  void write_tmp_bs_tree(const Tree& tree) const;
 };
 
 class CheckpointManager
