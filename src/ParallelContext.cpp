@@ -97,6 +97,8 @@ static void pin_thread(size_t core_id, pthread_t thread)
   if (rc != 0)
     std::cerr << "Error calling pthread_setaffinity_np: " << rc << "\n";
 #else
+  RAXML_UNUSED(core_id);
+  RAXML_UNUSED(thread);
   LOG_WARN << "WARNING: Thread pinning is not supported on non-Linux systems!" << std::endl;
 #endif
 }

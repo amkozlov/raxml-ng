@@ -22,7 +22,7 @@ extern "C" {
 #include "constants.hpp"
 #include "ParallelContext.hpp"
 #include "log.hpp"
-#include "SystemTimer.hpp"
+#include "util/SystemTimer.hpp"
 
 /* used to suppress compiler warnings about unused args */
 #define RAXML_UNUSED(expr) (void)(expr)

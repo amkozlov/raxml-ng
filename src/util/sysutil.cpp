@@ -177,11 +177,6 @@ static void get_cpuid(int32_t out[4], int32_t x)
 #endif
 }
 
-static std::string build_path(size_t cpu_number)
-{
-  return "/sys/devices/system/cpu/cpu" + to_string(cpu_number) + "/topology/";
-}
-
 size_t read_id_from_file(const std::string &filename)
 {
   ifstream f(filename);
@@ -220,7 +215,7 @@ int get_physical_core_count(size_t n_cpu)
   unordered_set<size_t> cores;
   for (size_t i = 0; i < n_cpu; ++i)
   {
-    string cpu_path = build_path(i);
+    string cpu_path = "/sys/devices/system/cpu/cpu" + to_string(i) + "/topology/";
     size_t core_id = get_core_id(cpu_path);
     size_t node_id = get_numa_node_id(cpu_path);
     size_t uniq_core_id = (node_id << 16) + core_id;
@@ -352,7 +347,8 @@ unsigned int sysutil_simd_autodetect()
     return PLL_ATTRIB_ARCH_CPU;
 }
 
-static string get_cpuinfo(const string& key)
+#if defined(__linux__)
+static string get_cpuinfo_linux(const string& key)
 {
   string value = "(not found)";
   ifstream fs("/proc/cpuinfo");
@@ -375,12 +371,13 @@ static string get_cpuinfo(const string& key)
 
   return value;
 }
+#endif
 
 string sysutil_get_cpu_model()
 {
   string model = "unknown CPU";
 #if defined(__linux__)
-  model = get_cpuinfo("model name");
+  model = get_cpuinfo_linux("model name");
 #elif defined(__APPLE__)
   char str[256];
   size_t len = 256;
