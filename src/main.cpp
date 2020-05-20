@@ -1101,19 +1101,20 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
     instance.run_phase = (ckpfile.ml_trees.size() >= instance.opts.num_searches) ?
         RaxmlRunPhase::bootstrap : RaxmlRunPhase::mlsearch;
 
-    if (ParallelContext::num_ranks() > 1)
+    ParallelContext::mpi_broadcast(instance.run_phase);
+
+    /* gather in-progress tree ids */
+    auto& in_work_trees = instance.run_phase == RaxmlRunPhase::bootstrap ?
+        instance.done_bs_trees : instance.done_ml_trees;
+    for (auto& c: ckpfile.checkp_list)
     {
-      ParallelContext::mpi_broadcast(instance.run_phase);
+      if (c.tree_index > 0)
+        in_work_trees.insert(c.tree_index);
+    }
 
-      /* gather in-progress tree ids */
-      auto& in_work_trees = instance.run_phase == RaxmlRunPhase::bootstrap ?
-          instance.done_bs_trees : instance.done_ml_trees;
-      for (auto& c: ckpfile.checkp_list)
-      {
-        if (c.tree_index > 0)
-          in_work_trees.insert(c.tree_index);
-      }
-
+    /* in coarse+MPI mode, collect in-progress tree ids from all ranks */
+    if (instance.opts.coarse() && ParallelContext::num_ranks() > 1)
+    {
       auto worker_cb = [&in_work_trees](void * buf, size_t buf_size) -> int
           {
             return (int) BinaryStream::serialize((char*) buf, buf_size, in_work_trees);
@@ -1132,6 +1133,7 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
       ParallelContext::mpi_gather_custom(worker_cb, master_cb);
     }
 
+    /* add in-progress tree ids to the "done" list, to exclude them from coarse load balancing */
     if (ParallelContext::master())
     {
       for (const auto& p: ckpfile.ml_trees)
