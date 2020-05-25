@@ -2942,7 +2942,7 @@ int main(int argc, char** argv)
   auto old_wh = sysutil_get_energy();
   auto retval = internal_main(argc, argv, 0);
   auto used_wh = sysutil_get_energy() - old_wh;
-  if (used_wh > 0.)
+  if (used_wh > 0.1)
     LOG_INFO << "Energy consumed: " << sysutil_get_energy() - old_wh << " Wh" << endl;
   return retval;
 }

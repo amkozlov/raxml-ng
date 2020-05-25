@@ -11,7 +11,6 @@ void Checkpoint::reset_search_state()
   search_state = SearchState();
 };
 
-// TOOD: fix!
 Tree CheckpointFile::tree() const
 {
   return checkp_list.at(0).tree;
@@ -22,14 +21,6 @@ MLTree CheckpointFile::best_tree() const
   MLTree result;
   result.loglh = -INFINITY;
   result.tree = tree();
-  for (const auto& ckp: checkp_list)
-  {
-    if (ckp.tree_index > 0 && ckp.loglh() > result.loglh)
-    {
-      result.loglh = ckp.loglh();
-      result.tree = ckp.tree;
-    }
-  }
 
   if (!ml_trees.empty())
   {
@@ -41,41 +32,53 @@ MLTree CheckpointFile::best_tree() const
       result.models = best_models;
     }
   }
+
+  for (const auto& ckp: checkp_list)
+  {
+    if (ckp.tree_index > 0 && ckp.last_loglh > result.loglh)
+    {
+      result.loglh = ckp.last_loglh;
+      result.tree = ckp.tree;
+//      printf("New best tree: %u, loglh: %lf\n ", ckp.tree_index, ckp.last_loglh);
+    }
+  }
+
   return result;
 }
 
 void CheckpointFile::write_tmp_tree(const Tree& tree, const std::string fname, bool append) const
 {
-  if (ParallelContext::master())
+  if (ParallelContext::group_master())
   {
-    if (opts.write_interim_results)
-    {
       auto mode = ios::out;
       if (append)
         mode |= ios::app;
       NewickStream ns(fname, mode);
       ns << tree;
-    }
   }
 }
 
 void CheckpointFile::write_tmp_best_tree() const
 {
-  write_tmp_tree(best_tree().tree, opts.tmp_best_tree_file());
+  /* NB: do not print last-best tree in bootstrapping stage! */
+  if (opts.write_interim_results && ml_trees.size() < opts.num_searches)
+    write_tmp_tree(best_tree().tree, opts.tmp_best_tree_file());
 }
 
 void CheckpointFile::write_tmp_ml_tree(const Tree& tree) const
 {
-  write_tmp_tree(tree, opts.tmp_ml_trees_file(), true);
+  if (opts.write_interim_results)
+    write_tmp_tree(tree, opts.tmp_ml_trees_file(), true);
 }
 
 void CheckpointFile::write_tmp_bs_tree(const Tree& tree) const
 {
-  write_tmp_tree(tree, opts.tmp_bs_trees_file(), true);
+  if (opts.write_interim_results)
+    write_tmp_tree(tree, opts.tmp_bs_trees_file(), true);
 }
 
 CheckpointManager::CheckpointManager(const Options& opts) :
-    _active(true), _ckp_fname(opts.checkp_file())
+    _active(opts.nofiles_mode ? false : true), _ckp_fname(opts.checkp_file())
 {
   _checkp_file.opts = opts;
 }
@@ -109,10 +112,13 @@ void CheckpointManager::init_checkpoints(const Tree& tree, const ModelCRefMap& m
 
 void CheckpointManager::write(const std::string& ckp_fname) const
 {
+  /* MPI+coarse mode -> master thread in each rank writes rank-specific ckp file
+   * otherwise -> only master thread in master rank writes global ckp file
+   * */
   if (ParallelContext::master() ||
-      (ParallelContext::group_master() && ParallelContext::num_groups() > 1))
+      (ParallelContext::master_thread() && ParallelContext::coarse_mpi()))
   {
-  //  printf("write ckp rank=%lu\n", ParallelContext::rank_id());
+//    printf("write ckp rank=%lu\n", ParallelContext::rank_id());
 
     backup();
 
@@ -167,12 +173,7 @@ void CheckpointManager::remove_backup() const
 
 SearchState& CheckpointManager::search_state()
 {
-  if (_active)
-    return checkpoint().search_state;
-  else
-  {
-    return _empty_search_state;
-  }
+  return checkpoint().search_state;
 };
 
 void CheckpointManager::reset_search_state()
@@ -180,12 +181,7 @@ void CheckpointManager::reset_search_state()
   ParallelContext::thread_barrier();
 
   if (ParallelContext::group_master_thread())
-  {
-    if (_active)
-      checkpoint().reset_search_state();
-    else
-      _empty_search_state = SearchState();
-  }
+    checkpoint().reset_search_state();
 
   ParallelContext::thread_barrier();
 };
@@ -252,7 +248,7 @@ void CheckpointManager::update_and_write(const TreeInfo& treeinfo)
   for (auto p: treeinfo.parts_master())
   {
     /* we will modify a global map -> define critical section */
-    ParallelContext::GroupLock lock;
+    ParallelContext::UniqueLock lock;
 
     assign(ckp.models.at(p), treeinfo, p);
 
@@ -268,7 +264,9 @@ void CheckpointManager::update_and_write(const TreeInfo& treeinfo)
 
   if (ParallelContext::group_master())
   {
+    ParallelContext::UniqueLock lock;
     assign_tree(ckp, treeinfo);
+    ckp.last_loglh = ckp.search_state.loglh;
     if (_active)
       write();
 

@@ -70,6 +70,7 @@ public:
   static size_t ranks_per_node() { return _num_ranks / _num_nodes; }
   static size_t threads_per_group() { return num_procs() / _num_groups; }
   static size_t ranks_per_group() { return _num_ranks / _num_groups; }
+  static bool coarse_mpi() { return _num_ranks > 1 && _num_groups > 1; }
 
   static void parallel_reduce(double * data, size_t size, int op);
   static void parallel_reduce_cb(void * context, double * data, size_t size, int op);

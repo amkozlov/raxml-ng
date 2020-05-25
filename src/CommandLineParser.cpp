@@ -683,6 +683,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         if (!optarg || strlen(optarg) == 0)
         {
           opts.nofiles_mode = true;
+          opts.write_interim_results = false;
         }
         else
         {

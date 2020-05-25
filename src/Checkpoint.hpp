@@ -43,7 +43,7 @@ struct SearchState
 
 struct Checkpoint
 {
-  Checkpoint() : search_state(), tree_index(0), tree(), models() {}
+  Checkpoint() : search_state(), tree_index(0), tree(), models(), last_loglh(0.) {}
 
   Checkpoint(const Checkpoint&) = default;
   Checkpoint& operator=(const Checkpoint&) = default;
@@ -55,6 +55,7 @@ struct Checkpoint
   size_t tree_index;
   Tree tree;
   ModelMap models;
+  double last_loglh;
 
   double loglh() const { return search_state.loglh; }
 
