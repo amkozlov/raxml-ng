@@ -2211,6 +2211,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
   }
 
   auto used_wh = global_energy_monitor.consumed_wh();
+  used_wh += checkp.consumed_wh;
   if (used_wh > 0.1)
   {
     LOG_INFO << endl << endl;

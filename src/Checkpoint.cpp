@@ -3,6 +3,7 @@
 #include "Checkpoint.hpp"
 #include "io/binary_io.hpp"
 #include "io/file_io.hpp"
+#include "util/EnergyMonitor.hpp"
 
 using namespace std;
 
@@ -407,6 +408,8 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const CheckpointFile& c
   // NB: accumulated runtime from past runs + current elapsed time
   stream << ckpfile.elapsed_seconds + global_timer().elapsed_seconds();
 
+  stream << ckpfile.consumed_wh + global_energy_monitor.consumed_wh(false);
+
   stream << ckpfile.opts;
 
   stream << ckpfile.checkp_list;
@@ -431,7 +434,12 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, CheckpointFile& ckpfile
 
   stream >> ckpfile.elapsed_seconds;
 
-  stream >> ckpfile.opts;
+  if (ckpfile.version > 3)
+  {
+    stream >> ckpfile.consumed_wh;
+
+    stream >> ckpfile.opts;
+  }
 
   {
     // we should take special care in case number of workers has been changed after restart:

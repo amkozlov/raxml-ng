@@ -405,8 +405,9 @@ void ParallelContext::parallel_reduce(double * data, size_t size, int op)
 
 void ParallelContext::parallel_reduce_cb(void * context, double * data, size_t size, int op)
 {
-  ParallelContext::parallel_reduce(data, size, op);
   RAXML_UNUSED(context);
+  if (ParallelContext::threads_per_group() > 1)
+    ParallelContext::parallel_reduce(data, size, op);
   if (master_thread())
     global_energy_monitor.update(10.);
 }

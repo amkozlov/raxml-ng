@@ -5,7 +5,7 @@
 #include "TreeInfo.hpp"
 #include "io/binary_io.hpp"
 
-constexpr int RAXML_CKP_VERSION = 3;
+constexpr int RAXML_CKP_VERSION = 4;
 constexpr int RAXML_CKP_MIN_SUPPORTED_VERSION = 3;
 
 struct MLTree
@@ -64,10 +64,11 @@ struct Checkpoint
 
 struct CheckpointFile
 {
-  CheckpointFile() : version(RAXML_CKP_VERSION), elapsed_seconds(0.) {}
+  CheckpointFile() : version(RAXML_CKP_VERSION), elapsed_seconds(0.), consumed_wh(0.) {}
 
   int version;
   double elapsed_seconds;
+  double consumed_wh;
   Options opts;
 
   std::vector<Checkpoint> checkp_list;

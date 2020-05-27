@@ -18,8 +18,8 @@ class EnergyMonitor
 public:
   EnergyMonitor ();
 
-  double consumed_wh();
-  double consumed_joules();
+  double consumed_wh(bool do_update = true);
+  double consumed_joules(bool do_update = true);
 
   void reset();
   void update(double interval = 0.);
@@ -32,7 +32,7 @@ private:
   bool _active;
   std::vector<RAPLPackage> _pkg_list;
   double _consumed_joules;
-  double last_update_ts;
+  time_t _last_update_ts;
 
   bool add_package(RAPLPackage& pkg);
   void init_packages();
