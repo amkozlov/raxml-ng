@@ -773,6 +773,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.tbe_naive = false;
             else if (eopt == "rba-nopartload")
               opts.use_rba_partload = false;
+            else if (eopt == "energy-off")
+              opts.use_energy_monitor = false;
             else
               throw InvalidOptionValueException("Unknown extra option: " + string(eopt));
           }

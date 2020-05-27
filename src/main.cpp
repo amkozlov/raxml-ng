@@ -44,6 +44,7 @@
 #include "autotune/ResourceEstimator.hpp"
 #include "ICScoreCalculator.hpp"
 #include "topology/RFDistCalculator.hpp"
+#include "util/EnergyMonitor.hpp"
 
 #ifdef _RAXML_TERRAPHAST
 #include "terraces/TerraceWrapper.hpp"
@@ -2209,6 +2210,20 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
         " seconds (total with restarts)";
   }
 
+  auto used_wh = global_energy_monitor.consumed_wh();
+  if (used_wh > 0.1)
+  {
+    LOG_INFO << endl << endl;
+    LOG_INFO << "Energy consumed: " << used_wh << " Wh";
+    if (used_wh > 200.)
+    {
+      size_t km_car = round(used_wh / 200.);
+      size_t km_scooter = round(used_wh / 35.);
+      LOG_INFO << " (= " << km_car << " km in an electric car, or "
+               << km_scooter << " km with an e-scooter!)";
+    }
+  }
+
   LOG_INFO << endl << endl;
 }
 
@@ -2764,6 +2779,9 @@ int internal_main(int argc, char** argv, void* comm)
 
     check_options_early(opts);
 
+    if (!opts.use_energy_monitor)
+      global_energy_monitor.disable();
+
     if (opts.redo_mode)
     {
       LOG_WARN << "WARNING: Running in REDO mode: existing checkpoints are ignored, "
@@ -2939,11 +2957,7 @@ extern "C" int dll_main(int argc, char** argv, void* comm)
 
 int main(int argc, char** argv)
 {
-  auto old_wh = sysutil_get_energy();
   auto retval = internal_main(argc, argv, 0);
-  auto used_wh = sysutil_get_energy() - old_wh;
-  if (used_wh > 0.1)
-    LOG_INFO << "Energy consumed: " << sysutil_get_energy() - old_wh << " Wh" << endl;
   return retval;
 }
 

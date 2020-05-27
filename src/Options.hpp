@@ -51,6 +51,7 @@ public:
   bool use_rate_scalers;
   bool use_repeats;
   bool use_rba_partload;
+  bool use_energy_monitor;
 
   bool optimize_model;
   bool optimize_brlen;

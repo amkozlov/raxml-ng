@@ -2,6 +2,8 @@
 
 #include "Options.hpp"
 
+#include "util/EnergyMonitor.hpp"
+
 using namespace std;
 
 // This is just a default size; the buffer will be resized later according to #part and #threads
@@ -405,6 +407,8 @@ void ParallelContext::parallel_reduce_cb(void * context, double * data, size_t s
 {
   ParallelContext::parallel_reduce(data, size, op);
   RAXML_UNUSED(context);
+  if (master_thread())
+    global_energy_monitor.update(10.);
 }
 
 void ParallelContext::thread_broadcast(size_t source_id, void * data, size_t size)

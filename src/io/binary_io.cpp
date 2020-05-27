@@ -413,11 +413,12 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Options& o)
   stream << o.command;
 
   stream << o.use_tip_inner << o.use_pattern_compression << o.use_prob_msa << o.use_rate_scalers;
-  stream << o.use_repeats << o.use_rba_partload << o.optimize_model << o.optimize_brlen;
+  stream << o.use_repeats << o.use_rba_partload << o.use_energy_monitor;
+  stream << o.optimize_model << o.optimize_brlen;
 
   stream << o.force_mode << o.safety_checks.flags();
 
-  stream << o.redo_mode << o.nofiles_mode;
+  stream << o.redo_mode << o.nofiles_mode << o.write_interim_results;
 
   stream << o.log_level << o.msa_format << o.data_type << o.random_seed;
 
@@ -453,11 +454,12 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, Options& o)
   stream >> o.command;
 
   stream >> o.use_tip_inner >> o.use_pattern_compression >> o.use_prob_msa >> o.use_rate_scalers;
-  stream >> o.use_repeats >> o.use_rba_partload >> o.optimize_model >> o.optimize_brlen;
+  stream >> o.use_repeats >> o.use_rba_partload >> o.use_energy_monitor;
+  stream >> o.optimize_model >> o.optimize_brlen;
 
   stream >> o.force_mode >> o.safety_checks;
 
-  stream >> o.redo_mode >> o.nofiles_mode;
+  stream >> o.redo_mode >> o.nofiles_mode >> o.write_interim_results;
 
   stream >> o.log_level >> o.msa_format >> o.data_type >> o.random_seed;
 
