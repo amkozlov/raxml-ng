@@ -72,8 +72,10 @@ public:
   static size_t ranks_per_group() { return _num_ranks / _num_groups; }
   static bool coarse_mpi() { return _num_ranks > 1 && _num_groups > 1; }
 
-  static void parallel_reduce(double * data, size_t size, int op);
+  static void mpi_reduce(double * data, size_t size, int op);
+  static void mpi_allreduce(double * data, size_t size, int op);
   static void parallel_reduce_cb(void * context, double * data, size_t size, int op);
+  static void parallel_reduce(double * data, size_t size, int op);
   static void thread_reduce(double * data, size_t size, int op);
   static void thread_broadcast(size_t source_id, void * data, size_t size);
   void thread_send_master(size_t source_id, void * data, size_t size) const;
@@ -97,8 +99,8 @@ public:
 
   static void global_master_broadcast(void * data, size_t size);
 
-  static void mpi_gather_custom(std::function<int(void*,int)> prepare_send_cb,
-                                std::function<void(void*,int)> process_recv_cb);
+  static void mpi_gather_custom(std::function<size_t(void*,size_t)> prepare_send_cb,
+                                std::function<void(void*,size_t,size_t)> process_recv_cb);
 
   static bool master() { return proc_id() == 0; }
   static bool master_rank() { return _rank_id == 0; }
@@ -116,6 +118,11 @@ public:
   static bool group_master() { return local_proc_id() == 0; }
   static bool group_master_rank() { return _local_rank_id == 0; }
   static bool group_master_thread() { return _local_thread_id == 0; }
+
+  static bool node_master() { return _node_master_rank && _thread_id == 0; }
+  static bool node_master_rank() { return _node_master_rank; }
+
+  static std::string node_name() { return _node_name; }
 
   static ThreadGroup& thread_group(size_t id);
 
@@ -166,6 +173,9 @@ private:
   static thread_local ThreadGroup * _thread_group;
 
   static std::vector<ThreadGroup> _thread_groups;
+
+  static bool _node_master_rank;
+  static std::string _node_name;
 
 #ifdef _RAXML_MPI
   static bool _owns_comm;

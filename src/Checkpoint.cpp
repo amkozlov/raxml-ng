@@ -278,7 +278,7 @@ void CheckpointManager::update_and_write(const TreeInfo& treeinfo)
 void CheckpointManager::gather_model_params()
 {
   /* send callback -> worker ranks */
-  auto worker_cb = [this](void * buf, size_t buf_size) -> int
+  auto worker_cb = [this](void * buf, size_t buf_size) -> size_t
       {
         BinaryStream bs((char*) buf, buf_size);
         bs << _updated_models.size();
@@ -286,11 +286,11 @@ void CheckpointManager::gather_model_params()
         {
           bs << p << checkpoint().models.at(p);
         }
-        return (int) bs.pos();
+        return bs.pos();
       };
 
   /* receive callback -> master rank */
-  auto master_cb = [this](void * buf, size_t buf_size)
+  auto master_cb = [this](void * buf, size_t buf_size, size_t /* rank */)
      {
        BinaryStream bs((char*) buf, buf_size);
        auto model_count = bs.get<size_t>();
@@ -313,7 +313,7 @@ void CheckpointManager::gather_ml_trees()
     return;
 
   /* send callback -> worker ranks */
-  auto worker_cb = [this](void * buf, size_t buf_size) -> int
+  auto worker_cb = [this](void * buf, size_t buf_size) -> size_t
       {
         BinaryStream bs((char*) buf, buf_size);
 
@@ -326,11 +326,11 @@ void CheckpointManager::gather_ml_trees()
         // clear this batch of ML trees from the worker, since they will now be stored by master
         _checkp_file.ml_trees.clear();
 
-        return (int) bs.pos();
+        return bs.pos();
       };
 
   /* receive callback -> master rank */
-  auto master_cb = [this](void * buf, size_t buf_size)
+  auto master_cb = [this](void * buf, size_t buf_size, size_t /* rank */)
      {
        double old_score = _checkp_file.ml_trees.best_score();
        BinaryStream bs((char*) buf, buf_size);
@@ -350,7 +350,7 @@ void CheckpointManager::gather_bs_trees()
     return;
 
   /* send callback -> worker ranks */
-  auto worker_cb = [this](void * buf, size_t buf_size) -> int
+  auto worker_cb = [this](void * buf, size_t buf_size) -> size_t
       {
         BinaryStream bs((char*) buf, buf_size);
 
@@ -361,11 +361,11 @@ void CheckpointManager::gather_bs_trees()
         // clear this batch of BS trees from the worker, since they will now be stored by master
         _checkp_file.bs_trees.clear();
 
-        return (int) bs.pos();
+        return bs.pos();
       };
 
   /* receive callback -> master rank */
-  auto master_cb = [this](void * buf, size_t buf_size)
+  auto master_cb = [this](void * buf, size_t buf_size, size_t /* rank */)
      {
        BinaryStream bs((char*) buf, buf_size);
 

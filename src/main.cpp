@@ -87,6 +87,7 @@ struct RaxmlInstance
   unique_ptr<BootstopCheckMRE> bootstop_checker;
   bool bs_converged;
   RaxmlRunPhase run_phase;
+  double used_wh;
 
   // mapping taxon name -> tip_id/clv_id in the tree
   NameIdMap tip_id_map;
@@ -116,7 +117,7 @@ struct RaxmlInstance
   vector<RaxmlWorker> workers;
   RaxmlWorker& get_worker() { return workers.at(ParallelContext::local_group_id()); }
 
-  RaxmlInstance() : bs_converged(false), run_phase(RaxmlRunPhase::start) {}
+  RaxmlInstance() : bs_converged(false), run_phase(RaxmlRunPhase::start), used_wh(0) {}
 };
 
 struct RaxmlWorker
@@ -1116,13 +1117,13 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
     /* in coarse+MPI mode, collect in-progress tree ids from all ranks */
     if (instance.opts.coarse() && ParallelContext::num_ranks() > 1)
     {
-      auto worker_cb = [&in_work_trees](void * buf, size_t buf_size) -> int
+      auto worker_cb = [&in_work_trees](void * buf, size_t buf_size) -> size_t
           {
-            return (int) BinaryStream::serialize((char*) buf, buf_size, in_work_trees);
+            return BinaryStream::serialize((char*) buf, buf_size, in_work_trees);
           };
 
       /* receive callback -> master rank */
-      auto master_cb = [&in_work_trees](void * buf, size_t buf_size)
+      auto master_cb = [&in_work_trees](void * buf, size_t buf_size, size_t /* rank */)
          {
            BinaryStream bs((char*) buf, buf_size);
 
@@ -2210,12 +2211,11 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
         " seconds (total with restarts)";
   }
 
-  auto used_wh = global_energy_monitor.consumed_wh();
-  used_wh += checkp.consumed_wh;
+  auto used_wh = instance.used_wh;
   if (used_wh > 0.1)
   {
     LOG_INFO << endl << endl;
-    LOG_INFO << "Energy consumed: " << used_wh << " Wh";
+    LOG_INFO << "Consumed energy: " << used_wh << " Wh";
     if (used_wh > 200.)
     {
       size_t km_car = round(used_wh / 200.);
@@ -2247,6 +2247,25 @@ void print_resources(const RaxmlInstance& instance)
   LOG_INFO << endl << "Please note that numbers given above are rough estimates only. " << endl <<
       "Actual memory consumption and parallel performance on your system may differ!"
       << endl << endl;
+}
+
+void finalize_energy(RaxmlInstance& instance, const CheckpointFile& checkp)
+{
+  if (ParallelContext::node_master_rank())
+  {
+    instance.used_wh = global_energy_monitor.consumed_wh();
+    instance.used_wh += checkp.consumed_wh;
+
+    if (logger().log_level() >= LogLevel::debug)
+    {
+      printf("Consumed energy at node %s: %.3lf Wh\n",
+             ParallelContext::node_name().c_str(), instance.used_wh);
+    }
+  }
+  else
+    instance.used_wh = 0;
+
+  ParallelContext::mpi_reduce(&instance.used_wh, 1, PLLMOD_COMMON_REDUCE_SUM);
 }
 
 void init_parallel_buffers(const RaxmlInstance& instance)
@@ -2927,6 +2946,7 @@ int internal_main(int argc, char** argv, void* comm)
     }
 
     /* finalize */
+    finalize_energy(instance, cm.checkp_file());
     if (ParallelContext::master_rank())
       print_final_output(instance, cm.checkp_file());
 

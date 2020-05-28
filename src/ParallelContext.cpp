@@ -15,6 +15,8 @@ size_t ParallelContext::_num_nodes = 1;
 size_t ParallelContext::_num_groups = 1;
 size_t ParallelContext::_rank_id = 0;
 size_t ParallelContext::_local_rank_id = 0;
+bool ParallelContext::_node_master_rank = true;
+std::string ParallelContext::_node_name = "";
 thread_local size_t ParallelContext::_thread_id = 0;
 std::vector<ThreadType> ParallelContext::_threads;
 std::vector<char> ParallelContext::_parallel_buf;
@@ -160,15 +162,23 @@ void ParallelContext::detect_num_nodes()
     int len;
     char name[MPI_MAX_PROCESSOR_NAME];
     unordered_set<string> node_names;
+    NameIdMap node_minrank;
+    vector<char> node_master(_num_ranks, 0);
 
     MPI_Get_processor_name(name, &len);
 
 //    printf("\n hostname: %s,  len; %d\n", name, len);
 
-    node_names.insert(name);
+    _node_name = name;
+
+    if (master())
+    {
+      node_names.insert(_node_name);
+      node_minrank[_node_name] = _rank_id;
+    }
 
     /* send callback -> work rank: send host name to master */
-    auto worker_cb = [name,len](void * buf, size_t buf_size) -> int
+    auto worker_cb = [name,len](void * buf, size_t buf_size) -> size_t
         {
           assert((size_t) len < buf_size);
           memcpy(buf, name, (len+1) * sizeof(char));
@@ -176,19 +186,35 @@ void ParallelContext::detect_num_nodes()
         };
 
     /* receive callback -> master rank: collect host names */
-    auto master_cb = [&node_names](void * buf, size_t buf_size)
+    auto master_cb = [&node_names,&node_minrank](void * buf, size_t buf_size, size_t rank)
        {
-        node_names.insert((char*) buf);
+        char * name = (char*) buf;
+        node_names.insert(name);
+        if (!node_minrank.count(name) || node_minrank[name] > rank)
+          node_minrank[name] = rank;
         RAXML_UNUSED(buf_size);
        };
 
     ParallelContext::mpi_gather_custom(worker_cb, master_cb);
 
-    /* number of nodes = number of unique hostnames */
-    _num_nodes = node_names.size();
+    if (master())
+    {
+      /* number of nodes = number of unique hostnames */
+      _num_nodes = node_names.size();
+
+      /* determine node master ranks -> first rank on each node */
+      for (const auto& pair: node_minrank)
+        node_master[pair.second] = 1;
+    }
 
     /* broadcast number of nodes from master */
     MPI_Bcast(&_num_nodes, sizeof(size_t), MPI_BYTE, 0, _comm);
+
+    /* scatter "node master" flags from master to all ranks */
+    char tmp;
+    MPI_Scatter(node_master.data(), 1, MPI_BYTE, &tmp, 1, MPI_BYTE, 0, _comm);
+    _node_master_rank = (tmp == 1);
+//    printf("RANK %lu, NODE_MASTER: %s\n", _rank_id, _node_master_rank ? "YES" : "NO");
   }
   else
     _num_nodes = 1;
@@ -363,6 +389,39 @@ void ParallelContext::thread_reduce(double * data, size_t size, int op)
   }
 }
 
+void ParallelContext::mpi_reduce(double * data, size_t size, int op)
+{
+#ifdef _RAXML_MPI
+  if (_num_ranks > 1)
+  {
+      MPI_Op reduce_op;
+      if (op == PLLMOD_COMMON_REDUCE_SUM)
+        reduce_op = MPI_SUM;
+      else if (op == PLLMOD_COMMON_REDUCE_MAX)
+        reduce_op = MPI_MAX;
+      else if (op == PLLMOD_COMMON_REDUCE_MIN)
+        reduce_op = MPI_MIN;
+      else
+        assert(0);
+
+      MPI_Reduce(data, _parallel_buf.data(), size, MPI_DOUBLE, reduce_op, 0, _comm);
+      memcpy(data, _parallel_buf.data(), size * sizeof(double));
+  }
+#else
+  RAXML_UNUSED(data);
+  RAXML_UNUSED(size);
+  RAXML_UNUSED(op);
+#endif
+}
+
+void ParallelContext::parallel_reduce_cb(void * context, double * data, size_t size, int op)
+{
+  RAXML_UNUSED(context);
+  if (ParallelContext::threads_per_group() > 1)
+    ParallelContext::parallel_reduce(data, size, op);
+  if (node_master())
+    global_energy_monitor.update(10.);
+}
 
 void ParallelContext::parallel_reduce(double * data, size_t size, int op)
 {
@@ -371,6 +430,13 @@ void ParallelContext::parallel_reduce(double * data, size_t size, int op)
     thread_reduce(data, size, op);
 #endif
 
+#ifdef _RAXML_MPI
+  mpi_allreduce(data, size, op);
+#endif
+}
+
+void ParallelContext::mpi_allreduce(double * data, size_t size, int op)
+{
 #ifdef _RAXML_MPI
   if (_num_ranks > _num_groups)
   {
@@ -401,15 +467,6 @@ void ParallelContext::parallel_reduce(double * data, size_t size, int op)
       thread_broadcast(0, data, size * sizeof(double));
   }
 #endif
-}
-
-void ParallelContext::parallel_reduce_cb(void * context, double * data, size_t size, int op)
-{
-  RAXML_UNUSED(context);
-  if (ParallelContext::threads_per_group() > 1)
-    ParallelContext::parallel_reduce(data, size, op);
-  if (master_thread())
-    global_energy_monitor.update(10.);
 }
 
 void ParallelContext::thread_broadcast(size_t source_id, void * data, size_t size)
@@ -477,8 +534,8 @@ void ParallelContext::thread_send_master(size_t source_id, void * data, size_t s
   barrier();
 }
 
-void ParallelContext::mpi_gather_custom(std::function<int(void*,int)> prepare_send_cb,
-                                        std::function<void(void*,int)> process_recv_cb)
+void ParallelContext::mpi_gather_custom(std::function<size_t(void*,size_t)> prepare_send_cb,
+                                        std::function<void(void*,size_t, size_t)> process_recv_cb)
 {
 #ifdef _RAXML_MPI
   /* we're gonna use _parallel_buf, so make sure other threads don't interfere... */
@@ -500,7 +557,7 @@ void ParallelContext::mpi_gather_custom(std::function<int(void*,int)> prepare_se
       MPI_Recv((void*) _parallel_buf.data(), recv_size, MPI_BYTE,
                r, 0, _comm, MPI_STATUS_IGNORE);
 
-      process_recv_cb(_parallel_buf.data(), recv_size);
+      process_recv_cb(_parallel_buf.data(), (size_t) recv_size, r);
     }
   }
   else
