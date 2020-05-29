@@ -16,6 +16,10 @@ static inline string  pkg_subdomain_path(int pkg_id, int sub_id)
   return  pkg_energy_path(pkg_id) + "/intel-rapl:" + to_string(pkg_id) + ":" + to_string(sub_id);
 }
 
+static inline string  pkg_name_fname(string pkg_path)
+{
+  return  pkg_path + "/name";
+}
 
 static inline string  pkg_energy_fname(string pkg_path)
 {
@@ -27,9 +31,10 @@ static inline string  pkg_energy_range_fname(string pkg_path)
   return  pkg_path + "/max_energy_range_uj";
 }
 
-static inline size_t read_value(string fname)
+template<typename T>
+static inline T read_value(string fname)
 {
-  size_t val;
+  T val;
   ifstream fs(fname);
   fs >> val;
   return val;
@@ -40,7 +45,9 @@ EnergyMonitor::EnergyMonitor ()
   // so far, power monitoring only works on Linux
 #if defined(__linux__)
   init_packages();
-  _active = true;
+//  for(auto& pkg: _pkg_list)
+//    printf("RAPL pkg %d:%d -> %s\n", pkg.pkg_id, pkg.sub_id, pkg.name.c_str());
+  _active = !_pkg_list.empty();
 #else
   _active = false;
 #endif
@@ -61,7 +68,7 @@ void EnergyMonitor::update(double interval)
 
   for(auto& pkg: _pkg_list)
   {
-    size_t energy_uj = read_value(pkg.energy_fname);
+    size_t energy_uj = read_value<size_t>(pkg.energy_fname);
 
     // account for overflow
     auto diff_uj = (energy_uj > pkg.last_energy_uj) ? energy_uj - pkg.last_energy_uj :
@@ -109,11 +116,29 @@ bool EnergyMonitor::add_package(RAPLPackage& pkg)
   if (!sysutil_file_exists(pkg.energy_fname))
     return false;
 
-  pkg.max_energy_range_uj = read_value(pkg_energy_range_fname(pkg_path));
-  pkg.last_energy_uj = read_value(pkg.energy_fname);
+  pkg.name = read_value<string>(pkg_name_fname(pkg_path));
+
+  /* It seems that DRAM subzone energy is NOT included in the parent package value,
+   * whereas other subzones (cores, uncore) are. This design choice is extremely confusing,
+   * and not clearly documented. So for now, we just ignore all subzones except DRAM.
+   * There is no guarantee this workaround will work as intended on all systems,
+   * especially the future ones. */
+  if (pkg.sub_id >= 0 && pkg.name != "dram")
+    return true;
+
+  bool proceed = true;
+  if (pkg.name == "psys")
+  {
+    /* BINGO! we got system-wide energy counter, ignore all the rest */
+    _pkg_list.clear();
+    proceed = false;
+  }
+
+  pkg.max_energy_range_uj = read_value<size_t>(pkg_energy_range_fname(pkg_path));
+  pkg.last_energy_uj = read_value<size_t>(pkg.energy_fname);
   _pkg_list.push_back(pkg);
 
-  return true;
+  return proceed;
 }
 
 void EnergyMonitor::init_packages()

@@ -466,6 +466,10 @@ void ParallelContext::mpi_allreduce(double * data, size_t size, int op)
     if (_thread_group->num_threads > 1)
       thread_broadcast(0, data, size * sizeof(double));
   }
+#else
+  RAXML_UNUSED(data);
+  RAXML_UNUSED(size);
+  RAXML_UNUSED(op);
 #endif
 }
 

@@ -8,6 +8,7 @@ struct RAPLPackage
 {
   int pkg_id;
   int sub_id;
+  std::string name;
   std::string energy_fname;
   size_t last_energy_uj;
   size_t max_energy_range_uj;
