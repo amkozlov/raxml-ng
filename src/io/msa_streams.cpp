@@ -571,6 +571,13 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
             {
                 auto gl = gt_g10[i * 10 + k];
                 auto s = vcf_to_rax_map[k];
+
+                if (gl > 0.)
+                {
+                  throw runtime_error(err_coord + "[" + msa.label(i) +
+                                      "] G10 field contains positive value: " + to_string(gl));
+                }
+
                 site_probs[s] = isfinite(gl) ? EXP10(gl) : 0.;
                 below &= (gl < _RAXML_VCF_MINGL);
             }
@@ -598,6 +605,13 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
             for (unsigned int k = 0; k < 10; ++k)
               site_probs[k] = 0.;
 
+            if (gt_pl[i * 3] < 0. || gt_pl[i * 3 + 1] < 0. || gt_pl[i * 3 + 2] < 0.)
+            {
+              int m = std::min({gt_pl[i * 3], gt_pl[i * 3 + 1], gt_pl[i * 3 + 2]});
+              throw runtime_error(err_coord + "[" + msa.label(i) +
+                                  "] PL field contains negative value: " + to_string(m));
+            }
+
             double p_ref = EXP10(-0.1 * gt_pl[i * 3]);
             double p_het = EXP10(-0.1 * gt_pl[i * 3 + 1]);
             double p_alt = EXP10(-0.1 * gt_pl[i * 3 + 2]);
@@ -622,10 +636,17 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
             for (unsigned int k = 0; k < 10; ++k)
               site_probs[k] = 0.;
 
-            double pl_ref = std::max(gt_fpl[i * 3], gt_fpl[i * 3 + 1]);
+            int pl_ref = std::max(gt_fpl[i * 3], gt_fpl[i * 3 + 1]);
             double p_ref = EXP10(-0.1 * pl_ref);
             double p_het = EXP10(-0.1 * gt_fpl[i * 3 + 2]);
             double p_alt = EXP10(-0.1 * gt_fpl[i * 3 + 3]);
+
+            if (pl_ref < 0. || gt_fpl[i * 3 + 2] < 0. || gt_fpl[i * 3 + 3] < 0.)
+            {
+              int m = std::min({pl_ref, gt_fpl[i * 3 + 2], gt_fpl[i * 3 + 3]});
+              throw runtime_error(err_coord + "[" + msa.label(i) +
+                                  "] FPL field contains negative value: " + to_string(m));
+            }
 
             site_probs[d10_ref] = p_ref;
             site_probs[d10_het] = p_het;
