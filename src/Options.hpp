@@ -103,8 +103,10 @@ public:
 
   /* parallelization stuff */
   unsigned int num_threads;             /* number of threads */
+  unsigned int num_threads_max;         /* maximum number of threads (for auto-tuning) */
   unsigned int num_ranks;               /* number of MPI ranks */
   unsigned int num_workers;             /* number of parallel tree searches */
+  unsigned int num_workers_max;         /* maximum number of parallel tree searches (for autotuning) */
   unsigned int simd_arch;               /* vector instruction set */
   bool thread_pinning;                  /* pin threads to cores */
   LoadBalancing load_balance_method;

@@ -710,7 +710,7 @@ void check_tree(const PartitionedMSA& msa, const Tree& tree)
 /* This function is called after MPI init, but before thread init, MSA loading etc. */
 void check_options_early(Options& opts)
 {
-  auto num_procs = opts.num_ranks * opts.num_threads;
+  auto num_procs = opts.num_ranks * (opts.num_threads > 0 ? opts.num_threads : opts.num_threads_max);
 
   if (!opts.constraint_tree_file.empty() &&
       (opts.start_trees.count(StartingTree::parsimony) > 0 ||
@@ -860,6 +860,58 @@ void check_oversubscribe(RaxmlInstance& instance)
       }
     }
   }
+}
+
+void autotune_threads(RaxmlInstance& instance)
+{
+  auto& opts = instance.opts;
+
+  /* user provided fixed values for threads and workers */
+  if (opts.num_workers > 0 && opts.num_threads > 0)
+    return;
+
+  StaticResourceEstimator resEstimator(*instance.parted_msa, instance.opts);
+  auto res = resEstimator.estimate();
+  auto num_ranks = opts.num_ranks;
+
+  LOG_DEBUG << "Recommended threads (response/balanced/throughput): " <<
+      res.num_threads_response << " / " << res.num_threads_balanced <<
+      " / " << res.num_threads_throughput << endl << endl;
+
+  size_t max_workers = std::max(opts.num_searches, opts.num_bootstraps);
+  size_t max_workers_mem = 0.9 * num_ranks * sysutil_get_memtotal() / res.total_mem_size;
+  max_workers = std::min(max_workers, max_workers_mem);
+  max_workers = std::min(max_workers, (size_t) opts.num_workers_max);
+  if (opts.num_workers == 0)
+  {
+    auto rank_threads = opts.num_threads > 0 ? opts.num_threads : opts.num_threads_max;
+    auto opt_workers = rank_threads / res.num_threads_throughput;
+    opt_workers *= num_ranks;
+    opts.num_workers = std::min(opt_workers, max_workers);
+    while (num_ranks*opts.num_threads % opts.num_workers != 0)
+      opts.num_workers--;
+  }
+
+  assert(opts.num_workers > 0);
+  assert(opts.num_workers == 1 || opts.num_workers % num_ranks == 0);
+
+  size_t workers_per_rank = std::max(opts.num_workers / num_ranks, 1u);
+  if (opts.num_threads == 0)
+  {
+    auto opt_rank_threads = res.num_threads_response * workers_per_rank;
+    opts.num_threads = opt_rank_threads <= (size_t) opts.num_threads_max ?
+        opt_rank_threads : (opts.num_threads_max / workers_per_rank) * workers_per_rank;
+
+    opts.safety_checks.unset(SafetyCheck::perf_threads);
+  }
+
+  assert(opts.num_threads > 0);
+  assert(opts.num_threads % workers_per_rank == 0);
+
+  auto threads_per_worker = opts.num_workers > 1 ? opts.num_threads / workers_per_rank :
+                                                   opts.num_threads * num_ranks;
+  LOG_INFO << "Parallelization scheme autoconfig: " << opts.num_workers << " worker(s) x "
+           << threads_per_worker << " thread(s)" << endl << endl;
 }
 
 void load_msa(RaxmlInstance& instance)
@@ -2219,7 +2271,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
     if (used_wh > 200.)
     {
       size_t km_car = round(used_wh / 200.);
-      size_t km_scooter = round(used_wh / 35.);
+      size_t km_scooter = round(used_wh / 40.);
       LOG_INFO << " (= " << km_car << " km in an electric car, or "
                << km_scooter << " km with an e-scooter!)";
     }
@@ -2580,13 +2632,24 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 {
   auto const& opts = instance.opts;
 
-  /* init workers */
-  assert(opts.num_workers > 0);
-  for (size_t i = 0; i < ParallelContext::num_local_groups(); ++i)
+  /* init load balancer */
+  switch(opts.load_balance_method)
   {
-    const auto& grp = ParallelContext::thread_group(i);
-    instance.workers.emplace_back(instance, grp.group_id);
+    case LoadBalancing::naive:
+      instance.load_balancer.reset(new SimpleLoadBalancer());
+      break;
+    case LoadBalancing::kassian:
+      instance.load_balancer.reset(new KassianLoadBalancer());
+      break;
+    case LoadBalancing::benoit:
+      instance.load_balancer.reset(new BenoitLoadBalancer());
+      break;
+    default:
+      assert(0);
   }
+
+  // use naive coarse-grained load balancer for now
+  instance.coarse_load_balancer.reset(new SimpleCoarseLoadBalancer());
 
   /* if resuming from a checkpoint, use binary MSA (if exists) */
   if (!opts.redo_mode &&
@@ -2604,7 +2667,21 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   load_constraint(instance);
 
+  autotune_threads(instance);
+
   check_options(instance);
+
+  ParallelContext::init_pthreads(opts, std::bind(thread_main,
+                                                 std::ref(instance),
+                                                 std::ref(cm)));
+
+  /* init workers */
+  assert(opts.num_workers > 0);
+  for (size_t i = 0; i < ParallelContext::num_local_groups(); ++i)
+  {
+    const auto& grp = ParallelContext::thread_group(i);
+    instance.workers.emplace_back(instance, grp.group_id);
+  }
 
   instance.bs_converged = false;
 
@@ -2843,29 +2920,6 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::all:
       case Command::ancestral:
       {
-        /* init load balancer */
-        switch(opts.load_balance_method)
-        {
-          case LoadBalancing::naive:
-            instance.load_balancer.reset(new SimpleLoadBalancer());
-            break;
-          case LoadBalancing::kassian:
-            instance.load_balancer.reset(new KassianLoadBalancer());
-            break;
-          case LoadBalancing::benoit:
-            instance.load_balancer.reset(new BenoitLoadBalancer());
-            break;
-          default:
-            assert(0);
-        }
-
-        // use naive coarse-grained load balancer for now
-        instance.coarse_load_balancer.reset(new SimpleCoarseLoadBalancer());
-
-        ParallelContext::init_pthreads(opts, std::bind(thread_main,
-                                                       std::ref(instance),
-                                                       std::ref(cm)));
-
         master_main(instance, cm);
         break;
       }

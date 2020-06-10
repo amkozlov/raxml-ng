@@ -1,5 +1,6 @@
 #include "Options.hpp"
 //#include <stdlib.h>
+#include <climits>
 
 using namespace std;
 
@@ -18,8 +19,8 @@ num_bootstraps(1000), bootstop_criterion(BootstopCriterion::none), bootstop_cuto
 bootstop_interval(RAXML_BOOTSTOP_INTERVAL), bootstop_permutations(RAXML_BOOTSTOP_PERMUTES),
 tbe_naive(false), consense_cutoff(ConsenseCutoff::MR),
 tree_file(""), constraint_tree_file(""), msa_file(""), model_file(""), outfile_prefix(""),
-num_threads(1), num_ranks(1), num_workers(1), simd_arch(PLL_ATTRIB_ARCH_CPU), thread_pinning(false),
-load_balance_method(LoadBalancing::benoit)
+num_threads(1), num_threads_max(1), num_ranks(1), num_workers(1), num_workers_max(UINT_MAX),
+simd_arch(PLL_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(LoadBalancing::benoit)
 {}
 
 string Options::output_fname(const string& suffix) const
@@ -448,16 +449,24 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   stream << "  parallelization: ";
   if (opts.coarse())
     stream << "coarse-grained (" << opts.num_workers << " workers), " ;
+  else if (opts.num_workers_max > 1 && opts.num_workers == 0)
+    stream << "coarse-grained (auto), ";
 
   if (opts.num_ranks > 1 && opts.num_threads > 1)
   {
     stream << "hybrid MPI+PTHREADS (" << opts.num_ranks <<  " ranks x " <<
         opts.num_threads <<  " threads)";
   }
+  else if (opts.num_ranks > 1 && opts.num_threads_max > 1 && opts.num_threads == 0)
+  {
+    stream << "hybrid MPI (" << opts.num_ranks <<  " ranks) + PTHREADS (auto)";
+  }
   else if (opts.num_ranks > 1)
     stream <<  "MPI (" << opts.num_ranks << " ranks)";
   else if (opts.num_threads > 1)
     stream << "PTHREADS (" << opts.num_threads << " threads)" ;
+  else if (opts.num_threads == 0 && opts.num_threads_max > 1)
+    stream << "PTHREADS (auto)" ;
   else
     stream << "NONE/sequential";
 

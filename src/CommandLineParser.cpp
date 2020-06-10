@@ -286,15 +286,16 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.brlen_min = RAXML_BRLEN_MIN;
   opts.brlen_max = RAXML_BRLEN_MAX;
 
+  /* by default, autodetect optimal number of threads for the dataset */
   opts.num_threads = 0;
 
-  /* use all available cores per default */
+  /* max #threads = # available CPU cores */
 #if !defined(_RAXML_PTHREADS)
   opts.num_threads = 1;
 #elif !defined(_RAXML_MPI)
-  opts.num_threads = std::max(1u, sysutil_get_cpu_cores());
+  opts.num_threads_max = std::max(1u, sysutil_get_cpu_cores());
 #else
-  opts.num_threads = std::max(1u, (unsigned int) (sysutil_get_cpu_cores() / ParallelContext::ranks_per_node()));
+  opts.num_threads_max = std::max(1u, (unsigned int) (sysutil_get_cpu_cores() / ParallelContext::ranks_per_node()));
 #endif
 
 #if defined(_RAXML_MPI)
@@ -473,10 +474,15 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
 
       case 19:  /* number of threads */
-        if (sscanf(optarg, "%u", &opts.num_threads) != 1 || opts.num_threads == 0)
+        if (strncasecmp(optarg, "auto", 4) == 0)
+        {
+          opts.num_threads = 0;
+          sscanf(optarg, "auto{%u}", &opts.num_threads_max);
+        }
+        else if (sscanf(optarg, "%u", &opts.num_threads) != 1 || opts.num_threads == 0)
         {
           throw InvalidOptionValueException("Invalid number of threads: %s " + string(optarg) +
-                                            ", please provide a positive integer number!");
+                                            ", please provide a positive integer number or `auto`!");
         }
         break;
       case 20: /* SIMD instruction set */
@@ -873,10 +879,15 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
 
       case 54:  /* number of workers (=parallel tree searches) */
-        if (sscanf(optarg, "%u", &opts.num_workers) != 1 || opts.num_workers == 0)
+        if (strncasecmp(optarg, "auto", 4) == 0)
+        {
+          opts.num_workers = 0;
+          sscanf(optarg, "auto{%u}", &opts.num_workers_max);
+        }
+        else if (sscanf(optarg, "%u", &opts.num_workers) != 1 || opts.num_workers == 0)
         {
           throw InvalidOptionValueException("Invalid number of workers: " + string(optarg) +
-                                            ", please provide a positive integer number!");
+                                            ", please provide a positive integer number or 'auto'!");
         }
         break;
 
