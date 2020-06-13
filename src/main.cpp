@@ -888,8 +888,23 @@ void autotune_threads(RaxmlInstance& instance)
     auto opt_workers = rank_threads / res.num_threads_throughput;
     opt_workers *= num_ranks;
     opts.num_workers = std::min(opt_workers, max_workers);
+
     while (num_ranks*opts.num_threads % opts.num_workers != 0)
       opts.num_workers--;
+
+    /* make sure we have integer number of workers per rank */
+    opts.num_workers -= opts.num_workers % num_ranks;
+
+    opts.num_workers = std::max(opts.num_workers, 1u);
+
+    /* workers spanning multiple MPI ranks are not supported atm -> check for this */
+    if (opts.num_workers > 1 && opts.num_workers < num_ranks)
+    {
+      if (num_ranks <= max_workers)
+        opts.num_workers = num_ranks;
+      else
+        opts.num_workers = 1;
+    }
   }
 
   assert(opts.num_workers > 0);
@@ -898,7 +913,7 @@ void autotune_threads(RaxmlInstance& instance)
   size_t workers_per_rank = std::max(opts.num_workers / num_ranks, 1u);
   if (opts.num_threads == 0)
   {
-    auto opt_rank_threads = res.num_threads_response * workers_per_rank;
+    auto opt_rank_threads = std::max(res.num_threads_response * opts.num_workers / num_ranks, 1lu);
     opts.num_threads = opt_rank_threads <= (size_t) opts.num_threads_max ?
         opt_rank_threads : (opts.num_threads_max / workers_per_rank) * workers_per_rank;
 
@@ -908,8 +923,7 @@ void autotune_threads(RaxmlInstance& instance)
   assert(opts.num_threads > 0);
   assert(opts.num_threads % workers_per_rank == 0);
 
-  auto threads_per_worker = opts.num_workers > 1 ? opts.num_threads / workers_per_rank :
-                                                   opts.num_threads * num_ranks;
+  auto threads_per_worker = opts.num_threads * num_ranks / opts.num_workers;
   LOG_INFO << "Parallelization scheme autoconfig: " << opts.num_workers << " worker(s) x "
            << threads_per_worker << " thread(s)" << endl << endl;
 }
