@@ -33,7 +33,7 @@ bool RBAStream::rba_file(const std::string& fname, bool check_version)
 
   bos >> header;
 
-  bool valid = header.valid();
+  bool valid = bos.good() && header.valid();
 
   if (check_version)
     valid = valid && header.supported();
@@ -91,6 +91,9 @@ RBAStream& operator>>(RBAStream& stream, RBAStream::RBAOutput out)
   RBAHeader header;
 
   bos >> header;
+
+  if (!bos.good())
+    throw runtime_error("Invalid RBA file!");
 
   if (!header.valid())
     throw runtime_error("Invalid RBA file header!");

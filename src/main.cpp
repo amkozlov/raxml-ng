@@ -938,6 +938,9 @@ void load_msa(RaxmlInstance& instance)
   /* load MSA */
   auto msa = msa_load_from_file(opts.msa_file, opts.msa_format);
 
+  if (!msa.size())
+    throw runtime_error("Alignment file is empty!");
+
   LOG_INFO_TS << "Loaded alignment with " << msa.size() << " taxa and " <<
       msa.num_sites() << " sites" << endl;
 

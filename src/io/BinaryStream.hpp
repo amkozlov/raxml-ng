@@ -131,6 +131,8 @@ public:
       _fstream.seekg(size, std::ios_base::cur);
   }
 
+  bool good() const { return _fstream.good(); }
+
 private:
   std::fstream _fstream;
 };
