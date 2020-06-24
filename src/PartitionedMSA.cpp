@@ -113,7 +113,21 @@ void PartitionedMSA::full_msa(MSA&& msa)
 
 void PartitionedMSA::split_msa()
 {
-  if (part_count() > 1)
+  bool need_split;
+  string full_range = "1-" + to_string(_full_msa.num_sites());
+
+  if (part_count() == 0)
+    return;
+
+  if (part_count() == 1)
+  {
+    const string& first_range = _part_list[0].range_string();
+    need_split = !first_range.empty() && first_range != full_range && first_range != "all";
+  }
+  else
+    need_split = true;
+
+  if (need_split)
   {
     /* split MSA into partitions */
     pll_msa_t ** part_msa_list =
@@ -129,7 +143,7 @@ void PartitionedMSA::split_msa()
   else
   {
     if (_part_list[0].range_string().empty())
-      _part_list[0].range_string("1-" + to_string(_full_msa.num_sites()));
+      _part_list[0].range_string(full_range);
     part_msa(0, std::move(_full_msa));
   }
 }
