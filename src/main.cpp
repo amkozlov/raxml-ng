@@ -228,7 +228,12 @@ void init_part_info(RaxmlInstance& instance)
 
   /* make sure that linked branch length mode is set for unpartitioned alignments */
   if (parted_msa.part_count() == 1)
+  {
     opts.brlen_linkage = PLLMOD_COMMON_BRLEN_LINKED;
+    if (opts.safety_checks.isset(SafetyCheck::model) &&
+        parted_msa.model(0).param_mode(PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER) != ParamValue::undefined)
+      throw runtime_error("Branch length scalers (+B) are not supported for non-partitioned models!");
+  }
 
   /* in the scaled brlen mode, use ML optimization of brlen scalers by default */
   if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_SCALED)
