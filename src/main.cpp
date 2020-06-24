@@ -665,10 +665,15 @@ void check_models(const RaxmlInstance& instance)
   }
 }
 
-void check_tree(const PartitionedMSA& msa, const Tree& tree)
+void check_tree(const PartitionedMSA& msa, const Tree& tree, bool require_binary)
 {
   auto missing_taxa = 0;
   auto duplicate_taxa = 0;
+
+  if (require_binary && !tree.binary())
+  {
+    throw runtime_error("Binary tree expected, but a tree with multifurcations provided!");
+  }
 
   if (msa.taxon_count() > tree.num_tips())
     throw runtime_error("Alignment file contains more sequences than expected");
@@ -1059,7 +1064,7 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
       LOG_DEBUG << "Loaded user starting tree with " << tree.num_tips() << " taxa from: "
                            << opts.tree_file << endl;
 
-      check_tree(parted_msa, tree);
+      check_tree(parted_msa, tree, true);
 
       break;
     }
