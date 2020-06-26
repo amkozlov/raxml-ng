@@ -74,9 +74,9 @@ size_t PartitionInfo::mark_partition_sites(unsigned int part_num, std::vector<un
   return sites_assigned;
 }
 
-void PartitionInfo::compress_patterns()
+void PartitionInfo::compress_patterns(bool store_backmap)
 {
-  _msa.compress_patterns(model().charmap());
+  _msa.compress_patterns(model().charmap(), store_backmap);
 }
 
 pllmod_msa_stats_t * PartitionInfo::compute_stats(unsigned long stats_mask) const

@@ -25,6 +25,7 @@ public:
 
   size_t full_msa_site(size_t index, size_t site) const;
   const uintVector& site_part_map() const;
+  IdPairVector full_to_parted_sitemap() const;
 
   size_t taxon_count() const { return _taxon_names.size(); };
   size_t part_count() const { return _part_list.size(); };
@@ -57,7 +58,7 @@ public:
   }
 
   void split_msa();
-  void compress_patterns();
+  void compress_patterns(bool store_backmap = false);
   void set_model_empirical_params();
 
 private:

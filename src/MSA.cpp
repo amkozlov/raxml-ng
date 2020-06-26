@@ -104,16 +104,20 @@ void MSA::append(const string& sequence, const string& header)
   _dirty = true;
 }
 
-void MSA::compress_patterns(const pll_state_t * charmap)
+void MSA::compress_patterns(const pll_state_t * charmap, bool store_backmap)
 {
   update_pll_msa();
 
   assert(_pll_msa->count && _pll_msa->length);
 
-  const unsigned int * w = pll_compress_site_patterns(_pll_msa->sequence,
-                                                      charmap,
-                                                      _pll_msa->count,
-                                                      &(_pll_msa->length));
+  if (store_backmap)
+    _site_pattern_map.resize(_pll_msa->length);
+
+  auto backmap_ptr = store_backmap ? _site_pattern_map.data() : nullptr;
+  unsigned int * w = pll_compress_site_patterns_msa(_pll_msa,
+                                                    charmap,
+                                                    backmap_ptr);
+
   if (!w)
     libpll_check_error("Pattern compression failed: ", true);
 

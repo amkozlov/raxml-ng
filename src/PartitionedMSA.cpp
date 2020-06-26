@@ -71,7 +71,7 @@ uintVector PartitionedMSA::get_site_part_assignment() const
 
 const uintVector& PartitionedMSA::site_part_map() const
 {
-  if (_site_part_map.empty())
+  if (_site_part_map.empty() && part_count() > 1)
     _site_part_map = get_site_part_assignment();
 
   return _site_part_map;
@@ -101,6 +101,29 @@ size_t PartitionedMSA::full_msa_site(size_t index, size_t site) const
     throw runtime_error("Site " + to_string(site+1) +
                         " not found in partition " +  to_string(index+1));
   }
+}
+
+/*
+ *  This function returns a pair (partition_id, local_site_id) for each site in
+ *  the original, full, uncompressed MSA file.
+ */
+IdPairVector PartitionedMSA::full_to_parted_sitemap() const
+{
+  auto total_sites = this->total_sites();
+  assert(site_part_map().empty() || site_part_map().size() == total_sites);
+
+  IdPairVector sitemap(total_sites);
+  IDVector part_site_idx(part_count(), 0);
+  for (size_t i = 0; i < total_sites; ++i)
+  {
+    auto pid = site_part_map().empty() ? 0 : site_part_map()[i] - 1;
+    auto sid = part_site_idx[pid]++;
+    auto spmap = part_info(pid).msa().site_pattern_map();
+    sitemap[i].first = pid;
+    sitemap[i].second = spmap.empty() ? sid : spmap[sid];
+  }
+
+  return sitemap;
 }
 
 
@@ -148,11 +171,11 @@ void PartitionedMSA::split_msa()
   }
 }
 
-void PartitionedMSA::compress_patterns()
+void PartitionedMSA::compress_patterns(bool store_backmap)
 {
   for (PartitionInfo& pinfo: _part_list)
   {
-    pinfo.compress_patterns();
+    pinfo.compress_patterns(store_backmap);
   }
 }
 

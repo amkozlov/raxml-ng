@@ -113,6 +113,7 @@ struct RaxmlInstance
 
   unique_ptr<RFDistCalculator> dist_calculator;
   AncestralStatesSharedPtr ancestral_states;
+  vector<vector<doubleVector>> persite_loglh;      // per-tree -> per-partition -> per-site
 
   vector<RaxmlWorker> workers;
   RaxmlWorker& get_worker() { return workers.at(ParallelContext::local_group_id()); }
@@ -173,6 +174,12 @@ void init_part_info(RaxmlInstance& instance)
       (opts.msa_format == FileFormat::autodetect && RBAStream::rba_file(opts.msa_file)))
   {
     opts.msa_format = FileFormat::binary;
+
+    if (opts.command == Command::sitelh)
+    {
+      throw runtime_error("Alignments in RBA format are not supported in "
+          "per-site likelihood mode, sorry!\n       Please use PHYLIP/FASTA instead.");
+    }
 
     if (!opts.model_file.empty())
     {
@@ -629,8 +636,8 @@ void check_models(const RaxmlInstance& instance)
         throw runtime_error("You enabled ascertainment bias correction for partition " +
                              pinfo.name() + ", but it contains " +
                              to_string(stats.inv_count()) + " invariant sites.\n"
-                            "This is not allowed! Please either remove invariant sites or "
-                            "disable ascertainment bias correction.");
+                            "This is not allowed! Please either remove invariant sites from MSA "
+                            "or disable ascertainment bias correction.");
       }
     }
   }
@@ -760,6 +767,12 @@ void check_options_early(Options& opts)
       throw runtime_error("Per-rate scalers are not supported in ancestral state reconstruction mode!");
     if (opts.num_ranks > 1)
       throw runtime_error("MPI parallelization is not supported in ancestral state reconstruction mode!");
+  }
+
+  if (opts.command == Command::sitelh)
+  {
+    if (opts.num_ranks > 1)
+      throw runtime_error("MPI parallelization is not supported in per-site likelihood computation mode!");
   }
 
   /* autodetect if we can use partial RBA loading */
@@ -981,7 +994,8 @@ void load_msa(RaxmlInstance& instance)
   if (opts.use_pattern_compression)
   {
     LOG_VERB_TS << "Compressing alignment patterns... " << endl;
-    parted_msa.compress_patterns();
+    bool store_backmap = opts.command == Command::sitelh;
+    parted_msa.compress_patterns(store_backmap);
 
     // temp workaround: since MSA pattern compression calls rand(), it will change all random
     // numbers generated afterwards. so just reset seed to the initial value to ensure that
@@ -1638,6 +1652,22 @@ void init_ancestral(RaxmlInstance& instance)
   }
 }
 
+void init_persite_loglh(RaxmlInstance& instance)
+{
+  if (instance.opts.command == Command::sitelh)
+  {
+    const auto& parted_msa = *instance.parted_msa;
+
+    instance.persite_loglh.resize(instance.start_trees.size());
+
+    for (auto& tree_slh: instance.persite_loglh)
+    {
+      for (const auto& pinfo: parted_msa.part_list())
+        tree_slh.emplace_back(pinfo.msa().length());
+    }
+  }
+}
+
 void reroot_tree_with_outgroup(const Options& opts, Tree& tree, bool add_root_node)
 {
   if (!opts.outgroup_taxa.empty())
@@ -2041,7 +2071,8 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
   const auto& parted_msa = *instance.parted_msa;
 
   if (opts.command == Command::search || opts.command == Command::all ||
-      opts.command == Command::evaluate || opts.command == Command::ancestral)
+      opts.command == Command::evaluate || opts.command == Command::sitelh ||
+      opts.command == Command::ancestral)
   {
     auto model_log_lvl = parted_msa.part_count() > 1 ? LogLevel::verbose : LogLevel::info;
     const auto& ml_models = instance.ml_tree.models;
@@ -2061,7 +2092,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
   }
 
   if (opts.command == Command::search || opts.command == Command::all ||
-      opts.command == Command::evaluate)
+      opts.command == Command::evaluate || opts.command == Command::sitelh)
   {
     auto best_loglh = instance.ml_tree.loglh;
 
@@ -2154,7 +2185,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
   }
 
   if (opts.command == Command::search || opts.command == Command::all ||
-      opts.command == Command::evaluate)
+      opts.command == Command::evaluate || opts.command == Command::sitelh)
   {
     if (!opts.best_model_file().empty())
     {
@@ -2274,6 +2305,40 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
       nw_result << *instance.ancestral_states;
 
       LOG_INFO << "Node-labeled tree saved to: " << sysutil_realpath(opts.asr_tree_file()) << endl;
+    }
+  }
+
+  if (opts.command == Command::sitelh)
+  {
+    if (!opts.sitelh_file().empty())
+    {
+      fstream fs(opts.sitelh_file(), ios::out);
+
+      assert(instance.persite_loglh.size() == opts.num_searches);
+
+      fs << instance.persite_loglh.size() << " " << parted_msa.total_sites() << endl;
+
+      fs << fixed << setprecision(logger().precision(LogElement::loglh));
+
+      size_t tree_num = 1;
+      for (auto& tree_slh: instance.persite_loglh)
+      {
+        fs << "tree" + to_string(tree_num++) + "   ";
+        for (const auto& coord: parted_msa.full_to_parted_sitemap())
+        {
+          /* coord.first = partition, coord.second = site (pattern) within partition */
+          auto lh = tree_slh[coord.first][coord.second];
+
+          /* NB: loglh was already multiplied with pattern weight -> undo it */
+          auto w = parted_msa.part_info(coord.first).msa().weights();
+          if (!w.empty())
+            lh /= w[coord.second];
+          fs << " " << lh;
+        }
+        fs << endl;
+      }
+
+      LOG_INFO << "Per-site LogLikelihoods saved to: " << sysutil_realpath(opts.sitelh_file()) << endl;
     }
   }
 
@@ -2446,7 +2511,8 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
 
     auto log_level = instance.start_trees.size() > 1 ? LogLevel::result : LogLevel::info;
     Optimizer optimizer(opts);
-    if (opts.command == Command::evaluate || opts.command == Command::ancestral)
+    if (opts.command == Command::evaluate || opts.command == Command::sitelh ||
+        opts.command == Command::ancestral)
     {
       // check if we have anything to optimize
       if (opts.optimize_brlen || opts.optimize_model)
@@ -2477,6 +2543,16 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
       LOG_WORKER_TS(log_level) << "ML tree search #" << start_tree_num <<
                            ", logLikelihood: " << FMT_LH(checkp.loglh()) << endl;
       LOG_PROGR << endl;
+    }
+
+    if (!instance.persite_loglh.empty())
+    {
+      assert(start_tree_num <= instance.persite_loglh.size());
+      auto& tree_slh = instance.persite_loglh[start_tree_num-1];
+      std::vector<double*> part_site_lh(master_msa.part_count(), nullptr);
+      for (const auto& pa: part_assign)
+        part_site_lh[pa.part_id] = tree_slh[pa.part_id].data() + pa.start;
+      treeinfo->persite_loglh(part_site_lh);
     }
 
     cm.save_ml_tree();
@@ -2639,7 +2715,8 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
   check_oversubscribe(instance);
 
   if ((opts.command == Command::search || opts.command == Command::all ||
-      opts.command == Command::evaluate || opts.command == Command::ancestral) &&
+      opts.command == Command::evaluate || opts.command == Command::sitelh ||
+      opts.command == Command::ancestral) &&
       !instance.start_trees.empty())
   {
     thread_infer_ml(instance, cm);
@@ -2782,6 +2859,8 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   init_ancestral(instance);
 
+  init_persite_loglh(instance);
+
   if (ParallelContext::master_rank())
     instance.opts.remove_result_files();
 
@@ -2864,6 +2943,7 @@ int internal_main(int argc, char** argv, void* comm)
     case Command::bsmsa:
     case Command::rfdist:
     case Command::consense:
+    case Command::sitelh:
     case Command::ancestral:
       if (!opts.redo_mode && opts.result_files_exist())
       {
@@ -2945,6 +3025,7 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::search:
       case Command::bootstrap:
       case Command::all:
+      case Command::sitelh:
       case Command::ancestral:
       {
         master_main(instance, cm);

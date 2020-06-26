@@ -39,7 +39,7 @@ public:
   MSA& operator=(const MSA& other) = delete;
 
   void append(const std::string& sequence, const std::string& header = "");
-  void compress_patterns(const pll_state_t * charmap);
+  void compress_patterns(const pll_state_t * charmap, bool store_backmap = false);
 
   bool empty() const { return _sequences.empty(); }
   size_t size() const { return _sequences.size(); }
@@ -48,6 +48,7 @@ public:
   size_t num_patterns() const { return _weights.size(); }
   const WeightVector& weights() const {return _weights; }
   const NameIdMap& label_id_map() const { return _label_id_map; }
+  const WeightVector site_pattern_map() const { return _site_pattern_map; }
   const pll_msa_t * pll_msa() const;
 
   const container& labels() const { return _labels; };
@@ -97,6 +98,7 @@ private:
   container _labels;
   NameIdMap _label_id_map;
   WeightVector _weights;
+  WeightVector _site_pattern_map;
   ProbVectorList _probs;
   RangeList _local_seq_ranges;
   size_t _states;

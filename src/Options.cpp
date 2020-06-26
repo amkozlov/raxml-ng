@@ -58,6 +58,7 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.asr_tree, "ancestralTree");
   set_default_outfile(outfile_names.asr_probs, "ancestralProbs");
   set_default_outfile(outfile_names.asr_states, "ancestralStates");
+  set_default_outfile(outfile_names.site_loglh, "siteLH");
   set_default_outfile(outfile_names.tmp_best_tree, "lastTree.TMP");
   set_default_outfile(outfile_names.tmp_ml_trees, "mlTrees.TMP");
   set_default_outfile(outfile_names.tmp_bs_trees, "bootstraps.TMP");
@@ -132,6 +133,8 @@ bool Options::result_files_exist() const
     case Command::ancestral:
       return sysutil_file_exists(asr_tree_file()) || sysutil_file_exists(asr_probs_file()) ||
              sysutil_file_exists(asr_states_file());
+    case Command::sitelh:
+      return sysutil_file_exists(sitelh_file());
     default:
       return false;
   }
@@ -177,7 +180,10 @@ void Options::remove_result_files() const
   if (command == Command::consense)
     sysutil_file_remove(cons_tree_file());
 
-  if (command == Command::consense)
+  if (command == Command::sitelh)
+    sysutil_file_remove(sitelh_file());
+
+  if (command == Command::ancestral)
   {
     sysutil_file_remove(asr_tree_file());
     sysutil_file_remove(asr_probs_file());
@@ -285,6 +291,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       break;
     case Command::ancestral:
       stream << "Ancestral state reconstruction";
+      break;
+    case Command::sitelh:
+      stream << "Per-site likelihood computation";
       break;
     default:
       break;

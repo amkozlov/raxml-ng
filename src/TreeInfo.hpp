@@ -52,6 +52,7 @@ public:
   void set_topology_constraint(const Tree& cons_tree);
 
   double loglh(bool incremental = false);
+  double persite_loglh(std::vector<double*> part_site_lh, bool incremental = false);
   double optimize_params(int params_to_optimize, double lh_epsilon);
   double optimize_params_all(double lh_epsilon)
   { return optimize_params(PLLMOD_OPT_PARAM_ALL, lh_epsilon); } ;

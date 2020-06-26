@@ -96,7 +96,7 @@ public:
 
   // operations
   size_t mark_partition_sites(unsigned int part_num, std::vector<unsigned int>& site_part) const;
-  void compress_patterns();
+  void compress_patterns(bool store_backmap = false);
   void set_model_empirical_params();
 
 private:

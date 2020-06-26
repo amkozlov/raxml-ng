@@ -37,7 +37,8 @@ enum class Command
   start,
   rfdist,
   consense,
-  ancestral
+  ancestral,
+  sitelh
 };
 
 enum class FileFormat
@@ -123,6 +124,8 @@ typedef std::vector<double> doubleVector;
 typedef std::vector<int> intVector;
 typedef std::vector<unsigned int> uintVector;
 typedef std::vector<std::string> NameList;
+typedef std::pair<size_t,size_t> IdPair;
+typedef std::vector<IdPair> IdPairVector;
 typedef std::pair<size_t,std::string> IdNamePair;
 typedef std::vector<IdNamePair> IdNameVector;
 typedef std::unordered_map<size_t,std::string> IdNameMap;
