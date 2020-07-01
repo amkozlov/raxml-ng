@@ -3,12 +3,6 @@
 
 #include <fstream>
 
-#ifdef _RAXML_VCF
-#include <htslib/hts.h>
-#include <htslib/vcf.h>
-#endif
-
-
 #include "../Tree.hpp"
 #include "../AncestralStates.hpp"
 #include "../MutationMap.hpp"
@@ -178,7 +172,11 @@ NewickStream& operator<<(NewickStream& stream, const SupportTree& tree);
 PhylipStream& operator>>(PhylipStream& stream, MSA& msa);
 FastaStream& operator>>(FastaStream& stream, MSA& msa);
 CATGStream& operator>>(CATGStream& stream, MSA& msa);
+
+#ifdef _RAXML_VCF
 VCFStream& operator>>(VCFStream& stream, MSA& msa);
+#endif
+
 MSA msa_load_from_file(const std::string &filename, const FileFormat format, const Options& opts);
 
 PhylipStream& operator<<(PhylipStream& stream, const MSA& msa);

@@ -7,6 +7,10 @@ file(GLOB RAXML_SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/topology/*.cpp
                         )
 
+if(NOT USE_VCF)
+  list(REMOVE_ITEM RAXML_SOURCES ${PROJECT_SOURCE_DIR}/src/io/VCFStream.cpp)
+endif()
+
 if(USE_TERRAPHAST)
   file (GLOB TERRACE_SOURCES ${PROJECT_SOURCE_DIR}/src/terraces/*.cpp)
 
