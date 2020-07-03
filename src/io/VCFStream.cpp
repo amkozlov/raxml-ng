@@ -437,7 +437,7 @@ void set_fpl_probs(MSA& msa, SNVRecord& snv, size_t snv_id, size_t sample_id)
   for (unsigned int k = 0; k < 10; ++k)
     site_probs[k] = 0.;
 
-  int pl_ref = std::max(gt_fpl[0], gt_fpl[1]);
+  int pl_ref = std::min(gt_fpl[0], gt_fpl[1]);
   double p_ref = EXP10(-0.1 * pl_ref);
   double p_het = EXP10(-0.1 * gt_fpl[2]);
   double p_alt = EXP10(-0.1 * gt_fpl[3]);
@@ -459,7 +459,7 @@ void set_sample_probs(MSA& msa, SNVRecord& snv, size_t snv_id, size_t sample_id,
                       VCFLikelihoodMode lh_mode)
 {
   const int al1 = bcf_gt_allele(snv.sample_gt->p[sample_id * 2]);
-  const int al2 = bcf_gt_allele(snv.sample_gt->p[sample_id * 2]);
+  const int al2 = bcf_gt_allele(snv.sample_gt->p[sample_id * 2 + 1]);
 
   auto gt1 = PLL_STATE_CTZ(snv.al_states[al1]);
   auto gt2 = PLL_STATE_CTZ(snv.al_states[al2]);
