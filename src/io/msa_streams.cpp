@@ -327,7 +327,9 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format, con
         case FileFormat::vcf:
         {
 #ifdef _RAXML_VCF
-          VCFStream s(filename, opts.vcf_normalized_gl);
+          auto vcf_lh_mode = opts.use_prob_msa ?
+                             VCFLikelihoodMode::autodetect : VCFLikelihoodMode::none;
+          VCFStream s(filename, opts.vcf_normalized_gl, vcf_lh_mode);
           s >> msa;
           return msa;
 #else

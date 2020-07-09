@@ -15,16 +15,6 @@
 
 using namespace std;
 
-enum class VCFLikelihoodMode
-{
-  none = 0,
-  gl = 1,
-  pl = 2,
-  fpl = 3,
-  g10 = 4,
-  g10n = 5
-};
-
 struct SNVRecord
 {
   string err_coord;
@@ -278,6 +268,7 @@ static void read_snv_sample_data(SNVRecord& snv, bcf_hdr_t * hdr, bcf1_t * rec,
       lh_per_sample = 4;
       break;
     case VCFLikelihoodMode::none:
+    case VCFLikelihoodMode::autodetect:
       assert(0);
       break;
   }
@@ -301,6 +292,7 @@ static void read_snv_sample_data(SNVRecord& snv, bcf_hdr_t * hdr, bcf1_t * rec,
       n_read = bcf_get_format_int32(hdr, rec, lh_field_name, &snv.sample_plh, &snv.sample_plh_size);
       break;
     case VCFLikelihoodMode::none:
+    case VCFLikelihoodMode::autodetect:
       assert(0);
       break;
   }
@@ -488,12 +480,16 @@ void set_sample_probs(MSA& msa, SNVRecord& snv, size_t snv_id, size_t sample_id,
         set_fpl_probs(msa, snv, snv_id, sample_id);
         break;
       case VCFLikelihoodMode::none:
+      {
         // no uncertainty specified, called genotype gets likelihood 1.0
         pll_state_t ml_state =  pll_map_gt10[(int) c];
         pll_state_t state = 1;
         for (unsigned int k = 0; k < 10; ++k, state <<= 1)
           site_probs[k] = (state & ml_state) ? 1.0 : 0.0;
+      }
         break;
+      case VCFLikelihoodMode::autodetect:
+        assert(0);
     }
   }
   else
@@ -533,8 +529,9 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
   bcf_hdr_t * hdr = bcf_hdr_read(fp);
   bcf1_t * rec    = bcf_init1();
 
-  /* detect genotype likelihood fields -> for now, use whatever is available */
-  VCFLikelihoodMode lh_mode = detect_likelihood_mode(stream, hdr);
+  /* autodetect genotype likelihood fields */
+  auto lh_mode = stream.gt_likelihood_mode() == VCFLikelihoodMode::autodetect ?
+                     detect_likelihood_mode(stream, hdr) : stream.gt_likelihood_mode();
 
   size_t sample_count = bcf_hdr_nsamples(hdr);
 

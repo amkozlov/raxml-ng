@@ -64,16 +64,31 @@ public:
   CATGStream(const std::string& fname) : MSAFileStream(fname) {}
 };
 
+
+enum class VCFLikelihoodMode
+{
+  autodetect = -1,
+  none = 0,
+  gl = 1,
+  pl = 2,
+  fpl = 3,
+  g10 = 4,
+  g10n = 5
+};
+
 class VCFStream : public MSAFileStream
 {
 public:
-  VCFStream(const std::string& fname, bool normalized_gl = false) :
-    MSAFileStream(fname), _use_normalized_gl(normalized_gl) {}
+  VCFStream(const std::string& fname, bool normalized_gl = false,
+            VCFLikelihoodMode likelihood_mode = VCFLikelihoodMode::autodetect) :
+    MSAFileStream(fname), _use_normalized_gl(normalized_gl), _gt_likelihood_mode(likelihood_mode) {}
 
   bool use_normalized_gl() const { return _use_normalized_gl; }
+  VCFLikelihoodMode gt_likelihood_mode() const { return _gt_likelihood_mode; }
 
 private:
   bool _use_normalized_gl;
+  VCFLikelihoodMode _gt_likelihood_mode;
 };
 
 
