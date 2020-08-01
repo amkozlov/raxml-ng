@@ -20,6 +20,7 @@
 */
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
 
 #include <memory>
 
@@ -189,6 +190,15 @@ void init_part_info(RaxmlInstance& instance)
           "         since the binary MSA file already contains a model definition." << endl <<
           "         If you want to change the model, please re-run RAxML-NG "  << endl <<
           "         with the original PHYLIP/FASTA alignment and --redo option."
+          << endl << endl;
+    }
+
+    if (!opts.weights_file.empty())
+    {
+      LOG_WARN <<
+          "WARNING: Alignment site weights file (" << opts.weights_file <<
+                    ") will be ignored!" << endl <<
+          "NOTE:    Custom site weights are not allowed in combination with RBA input."
           << endl << endl;
     }
 
@@ -729,6 +739,9 @@ void check_options_early(Options& opts)
 {
   auto num_procs = opts.num_ranks * (opts.num_threads > 0 ? opts.num_threads : opts.num_threads_max);
 
+  if (!opts.weights_file.empty() && !sysutil_file_exists(opts.weights_file))
+    throw runtime_error("Site weights file not found: " + opts.weights_file);
+
   if (!opts.constraint_tree_file.empty() &&
       (opts.start_trees.count(StartingTree::parsimony) > 0 ||
        opts.start_trees.count(StartingTree::user)))
@@ -773,6 +786,8 @@ void check_options_early(Options& opts)
   {
     if (opts.num_ranks > 1)
       throw runtime_error("MPI parallelization is not supported in per-site likelihood computation mode!");
+    if (!opts.weights_file.empty())
+      throw runtime_error("Custom site weights are not supported in per-site likelihood computation mode!");
   }
 
   /* autodetect if we can use partial RBA loading */
@@ -951,6 +966,63 @@ void autotune_threads(RaxmlInstance& instance)
            << threads_per_worker << " thread(s)" << endl << endl;
 }
 
+void load_msa_weights(MSA& msa, const Options& opts)
+{
+  /* load site weights from file */
+  if (!opts.weights_file.empty())
+  {
+    LOG_VERB_TS << "Loading site weights... " << endl;
+
+    /* RBA file contains collapsed site weights -> not compatible with weights file! */
+    assert(opts.msa_format != FileFormat::binary);
+
+    FILE* f = fopen(opts.weights_file.c_str(), "r");
+    if (!f)
+      throw runtime_error("Unable to open site weights file: " + opts.weights_file);
+
+    WeightVector w;
+    w.reserve(msa.length());
+    const auto maxw = std::numeric_limits<WeightVector::value_type>::max();
+    int fres;
+    intmax_t x;
+    while ((fres = fscanf(f,"%jd", &x)) != EOF)
+    {
+      if (!fres)
+      {
+        char buf[101];
+        size_t c = fread(buf, 1, 100, f);
+        buf[c] = 0;
+        fclose(f);
+        throw runtime_error("Invalid site weight entry found near: " + string(buf));
+      }
+      else if (x <= 0)
+      {
+        fclose(f);
+        throw runtime_error("Non-positive site weight found: " + to_string(x) +
+                            " (at position " + to_string(w.size()+1) + ")");
+      }
+      else if (x > maxw)
+      {
+        fclose(f);
+        throw runtime_error("Site weight too large: " + to_string(x) +
+                            " (max: " + to_string(maxw) + ")");
+      }
+      else
+        w.push_back((WeightType) x);
+    }
+    fclose(f);
+
+    if (w.size() != msa.length())
+    {
+      throw runtime_error("Site weights file contains the wrong number of entries: " +
+                          to_string(w.size()) + " (expected: " + to_string(msa.length()) + ")" +
+                          "\nPlease check that this file contains one positive integer per site: "
+                          + opts.weights_file);
+    }
+    msa.weights(w);
+  }
+}
+
 void load_msa(RaxmlInstance& instance)
 {
   const auto& opts = instance.opts;
@@ -980,6 +1052,8 @@ void load_msa(RaxmlInstance& instance)
 
   if (!check_msa_global(msa))
     throw runtime_error("Alignment check failed (see details above)!");
+
+  load_msa_weights(msa, opts);
 
   parted_msa.full_msa(std::move(msa));
 
@@ -2400,7 +2474,7 @@ void finalize_energy(RaxmlInstance& instance, const CheckpointFile& checkp)
     instance.used_wh = global_energy_monitor.consumed_wh();
     instance.used_wh += checkp.consumed_wh;
 
-    if (logger().log_level() >= LogLevel::debug)
+    if (logger().log_level() >= LogLevel::debug && ParallelContext::num_nodes() > 1)
     {
       printf("Consumed energy at node %s: %.3lf Wh\n",
              ParallelContext::node_name().c_str(), instance.used_wh);

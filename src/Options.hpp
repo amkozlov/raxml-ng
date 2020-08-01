@@ -99,6 +99,7 @@ public:
   std::string constraint_tree_file;
   std::string msa_file;
   std::string model_file;     /* could be also model string */
+  std::string weights_file;   /* MSA column weights / per-site LH scalers */
   std::string outfile_prefix;
   OutputFileNames outfile_names;
 

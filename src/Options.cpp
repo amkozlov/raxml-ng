@@ -17,8 +17,8 @@ brlen_min(RAXML_BRLEN_MIN), brlen_max(RAXML_BRLEN_MAX),
 num_searches(1), terrace_maxsize(100),
 num_bootstraps(1000), bootstop_criterion(BootstopCriterion::none), bootstop_cutoff(0.03),
 bootstop_interval(RAXML_BOOTSTOP_INTERVAL), bootstop_permutations(RAXML_BOOTSTOP_PERMUTES),
-tbe_naive(false), consense_cutoff(ConsenseCutoff::MR),
-tree_file(""), constraint_tree_file(""), msa_file(""), model_file(""), outfile_prefix(""),
+tbe_naive(false), consense_cutoff(ConsenseCutoff::MR), tree_file(""), constraint_tree_file(""),
+msa_file(""), model_file(""), weights_file(""), outfile_prefix(""),
 num_threads(1), num_threads_max(1), num_ranks(1), num_workers(1), num_workers_max(UINT_MAX),
 simd_arch(PLL_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(LoadBalancing::benoit)
 {}
@@ -379,6 +379,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
 
   if (!opts.constraint_tree_file.empty())
     stream << "  topological constraint: " << opts.constraint_tree_file << endl;
+
+  if (!opts.weights_file.empty())
+    stream << "  site weights: " << opts.weights_file << endl;
 
   if (!opts.outgroup_taxa.empty())
   {

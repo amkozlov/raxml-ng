@@ -36,7 +36,7 @@ void PartitionedMSA::set_taxon_names(const NameList& taxon_names)
 
 uintVector PartitionedMSA::get_site_part_assignment() const
 {
-  const size_t full_len = _full_msa.num_sites();
+  const size_t full_len = _full_msa.length();
 
   uintVector spa(full_len);
 
@@ -137,7 +137,7 @@ void PartitionedMSA::full_msa(MSA&& msa)
 void PartitionedMSA::split_msa()
 {
   bool need_split;
-  string full_range = "1-" + to_string(_full_msa.num_sites());
+  string full_range = "1-" + to_string(_full_msa.length());
 
   if (part_count() == 0)
     return;
@@ -160,6 +160,24 @@ void PartitionedMSA::split_msa()
     {
       part_msa(p, part_msa_list[p]);
       pll_msa_destroy(part_msa_list[p]);
+
+      /* distribute external site weights to per-partition MSAs */
+      if (!_full_msa.weights().empty())
+      {
+        auto& msa = _part_list[p].msa();
+        WeightVector w(msa.length());
+        const auto full_weights = _full_msa.weights();
+        assert(full_weights.size() == site_part_map().size());
+
+        size_t pos = 0;
+        for (size_t i = 0; i < site_part_map().size(); ++i)
+        {
+          if (_site_part_map[i] == p+1)
+            w[pos++] = full_weights[i];
+        }
+        assert(pos == msa.length());
+        msa.weights(w);
+      }
     }
     free(part_msa_list);
   }

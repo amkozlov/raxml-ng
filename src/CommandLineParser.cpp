@@ -77,6 +77,7 @@ static struct option long_options[] =
 
   {"workers",            required_argument, 0, 0 },  /*  54 */
   {"sitelh",             no_argument, 0, 0 },        /*  55 */
+  {"site-weights",       required_argument, 0, 0 },  /*  56 */
 
   { 0, 0, 0, 0 }
 };
@@ -897,6 +898,11 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         num_commands++;
         break;
 
+      case 56: /* site weights */
+        opts.weights_file = optarg;
+        break;
+
+
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -976,6 +982,7 @@ void CommandLineParser::print_help()
             "  --nofiles                                  do not create any output files, print results to the terminal only\n"
             "  --precision       VALUE                    number of decimal places to print (default: 6)\n"
             "  --outgroup        o1,o2,..,oN              comma-separated list of outgroup taxon names (it's just a drawing option!)\n"
+            "  --site-weights    FILE                     file with MSA column weights (positive integers only!)  \n"
             "\n"
             "General options:\n"
             "  --seed         VALUE                       seed for pseudo-random number generator (default: current time)\n"

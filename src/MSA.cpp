@@ -110,10 +110,15 @@ void MSA::compress_patterns(const pll_state_t * charmap, bool store_backmap)
 
   assert(_pll_msa->count && _pll_msa->length);
 
-  if (store_backmap)
-    _site_pattern_map.resize(_pll_msa->length);
+  size_t uncompressed_length = _pll_msa->length;
+  unsigned int * backmap_ptr = nullptr;
 
-  auto backmap_ptr = store_backmap ? _site_pattern_map.data() : nullptr;
+  if (store_backmap || !_weights.empty())
+  {
+    _site_pattern_map.resize(uncompressed_length);
+    backmap_ptr = _site_pattern_map.data();
+  }
+
   unsigned int * w = pll_compress_site_patterns_msa(_pll_msa,
                                                     charmap,
                                                     backmap_ptr);
@@ -121,13 +126,24 @@ void MSA::compress_patterns(const pll_state_t * charmap, bool store_backmap)
   if (!w)
     libpll_check_error("Pattern compression failed: ", true);
 
+  /* set new, compressed length which has been updated in pll_msa */
   _length = _pll_msa->length;
-  _weights = WeightVector(w, w + _pll_msa->length);
+
+  if (_weights.empty())
+    _weights = WeightVector(w, w + _pll_msa->length);
+  else
+  {
+    /* external weights specified -> use site_pattern_map to generate a compressed weight vector */
+    assert(_weights.size() == uncompressed_length);
+    assert(!_site_pattern_map.empty());
+    WeightVector new_weights(_length, 0);
+    for (size_t i = 0; i < _site_pattern_map.size(); ++i)
+      new_weights[_site_pattern_map[i]] += _weights[i];
+    _weights = std::move(new_weights);
+  }
 
   for (auto& entry : _sequences)
-  {
     entry.resize(_length);
-  }
 
   _dirty = false;
 }
@@ -309,6 +325,19 @@ void MSA::update_num_sites()
   if (!_weights.empty())
     _num_sites =  std::accumulate(_weights.begin(), _weights.end(), 0);
 }
+
+void MSA::weights(const WeightVector& v)
+{
+  _weights = v;
+   update_num_sites();
+}
+
+void MSA::weights(WeightVector&& v)
+{
+  _weights = std::move(v);
+  update_num_sites();
+}
+
 
 const RangeList& MSA::local_seq_ranges() const
 {

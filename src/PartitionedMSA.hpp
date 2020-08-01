@@ -15,6 +15,7 @@ public:
 
   // getters
   const MSA& full_msa() const { return (part_count() == 1) ? _part_list.at(0).msa() : _full_msa; };
+  const MSA& part_msa(size_t index) const { return _part_list.at(index).msa(); };
   const PartitionInfo& part_info(size_t index) const { return _part_list.at(index); };
   const Model& model(size_t index) const { return _part_list.at(index).model(); };
   ModelCRefMap models() const;
