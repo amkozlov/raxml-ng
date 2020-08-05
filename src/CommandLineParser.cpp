@@ -288,8 +288,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.brlen_min = RAXML_BRLEN_MIN;
   opts.brlen_max = RAXML_BRLEN_MAX;
 
-  /* by default, autodetect optimal number of threads for the dataset */
+  /* by default, autodetect optimal number of threads and workers for the dataset */
   opts.num_threads = 0;
+  opts.num_workers = 0;
 
   /* max #threads = # available CPU cores */
 #if !defined(_RAXML_PTHREADS)
