@@ -121,6 +121,8 @@ PhylipStream& operator<<(PhylipStream& stream, const PartitionedMSA& msa)
 {
   PartitionedMSAView msa_view(msa);
 
+  stream << msa_view;
+
   return stream;
 }
 

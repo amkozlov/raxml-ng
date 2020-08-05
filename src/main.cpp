@@ -1763,7 +1763,6 @@ void reroot_tree_with_outgroup(const Options& opts, Tree& tree, bool add_root_no
 void postprocess_tree(const Options& opts, Tree& tree)
 {
   reroot_tree_with_outgroup(opts, tree, true);
-  // TODO: collapse short branches
   // TODO: regraft previously removed duplicate seqs etc.
 }
 
@@ -2177,10 +2176,30 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
     print_ic_scores(instance, best_loglh);
 
     Tree best_tree = instance.ml_tree.tree;
+    Tree collapsed_tree = best_tree;
 
     check_terrace(instance, best_tree);
 
     postprocess_tree(opts, best_tree);
+
+    collapsed_tree.collapse_short_branches(opts.brlen_min);
+    if (!collapsed_tree.binary())
+    {
+      postprocess_tree(opts, collapsed_tree);
+
+      auto collapsed_count = best_tree.num_branches() - collapsed_tree.num_branches();
+      LOG_WARN << "WARNING: Best ML tree contains " << collapsed_count << " near-zero branches!"
+               << endl << endl;
+
+      if (!opts.best_tree_collapsed_file().empty())
+      {
+        NewickStream nw_result(opts.best_tree_collapsed_file());
+        nw_result << collapsed_tree;
+
+        LOG_INFO << "Best ML tree with collapsed near-zero branches saved to: " <<
+            sysutil_realpath(opts.best_tree_collapsed_file()) << endl;
+      }
+    }
 
 //    pll_utree_show_ascii(&best_tree.pll_utree_root(),
 //                         PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH | PLL_UTREE_SHOW_CLV_INDEX );

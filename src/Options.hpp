@@ -11,6 +11,7 @@ struct OutputFileNames
   std::string checkpoint;       /* checkpoint file */
   std::string start_tree;
   std::string best_tree;
+  std::string best_tree_collapsed;
   std::string best_model;
   std::string partition_trees;
   std::string ml_trees;
@@ -124,6 +125,7 @@ public:
   std::string checkp_file() const;
   const std::string& start_tree_file() const { return outfile_names.start_tree; }
   const std::string& best_tree_file() const { return outfile_names.best_tree; }
+  const std::string& best_tree_collapsed_file() const { return outfile_names.best_tree_collapsed; }
   const std::string& best_model_file() const { return outfile_names.best_model; }
   const std::string& partition_trees_file() const { return outfile_names.partition_trees; }
   const std::string& ml_trees_file() const { return outfile_names.ml_trees; }

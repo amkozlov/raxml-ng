@@ -332,6 +332,12 @@ void Tree::reset_brlens(double new_brlen)
   pllmod_utree_set_length_recursive(_pll_utree.get(), new_brlen, 0);
 }
 
+void Tree::collapse_short_branches(double min_brlen)
+{
+  if (!pllmod_utree_collapse_branches(_pll_utree.get(), min_brlen))
+    libpll_check_error("Failed to collapse short branches: ", true);
+}
+
 PllNodeVector Tree::subnodes() const
 {
   PllNodeVector subnodes;

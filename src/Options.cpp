@@ -43,6 +43,7 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.checkpoint, "ckp");
   set_default_outfile(outfile_names.start_tree, "startTree");
   set_default_outfile(outfile_names.best_tree, "bestTree");
+  set_default_outfile(outfile_names.best_tree_collapsed, "bestTreeCollapsed");
   set_default_outfile(outfile_names.best_model, "bestModel");
   set_default_outfile(outfile_names.partition_trees, "bestPartitionTrees");
   set_default_outfile(outfile_names.ml_trees, "mlTrees");
@@ -109,14 +110,14 @@ bool Options::result_files_exist() const
   {
     case Command::evaluate:
     case Command::search:
-      return sysutil_file_exists(best_tree_file()) || sysutil_file_exists(best_model_file()) ||
-             sysutil_file_exists(partition_trees_file());
+      return sysutil_file_exists(best_tree_file()) || sysutil_file_exists(best_tree_collapsed_file()) ||
+             sysutil_file_exists(best_model_file()) ||sysutil_file_exists(partition_trees_file());
     case Command::bootstrap:
       return sysutil_file_exists(bootstrap_trees_file());
     case Command::all:
       return sysutil_file_exists(best_tree_file()) || sysutil_file_exists(bootstrap_trees_file()) ||
              sysutil_file_exists(support_tree_file()) || sysutil_file_exists(best_model_file()) ||
-             sysutil_file_exists(partition_trees_file());
+             sysutil_file_exists(partition_trees_file()) || sysutil_file_exists(best_tree_collapsed_file());
     case Command::support:
       return sysutil_file_exists(support_tree_file());
     case Command::terrace:
@@ -146,6 +147,7 @@ void Options::remove_result_files() const
       command == Command::evaluate)
   {
     sysutil_file_remove(best_tree_file());
+    sysutil_file_remove(best_tree_collapsed_file());
     sysutil_file_remove(best_model_file());
     sysutil_file_remove(partition_trees_file());
     sysutil_file_remove(ml_trees_file());
