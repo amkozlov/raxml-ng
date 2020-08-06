@@ -409,6 +409,7 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, PartitionStats& ps)
 
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Options& o)
 {
+  stream << o.opt_version;
   stream << o.cmdline;
   stream << o.command;
 
@@ -438,11 +439,13 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Options& o)
 
   stream << o.consense_cutoff;
 
-  stream << o.tree_file << o.constraint_tree_file << o.msa_file << o.model_file << o.outfile_prefix;
+  stream << o.tree_file << o.constraint_tree_file << o.msa_file << o.model_file << o.weights_file;
+  stream << o.outfile_prefix;
 
 //  OutputFileNames outfile_names;
 
-  stream << o.num_threads << o.num_ranks << o.num_workers << o.simd_arch << o.thread_pinning;
+  stream << o.num_threads << o.num_ranks << o.num_workers << o.num_threads_max << o.num_workers_max;
+  stream << o.simd_arch << o.thread_pinning;
   stream << o.load_balance_method;
 
   return stream;
@@ -450,6 +453,7 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Options& o)
 
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, Options& o)
 {
+  stream >> o.opt_version;
   stream >> o.cmdline;
   stream >> o.command;
 
@@ -479,11 +483,13 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, Options& o)
 
   stream >> o.consense_cutoff;
 
-  stream >> o.tree_file >> o.constraint_tree_file >> o.msa_file >> o.model_file >> o.outfile_prefix;
+  stream >> o.tree_file >> o.constraint_tree_file >> o.msa_file >> o.model_file >> o.weights_file;
+  stream >> o.outfile_prefix;
 
 //  OutputFileNames outfile_names;
 
-  stream >> o.num_threads >> o.num_ranks >> o.num_workers >> o.simd_arch >> o.thread_pinning;
+  stream >> o.num_threads >> o.num_ranks >> o.num_workers >> o.num_threads_max >> o.num_workers_max;
+  stream >> o.simd_arch >> o.thread_pinning;
   stream >> o.load_balance_method;
 
   return stream;

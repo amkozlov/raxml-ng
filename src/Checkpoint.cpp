@@ -145,7 +145,8 @@ bool CheckpointManager::read(const std::string& ckp_fname)
     }
     catch (runtime_error& e)
     {
-      reset_search_state();
+      if (ParallelContext::group_master_thread())
+        checkpoint().reset_search_state();
       LOG_DEBUG << "Error reading checkpoint: " << e.what() << endl;
       return false;
     }

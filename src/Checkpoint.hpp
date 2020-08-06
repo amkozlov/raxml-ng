@@ -5,8 +5,8 @@
 #include "TreeInfo.hpp"
 #include "io/binary_io.hpp"
 
-constexpr int RAXML_CKP_VERSION = 4;
-constexpr int RAXML_CKP_MIN_SUPPORTED_VERSION = 3;
+constexpr int RAXML_CKP_VERSION = 5;
+constexpr int RAXML_CKP_MIN_SUPPORTED_VERSION = 5;
 
 struct MLTree
 {

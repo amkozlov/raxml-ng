@@ -4,9 +4,9 @@
 
 using namespace std;
 
-Options::Options() : cmdline(""), command(Command::none), use_tip_inner(true),
-use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false), use_repeats(true),
-use_rba_partload(true), use_energy_monitor(true),
+Options::Options() : opt_version(RAXML_OPT_VERSION), cmdline(""), command(Command::none),
+use_tip_inner(true), use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false),
+use_repeats(true), use_rba_partload(true), use_energy_monitor(true),
 optimize_model(true), optimize_brlen(true), force_mode(false), safety_checks(SafetyCheck::all),
 redo_mode(false), nofiles_mode(false), write_interim_results(true), log_level(LogLevel::progress),
 msa_format(FileFormat::autodetect), data_type(DataType::autodetect),

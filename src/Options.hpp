@@ -5,6 +5,8 @@
 #include "PartitionedMSA.hpp"
 #include "util/SafetyCheck.hpp"
 
+constexpr int RAXML_OPT_VERSION = 1;
+
 struct OutputFileNames
 {
   std::string log;
@@ -42,6 +44,8 @@ public:
   Options& operator=(const Options& other) = default;
 
   ~Options() = default;
+
+  int opt_version;  /* version of Options struct, for serialization */
 
   std::string cmdline;
 
