@@ -1713,6 +1713,7 @@ void generate_bootstraps(RaxmlInstance& instance, const CheckpointFile& checkp)
       instance.bs_start_trees.emplace_back(move(tree));
     }
   }
+  RAXML_UNUSED(checkp); // might need it again for re-using previously computed replicates
 }
 
 void init_ancestral(RaxmlInstance& instance)
@@ -1896,6 +1897,13 @@ TreeTopologyList read_newick_trees(Tree& ref_tree, const std::string& fname,
 
     assert(!ref_tip_ids.empty());
 
+    if (tree.num_tips() != ref_tree.num_tips())
+    {
+      throw runtime_error(tree_kind_cap + " tree #" + to_string(bs_num+1) +
+                          " contains wrong number of tips: " + to_string(tree.num_tips()) +
+                          " (expected: " + to_string(ref_tree.num_tips()) + ")");
+    }
+
     if (!tree.binary())
     {
       LOG_DEBUG << "REF #branches: " << ref_tree.num_branches()
@@ -1983,6 +1991,9 @@ void command_support(RaxmlInstance& instance)
   refs >> ref_tree;
 
   LOG_INFO << "Reference tree size: " << to_string(ref_tree.num_tips()) << endl << endl;
+
+  if (!ref_tree.binary())
+    throw runtime_error("Reference tree contains multifurcations, this is not supported!");
 
   /* read all bootstrap trees from a Newick file */
   auto bs_trees = read_bootstrap_trees(instance, ref_tree);

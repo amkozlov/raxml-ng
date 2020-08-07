@@ -377,6 +377,7 @@ TreeTopology Tree::topology() const
   size_t branches = 0;
   for (auto n: subnodes())
   {
+    assert(n);
     if (n->node_index < n->back->node_index)
     {
       topol.edges.at(n->pmatrix_index) = TreeBranch(n->node_index, n->back->node_index, n->length);
