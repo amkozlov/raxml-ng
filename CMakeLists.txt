@@ -84,7 +84,7 @@ endif()
 message (STATUS "Building ${CMAKE_BUILD_TYPE}")
 
 set (WARN_FLAGS               "-Wall -Wextra")
-set (CMAKE_CXX_FLAGS          "-std=c++11 ${WARN_FLAGS}")
+set (CMAKE_CXX_FLAGS          "-std=gnu++11 ${WARN_FLAGS}")
 
 if (ENABLE_GMP)
 #find_package(GMP REQUIRED)

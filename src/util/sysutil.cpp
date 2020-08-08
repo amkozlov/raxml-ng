@@ -1,6 +1,13 @@
-#ifndef _WIN32
 #include <cpuid.h>
-#endif
+
+#if defined __MINGW32__
+#include <windows.h>
+#include <psapi.h>
+#include <stdint.h>
+#include <stdlib.h>
+typedef uint32_t u_int32_t;
+#define posix_memalign(p, a, s) (((*(p)) = _aligned_malloc((s), (a))), *(p) ?0 :errno)
+#else
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/types.h>
@@ -8,6 +15,8 @@
 #if defined __APPLE__
 #include <sys/sysctl.h>
 #endif
+#endif
+
 #include <stdarg.h>
 #include <limits.h>
 
@@ -62,7 +71,7 @@ void * xmemalign(size_t size, size_t alignment)
 
 double sysutil_gettime()
 {
-#ifdef WIN32 // WINDOWS build
+#if defined __MINGW32__ // WINDOWS build
         FILETIME tm;
         ULONGLONG t;
 #if defined(NTDDI_WIN8) && NTDDI_VERSION >= NTDDI_WIN8 // >= WIN8
@@ -81,6 +90,22 @@ double sysutil_gettime()
 
 void sysutil_show_rusage()
 {
+#if defined __MINGW32__
+  LARGE_INTEGER time, freq;
+
+  QueryPerformanceCounter(&time);
+  QueryPerformanceFrequency(&freq);
+
+  fprintf(stderr,
+          "Time: %.3fs (user)", 
+          static_cast<double>(time.QuadPart) / freq.QuadPart);
+
+  PROCESS_MEMORY_COUNTERS info;
+
+  GetProcessMemoryInfo(GetCurrentProcess(), &info, sizeof(info));
+
+  fprintf(stderr, " Memory: %.0fMB\n", (size_t)info.PeakWorkingSetSize * 1.0e-6);
+#else
   struct rusage r_usage;
   getrusage(RUSAGE_SELF, & r_usage);
   
@@ -98,10 +123,18 @@ void sysutil_show_rusage()
   /* Linux: ru_maxrss gives the size in kilobytes  */
   fprintf(stderr, " Memory: %.0fMB\n", r_usage.ru_maxrss * 1.0e-3);
 #endif
+#endif
 }
 
 unsigned long sysutil_get_memused()
 {
+#if defined __MINGW32__
+  PROCESS_MEMORY_COUNTERS info;
+
+  GetProcessMemoryInfo(GetCurrentProcess(), &info, sizeof(info));
+
+  return (unsigned long)(info.PeakWorkingSetSize);
+#else
   struct rusage r_usage;
   getrusage(RUSAGE_SELF, & r_usage);
 
@@ -111,6 +144,7 @@ unsigned long sysutil_get_memused()
 #else
   /* Linux: ru_maxrss gives the size in kilobytes  */
   return (unsigned long)r_usage.ru_maxrss * 1024;
+#endif
 #endif
 }
 
@@ -153,6 +187,16 @@ unsigned long sysutil_get_memtotal(bool ignore_errors)
   }
   return ram;
 
+#elif defined __MINGW32__
+
+  MEMORYSTATUSEX memory_status;
+
+  memory_status.dwLength = sizeof(MEMORYSTATUSEX);
+  if (GlobalMemoryStatusEx(&memory_status))
+    return memory_status.ullTotalPhys;
+  else
+    sysutil_fatal("Cannot determine amount of RAM");
+
 #else
 
   struct sysinfo si;
@@ -170,7 +214,7 @@ unsigned long sysutil_get_memtotal(bool ignore_errors)
 
 static void get_cpuid(int32_t out[4], int32_t x)
 {
-#ifdef _WIN32
+#ifdef __MINGW32__
   __cpuid(out, x);
 #else
   __cpuid_count(x, 0, out[0], out[1], out[2], out[3]);
@@ -417,7 +461,11 @@ double sysutil_get_energy()
 
 std::string sysutil_realpath(const std::string& path)
 {
+#if defined __MINGW32__
+  char * real_path = _fullpath(NULL, path.c_str(), PATH_MAX);
+#else
   char * real_path = realpath(path.c_str(), NULL);
+#endif
   if (real_path)
   {
     const string result(real_path);

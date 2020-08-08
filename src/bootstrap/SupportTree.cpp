@@ -1,5 +1,9 @@
 #include "SupportTree.hpp"
 
+#if defined __MINGW32__
+#define asprintf __mingw_asprintf
+#endif
+
 using namespace std;
 
 char * support_fmt_pct(double support)
