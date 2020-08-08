@@ -9,14 +9,14 @@
 using namespace terraces;
 
 LogStream& operator<<(LogStream& s,
-                      const std::pair<const terraces::bitmatrix&, const terraces::name_map&> nbm)
+                      const std::pair<const terraces::bitmatrix&, const terraces::name_map&>& nbm)
 {
   auto bm = nbm.first;
   auto names = nbm.second;
   s << bm.rows() << " " << bm.cols() << std::endl;
-  for (auto row = terraces::index{}; row < bm.rows(); ++row)
+  for (auto row = terraces::index_t{}; row < bm.rows(); ++row)
   {
-    for (auto col = terraces::index{}; col < bm.cols(); ++col)
+    for (auto col = terraces::index_t{}; col < bm.cols(); ++col)
       s << bm.get(row, col) << " ";
     s << names.at(row) <<  std::endl;
   }
@@ -26,15 +26,15 @@ LogStream& operator<<(LogStream& s,
 
 void set(terraces::bitmatrix& bm, bool val)
 {
-  for (auto row = terraces::index{}; row < bm.rows(); ++row)
-    for (auto col = terraces::index{}; col < bm.cols(); ++col)
+  for (auto row = terraces::index_t{}; row < bm.rows(); ++row)
+    for (auto col = terraces::index_t{}; col < bm.cols(); ++col)
       bm.set(row, col, val);
 }
 
 void set(terraces::bitmatrix& bm, terraces::index_map indices, bool val)
 {
   for (auto it: indices)
-    for (auto col = terraces::index{}; col < bm.cols(); ++col)
+    for (auto col = terraces::index_t{}; col < bm.cols(); ++col)
       bm.set(it.second, col, val);
 }
 

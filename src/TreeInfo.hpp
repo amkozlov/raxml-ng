@@ -4,6 +4,7 @@
 #include "common.h"
 #include "Tree.hpp"
 #include "Options.hpp"
+#include "AncestralStates.hpp"
 #include "loadbalance/PartitionAssignment.hpp"
 
 struct spr_round_params
@@ -51,6 +52,7 @@ public:
   void set_topology_constraint(const Tree& cons_tree);
 
   double loglh(bool incremental = false);
+  double persite_loglh(std::vector<double*> part_site_lh, bool incremental = false);
   double optimize_params(int params_to_optimize, double lh_epsilon);
   double optimize_params_all(double lh_epsilon)
   { return optimize_params(PLLMOD_OPT_PARAM_ALL, lh_epsilon); } ;
@@ -58,6 +60,8 @@ public:
   { return optimize_params(PLLMOD_OPT_PARAM_ALL & ~PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE, lh_epsilon); } ;
   double optimize_branches(double lh_epsilon, double brlen_smooth_factor);
   double spr_round(spr_round_params& params);
+  void compute_ancestral(const AncestralStatesSharedPtr& ancestral,
+                         const PartitionAssignment& part_assign);
 
 private:
   pllmod_treeinfo_t * _pll_treeinfo;
@@ -65,11 +69,14 @@ private:
   int _brlen_opt_method;
   double _brlen_min;
   double _brlen_max;
+  bool _check_lh_impr;
   doubleVector _partition_contributions;
 
   void init(const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
             const IDVector& tip_msa_idmap, const PartitionAssignment& part_assign,
             const std::vector<uintVector>& site_weights);
+
+  void assert_lh_improvement(double old_lh, double new_lh, const std::string& where = "");
 };
 
 void assign(PartitionedMSA& parted_msa, const TreeInfo& treeinfo);

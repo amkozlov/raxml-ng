@@ -39,6 +39,7 @@ struct TreeTopology
   const_iterator cbegin() { return edges.cbegin(); }
   const_iterator cend() { return edges.cend(); }
 
+  size_t vroot_node_id;
   edge_container edges;
   std::vector<doubleVector> brlens;
 };
@@ -58,7 +59,7 @@ public:
   virtual size_t num_inner() const { return _num_tips - 2; };
   virtual size_t num_nodes() const { return num_tips() + num_inner(); };
   virtual size_t num_subnodes() const { return num_branches() * 2; };
-  virtual size_t num_branches() const { return _num_tips + _num_tips - 3; };
+  virtual size_t num_branches() const { return _num_tips ? _num_tips + _num_tips - 3 : 0; };
   virtual size_t num_splits() const { return num_branches() - _num_tips; };
 
 protected:
@@ -94,6 +95,8 @@ public:
                              unsigned int attributes, unsigned int * score = nullptr);
   static Tree loadFromFile(const std::string& file_name);
 
+  std::vector<const char*> tip_labels_cstr() const;
+  NameList tip_labels_list() const;
   IdNameVector tip_labels() const;
   NameIdMap tip_ids() const;
 
@@ -107,14 +110,18 @@ public:
   void add_partition_brlens(doubleVector&& brlens);
 
   // TODO: use move semantics to transfer ownership?
-  pll_utree_t * pll_utree_copy() const { return pll_utree_clone(_pll_utree.get()); }
   const pll_utree_t& pll_utree() const { return *_pll_utree; }
+  pll_utree_t * pll_utree_copy() const;
+  void pll_utree(const pll_utree_t&);
+  void pll_utree(unsigned int tip_count, const pll_unode_t& root);
 
   const pll_unode_t& pll_utree_root() const { return *_pll_utree->vroot; }
   bool empty() const { return _num_tips == 0; }
 
+  void fix_outbound_brlens(double min_brlen, double max_brlen);
   void fix_missing_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
   void reset_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
+  void collapse_short_branches(double min_brlen);
   void apply_partition_brlens(size_t partition_idx);
   void apply_avg_brlens(const doubleVector& partition_contributions);
 
@@ -137,30 +144,37 @@ protected:
   PllNodeVector subnodes() const;
 };
 
+typedef std::vector<Tree> TreeList;
+typedef std::vector<TreeTopology> TreeTopologyList;
+
 typedef std::pair<double, TreeTopology> ScoredTopology;
 
-class TreeCollection
+class ScoredTopologyMap
 {
 public:
-  typedef std::vector<ScoredTopology> container_type;
+  typedef std::map<size_t, ScoredTopology> container_type;
   typedef container_type::const_iterator const_iterator;
   typedef container_type::value_type value_type;
+  typedef container_type::mapped_type mapped_type;
 
   size_t size() const { return  _trees.size(); }
   bool empty() const { return  _trees.empty(); }
+  bool contains(size_t index) const { return  _trees.count(index) > 0; }
   const_iterator best() const;
-  value_type::first_type best_score() const { return best()->first; }
-  const value_type::second_type& best_topology() const { return best()->second; }
+  double best_score() const { return best()->second.first; }
+  const TreeTopology& best_topology() const { return best()->second.second; }
+
+  const mapped_type& at(size_t index) const;
 
   const_iterator begin() const { return _trees.cbegin(); }
   const_iterator end() const { return _trees.cend(); }
 
   void clear() { _trees.clear(); };
-  void push_back(double score, const Tree& tree);
-  void push_back(double score, TreeTopology&& topol);
+  void insert(size_t index, const ScoredTopology& t) { _trees[index] = t; };
 
 private:
   container_type _trees;
 };
+
 
 #endif /* RAXML_TREE_HPP_ */

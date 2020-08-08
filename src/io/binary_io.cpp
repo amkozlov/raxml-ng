@@ -1,4 +1,5 @@
 #include "binary_io.hpp"
+#include "../Options.hpp"
 
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const std::string& s)
 {
@@ -15,6 +16,20 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::string& s)
   s.resize(len);
   stream.get(&s[0], len * sizeof(char));
 
+  return stream;
+}
+
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const SafetyCheck& c)
+{
+  stream << c.flags();
+  return stream;
+}
+
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, SafetyCheck& c)
+{
+  SafetyCheck::Flags flags;
+  stream >> flags;
+  c = flags;
   return stream;
 }
 
@@ -221,8 +236,23 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::tuple<Model&, Mode
   return stream;
 }
 
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, ModelMap& m)
+{
+  size_t num_models, part_id;
+  stream >> num_models;
+  assert(num_models == m.size());
+  for (size_t i = 0; i < num_models; ++i)
+  {
+    stream >> part_id;
+    stream >> m[part_id];
+  }
+
+  return stream;
+}
+
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const TreeTopology& t)
 {
+  stream << t.vroot_node_id;
   stream << t.edges;
   stream << t.brlens;
 
@@ -231,27 +261,29 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const TreeTopology& t)
 
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, TreeTopology& t)
 {
+  stream >> t.vroot_node_id;
   stream >> t.edges;
   stream >> t.brlens;
 
   return stream;
 }
 
-BasicBinaryStream& operator<<(BasicBinaryStream& stream, const TreeCollection& c)
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const ScoredTopologyMap& c)
 {
   stream << c.size();
   for (const auto tree: c)
-    stream << tree.first << tree.second;
+    stream << tree.first << tree.second.first << tree.second.second;
   return stream;
 }
 
-BasicBinaryStream& operator>>(BasicBinaryStream& stream, TreeCollection& c)
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, ScoredTopologyMap& c)
 {
   auto size = stream.get<size_t>();
   for (size_t i = 0; i < size; ++i)
   {
+    auto index = stream.get<size_t>();
     auto score = stream.get<double>();
-    c.push_back(score, stream.get<TreeTopology>());
+    c.insert(index, ScoredTopology(score, stream.get<TreeTopology>()));
   }
   return stream;
 }
@@ -273,7 +305,6 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const MSA& m)
   return stream;
 }
 
-
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, MSA& m)
 {
   auto taxa_count = stream.get<size_t>();
@@ -293,12 +324,69 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, MSA& m)
   return stream;
 }
 
+template<class T>
+void read_vector_range(BasicBinaryStream& stream, T* dest, const RangeList& rl, size_t total_len)
+{
+  auto dptr = dest;
+  size_t pos = 0;
+  for (auto r: rl)
+  {
+    stream.skip((r.start - pos) * sizeof(T));
+    stream.read(dptr, r.length * sizeof(T));
+    pos = r.start + r.length;
+    dptr += r.length;
+  }
+  stream.skip((total_len - pos) * sizeof(T));
+}
+
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, MSARange mr)
+{
+  auto& m = mr.first;
+
+  m = MSA(mr.second);
+
+  const auto& rl = m.local_seq_ranges();
+  const auto local_len = m.num_sites();
+
+  auto taxa_count = stream.get<size_t>();
+  auto pat_count = stream.get<size_t>();
+  auto weight_count = stream.get<size_t>();
+
+  assert(local_len <= pat_count);
+  assert(local_len <= weight_count);
+
+  WeightVector w(local_len);
+  read_vector_range(stream, &w[0], rl, pat_count);
+
+  m.weights(std::move(w));
+
+  std::string seq(local_len, 0);
+  for (size_t i = 0; i < taxa_count; ++i)
+  {
+    read_vector_range(stream, &seq[0], rl, pat_count);
+    m.append(seq);
+  }
+
+  return stream;
+}
+
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, NullMSA)
+{
+  auto taxa_count = stream.get<size_t>();
+  auto pat_count = stream.get<size_t>();
+
+  WeightVector v;
+  stream >> v;
+  stream.skip(taxa_count * pat_count);
+
+  return stream;
+}
 
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const PartitionStats& ps)
 {
   stream << ps.site_count;
   stream << ps.pattern_count;
-  stream << ps.inv_count;
+  stream << ps.inv_prop;
   stream << ps.gap_prop;
   stream << ps.emp_base_freqs;
   stream << ps.emp_subst_rates;
@@ -310,10 +398,99 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, PartitionStats& ps)
 {
   stream >> ps.site_count;
   stream >> ps.pattern_count;
-  stream >> ps.inv_count;
+  stream >> ps.inv_prop;
   stream >> ps.gap_prop;
   stream >> ps.emp_base_freqs;
   stream >> ps.emp_subst_rates;
+
+  return stream;
+}
+
+
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Options& o)
+{
+  stream << o.opt_version;
+  stream << o.cmdline;
+  stream << o.command;
+
+  stream << o.use_tip_inner << o.use_pattern_compression << o.use_prob_msa << o.use_rate_scalers;
+  stream << o.use_repeats << o.use_rba_partload << o.use_energy_monitor;
+  stream << o.optimize_model << o.optimize_brlen;
+
+  stream << o.force_mode << o.safety_checks.flags();
+
+  stream << o.redo_mode << o.nofiles_mode << o.write_interim_results;
+
+  stream << o.log_level << o.msa_format << o.data_type << o.random_seed;
+
+  stream << o.start_trees;
+
+  stream << o.lh_epsilon << o.spr_radius << o.spr_cutoff;
+  stream << o.brlen_linkage << o.brlen_opt_method << o.brlen_min << o.brlen_max;
+
+  stream << o.num_searches << o.terrace_maxsize;
+
+  stream << o.num_bootstraps << o.bs_metrics << o.bootstop_criterion;
+  stream << o.bootstop_cutoff << o.bootstop_interval << o.bootstop_permutations;
+
+  stream << o.precision << o.outgroup_taxa;
+
+  stream << o.tbe_naive;
+
+  stream << o.consense_cutoff;
+
+  stream << o.tree_file << o.constraint_tree_file << o.msa_file << o.model_file << o.weights_file;
+  stream << o.outfile_prefix;
+
+//  OutputFileNames outfile_names;
+
+  stream << o.num_threads << o.num_ranks << o.num_workers << o.num_threads_max << o.num_workers_max;
+  stream << o.simd_arch << o.thread_pinning;
+  stream << o.load_balance_method;
+
+  return stream;
+}
+
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, Options& o)
+{
+  stream >> o.opt_version;
+  stream >> o.cmdline;
+  stream >> o.command;
+
+  stream >> o.use_tip_inner >> o.use_pattern_compression >> o.use_prob_msa >> o.use_rate_scalers;
+  stream >> o.use_repeats >> o.use_rba_partload >> o.use_energy_monitor;
+  stream >> o.optimize_model >> o.optimize_brlen;
+
+  stream >> o.force_mode >> o.safety_checks;
+
+  stream >> o.redo_mode >> o.nofiles_mode >> o.write_interim_results;
+
+  stream >> o.log_level >> o.msa_format >> o.data_type >> o.random_seed;
+
+  stream >> o.start_trees;
+
+  stream >> o.lh_epsilon >> o.spr_radius >> o.spr_cutoff;
+  stream >> o.brlen_linkage >> o.brlen_opt_method >> o.brlen_min >> o.brlen_max;
+
+  stream >> o.num_searches >> o.terrace_maxsize;
+
+  stream >> o.num_bootstraps >> o.bs_metrics >> o.bootstop_criterion;
+  stream >> o.bootstop_cutoff >> o.bootstop_interval >> o.bootstop_permutations;
+
+  stream >> o.precision >> o.outgroup_taxa;
+
+  stream >> o.tbe_naive;
+
+  stream >> o.consense_cutoff;
+
+  stream >> o.tree_file >> o.constraint_tree_file >> o.msa_file >> o.model_file >> o.weights_file;
+  stream >> o.outfile_prefix;
+
+//  OutputFileNames outfile_names;
+
+  stream >> o.num_threads >> o.num_ranks >> o.num_workers >> o.num_threads_max >> o.num_workers_max;
+  stream >> o.simd_arch >> o.thread_pinning;
+  stream >> o.load_balance_method;
 
   return stream;
 }

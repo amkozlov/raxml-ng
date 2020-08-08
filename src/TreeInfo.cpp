@@ -28,6 +28,7 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
   _brlen_min = opts.brlen_min;
   _brlen_max = opts.brlen_max;
   _brlen_opt_method = opts.brlen_opt_method;
+  _check_lh_impr = opts.safety_checks.isset(SafetyCheck::model_lh_impr);
   _partition_contributions.resize(parted_msa.part_count());
   double total_weight = 0;
 
@@ -38,11 +39,8 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
   libpll_check_error("ERROR creating treeinfo structure");
   assert(_pll_treeinfo);
 
-  if (ParallelContext::num_procs() > 1)
-  {
-    pllmod_treeinfo_set_parallel_context(_pll_treeinfo, (void *) nullptr,
-                                         ParallelContext::parallel_reduce_cb);
-  }
+  pllmod_treeinfo_set_parallel_context(_pll_treeinfo, (void *) nullptr,
+                                       ParallelContext::parallel_reduce_cb);
 
   // init partitions
   int optimize_branches = opts.optimize_brlen ? PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE : 0;
@@ -77,8 +75,13 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
         libpll_check_error("ERROR adding treeinfo partition");
       }
 
-      // set per-partition branch lengths
-      if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED && !tree.partition_brlens().empty())
+      // set per-partition branch lengths or scalers
+      if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_SCALED)
+      {
+        assert (_pll_treeinfo->brlen_scalers);
+        _pll_treeinfo->brlen_scalers[p] = pinfo.model().brlen_scaler();
+      }
+      else if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED && !tree.partition_brlens().empty())
       {
         assert(_pll_treeinfo->branch_lengths[p]);
         memcpy(_pll_treeinfo->branch_lengths[p], tree.partition_brlens(p).data(),
@@ -115,6 +118,19 @@ TreeInfo::~TreeInfo ()
     pllmod_treeinfo_destroy(_pll_treeinfo);
   }
 }
+
+void TreeInfo::assert_lh_improvement(double old_lh, double new_lh, const std::string& where)
+{
+  if (_check_lh_impr && !(old_lh - new_lh < -new_lh * RAXML_LOGLH_TOLERANCE))
+  {
+    throw runtime_error((where.empty() ? "" : "[" + where + "] ") +
+                        "Worse log-likelihood after optimization!\n" +
+                        "Old: " + to_string(old_lh) + "\n"
+                        "New: " + to_string(new_lh) + "\n" +
+                        "NOTE: You can disable this check with '--force model_lh_impr'");
+  }
+}
+
 
 Tree TreeInfo::tree() const
 {
@@ -169,6 +185,14 @@ double TreeInfo::loglh(bool incremental)
 {
   return pllmod_treeinfo_compute_loglh(_pll_treeinfo, incremental ? 1 : 0);
 }
+
+double TreeInfo::persite_loglh(std::vector<double*> part_site_lh, bool incremental)
+{
+  assert(part_site_lh.size() == _pll_treeinfo->partition_count);
+  return pllmod_treeinfo_compute_loglh_persite(_pll_treeinfo, incremental ? 1 : 0,
+      part_site_lh.data());
+}
+
 
 void TreeInfo::model(size_t partition_id, const Model& model)
 {
@@ -250,7 +274,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
     LOG_DEBUG << "\t - after rates: logLH = " << new_loglh << endl;
 
     libpll_check_error("ERROR in substitution rates optimization");
-    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+    assert_lh_improvement(cur_loglh, new_loglh, "RATES");
     cur_loglh = new_loglh;
   }
 
@@ -267,7 +291,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
     LOG_DEBUG << "\t - after freqs: logLH = " << new_loglh << endl;
 
     libpll_check_error("ERROR in base frequencies optimization");
-    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+    assert_lh_improvement(cur_loglh, new_loglh, "FREQS");
     cur_loglh = new_loglh;
   }
 
@@ -288,7 +312,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
     LOG_DEBUG << "\t - after a+i  : logLH = " << new_loglh << endl;
 
     libpll_check_error("ERROR in alpha/p-inv parameter optimization");
-    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+    assert_lh_improvement(cur_loglh, new_loglh, "ALPHA+PINV");
     cur_loglh = new_loglh;
   }
   else
@@ -305,7 +329,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
      LOG_DEBUG << "\t - after alpha: logLH = " << new_loglh << endl;
 
      libpll_check_error("ERROR in alpha parameter optimization");
-     assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+     assert_lh_improvement(cur_loglh, new_loglh, "ALPHA");
      cur_loglh = new_loglh;
     }
 
@@ -321,7 +345,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
       LOG_DEBUG << "\t - after p-inv: logLH = " << new_loglh << endl;
 
       libpll_check_error("ERROR in p-inv optimization");
-      assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+      assert_lh_improvement(cur_loglh, new_loglh, "PINV");
       cur_loglh = new_loglh;
     }
   }
@@ -332,19 +356,16 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
     new_loglh = -1 * pllmod_algo_opt_rates_weights_treeinfo (_pll_treeinfo,
                                                           RAXML_FREERATE_MIN,
                                                           RAXML_FREERATE_MAX,
+                                                          _brlen_min,
+                                                          _brlen_max,
                                                           RAXML_BFGS_FACTOR,
                                                           RAXML_PARAM_EPSILON);
-
-    /* normalize scalers and scale the branches accordingly */
-    if (_pll_treeinfo->brlen_linkage == PLLMOD_COMMON_BRLEN_SCALED &&
-        _pll_treeinfo->partition_count > 1)
-      pllmod_treeinfo_normalize_brlen_scalers(_pll_treeinfo);
 
     LOG_DEBUG << "\t - after freeR: logLH = " << new_loglh << endl;
 //    LOG_DEBUG << "\t - after freeR/crosscheck: logLH = " << loglh() << endl;
 
     libpll_check_error("ERROR in FreeRate rates/weights optimization");
-    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+    assert_lh_improvement(cur_loglh, new_loglh, "FREE RATES");
     cur_loglh = new_loglh;
   }
 
@@ -352,7 +373,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
   {
     new_loglh = optimize_branches(lh_epsilon, 0.25);
 
-    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
+    assert_lh_improvement(cur_loglh, new_loglh, "BRLEN");
     cur_loglh = new_loglh;
   }
 
@@ -383,6 +404,24 @@ void TreeInfo::set_topology_constraint(const Tree& cons_tree)
     if (!retval)
       libpll_check_error("ERROR: Cannot set topological constraint");
   }
+}
+
+void TreeInfo::compute_ancestral(const AncestralStatesSharedPtr& ancestral,
+                                 const PartitionAssignment& part_assign)
+{
+  pllmod_ancestral_t * pll_ancestral = pllmod_treeinfo_compute_ancestral(_pll_treeinfo);
+
+  if (!pll_ancestral)
+    libpll_check_error("Unable to compute ancestral states", true);
+
+  assert(pll_ancestral->partition_count > 0 && pll_ancestral->partition_indices);
+
+  if (ParallelContext::master_thread())
+    assign_tree(*ancestral, *pll_ancestral);
+
+  assign_probs(*ancestral, *pll_ancestral, part_assign);
+
+  pllmod_treeinfo_destroy_ancestral(pll_ancestral);
 }
 
 void assign(PartitionedMSA& parted_msa, const TreeInfo& treeinfo)
@@ -455,9 +494,14 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
                         const PartitionRange& part_region,
                         pll_partition_t* partition, const pll_state_t * charmap)
 {
+  /* get "true" sequence offset considering that MSA can be partially loaded */
+  auto seq_offset = msa.get_local_offset(part_region.start);
+
+//  printf("\n\n rank %lu, GLOBAL OFFSET %lu, LOCAL OFFSET %lu \n\n", ParallelContext::proc_id(), part_region.start, seq_offset);
+
   /* set pattern weights */
   if (!msa.weights().empty())
-    pll_set_pattern_weights(partition, msa.weights().data() + part_region.start);
+    pll_set_pattern_weights(partition, msa.weights().data() + seq_offset);
 
   if (opts.use_prob_msa && msa.probabilistic())
   {
@@ -465,7 +509,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
     assert(partition->states == msa.states());
 
     auto normalize = !msa.normalized();
-    auto weights_start = msa.weights().cbegin() + part_region.start;
+    auto weights_start = msa.weights().cbegin() + seq_offset;
 
     // we need a libpll function for that!
     auto clv_size = partition->sites * partition->states;
@@ -473,7 +517,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
     for (size_t tip_id = 0; tip_id < partition->tips; ++tip_id)
     {
       auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
-      auto prob_start = msa.probs(seq_id, part_region.start);
+      auto prob_start = msa.probs(seq_id, seq_offset);
       build_clv(prob_start, partition->sites, weights_start, partition, normalize, tmp_clv);
       pll_set_tip_clv(partition, tip_id, tmp_clv.data(), PLL_FALSE);
     }
@@ -483,7 +527,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
     for (size_t tip_id = 0; tip_id < partition->tips; ++tip_id)
     {
       auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
-      pll_set_tip_states(partition, tip_id, charmap, msa.at(seq_id).c_str() + part_region.start);
+      pll_set_tip_states(partition, tip_id, charmap, msa.at(seq_id).c_str() + seq_offset);
     }
   }
 }
@@ -495,8 +539,9 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
 {
   assert(!weights.empty());
 
-  const auto pstart = part_region.start;
-  const auto pend = part_region.start + part_region.length;
+  const auto pstart = msa.get_local_offset(part_region.start);
+  const auto plen = part_region.length;
+  const auto pend = pstart + plen;
 
   /* compress weights array by removing all zero entries */
   uintVector comp_weights;
@@ -513,22 +558,22 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
     assert(partition->states == msa.states());
 
     auto normalize = !msa.normalized();
-    auto weights_start = msa.weights().cbegin() + part_region.start;
+    auto weights_start = msa.weights().cbegin() + pstart;
 
     // we need a libpll function for that!
-    auto clv_size = part_region.length * partition->states;
+    auto clv_size = plen * partition->states;
     std::vector<double> tmp_clv(clv_size);
     for (size_t tip_id = 0; tip_id < partition->tips; ++tip_id)
     {
       auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
-      auto prob_start = msa.probs(seq_id, part_region.start);
-      build_clv(prob_start, part_region.length, weights_start, partition, normalize, tmp_clv);
+      auto prob_start = msa.probs(seq_id, pstart);
+      build_clv(prob_start, plen, weights_start, partition, normalize, tmp_clv);
       pll_set_tip_clv(partition, tip_id, tmp_clv.data(), PLL_FALSE);
     }
   }
   else
   {
-    std::vector<char> bs_seq(part_region.length);
+    std::vector<char> bs_seq(plen);
     for (size_t tip_id = 0; tip_id < partition->tips; ++tip_id)
     {
       auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
@@ -554,11 +599,14 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
 {
   const MSA& msa = pinfo.msa();
   const Model& model = pinfo.model();
+  const auto pstart = msa.get_local_offset(part_region.start);
+
+//  printf("\n\n rank %lu, GLOBAL OFFSET %lu, LOCAL OFFSET %lu \n\n", ParallelContext::proc_id(), part_region.start, pstart);
 
   /* part_length doesn't include columns with zero weight */
   const size_t part_length = weights.empty() ? part_region.length :
-                             std::count_if(weights.begin() + part_region.start,
-                                           weights.begin() + part_region.start + part_region.length,
+                             std::count_if(weights.begin() + pstart,
+                                           weights.begin() + pstart + part_region.length,
                                            [](uintVector::value_type w) -> bool
                                              { return w > 0; }
                                            );

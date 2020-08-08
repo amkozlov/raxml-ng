@@ -12,9 +12,7 @@ void LogStream::add_stream(std::ostream* stream)
   }
 }
 
-Logging::Logging() : _log_level(LogLevel::info), _logfile(),
-    _precision_loglh(RAXML_DEFAULT_PRECISION), _precision_model(RAXML_DEFAULT_PRECISION),
-    _precision_brlen(RAXML_DEFAULT_PRECISION)
+Logging::Logging() : _log_level(LogLevel::info), _logfile()
 {
   /* add file stream to the list, even though it's to attached to a file yet */
   _full_stream.add_stream(&_logfile);
@@ -27,9 +25,10 @@ Logging& Logging::instance()
   return instance;
 }
 
-LogStream& Logging::logstream(LogLevel level)
+LogStream& Logging::logstream(LogLevel level, bool worker)
 {
-  if (ParallelContext::master() && level <= _log_level)
+  if ((ParallelContext::master() || (ParallelContext::group_master() && worker))
+      && level <= _log_level)
     return _full_stream;
   else
     return _empty_stream;
@@ -38,6 +37,11 @@ LogStream& Logging::logstream(LogLevel level)
 void Logging::set_log_filename(const std::string& fname, ios_base::openmode mode)
 {
   _logfile.open(fname, mode);
+  if (_logfile.fail())
+  {
+    throw runtime_error("Cannot open the log file for writing: " + fname +
+        "\nPlease make sure directory exists and you have write permissions for it!");
+  }
 }
 
 void Logging::add_log_stream(std::ostream* stream)
@@ -56,43 +60,24 @@ LogLevel Logging::log_level() const
   return _log_level;
 }
 
+void Logging::precision(const LogElementMap& prec)
+{
+  _precision = prec;
+}
+
 void Logging::precision(unsigned int prec, LogElement elem)
 {
-  switch(elem)
-  {
-    case LogElement::loglh:
-      _precision_loglh = prec;
-      break;
-    case LogElement::model:
-      _precision_model = prec;
-      break;
-    case LogElement::brlen:
-      _precision_brlen = prec;
-      break;
-    case LogElement::all:
-      _precision_loglh = _precision_model = _precision_brlen = prec;
-      break;
-    default:
-      assert(0);
-  }
+  _precision[elem] = prec;
 }
 
 unsigned int Logging::precision(LogElement elem) const
 {
-  switch(elem)
-  {
-    case LogElement::loglh:
-      return _precision_loglh;
-    case LogElement::model:
-      return _precision_model;
-    case LogElement::brlen:
-      return _precision_brlen;
-    case LogElement::all:
-      return RAXML_DEFAULT_PRECISION;
-    default:
-      assert(0);
-      return 0;
-  }
+  if (_precision.count(elem))
+    return _precision.at(elem);
+  else if (_precision.count(LogElement::all))
+    return _precision.at(LogElement::all);
+  else
+    return RAXML_DEFAULT_PRECISION;
 }
 
 Logging& logger()
@@ -115,10 +100,7 @@ LogStream& operator<<(LogStream& logstream, std::ostream& (*pf)(std::ostream&))
 
 LogStream& operator<<(LogStream& logstream, const time_t& t)
 {
-  std::array<char, 128> buffer;
-  const auto timeinfo = std::localtime(&t);
-  strftime(buffer.data(), sizeof(buffer), "%d-%b-%Y %H:%M:%S", timeinfo);
-  logstream << buffer.data();
+  logstream << sysutil_fmt_time(t);
 
   return logstream;
 }

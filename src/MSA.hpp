@@ -6,6 +6,16 @@
 typedef std::vector<double> ProbVector;
 typedef std::vector<ProbVector> ProbVectorList;
 
+struct Range
+{
+  size_t start;
+  size_t length;
+
+  Range(size_t s, size_t l) : start(s), length(l) {}
+};
+
+typedef std::vector<Range> RangeList;
+
 class MSA
 {
 public:
@@ -17,6 +27,8 @@ public:
   MSA() : _length(0), _num_sites(0), _states(0), _pll_msa(NULL), _dirty(false) {};
   MSA(const unsigned int num_sites) : _length(0), _num_sites(num_sites),
       _states(0), _pll_msa(nullptr), _dirty(false) {};
+  MSA(const RangeList& rl);
+
   MSA(const pll_msa_t * pll_msa);
   MSA(MSA&& other);
   MSA(const MSA& other) = delete;
@@ -27,7 +39,7 @@ public:
   MSA& operator=(const MSA& other) = delete;
 
   void append(const std::string& sequence, const std::string& header = "");
-  void compress_patterns(const pll_state_t * charmap);
+  void compress_patterns(const pll_state_t * charmap, bool store_backmap = false);
 
   bool empty() const { return _sequences.empty(); }
   size_t size() const { return _sequences.size(); }
@@ -36,6 +48,7 @@ public:
   size_t num_patterns() const { return _weights.size(); }
   const WeightVector& weights() const {return _weights; }
   const NameIdMap& label_id_map() const { return _label_id_map; }
+  const WeightVector site_pattern_map() const { return _site_pattern_map; }
   const pll_msa_t * pll_msa() const;
 
   const container& labels() const { return _labels; };
@@ -58,10 +71,13 @@ public:
   doubleVector state_freqs() const;
 
   void num_sites(const unsigned int sites) { _num_sites = sites; }
-  void weights(const WeightVector& v) { _weights = v; update_num_sites(); }
-  void weights(WeightVector&& v) { _weights = std::move(v); update_num_sites(); }
+  void weights(const WeightVector& v);
+  void weights(WeightVector&& v);
 
   void remove_sites(const std::vector<size_t>& site_indices);
+
+  const RangeList& local_seq_ranges() const;
+  size_t get_local_offset(size_t global_offset) const;
 
   //Iterator Compatibility
   iterator begin() { return _sequences.begin(); }
@@ -82,7 +98,9 @@ private:
   container _labels;
   NameIdMap _label_id_map;
   WeightVector _weights;
+  WeightVector _site_pattern_map;
   ProbVectorList _probs;
+  RangeList _local_seq_ranges;
   size_t _states;
   mutable pll_msa_t * _pll_msa;
   mutable bool _dirty;
@@ -91,6 +109,8 @@ private:
   void free_pll_msa() noexcept;
 
   void update_num_sites();
+
+  void local_seq_ranges(const RangeList& rl);
 };
 
 #endif /* RAXML_MSA_HPP_ */

@@ -4,8 +4,10 @@
 ResourceEstimator::ResourceEstimator(const PartitionedMSA& parted_msa, const Options& opts)
 {
   _taxon_clv_size = parted_msa.taxon_clv_size();
+
   _num_patterns = opts.use_pattern_compression ? parted_msa.total_patterns() :
                                                  parted_msa.total_sites();
+
   _num_taxa = parted_msa.taxon_count();
   _num_partitions = parted_msa.part_count();
 }

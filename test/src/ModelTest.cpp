@@ -4,6 +4,27 @@
 
 using namespace std;
 
+string list_to_string(const NameList& list)
+{
+  string res = "";
+  for (auto& s: list)
+    res += s;
+
+  return res;
+}
+
+template<typename T>
+string map_to_string(const unordered_map<T, string>& map)
+{
+  string res = "";
+  for (auto it: map)
+    res += it.second;
+
+  std::sort(res.begin(), res.end());
+
+  return res;
+}
+
 TEST(ModelTest, defaults)
 {
   // buildup
@@ -18,6 +39,8 @@ TEST(ModelTest, defaults)
   EXPECT_EQ(model.num_ratecats(), 1);
   EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_FREQUENCIES);
   EXPECT_EQ(model.num_free_params(), 8);
+  EXPECT_EQ(list_to_string(model.state_names()), "ACGT");
+  EXPECT_EQ(map_to_string(model.full_state_namemap()), "-ABCDGHKMRSTVWY");
 }
 
 TEST(ModelTest, GTR)
@@ -153,6 +176,8 @@ TEST(ModelTest, LGFI)
   EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_GAMMA);
   EXPECT_EQ(model.num_ratecats(), 8);
   EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_PINV | PLLMOD_OPT_PARAM_ALPHA);
+  EXPECT_EQ(list_to_string(model.state_names()), "ARNDCQEGHILKMFPSTWYV");
+  EXPECT_EQ(map_to_string(model.full_state_namemap()), "*ABCDEFGHIJKLMNPQRSTVWYZ");
 }
 
 TEST(ModelTest, LG4X)
@@ -240,6 +265,7 @@ TEST(ModelTest, multistate)
   EXPECT_EQ(PLLMOD_OPT_PARAM_ALPHA, model.params_to_optimize());
   EXPECT_NE(nullptr, model.charmap());
   EXPECT_EQ(model.num_free_params(), 1);
+  EXPECT_EQ(list_to_string(model.state_names()), "01234567");
 
   model = Model(DataType::autodetect, "MULTI53_GTR");
   EXPECT_EQ(DataType::multistate, model.data_type());
@@ -247,4 +273,92 @@ TEST(ModelTest, multistate)
   EXPECT_EQ(PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_FREQUENCIES,
             model.params_to_optimize());
   EXPECT_EQ(model.num_free_params(), (53*(53-1) / 2 - 1) + (53-1));
+  EXPECT_EQ(list_to_string(model.state_names()), "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#$%&'()*+,/:;<=");
 }
+
+TEST(ModelTest, multistate_custom)
+{
+  // buildup
+  auto model = Model(DataType::autodetect, "MULTI6_GTR+M{AbCDef}{X-?}");
+
+  // tests
+  EXPECT_EQ("MULTI6_GTR+FO+M{AbCDef}{X-?}", model.to_string());
+  EXPECT_EQ(DataType::multistate, model.data_type());
+  EXPECT_EQ("MULTI6_GTR", model.name());
+  EXPECT_EQ(6, model.num_states());
+  EXPECT_EQ(PLLMOD_UTIL_MIXTYPE_FIXED, model.ratehet_mode());
+  EXPECT_EQ(1, model.num_ratecats());
+  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_FREQUENCIES);
+  EXPECT_NE(nullptr, model.charmap());
+  EXPECT_EQ(model.num_free_params(), 19);
+  EXPECT_EQ(list_to_string(model.state_names()), "AbCDef");
+  EXPECT_EQ(map_to_string(model.full_state_namemap()), "-ACDbef");
+
+  model = Model(DataType::autodetect, "MULTI5_MK+Mi{AbCdF}+F+G+I");
+  EXPECT_EQ("MULTI5_MK+FC+I+G4m+Mi{AbCdF}", model.to_string());
+  EXPECT_EQ(DataType::multistate, model.data_type());
+  EXPECT_EQ("MULTI5_MK", model.name());
+  EXPECT_EQ(5, model.num_states());
+  EXPECT_EQ(PLLMOD_UTIL_MIXTYPE_GAMMA, model.ratehet_mode());
+  EXPECT_EQ(4, model.num_ratecats());
+  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_ALPHA | PLLMOD_OPT_PARAM_PINV);
+  EXPECT_NE(nullptr, model.charmap());
+  EXPECT_EQ(6, model.num_free_params());
+  EXPECT_EQ(list_to_string(model.state_names()), "ABCDF");
+  EXPECT_EQ(map_to_string(model.full_state_namemap()), "ABCDF");
+}
+
+TEST(ModelTest, genotype)
+{
+  // buildup
+  auto model = Model(DataType::autodetect, "GTGTR4");
+
+  // tests
+  EXPECT_EQ("GTGTR4+FO", model.to_string());
+  EXPECT_EQ(DataType::genotype10, model.data_type());
+  EXPECT_EQ("GTGTR4", model.name());
+  EXPECT_EQ(10, model.num_states());
+  EXPECT_EQ(PLLMOD_UTIL_MIXTYPE_FIXED, model.ratehet_mode());
+  EXPECT_EQ(1, model.num_ratecats());
+  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_FREQUENCIES);
+  EXPECT_NE(nullptr, model.charmap());
+  EXPECT_EQ(model.num_free_params(), 15);
+  EXPECT_EQ(list_to_string(model.state_names()), "ACGTMRWSYK");
+  EXPECT_EQ(map_to_string(model.full_state_namemap()), "-ACGKMRSTWY");
+}
+
+
+TEST(ModelTest, DNA_usersym)
+{
+  // buildup
+  auto model = Model(DataType::autodetect, "DNA001122");
+
+  // tests
+  EXPECT_EQ(model.to_string(), "DNA001122+FO");
+  EXPECT_EQ(model.data_type(), DataType::dna);
+  EXPECT_EQ(model.name(), "DNA001122");
+  EXPECT_EQ(model.num_states(), 4);
+  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_FIXED);
+  EXPECT_EQ(model.num_ratecats(), 1);
+  EXPECT_EQ(model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES), ParamValue::ML);
+  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_FREQUENCIES);
+  EXPECT_EQ(model.num_free_params(), 5);
+}
+
+TEST(ModelTest, multistate_usersym)
+{
+  // buildup
+  auto model = Model(DataType::autodetect, "MULTI5_USER1234561231+FC+G");
+
+  // tests
+  EXPECT_EQ(model.to_string(), "MULTI5_USER1234561231+FC+G4m");
+  EXPECT_EQ(model.data_type(), DataType::multistate);
+  EXPECT_EQ(model.name(), "MULTI5_USER1234561231");
+  EXPECT_EQ(model.num_states(), 5);
+  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_GAMMA);
+  EXPECT_EQ(model.num_ratecats(), 4);
+  EXPECT_EQ(model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES), ParamValue::ML);
+  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_ALPHA);
+  EXPECT_EQ(model.num_free_params(), 10);
+}
+

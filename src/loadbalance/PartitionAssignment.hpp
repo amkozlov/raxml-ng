@@ -29,6 +29,7 @@ struct PartitionAssignment
 
   PartitionAssignment() : _length(0.0), _weight(0.0) {}
 
+  bool empty() const { return _part_range_list.empty(); }
   size_t num_parts() const { return _part_range_list.size(); }
   size_t length() const { return _length; }
   double weight() const { return _weight; }

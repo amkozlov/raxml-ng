@@ -33,11 +33,9 @@ WeightVector BootstrapGenerator::generate(const MSA& msa, unsigned long random_s
 
 WeightVector BootstrapGenerator::generate(const MSA& msa, RandomGenerator& gen)
 {
-  auto orig_weights = msa.weights();
   unsigned int orig_len = msa.num_sites();
   unsigned int comp_len = msa.length();
 
-  WeightVector result(comp_len, 0);
   WeightVector w_buf(orig_len, 0);
 
   std::uniform_int_distribution<unsigned int> distr(0, orig_len-1);
@@ -48,13 +46,23 @@ WeightVector BootstrapGenerator::generate(const MSA& msa, RandomGenerator& gen)
     w_buf[site]++;
   }
 
-  unsigned int pos = 0;
-  for (unsigned int i = 0; i < comp_len; ++i)
+  if (orig_len == comp_len)
+    return w_buf;
+  else
   {
-    for (unsigned int j = 0; j < orig_weights[i]; ++j)
-      result[i] += w_buf[pos++];
-  }
+    WeightVector result(comp_len, 0);
+    auto orig_weights = msa.weights();
 
-  return result;
+    assert(!orig_weights.empty());
+
+    unsigned int pos = 0;
+    for (unsigned int i = 0; i < comp_len; ++i)
+    {
+      for (unsigned int j = 0; j < orig_weights[i]; ++j)
+        result[i] += w_buf[pos++];
+    }
+
+    return result;
+  }
 }
 

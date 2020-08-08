@@ -112,6 +112,7 @@ TEST(LoadBalanceTest, testSMALL)
   part_sizes.assign_sites(3, 0, 218, 20);
 
   // tests
+  check_assignment_all(part_sizes, 2);
   check_assignment_all(part_sizes, 4);
   check_assignment_all(part_sizes, 16);
   check_assignment_all(part_sizes, 32);
@@ -129,6 +130,22 @@ TEST(LoadBalanceTest, testSMALL2)
   part_sizes.assign_sites(3, 0, 228, 16);
 
   // tests
+  check_assignment_all(part_sizes, 2);
+  check_assignment_all(part_sizes, 4);
+  check_assignment_all(part_sizes, 16);
+  check_assignment_all(part_sizes, 32);
+}
+
+TEST(LoadBalanceTest, testSMALL3)
+{
+  // buildup
+  PartitionAssignment part_sizes;
+
+  part_sizes.assign_sites(0, 0, 234, 16);
+  part_sizes.assign_sites(1, 0, 235, 16);
+
+  // tests
+  check_assignment_all(part_sizes, 2);
   check_assignment_all(part_sizes, 4);
   check_assignment_all(part_sizes, 16);
   check_assignment_all(part_sizes, 32);

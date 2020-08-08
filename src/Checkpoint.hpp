@@ -5,8 +5,15 @@
 #include "TreeInfo.hpp"
 #include "io/binary_io.hpp"
 
-constexpr int CKP_VERSION = 1;
-constexpr int CKP_MIN_SUPPORTED_VERSION = 1;
+constexpr int RAXML_CKP_VERSION = 5;
+constexpr int RAXML_CKP_MIN_SUPPORTED_VERSION = 5;
+
+struct MLTree
+{
+  double loglh;
+  Tree tree;
+  ModelMap models;
+};
 
 enum class CheckpointStep
 {
@@ -36,42 +43,64 @@ struct SearchState
 
 struct Checkpoint
 {
-  Checkpoint() : version(CKP_VERSION), elapsed_seconds(0.), search_state(), tree(), models() {}
+  Checkpoint() : search_state(), tree_index(0), tree(), models(), last_loglh(0.) {}
 
-  Checkpoint(const Checkpoint&) = delete;
-  Checkpoint& operator=(const Checkpoint&) = delete;
+  Checkpoint(const Checkpoint&) = default;
+  Checkpoint& operator=(const Checkpoint&) = default;
   Checkpoint(Checkpoint&&) = default;
   Checkpoint& operator=(Checkpoint&&) = default;
 
-  int version;
-
-  double elapsed_seconds;
-
   SearchState search_state;
 
+  size_t tree_index;
   Tree tree;
-  std::unordered_map<size_t, Model> models;
-
-  TreeCollection ml_trees;
-  TreeCollection bs_trees;
+  ModelMap models;
+  double last_loglh;
 
   double loglh() const { return search_state.loglh; }
 
-  void save_ml_tree() { ml_trees.push_back(loglh(), tree); }
-  void save_bs_tree() { bs_trees.push_back(loglh(), tree); }
+  void reset_search_state();
+};
+
+struct CheckpointFile
+{
+  CheckpointFile() : version(RAXML_CKP_VERSION), elapsed_seconds(0.), consumed_wh(0.) {}
+
+  int version;
+  double elapsed_seconds;
+  double consumed_wh;
+  Options opts;
+
+  std::vector<Checkpoint> checkp_list;
+
+  ModelMap best_models;         /* model parameters for the best-scoring ML tree */
+  ScoredTopologyMap ml_trees;   /* ML trees from all individual searches*/
+  ScoredTopologyMap bs_trees;   /* bootstrap replicate trees */
+
+  MLTree best_tree() const;
+  Tree tree() const;
+
+  void write_tmp_tree(const Tree& tree, const std::string fname, bool append = false) const;
+  void write_tmp_best_tree() const;
+  void write_tmp_ml_tree(const Tree& tree) const;
+  void write_tmp_bs_tree(const Tree& tree) const;
 };
 
 class CheckpointManager
 {
 public:
-  CheckpointManager(const std::string& ckp_fname) : _active(true), _ckp_fname(ckp_fname) {}
+  CheckpointManager(const Options& opts);
 
-  const Checkpoint& checkpoint() { return _checkp; }
-  void checkpoint(Checkpoint&& ckp) { _checkp = std::move(ckp); }
+  const CheckpointFile& checkp_file() const { return _checkp_file;  }
+
+  const Checkpoint& checkpoint(size_t ckp_id = ParallelContext::local_group_id()) const;
+  Checkpoint& checkpoint(size_t ckp_id = ParallelContext::local_group_id());
 
   //TODO: this is not very elegant, but should do the job for now
   SearchState& search_state();
   void reset_search_state();
+
+  void init_checkpoints(const Tree& tree, const ModelCRefMap& models);
 
   void enable() { _active = true; }
   void disable() { _active = false; }
@@ -90,10 +119,13 @@ public:
   void backup() const;
   void remove_backup() const;
 
+  void gather_ml_trees();
+  void gather_bs_trees();
+
 private:
   bool _active;
   std::string _ckp_fname;
-  Checkpoint _checkp;
+  CheckpointFile _checkp_file;
   IDSet _updated_models;
   SearchState _empty_search_state;
 
@@ -103,6 +135,9 @@ private:
 
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Checkpoint& ckp);
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, Checkpoint& ckp);
+
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const CheckpointFile& ckpfile);
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, CheckpointFile& ckpfile);
 
 void assign_tree(Checkpoint& ckp, const TreeInfo& treeinfo);
 void assign_models(Checkpoint& ckp, const TreeInfo& treeinfo);

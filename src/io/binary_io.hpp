@@ -1,6 +1,7 @@
 #ifndef RAXML_BINARY_IO_HPP_
 #define RAXML_BINARY_IO_HPP_
 
+#include "BinaryStream.hpp"
 #include "../Model.hpp"
 #include "../Tree.hpp"
 
@@ -14,91 +15,9 @@ enum class ModelBinaryFmt
 
 typedef std::tuple<const Model&, ModelBinaryFmt> BinaryModel;
 
-class BasicBinaryStream
-{
-public:
-  virtual ~BasicBinaryStream() {}
+struct NullMSA {};
 
-  template<typename T>
-  T get()
-  {
-    T tmp;
-    *this >> tmp;
-//    get(&tmp, sizeof(T));
-    return tmp;
-  }
-
-  void get(void *data, size_t size) { read(data, size); };
-  void put(const void *data, size_t size) { write(data, size); };
-
-public:
-  virtual void read(void *data, size_t size) = 0;
-  virtual void write(const void *data, size_t size) = 0;
-};
-
-class BinaryStream : public BasicBinaryStream
-{
-public:
-  BinaryStream(char * buf, size_t size)
-  {
-    _buf = buf;
-    _ptr = buf;
-    _size = size;
-  }
-
-  ~BinaryStream() {}
-
-//  template<typename T>
-//  T get()
-//  {
-//    T tmp;
-//    *this >> tmp;
-//    return tmp;
-//  }
-
-  const char* buf() { return _buf; }
-  size_t size() const { return _size; }
-  size_t pos() const { return _ptr - _buf;}
-  char* reset() { _ptr = _buf; return _buf; }
-
-public:
-  void write(const void *data, size_t size)
-  {
-    if (_ptr + size > _buf + _size)
-      throw std::out_of_range("BinaryStream::put");
-
-    memcpy(_ptr, data, size);
-    _ptr += size;
-  }
-
-  void read(void *data, size_t size)
-  {
-    if (_ptr + size > _buf + _size)
-      throw std::out_of_range("BinaryStream::get");
-
-    memcpy(data, _ptr, size);
-    _ptr += size;
-  }
-
-private:
-  char * _buf;
-  char * _ptr;
-  size_t _size;
-};
-
-class BinaryFileStream : public BasicBinaryStream
-{
-public:
-  BinaryFileStream(const std::string fname, std::ios_base::openmode mode) :
-    _fstream(fname, std::ios::binary | mode) {}
-
-public:
-  void write(const void *data, size_t size) { _fstream.write((char*) data, size); }
-  void read(void *data, size_t size) { _fstream.read((char*) data, size); }
-
-private:
-  std::fstream _fstream;
-};
+typedef std::pair<MSA&,RangeList&> MSARange;
 
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const std::string& s);
 
@@ -120,8 +39,28 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const std::vector<T>& v
   return stream;
 }
 
+template<typename T>
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const std::set<T>& s)
+{
+  stream << s.size();
+  for (auto const& v: s)
+    stream << v;
+
+  return stream;
+}
+
 template<typename T1, typename T2>
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const std::unordered_map<T1,T2>& map)
+{
+  stream << map.size();
+  for (auto const& e: map)
+    stream << e.first << e.second;
+
+  return stream;
+}
+
+template<typename T1, typename T2>
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const std::map<T1,T2>& map)
 {
   stream << map.size();
   for (auto const& e: map)
@@ -158,8 +97,39 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::vector<T>& vec)
   return stream;
 }
 
+template<typename T>
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::set<T>& s)
+{
+  size_t set_size;
+  stream >> set_size;
+
+  for (size_t i = 0; i < set_size; ++i)
+    s.insert(stream.get<T>());
+
+  return stream;
+}
+
 template<typename T1, typename T2>
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::unordered_map<T1,T2>& map)
+{
+  size_t map_size;
+  stream >> map_size;
+
+  map.clear();
+
+  T1 key;
+  T2 val;
+  for (size_t i = 0; i < map_size; ++i)
+  {
+    stream >> key >> val;
+    map.emplace(key, val);
+  }
+
+  return stream;
+}
+
+template<typename T1, typename T2>
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::map<T1,T2>& map)
 {
   size_t map_size;
   stream >> map_size;
@@ -186,6 +156,7 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, std::tuple<const Model&
 
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, Model& m);
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::tuple<Model&, ModelBinaryFmt> bm);
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, ModelMap& m);
 
 /**
  * Partition I/O
@@ -199,6 +170,8 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, PartitionStats& ps);
  */
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const MSA& m);
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, MSA& m);
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, MSARange mr);
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, NullMSA);
 
 /**
  * TreeTopology I/O
@@ -209,8 +182,14 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, TreeTopology& t);
 /**
  * TreeCollection I/O
  */
-BasicBinaryStream& operator<<(BasicBinaryStream& stream, const TreeCollection& c);
-BasicBinaryStream& operator>>(BasicBinaryStream& stream, TreeCollection& c);
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const ScoredTopologyMap& c);
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, ScoredTopologyMap& c);
+
+/**
+ * Options I/O
+ */
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Options& o);
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, Options& o);
 
 #endif
 

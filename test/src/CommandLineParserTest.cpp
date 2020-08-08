@@ -1,6 +1,7 @@
 #include "RaxmlTest.hpp"
 
 #include "src/CommandLineParser.hpp"
+#include "src/io/binary_io.hpp"
 
 using namespace std;
 
@@ -41,6 +42,22 @@ void parse_options(string &cmd, CommandLineParser &parser, Options &opts,
   mutx.Unlock();
 }
 
+void compare_opts(const Options& opts1, const Options& opts2)
+{
+  EXPECT_EQ(opts1.command, opts2.command);
+  EXPECT_EQ(opts1.outfile_prefix, opts2.outfile_prefix);
+  EXPECT_EQ(opts1.outfile_prefix, opts2.outfile_prefix);
+  EXPECT_EQ(opts1.cmdline, opts2.cmdline);
+  EXPECT_EQ(opts1.num_threads, opts2.num_threads);
+
+  std::stringstream s1, s2;
+
+  s1 << opts1;
+  s2 << opts2;
+
+  EXPECT_EQ(s1.str(), s2.str());
+}
+
 TEST(CommandLineParserTest, help)
 {
   // buildup
@@ -76,6 +93,10 @@ TEST(CommandLineParserTest, search_minimal)
   EXPECT_EQ(Command::search, options.command);
   EXPECT_EQ("data.fa", options.msa_file);
   EXPECT_EQ("GTR", options.model_file);
+  EXPECT_EQ(2, options.start_trees.size());
+  EXPECT_EQ(10, options.start_trees.at(StartingTree::random));
+  EXPECT_EQ(10, options.start_trees.at(StartingTree::parsimony));
+  EXPECT_EQ(20, options.num_searches);
 }
 
 TEST(CommandLineParserTest, search_complex1)
@@ -90,7 +111,7 @@ TEST(CommandLineParserTest, search_complex1)
   EXPECT_EQ(Command::search, options.command);
   EXPECT_EQ("data.fa", options.msa_file);
   EXPECT_EQ(1, options.start_trees.size());
-  EXPECT_EQ(1, options.start_trees.count(StartingTree::user));
+  EXPECT_EQ(1, options.start_trees.at(StartingTree::user));
   EXPECT_EQ("start.tre", options.tree_file);
   EXPECT_EQ("JC69", options.model_file);
   EXPECT_EQ(4, options.num_threads);
@@ -109,7 +130,7 @@ TEST(CommandLineParserTest, search_complex2)
   parse_options(cmd, parser, options, false);
   EXPECT_EQ(Command::search, options.command);
   EXPECT_EQ(1, options.start_trees.size());
-  EXPECT_EQ(1, options.start_trees.count(StartingTree::random));
+  EXPECT_EQ(10, options.start_trees.at(StartingTree::random));
   EXPECT_EQ("myRun", options.outfile_prefix);
   EXPECT_TRUE(options.use_prob_msa);
   EXPECT_EQ(PLLMOD_COMMON_BRLEN_LINKED, options.brlen_linkage);
@@ -131,8 +152,9 @@ TEST(CommandLineParserTest, all_default)
   EXPECT_EQ(10, options.start_trees.at(StartingTree::random));
   EXPECT_EQ(10, options.start_trees.at(StartingTree::parsimony));
   EXPECT_EQ(20, options.num_searches);
-  EXPECT_EQ(100, options.num_bootstraps);
-  EXPECT_EQ(PLLMOD_COMMON_BRLEN_LINKED, options.brlen_linkage);
+  EXPECT_EQ(1000, options.num_bootstraps);
+  EXPECT_EQ(BootstopCriterion::autoMRE, options.bootstop_criterion);
+  EXPECT_EQ(PLLMOD_COMMON_BRLEN_SCALED, options.brlen_linkage);
 }
 
 TEST(CommandLineParserTest, all_complex)
@@ -143,7 +165,7 @@ TEST(CommandLineParserTest, all_complex)
 
   // fancy search command
   string cmd = "raxml-ng --all --msa data.fa --model part.txt --tree rand{30},pars{20},my.tree "
-      "--bs-trees 1000 --prefix myBS";
+      "--bs-trees 1000 --prefix myBS --brlen unlinked";
   parse_options(cmd, parser, options, false);
   EXPECT_EQ(Command::all, options.command);
   EXPECT_EQ("my.tree", options.tree_file);
@@ -154,7 +176,7 @@ TEST(CommandLineParserTest, all_complex)
   EXPECT_EQ(51, options.num_searches);
   EXPECT_EQ(1000, options.num_bootstraps);
   EXPECT_EQ("myBS", options.outfile_prefix);
-  EXPECT_EQ(PLLMOD_COMMON_BRLEN_LINKED, options.brlen_linkage);
+  EXPECT_EQ(PLLMOD_COMMON_BRLEN_UNLINKED, options.brlen_linkage);
 }
 
 TEST(CommandLineParserTest, eval_wrong)
@@ -200,4 +222,46 @@ TEST(CommandLineParserTest, eval_complex)
   EXPECT_FALSE(options.optimize_brlen);
   EXPECT_DOUBLE_EQ(0.02, options.lh_epsilon);
 }
+
+
+TEST(CommandLineParserTest, options_copy)
+{
+  // buildup
+  CommandLineParser parser;
+  Options opts;
+
+  string cmd = "raxml-ng --all --msa data.fa --model GTR --tree rand{10},pars{5} --bs-metric fbp,tbe "
+      "--outgroup taxon1,taxon2 --prefix test --threads 2";
+  parse_options(cmd, parser, opts, false);
+
+  Options opts2 = opts;
+
+  compare_opts(opts, opts2);
+}
+
+TEST(CommandLineParserTest, options_serialize)
+{
+  // buildup
+  CommandLineParser parser;
+  Options opts, opts2;
+  const std::string fname = "tmpfile";
+
+  string cmd = "raxml-ng --all --msa data.fa --model GTR --tree rand{10},pars{5} --bs-metric fbp,tbe "
+      "--outgroup taxon1,taxon2 --prefix test --threads 2";
+  parse_options(cmd, parser, opts, false);
+
+  {
+    BinaryFileStream bos(fname, ios::out);
+    bos << opts;
+  }
+
+  {
+    BinaryFileStream bis(fname, ios::in);
+    bis >> opts2;
+    sysutil_file_remove(fname);
+  }
+
+  compare_opts(opts, opts2);
+}
+
 

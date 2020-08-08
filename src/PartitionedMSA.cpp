@@ -16,6 +16,15 @@ PartitionedMSA& PartitionedMSA::operator=(PartitionedMSA&& other)
    return *this;
 }
 
+ModelCRefMap PartitionedMSA::models() const
+{
+  ModelCRefMap mmap;
+  for (size_t p = 0; p < part_count(); ++p)
+    mmap.emplace(p, _part_list.at(p).model());
+
+  return mmap;
+}
+
 void PartitionedMSA::set_taxon_names(const NameList& taxon_names)
 {
   _taxon_names.assign(taxon_names.cbegin(), taxon_names.cend());
@@ -25,11 +34,11 @@ void PartitionedMSA::set_taxon_names(const NameList& taxon_names)
   assert(_taxon_names.size() == taxon_names.size() && _taxon_id_map.size() == taxon_names.size());
 }
 
-std::vector<unsigned int> PartitionedMSA::get_site_part_assignment()
+uintVector PartitionedMSA::get_site_part_assignment() const
 {
-  const size_t full_len = _full_msa.num_sites();
+  const size_t full_len = _full_msa.length();
 
-  std::vector<unsigned int> spa(full_len);
+  uintVector spa(full_len);
 
   size_t p = 0;
   for (auto& pinfo: _part_list)
@@ -60,6 +69,64 @@ std::vector<unsigned int> PartitionedMSA::get_site_part_assignment()
   return spa;
 }
 
+const uintVector& PartitionedMSA::site_part_map() const
+{
+  if (_site_part_map.empty() && part_count() > 1)
+    _site_part_map = get_site_part_assignment();
+
+  return _site_part_map;
+}
+
+size_t PartitionedMSA::full_msa_site(size_t index, size_t site) const
+{
+  if (part_count() == 1)
+    return site;
+  else
+  {
+    size_t cur_site = site;
+    auto index_map = site_part_map();
+
+    // TODO: this can be optimized
+    for (size_t i = 0; i < index_map.size(); ++i)
+    {
+      if (index_map[i] == index+1)
+      {
+        if (!cur_site)
+          return i;
+
+        cur_site--;
+      }
+    }
+
+    throw runtime_error("Site " + to_string(site+1) +
+                        " not found in partition " +  to_string(index+1));
+  }
+}
+
+/*
+ *  This function returns a pair (partition_id, local_site_id) for each site in
+ *  the original, full, uncompressed MSA file.
+ */
+IdPairVector PartitionedMSA::full_to_parted_sitemap() const
+{
+  auto total_sites = this->total_sites();
+  assert(site_part_map().empty() || site_part_map().size() == total_sites);
+
+  IdPairVector sitemap(total_sites);
+  IDVector part_site_idx(part_count(), 0);
+  for (size_t i = 0; i < total_sites; ++i)
+  {
+    auto pid = site_part_map().empty() ? 0 : site_part_map()[i] - 1;
+    auto sid = part_site_idx[pid]++;
+    auto spmap = part_info(pid).msa().site_pattern_map();
+    sitemap[i].first = pid;
+    sitemap[i].second = spmap.empty() ? sid : spmap[sid];
+  }
+
+  return sitemap;
+}
+
+
 void PartitionedMSA::full_msa(MSA&& msa)
 {
   _full_msa = std::move(msa);
@@ -69,34 +136,64 @@ void PartitionedMSA::full_msa(MSA&& msa)
 
 void PartitionedMSA::split_msa()
 {
-  if (part_count() > 1)
-  {
-    auto site_part = get_site_part_assignment();
+  bool need_split;
+  string full_range = "1-" + to_string(_full_msa.length());
 
+  if (part_count() == 0)
+    return;
+
+  if (part_count() == 1)
+  {
+    const string& first_range = _part_list[0].range_string();
+    need_split = !first_range.empty() && first_range != full_range && first_range != "all";
+  }
+  else
+    need_split = true;
+
+  if (need_split)
+  {
     /* split MSA into partitions */
     pll_msa_t ** part_msa_list =
-        pllmod_msa_split(_full_msa.pll_msa(), site_part.data(), part_count());
+        pllmod_msa_split(_full_msa.pll_msa(), site_part_map().data(), part_count());
 
     for (size_t p = 0; p < part_count(); ++p)
     {
       part_msa(p, part_msa_list[p]);
       pll_msa_destroy(part_msa_list[p]);
+
+      /* distribute external site weights to per-partition MSAs */
+      if (!_full_msa.weights().empty())
+      {
+        auto& msa = _part_list[p].msa();
+        WeightVector w(msa.length());
+        const auto full_weights = _full_msa.weights();
+        assert(full_weights.size() == site_part_map().size());
+
+        size_t pos = 0;
+        for (size_t i = 0; i < site_part_map().size(); ++i)
+        {
+          if (_site_part_map[i] == p+1)
+            w[pos++] = full_weights[i];
+        }
+        assert(pos == msa.length());
+        msa.weights(w);
+      }
     }
     free(part_msa_list);
   }
   else
   {
     if (_part_list[0].range_string().empty())
-      _part_list[0].range_string("1-" + to_string(_full_msa.num_sites()));
+      _part_list[0].range_string(full_range);
     part_msa(0, std::move(_full_msa));
   }
 }
 
-void PartitionedMSA::compress_patterns()
+void PartitionedMSA::compress_patterns(bool store_backmap)
 {
   for (PartitionInfo& pinfo: _part_list)
   {
-    pinfo.compress_patterns();
+    pinfo.compress_patterns(store_backmap);
   }
 }
 
@@ -106,7 +203,7 @@ size_t PartitionedMSA::total_length() const
 
   for (const auto& pinfo: _part_list)
   {
-    sum += pinfo.msa().length();
+    sum += pinfo.length();
   }
 
   return sum;
@@ -186,7 +283,7 @@ std::ostream& operator<<(std::ostream& stream, const PartitionedMSA& part_msa)
 
 //    stream << fixed;
     stream << "Gaps: " << setprecision(2) << (pstats.gap_prop * 100) << " %" << endl;
-    stream << "Invariant sites: " << setprecision(2) << (pstats.inv_prop() * 100) << " %" << endl;
+    stream << "Invariant sites: " << setprecision(2) << (pstats.inv_prop * 100) << " %" << endl;
     stream << endl;
   }
 

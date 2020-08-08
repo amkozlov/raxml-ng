@@ -11,19 +11,33 @@ const vector<int> ALL_MODEL_PARAMS = {PLLMOD_OPT_PARAM_FREQUENCIES, PLLMOD_OPT_P
 const unordered_map<DataType,unsigned int,EnumClassHash>  DATATYPE_STATES { {DataType::dna, 4},
                                                                             {DataType::protein, 20},
                                                                             {DataType::binary, 2},
-                                                                            {DataType::diploid10, 10}
+                                                                            {DataType::genotype10, 10}
                                                                           };
 
 const unordered_map<DataType,const pll_state_t*,EnumClassHash>  DATATYPE_MAPS {
   {DataType::dna, pll_map_nt},
   {DataType::protein, pll_map_aa},
   {DataType::binary, pll_map_bin},
-  {DataType::diploid10, pll_map_diploid10}
+  {DataType::genotype10, pll_map_gt10}
 };
+
+const unordered_map<DataType,string,EnumClassHash>  DATATYPE_PREFIX { {DataType::dna, "DNA"},
+                                                                      {DataType::protein, "PROT"},
+                                                                      {DataType::binary, "BIN"},
+                                                                      {DataType::genotype10, "GT"},
+                                                                      {DataType::multistate, "MULTI"},
+                                                                      {DataType::autodetect, "AUTO"}
+                                                                    };
+
 
 
 // TODO move it out of here
-class parse_error {};
+class parse_error : public runtime_error
+{
+public:
+  parse_error(const std::string& msg = "") : runtime_error(msg) {};
+};
+
 static string read_option(istringstream& s)
 {
   ostringstream os;
@@ -43,8 +57,8 @@ static bool read_param(istringstream& s, string& val)
     // consume the opening bracket
     s.get();
 
-    char str[1024];
-    if (!s.getline(str, 1024, delim))
+    string str;
+    if (!std::getline(s, str, delim))
       throw parse_error();
     val = str;
 
@@ -105,8 +119,8 @@ static bool read_param_file(istringstream& s, std::vector<T>& vec)
     // consume the opening bracket
     s.get();
 
-    char fname[1024];
-    s.getline(fname, 1024, delim);
+    string fname;
+    std::getline(s, fname, delim);
     if (sysutil_file_exists(fname))
     {
       ifstream fs(fname);
@@ -202,7 +216,7 @@ std::string Model::data_type_name() const
       return "DNA";
     case DataType::protein:
       return "AA";
-    case DataType::diploid10:
+    case DataType::genotype10:
       return "GT";
     case DataType::multistate:
       return "MULTI" + std::to_string(_num_states);
@@ -219,7 +233,7 @@ void Model::autodetect_data_type(const std::string &model_name)
   {
     if (pllmod_util_model_exists_genotype(model_name.c_str()))
     {
-      _data_type = DataType::diploid10;
+      _data_type = DataType::genotype10;
     }
     else if (pllmod_util_model_exists_mult(model_name.c_str()))
     {
@@ -234,9 +248,23 @@ void Model::autodetect_data_type(const std::string &model_name)
     {
       _data_type = DataType::protein;
     }
-    else
+    else if (pllmod_util_model_exists_dna(model_name.c_str()))
     {
       _data_type = DataType::dna;
+    }
+    else
+    {
+      /* try to guess datatype from model prefix */
+      if (isprefix(model_name, "DNA"))
+        _data_type = DataType::dna;
+      else if (isprefix(model_name, "PROT"))
+        _data_type = DataType::protein;
+      else if (isprefix(model_name, "GT"))
+        _data_type = DataType::genotype10;
+      else if (isprefix(model_name, "MULTI"))
+        _data_type = DataType::multistate;
+      else
+        _data_type = DataType::dna;   /* assume DNA by default & hope for the best */
     }
   }
 }
@@ -244,6 +272,7 @@ void Model::autodetect_data_type(const std::string &model_name)
 pllmod_mixture_model_t * Model::init_mix_model(const std::string &model_name)
 {
   const char * model_cstr = model_name.c_str();
+  const std::string& prefix = DATATYPE_PREFIX.at(_data_type);
   pllmod_mixture_model_t * mix_model = nullptr;
 
   if (pllmod_util_model_exists_protmix(model_cstr))
@@ -267,7 +296,7 @@ pllmod_mixture_model_t * Model::init_mix_model(const std::string &model_name)
     {
       modinfo =  pllmod_util_model_create_custom("BIN", 2, NULL, NULL, NULL, NULL);
     }
-    else if (_data_type == DataType::diploid10)
+    else if (_data_type == DataType::genotype10)
     {
       modinfo =  pllmod_util_model_info_genotype(model_cstr);
     }
@@ -276,10 +305,15 @@ pllmod_mixture_model_t * Model::init_mix_model(const std::string &model_name)
       modinfo =  pllmod_util_model_info_mult(model_cstr);
     }
 
-    // TODO: user models must be defined explicitly
-//    /* pre-defined model not found; assume model string encodes rate symmetries */
-//    if (!modinfo)
-//      modinfo =  pllmod_util_model_create_custom("USER", _num_states, NULL, NULL, model_cstr, NULL);
+    /* pre-defined model not found; assume model string encodes rate symmetries */
+    if (!modinfo && isprefix(model_name, prefix) && _data_type != DataType::multistate)
+    {
+      pllmod_reset_error();
+
+      const char * custom_sym_cstr = model_cstr + prefix.size();
+      modinfo =  pllmod_util_model_create_custom(model_cstr, _num_states, NULL, NULL,
+                                                 custom_sym_cstr, NULL);
+    }
 
     if (!modinfo)
     {
@@ -298,6 +332,46 @@ pllmod_mixture_model_t * Model::init_mix_model(const std::string &model_name)
 
   return mix_model;
 }
+
+void Model::set_user_srates(doubleVector& srates, bool normalize)
+{
+  auto smodel = _submodels[0];
+
+  // normalize the rates
+  if (normalize)
+  {
+    auto last_rate = smodel.rate_sym().empty() ?
+                                srates.back() : srates[smodel.rate_sym().back()];
+    for (auto& r: srates)
+      r /= last_rate;
+  }
+
+  for (auto& m: _submodels)
+    m.uniq_subst_rates(srates);
+
+  _param_mode[PLLMOD_OPT_PARAM_SUBST_RATES] = ParamValue::user;
+}
+
+void Model::set_user_freqs(doubleVector& freqs)
+{
+  bool invalid = false;
+  for (auto v: freqs)
+  {
+    invalid |= (v < 0. || v >= 1.);
+  }
+
+  if (invalid)
+  {
+    throw runtime_error("Invalid base frequencies specified! "
+        "Frequencies must be positive numbers between 0. and 1.");
+  }
+
+  for (auto& m: _submodels)
+    m.base_freqs(freqs);
+
+  _param_mode[PLLMOD_OPT_PARAM_FREQUENCIES] = ParamValue::user;
+}
+
 
 void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_model_t& mix_model)
 {
@@ -347,23 +421,42 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
 
       auto smodel = _submodels[0];
       auto num_uniq_rates = smodel.num_uniq_rates();
-      if (user_srates.size() != num_uniq_rates)
+      if (user_srates.size() == num_uniq_rates + _num_states)
+      {
+        // read as PAML file (rates + frequencies)
+        doubleVector rates(num_uniq_rates);
+
+        // convert rates: lower triangle (PAML) -> upper triangle (libpll)
+        for (size_t i = 0, j = 0, stride = 1, col = 1, start_col = 0; i < num_uniq_rates; ++i)
+        {
+          rates[i] = user_srates[j];
+          j += stride;
+          if (stride == _num_states-1)
+          {
+            ++col;
+            start_col += col;
+            j = start_col;
+            stride = col;
+          }
+          else
+            ++stride;
+        }
+
+        set_user_srates(rates, false);
+
+        doubleVector freqs(user_srates.cbegin() + num_uniq_rates, user_srates.cend());
+        set_user_freqs(freqs);
+      }
+      else if (user_srates.size() == num_uniq_rates)
+      {
+        set_user_srates(user_srates, true);
+      }
+      else
       {
         throw runtime_error("Invalid number of substitution rates specified: " +
                             std::to_string(user_srates.size()) + " (expected: " +
                             std::to_string(num_uniq_rates) + ")\n");
       }
-
-      // normalize the rates
-      auto last_rate = smodel.rate_sym().empty() ?
-                                  user_srates.back() : user_srates[smodel.rate_sym().back()];
-      for (auto& r: user_srates)
-        r /= last_rate;
-
-      for (auto& m: _submodels)
-        m.uniq_subst_rates(user_srates);
-
-      _param_mode[PLLMOD_OPT_PARAM_SUBST_RATES] = ParamValue::user;
     }
   }
   catch(parse_error& e)
@@ -496,20 +589,7 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
                            std::to_string(_num_states) + "\n");
                 }
 
-                bool invalid = false;
-                for (auto v: user_freqs)
-                {
-                  invalid |= (v <= 0. || v >= 1.);
-                }
-
-                if (invalid)
-                {
-                  throw runtime_error("Invalid base frequencies specified! "
-                      "Frequencies must be positive numbers between 0. and 1.");
-                }
-
-                for (auto& m: _submodels)
-                  m.base_freqs(user_freqs);
+                set_user_freqs(user_freqs);
               }
               else
                 throw parse_error();
@@ -592,35 +672,49 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
       case 'M':
         try
         {
-           std::string state_chars, gap_chars;
-           int case_sensitive = 1;
+          if (tolower(ss.peek()) == 'i')
+          {
+            ss.get();
+            _custom_case_sensitive = false;
+          }
+          else
+            _custom_case_sensitive = true;
 
-           if (tolower(ss.peek()) == 'i')
-           {
-             ss.get();
-             case_sensitive = 0;
-           }
+          if (!read_param(ss, _custom_states))
+            throw parse_error();
 
-           if (!read_param(ss, state_chars))
-             throw parse_error();
+          read_param(ss, _custom_gaps);
 
-           read_param(ss, gap_chars);
+          if (sysutil_file_exists(_custom_states) && _custom_gaps.empty())
+          {
+            /* read custom character map from a file */
+            _custom_charmap = shared_ptr<pll_state_t>(
+                pllmod_util_charmap_parse(_num_states,
+                                          _custom_states.c_str(),
+                                          _custom_case_sensitive ? 1 : 0,
+                                          nullptr),
+                free);
+          }
+          else
+          {
+            _custom_charmap = shared_ptr<pll_state_t>(
+                pllmod_util_charmap_create(_num_states,
+                                           _custom_states.c_str(),
+                                           _custom_gaps.c_str(),
+                                           _custom_case_sensitive ? 1 : 0),
+                free);
+          }
 
-           _custom_charmap = shared_ptr<pll_state_t>(
-               pllmod_util_charmap_create(_num_states,
-                                          state_chars.c_str(),
-                                          gap_chars.c_str(),
-                                          case_sensitive),
-               free);
-           if (!_custom_charmap)
-           {
-             assert(pll_errno);
-             throw parse_error();
-           }
+          if (!_custom_charmap)
+          {
+            assert(pll_errno);
+            throw parse_error(pll_errmsg);
+          }
         }
         catch(parse_error& e)
         {
-          throw runtime_error(string("Invalid character map specification: ") + s);
+          throw runtime_error(string("Invalid character map specification: ") + s +
+              (e.what() ? "\n" + string(e.what()) : ""));
         }
         break;
       case 'R':
@@ -882,6 +976,14 @@ std::string Model::to_string(bool print_params, unsigned int precision) const
       break;
   }
 
+  if (!_custom_states.empty())
+  {
+    model_string << "+M" << (_custom_case_sensitive ? "" : "i");
+    model_string << "{" << _custom_states << "}";
+    if (!_custom_gaps.empty())
+      model_string << "{" << _custom_gaps << "}";
+  }
+
   return model_string.str();
 }
 
@@ -946,6 +1048,50 @@ unsigned int Model::num_free_params() const
   return free_params;
 }
 
+void Model::init_state_names() const
+{
+  auto map = charmap();
+
+  if (!charmap())
+    return;
+
+  _state_names.resize(_num_states);
+
+  for (size_t i = 0; i < PLL_ASCII_SIZE; ++i)
+  {
+    auto state = map[i];
+    auto popcnt = PLL_STATE_POPCNT(state);
+    if (popcnt > 0 && !_full_state_namemap.count(state))
+    {
+      string state_name;
+      state_name = (char) i;
+
+      _full_state_namemap[state] = state_name;
+
+      if (popcnt == 1)
+      {
+        auto idx = PLL_STATE_CTZ(state);
+        _state_names[idx] = state_name;
+      }
+    }
+  }
+}
+
+const NameList& Model::state_names() const
+{
+  if (_state_names.empty())
+    init_state_names();
+
+  return _state_names;
+}
+
+const StateNameMap& Model::full_state_namemap() const
+{
+  if (_full_state_namemap.empty())
+    init_state_names();
+
+  return _full_state_namemap;
+}
 
 void assign(Model& model, const pll_partition_t * partition)
 {

@@ -3,8 +3,10 @@ cmake_minimum_required (VERSION 3.0.2 FATAL_ERROR)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES  ON)
 
+set(RAXML_BINARY_NAME "" CACHE STRING "Custom RAxML-NG binary name")
 set(USE_LIBPLL_CMAKE ON CACHE BOOL "Use CMake to build libpll and pll-modules")
 set(BUILD_AS_LIBRARY OFF CACHE BOOL "Build RAxML-NG as shared library (instead of stand-alone executable)")
+set(PLLMOD_DEBUG OFF CACHE BOOL "Debug pll-modules (tons of console output!)")
 
 set (USE_PTHREADS ON CACHE BOOL "Enable multi-threading support (PTHREADS)")
 set (USE_MPI OFF CACHE BOOL "Enable MPI support")
@@ -19,7 +21,7 @@ set (ENABLE_PLLMOD_SIMD OFF CACHE BOOL "Enable SIMD instructions in pll-modules 
 set(STATIC_BUILD OFF CACHE BOOL "Build static binary")
 
 set(USE_TERRAPHAST ON CACHE BOOL "Use phylogentic terraces library (terraphast) ")
-set(USE_GMP OFF CACHE BOOL "Use Gnu Muliple precision (GMP) library ")
+set(USE_GMP OFF CACHE BOOL "Use GNU Multiple precision (GMP) library ")
 
 set(ENABLE_PTHREADS ${USE_PTHREADS})
 
@@ -68,8 +70,8 @@ if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS RAXML_COMPILER_TARGET_VERSION)
 endif()
 
 
-set (raxml-ng_VERSION_MAJOR 0)
-set (raxml-ng_VERSION_MINOR 6)
+set (raxml-ng_VERSION_MAJOR 1)
+set (raxml-ng_VERSION_MINOR 0)
 
 #set (CMAKE_BUILD_TYPE DEBUG)
 #set (CMAKE_BUILD_TYPE RELEASE)

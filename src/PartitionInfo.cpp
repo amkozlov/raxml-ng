@@ -8,7 +8,19 @@ PartitionInfo::~PartitionInfo ()
 {
 }
 
-size_t PartitionInfo::mark_partition_sites(unsigned int part_num, std::vector<unsigned int>& site_part)
+size_t PartitionInfo::length() const
+{
+  const auto& st = stats();
+  return st.pattern_count ? st.pattern_count : st.site_count;
+}
+
+size_t PartitionInfo::taxon_clv_size(bool partial) const
+{
+  auto sites = partial ? (_msa.num_patterns() ? _msa.num_patterns() : _msa.num_sites()) : length();
+  return _model.clv_entry_size() * sites;
+}
+
+size_t PartitionInfo::mark_partition_sites(unsigned int part_num, std::vector<unsigned int>& site_part) const
 {
   size_t start, end, stride;
   size_t i;
@@ -62,9 +74,9 @@ size_t PartitionInfo::mark_partition_sites(unsigned int part_num, std::vector<un
   return sites_assigned;
 }
 
-void PartitionInfo::compress_patterns()
+void PartitionInfo::compress_patterns(bool store_backmap)
 {
-  _msa.compress_patterns(model().charmap());
+  _msa.compress_patterns(model().charmap(), store_backmap);
 }
 
 pllmod_msa_stats_t * PartitionInfo::compute_stats(unsigned long stats_mask) const
@@ -106,7 +118,8 @@ const PartitionStats& PartitionInfo::stats() const
 
     _stats.site_count = _msa.num_sites();
     _stats.pattern_count = _msa.num_patterns();
-    _stats.inv_count = pll_stats->inv_cols_count;
+    _stats.inv_prop = pll_stats->inv_prop;
+
     _stats.gap_prop = pll_stats->gap_prop;
     _stats.gap_seqs.assign(pll_stats->gap_seqs, pll_stats->gap_seqs + pll_stats->gap_seqs_count);
 
@@ -134,11 +147,11 @@ void assign(Model& model, const PartitionStats& stats)
   switch (model.param_mode(PLLMOD_OPT_PARAM_PINV))
   {
     case ParamValue::empirical:
-      model.pinv(stats.inv_prop());
+      model.pinv(stats.inv_prop);
       break;
     case ParamValue::ML:
       /* use half of empirical pinv as a starting value */
-      model.pinv(stats.inv_prop() / 2);
+      model.pinv(stats.inv_prop / 2);
       break;
     case ParamValue::user:
     case ParamValue::undefined:

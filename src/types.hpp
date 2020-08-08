@@ -6,6 +6,7 @@
 #include <array>
 #include <set>
 #include <map>
+#include <queue>
 #include <unordered_map>
 #include <unordered_set>
 #include <random>
@@ -29,10 +30,15 @@ enum class Command
   all,
   support,
   bsconverge,
+  bsmsa,
   terrace,
   check,
   parse,
-  start
+  start,
+  rfdist,
+  consense,
+  ancestral,
+  sitelh
 };
 
 enum class FileFormat
@@ -53,7 +59,7 @@ enum class DataType
   protein,
   binary,
   multistate,
-  diploid10
+  genotype10
 };
 
 enum class ParamValue
@@ -102,6 +108,15 @@ enum class InformationCriterion
   bic
 };
 
+namespace ConsenseCutoff
+{
+  enum ConsenseCutoff : unsigned int
+  {
+    MRE = 0,
+    MR = 50,
+    strict = 100
+  };
+};
 
 const std::string ParamValueNames[] = {"undefined", "equal", "user", "model", "empirical", "ML"};
 
@@ -109,6 +124,8 @@ typedef std::vector<double> doubleVector;
 typedef std::vector<int> intVector;
 typedef std::vector<unsigned int> uintVector;
 typedef std::vector<std::string> NameList;
+typedef std::pair<size_t,size_t> IdPair;
+typedef std::vector<IdPair> IdPairVector;
 typedef std::pair<size_t,std::string> IdNamePair;
 typedef std::vector<IdNamePair> IdNameVector;
 typedef std::unordered_map<size_t,std::string> IdNameMap;
@@ -116,6 +133,7 @@ typedef std::unordered_map<std::string,size_t> NameIdMap;
 typedef std::unordered_map<std::string,std::string> NameMap;
 typedef std::set<size_t> IDSet;
 typedef std::vector<size_t> IDVector;
+typedef std::queue<size_t> IDQueue;
 typedef std::map<StartingTree,size_t> StartingTreeMap;
 
 typedef unsigned int WeightType;

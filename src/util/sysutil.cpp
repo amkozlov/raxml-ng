@@ -1,6 +1,4 @@
 #include <cpuid.h>
-#include <stdarg.h>
-#include <limits.h>
 
 #if defined __MINGW32__
 #include <windows.h>
@@ -9,20 +7,23 @@
 #include <stdlib.h>
 typedef uint32_t u_int32_t;
 #define posix_memalign(p, a, s) (((*(p)) = _aligned_malloc((s), (a))), *(p) ?0 :errno)
-#elif defined __APPLE__
-#include <sys/time.h>
-#include <sys/resource.h>
-#include <sys/types.h>
-#include <sys/sysctl.h>
 #else
 #include <sys/time.h>
 #include <sys/resource.h>
-#include <sys/sysinfo.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#if defined __APPLE__
+#include <sys/sysctl.h>
+#endif
 #endif
 
-#include <chrono>
+#include <stdarg.h>
+#include <limits.h>
 
-#include "common.h"
+#include <chrono>
+#include <thread>
+
+#include "../common.h"
 
 using namespace std;
 
@@ -43,10 +44,12 @@ void sysutil_fatal_libpll()
   sysutil_fatal("ERROR(%d): %s\n", pll_errno, pll_errmsg);
 }
 
-void libpll_check_error(const std::string& errmsg = "ERROR in libpll")
+void libpll_check_error(const std::string& errmsg, bool force)
 {
   if (pll_errno)
     throw runtime_error(errmsg +  " (LIBPLL-" + to_string(pll_errno) + "): " + string(pll_errmsg));
+  else if (force)
+    throw runtime_error("Unknown LIBPLL error.");
 }
 
 void libpll_reset_error()
@@ -145,7 +148,7 @@ unsigned long sysutil_get_memused()
 #endif
 }
 
-unsigned long sysutil_get_memtotal()
+unsigned long sysutil_get_memtotal(bool ignore_errors)
 {
 #if defined(_SC_PHYS_PAGES) && defined(_SC_PAGESIZE)
 
@@ -153,7 +156,12 @@ unsigned long sysutil_get_memtotal()
   long pagesize = sysconf(_SC_PAGESIZE);
 
   if ((phys_pages == -1) || (pagesize == -1))
-    sysutil_fatal("Cannot determine amount of RAM");
+  {
+    if (ignore_errors)
+      return 0;
+    else
+      throw runtime_error("Cannot determine amount of RAM");
+  }
 
   // sysconf(3) notes that pagesize * phys_pages can overflow, such as
   // when long is 32-bits and there's more than 4GB RAM.  Since vsearch
@@ -171,7 +179,12 @@ unsigned long sysutil_get_memtotal()
   int64_t ram = 0;
   size_t length = sizeof(ram);
   if(-1 == sysctl(mib, 2, &ram, &length, NULL, 0))
-    sysutil_fatal("Cannot determine amount of RAM");
+  {
+    if (ignore_errors)
+      return 0;
+    else
+      throw runtime_error("Cannot determine amount of RAM");
+  }
   return ram;
 
 #elif defined __MINGW32__
@@ -188,7 +201,12 @@ unsigned long sysutil_get_memtotal()
 
   struct sysinfo si;
   if (sysinfo(&si))
-    sysutil_fatal("Cannot determine amount of RAM");
+  {
+    if (ignore_errors)
+      return 0;
+    else
+      throw runtime_error("Cannot determine amount of RAM");
+  }
   return si.totalram * si.mem_unit;
 
 #endif
@@ -196,7 +214,86 @@ unsigned long sysutil_get_memtotal()
 
 static void get_cpuid(int32_t out[4], int32_t x)
 {
+#ifdef __MINGW32__
+  __cpuid(out, x);
+#else
   __cpuid_count(x, 0, out[0], out[1], out[2], out[3]);
+#endif
+}
+
+size_t read_id_from_file(const std::string &filename)
+{
+  ifstream f(filename);
+  if (f.good())
+  {
+    size_t id;
+    f >> id;
+    return id;
+  }
+  else
+    throw runtime_error("couldn't open sys files");
+}
+
+size_t get_numa_node_id(const std::string &cpu_path)
+{
+  // this is ugly, but should be reliable -> please blame Linux kernel developers & Intel!
+  string node_path = cpu_path + "../node";
+  for (size_t i = 0; i < 1000; ++i)
+  {
+    if (sysutil_dir_exists(node_path + to_string(i)))
+      return i;
+  }
+
+  // fallback solution: return socket_id which is often identical to numa id
+  return read_id_from_file(cpu_path + "physical_package_id");
+}
+
+size_t get_core_id(const std::string &cpu_path)
+{
+  return read_id_from_file(cpu_path + "core_id");
+}
+
+int get_physical_core_count(size_t n_cpu)
+{
+#if defined(__linux__)
+  unordered_set<size_t> cores;
+  for (size_t i = 0; i < n_cpu; ++i)
+  {
+    string cpu_path = "/sys/devices/system/cpu/cpu" + to_string(i) + "/topology/";
+    size_t core_id = get_core_id(cpu_path);
+    size_t node_id = get_numa_node_id(cpu_path);
+    size_t uniq_core_id = (node_id << 16) + core_id;
+    cores.insert(uniq_core_id);
+  }
+  return cores.size();
+#else
+  RAXML_UNUSED(n_cpu);
+  throw std::runtime_error("This function only supports linux");
+#endif
+}
+
+static bool ht_enabled()
+{
+  int32_t info[4];
+
+  get_cpuid(info, 1);
+
+  return (bool) (info[3] & (0x1 << 28));
+}
+
+unsigned int sysutil_get_cpu_cores()
+{
+  auto lcores = std::thread::hardware_concurrency();
+  try
+  {
+    return get_physical_core_count(lcores);
+  }
+  catch (const std::runtime_error&)
+  {
+    auto threads_per_core = ht_enabled() ? 2 : 1;
+
+    return lcores / threads_per_core;
+  }
 }
 
 unsigned long sysutil_get_cpu_features()
@@ -294,6 +391,74 @@ unsigned int sysutil_simd_autodetect()
     return PLL_ATTRIB_ARCH_CPU;
 }
 
+#if defined(__linux__)
+static string get_cpuinfo_linux(const string& key)
+{
+  string value = "(not found)";
+  ifstream fs("/proc/cpuinfo");
+  if (fs.good())
+  {
+    string line;
+    while (!fs.eof())
+    {
+      std::getline(fs, line, '\n');
+      if (strncmp(line.c_str(), key.c_str(), key.length()) == 0)
+      {
+        size_t offset = key.length();
+        while ((isspace(line[offset]) || line[offset] == ':') && offset < line.length())
+          offset++;
+        value = line.c_str() + offset;
+        break;
+      }
+    }
+  }
+
+  return value;
+}
+#endif
+
+string sysutil_get_cpu_model()
+{
+  string model = "unknown CPU";
+#if defined(__linux__)
+  model = get_cpuinfo_linux("model name");
+#elif defined(__APPLE__)
+  char str[256];
+  size_t len = 256;
+  if (sysctlbyname("machdep.cpu.brand_string", &str, &len, NULL, 0) == 0)
+    model = str;
+#endif
+  return model;
+}
+
+double sysutil_get_energy()
+{
+  double energy = 0;
+  size_t max_packages = 32;
+  try
+  {
+    for(size_t i = 0; i < max_packages; i++)
+    {
+      double pkg_energy;
+      auto fname = "/sys/class/powercap/intel-rapl/intel-rapl:" + to_string(i) + "/energy_uj";
+      if (!sysutil_file_exists(fname))
+        break;
+      ifstream fs(fname);
+      fs >> pkg_energy;
+      energy += pkg_energy;
+    }
+    energy /= 1e6; // convert to Joules
+    energy /= 3600; // convert to Wh
+    return energy;
+  }
+  catch(const std::runtime_error& e)
+  {
+    printf("Error getting energy: %s\n", e.what());
+    return 0;
+  }
+}
+
+
 std::string sysutil_realpath(const std::string& path)
 {
 #if defined __MINGW32__
@@ -329,12 +494,54 @@ std::string sysutil_realpath(const std::string& path)
 
 bool sysutil_file_exists(const std::string& fname, int access_mode)
 {
-  return access(fname.c_str(), access_mode) == 0;
+  return !sysutil_dir_exists(fname) && access(fname.c_str(), access_mode) == 0;
 }
+
+bool sysutil_dir_exists(const std::string& dname)
+{
+  struct stat info;
+
+  if( stat( dname.c_str(), &info ) != 0 )
+    return false;
+  else if( info.st_mode & S_IFDIR )
+    return true;
+  else
+    return false;
+}
+
+void sysutil_file_remove(const std::string& fname, bool must_exist)
+{
+  if (sysutil_file_exists(fname))
+    std::remove(fname.c_str());
+  else if (must_exist)
+    throw runtime_error("File does not exist: " + fname);
+}
+
 
 const SystemTimer& global_timer()
 {
   return systimer;
 }
 
+string sysutil_fmt_time(const time_t& t)
+{
+  std::array<char, 128> buffer;
+  const auto timeinfo = std::localtime(&t);
+  strftime(buffer.data(), sizeof(buffer), "%d-%b-%Y %H:%M:%S", timeinfo);
+  return buffer.data();
+}
+
+bool sysutil_isnumber(const std::string& str)
+{
+  if (str.empty())
+    return false;
+  else
+  {
+    const char* s = str.c_str();
+    while (*s)
+      if (!isdigit(*s++)) return false;
+
+    return true;
+  }
+}
 

@@ -1,8 +1,10 @@
 file(GLOB RAXML_SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp 
+                        ${PROJECT_SOURCE_DIR}/src/util/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/io/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/bootstrap/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/autotune/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/loadbalance/*.cpp
+                        ${PROJECT_SOURCE_DIR}/src/topology/*.cpp
                         )
 
 if(USE_TERRAPHAST)
@@ -55,6 +57,7 @@ set(RAXML_LIBS ${LIBPLL_LIBS} m)
 
 if(USE_TERRAPHAST)
   set(RAXML_LIBS ${RAXML_LOCALDEPS_DIR}/lib/libterraces.a ${RAXML_LIBS})
+  add_dependencies(raxml_module terraces)
 endif()
 
 # export to the parent dir to use in GTest makefile
@@ -86,12 +89,18 @@ if(MPI_LINK_FLAGS)
                           LINK_FLAGS "${MPI_LINK_FLAGS}")
 endif()
 
-if(MPI_FOUND)
-  set_target_properties(raxml_module PROPERTIES OUTPUT_NAME raxml-ng-mpi)
-elseif(STATIC_BUILD)
-  set_target_properties(raxml_module PROPERTIES OUTPUT_NAME raxml-ng-static)
+if(RAXML_BINARY_NAME)
+  set_target_properties(raxml_module PROPERTIES OUTPUT_NAME ${RAXML_BINARY_NAME})	
 else()
-  set_target_properties(raxml_module PROPERTIES OUTPUT_NAME raxml-ng)
+  if(MPI_FOUND)
+    set_target_properties(raxml_module PROPERTIES OUTPUT_NAME raxml-ng-mpi)
+  elseif(STATIC_BUILD)
+    set_target_properties(raxml_module PROPERTIES OUTPUT_NAME raxml-ng-static)
+  else()
+    set_target_properties(raxml_module PROPERTIES OUTPUT_NAME raxml-ng)
+  endif()
 endif()
 
 set_target_properties(raxml_module PROPERTIES PREFIX "")
+
+install(TARGETS raxml_module DESTINATION bin)

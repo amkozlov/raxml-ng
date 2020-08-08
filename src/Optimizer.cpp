@@ -30,10 +30,9 @@ double Optimizer::optimize_model(TreeInfo& treeinfo, double lh_epsilon)
     new_loglh = treeinfo.loglh();
 
 //      printf("old: %f, new: %f\n", cur_loglh, new_loglh);
-    assert(cur_loglh - new_loglh < -new_loglh * RAXML_DOUBLE_TOLERANCE);
 
     iter_num++;
-//    LOG_PROGRESS(new_loglh) << "Iteration %d: logLH = %f\n", iter_num, new_loglh);
+    LOG_DEBUG << "Iteration " << iter_num <<  ": logLH = " << new_loglh << endl;
   }
   while (new_loglh - cur_loglh > lh_epsilon);
 
@@ -46,7 +45,7 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
   const double interim_modopt_eps = 3.;
 
   SearchState local_search_state = cm.search_state();
-  auto& search_state = ParallelContext::master_thread() ? cm.search_state() : local_search_state;
+  auto& search_state = ParallelContext::group_master_thread() ? cm.search_state() : local_search_state;
   ParallelContext::barrier();
 
   /* set references such that we can work directly with checkpoint values */
@@ -84,7 +83,6 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
     cm.update_and_write(treeinfo);
     LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << fast_modopt_eps << ")" << endl;
     loglh = optimize_model(treeinfo, fast_modopt_eps);
-  //  print_model_params(treeinfo, useropt);
 
     /* start spr rounds from the beginning */
     iter = 0;
@@ -246,7 +244,7 @@ double Optimizer::evaluate(TreeInfo& treeinfo, CheckpointManager& cm)
   const double fast_modopt_eps = 10.;
 
   SearchState local_search_state = cm.search_state();
-  auto& search_state = ParallelContext::master_thread() ? cm.search_state() : local_search_state;
+  auto& search_state = ParallelContext::group_master_thread() ? cm.search_state() : local_search_state;
   ParallelContext::barrier();
 
   double &loglh = search_state.loglh;
