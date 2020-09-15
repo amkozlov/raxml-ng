@@ -82,9 +82,7 @@ static void check_assignment_benoit(const PartitionAssignment& part_sizes,
   auto opt_thread_parts = ((double) stats.total_parts) / stats.num_cores;
 
 //  std::cout << "threads: " << num_proc << ", " << stats << std::endl;
-
-//  if (num_proc == 4 && part_sizes.num_parts() == 4)
-//    std::cout << pa_list;
+//  std::cout << pa_list;
 
   EXPECT_GT(stats.min_thread_parts, 0);
   EXPECT_LE(stats.max_thread_parts, opt_thread_parts + 1);
@@ -177,4 +175,66 @@ TEST(LoadBalanceTest, testLARGE)
     check_assignment_all(part_sizes, 512);
     check_assignment_all(part_sizes, 1999);
   }
+}
+
+TEST(LoadBalanceTest, testSTUPID1)
+{
+  // buildup
+  PartitionAssignment part_sizes;
+
+  part_sizes.assign_sites(0, 0, 479, 80);
+
+  // tests
+  try
+  {
+    check_assignment_all(part_sizes, 480);
+    FAIL() << "exception expected but not thrown!";
+  }
+  catch (LoadBalancerException& e)
+  {
+    // expected
+  }
+}
+
+TEST(LoadBalanceTest, testSTUPID2)
+{
+  // buildup
+  PartitionAssignment part_sizes;
+
+  part_sizes.assign_sites(0, 0, 480, 80);
+
+  // tests
+  check_assignment_all(part_sizes, 480);
+}
+
+TEST(LoadBalanceTest, testSTUPID3)
+{
+  // buildup
+  PartitionAssignment part_sizes;
+
+  part_sizes.assign_sites(0, 0, 15, 16);
+  part_sizes.assign_sites(1, 0, 10, 80);
+
+  // tests
+  try
+  {
+    check_assignment_all(part_sizes, 30);
+    FAIL() << "exception expected but not thrown!";
+  }
+  catch (LoadBalancerException& e)
+  {
+    // expected
+  }
+}
+
+TEST(LoadBalanceTest, testSTUPID4)
+{
+  // buildup
+  PartitionAssignment part_sizes;
+
+  part_sizes.assign_sites(0, 0, 30, 16);
+  part_sizes.assign_sites(1, 0, 20, 80);
+
+  // tests
+  check_assignment_all(part_sizes, 25);
 }

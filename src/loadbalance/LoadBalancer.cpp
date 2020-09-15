@@ -23,7 +23,16 @@ PartitionAssignmentList LoadBalancer::get_all_assignments(const PartitionAssignm
   if (num_procs == 1)
     return PartitionAssignmentList(1, part_sizes);
   else
+  {
+    if (part_sizes.length() < num_procs)
+    {
+      throw LoadBalancerException("There are fewer alignment sites (" +
+                                  to_string(part_sizes.length()) +
+                                  ") than processes (" + to_string(num_procs) + ")!");
+    }
+
     return compute_assignments(part_sizes, num_procs);
+  }
 }
 
 PartitionAssignment LoadBalancer::get_proc_assignments(const PartitionAssignment& part_sizes,

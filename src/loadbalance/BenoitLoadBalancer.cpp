@@ -21,6 +21,8 @@ struct BalancerState
   size_t curr_part;
   size_t current_bin;
   size_t remaining;
+  size_t total_remaining;
+  size_t empty_bins;
 
   stack<PartitionAssignment *> qlow_;
   stack<PartitionAssignment *> qhigh_;
@@ -30,6 +32,7 @@ static void init(BalancerState& s, const PartitionAssignment& part_sizes, size_t
 {
   s.num_procs = num_procs;
   s.bins.resize(s.num_procs);
+  s.empty_bins = s.num_procs;
   s.num_parts = part_sizes.num_parts();
 
   // Sort the partitions by size in ascending order
@@ -40,25 +43,45 @@ static void init(BalancerState& s, const PartitionAssignment& part_sizes, size_t
           { return (r1->weight() < r2->weight());} );
 
   double total_weight =   part_sizes.weight();
+  double total_sites =   part_sizes.length();
   double max_site_weight = 0.;
+  double min_site_weight = MAXFLOAT;
+  s.total_remaining = total_sites;
   for (auto const& range: part_sizes)
   {
     max_site_weight = std::max(max_site_weight, range.per_site_weight);
+    min_site_weight = std::min(min_site_weight, range.per_site_weight);
   }
 
   assert(max_site_weight > 0.);
 
   // Compute the optimum number of sites per bin
   s.opt_bin_weight = total_weight / s.num_procs;
+  s.min_bin_weight = std::max(s.opt_bin_weight - max_site_weight, min_site_weight);
   s.max_bin_weight = s.opt_bin_weight + max_site_weight;
-  s.min_bin_weight = s.opt_bin_weight - max_site_weight;
   s.rest_over_weight = 0.8 * s.opt_bin_weight;
+
+//  printf("%lf  %lf   %lf  %lf\n",
+//         s.opt_bin_weight, s.min_bin_weight, s.max_bin_weight, s.rest_over_weight);
 
   s.curr_part = 0; // index in sorted_partitons (AND NOT IN _partitions)
   s.current_bin = 0;
 
 //  printf("bins: %lu, weight total / opt / max: %f / %f / %f\n",
-//         s.bins.size(), total_weight, s.opt_bin_weight, s.max_bin_weight);
+//         s.bins.size(), total_weight, s.opt_bin_weight, s.max_bin_wesinight);
+}
+
+static size_t assign_sites(BalancerState& s, PartitionAssignment& bin, size_t part_id,
+                         size_t offset, size_t len, double per_site_weight)
+{
+  if (!len)
+    return 0;
+  if (bin.empty())
+    s.empty_bins--;
+  size_t sites_toassign = std::min(len, s.total_remaining - s.empty_bins);
+  bin.assign_sites(part_id, offset, sites_toassign, per_site_weight);
+  s.total_remaining -= sites_toassign;
+  return sites_toassign;
 }
 
 static void kassian_phase1(BalancerState& s)
@@ -75,7 +98,7 @@ static void kassian_phase1(BalancerState& s)
       break;
 
     // add the partition
-    bin.assign_sites(partition->part_id, 0, partition->length, partition->per_site_weight);
+    assign_sites(s, bin, partition->part_id, 0, partition->length, partition->per_site_weight);
 
     if (bin.weight() > s.opt_bin_weight)
       s.rest_over_weight -= bin.weight() - s.opt_bin_weight;
@@ -137,20 +160,22 @@ static void fill_bin(BalancerState& s,  stack<PartitionAssignment *>& q)
     // remainder across multiple bins (which would also be suboptimal)
     assert(s.curr_part == s.num_parts - 1);
     toassign = s.remaining;
+//    printf("assign remainder: %u\n", toassign);
   }
   else
   {
     double opt_toassign = (s.opt_bin_weight - bin->weight()) / partition->per_site_weight;
     toassign = (s.rest_over_weight > 0.) ? ceil(opt_toassign) : floor(opt_toassign);
     toassign = std::min(toassign, s.remaining);
-//    printf("%f / %f / %f / %u / %u\n",
+//    printf("opt/cur_wgt/opt_add/add/qsize: %f / %f / %f / %u / %u\n",
 //           s.opt_bin_weight, bin->weight(), opt_toassign, toassign, q.size());
 //    printf("qsize h/l: %u / %u\n", s.qhigh_.size(), s.qlow_.size());
   }
   assert(toassign > 0 && toassign <= s.remaining);
-  bin->assign_sites(partition->part_id, partition->length - s.remaining, toassign,
-                    partition->per_site_weight);
-  s.remaining -= toassign;
+
+  auto assigned = assign_sites(s, *bin, partition->part_id, partition->length - s.remaining,
+                               toassign, partition->per_site_weight);
+  s.remaining -= assigned;
 
   if (bin->weight() > s.opt_bin_weight)
     s.rest_over_weight -= bin->weight() - s.opt_bin_weight;
@@ -184,9 +209,9 @@ static void kassian_phase2(BalancerState& s)
       // so just assign ALL its remaining sites
       PartitionAssignment * bin = qlow->top();
       qlow->pop();
-      bin->assign_sites(partition->part_id, partition->length - s.remaining, s.remaining,
-                        partition->per_site_weight);
-      s.remaining = 0;
+      auto assigned = assign_sites(s, *bin, partition->part_id, partition->length - s.remaining, s.remaining,
+                   partition->per_site_weight);
+      s.remaining -= assigned;
 
       if (bin->weight() < s.min_bin_weight)
       {

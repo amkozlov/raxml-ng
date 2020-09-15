@@ -2,6 +2,7 @@
 #define RAXML_LOADBALANCER_HPP_
 
 #include "PartitionAssignment.hpp"
+#include "../common.h"
 
 class LoadBalancer
 {
@@ -41,6 +42,13 @@ protected:
   virtual PartitionAssignmentList compute_assignments(const PartitionAssignment& part_sizes,
                                                       size_t num_procs);
 };
+
+class LoadBalancerException : public RaxmlException
+{
+public:
+  LoadBalancerException(const std::string& message) : RaxmlException(message) {}
+};
+
 
 
 #endif /* RAXML_LOADBALANCER_HPP_ */
