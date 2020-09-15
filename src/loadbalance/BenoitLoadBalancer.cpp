@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <cmath>
+#include <float.h>
 
 #include "LoadBalancer.hpp"
 
@@ -45,7 +46,7 @@ static void init(BalancerState& s, const PartitionAssignment& part_sizes, size_t
   double total_weight =   part_sizes.weight();
   double total_sites =   part_sizes.length();
   double max_site_weight = 0.;
-  double min_site_weight = MAXFLOAT;
+  double min_site_weight = FLT_MAX;
   s.total_remaining = total_sites;
   for (auto const& range: part_sizes)
   {
