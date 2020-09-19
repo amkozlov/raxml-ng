@@ -1963,9 +1963,9 @@ void read_multiple_tree_files(RaxmlInstance& instance)
   else
     fname_list = split_string(opts.tree_file, ',');
 
+  Tree ref_tree = instance.random_tree;
   for (const auto& fname: fname_list)
   {
-    Tree ref_tree = instance.random_tree;
     auto topos = read_newick_trees(ref_tree, fname, "input");
     for (const auto& t: topos)
     {
