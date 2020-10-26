@@ -368,7 +368,7 @@ bool check_msa(RaxmlInstance& instance)
   /* check taxon names for invalid characters */
   if (opts.safety_checks.isset(SafetyCheck::msa_names))
   {
-    const string invalid_chars = "(),;:' \t\n";
+    const string invalid_chars = "[](),;:' \t\n";
     for (const auto& taxon: parted_msa.taxon_names())
     {
       if (taxon.find_first_of(invalid_chars) != std::string::npos)
