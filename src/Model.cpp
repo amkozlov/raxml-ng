@@ -13,20 +13,23 @@ const vector<int> ALL_MODEL_PARAMS = {PLLMOD_OPT_PARAM_FREQUENCIES, PLLMOD_OPT_P
 const unordered_map<DataType,unsigned int,EnumClassHash>  DATATYPE_STATES { {DataType::dna, 4},
                                                                             {DataType::protein, 20},
                                                                             {DataType::binary, 2},
-                                                                            {DataType::genotype10, 10}
+                                                                            {DataType::genotype10, 10},
+                                                                            {DataType::genotype16, 16}
                                                                           };
 
 const unordered_map<DataType,const pll_state_t*,EnumClassHash>  DATATYPE_MAPS {
   {DataType::dna, pll_map_nt},
   {DataType::protein, pll_map_aa},
   {DataType::binary, pll_map_bin},
-  {DataType::genotype10, pll_map_gt10}
+  {DataType::genotype10, pll_map_gt10},
+  {DataType::genotype16, pll_map_gt16}
 };
 
 const unordered_map<DataType,string,EnumClassHash>  DATATYPE_PREFIX { {DataType::dna, "DNA"},
                                                                       {DataType::protein, "PROT"},
                                                                       {DataType::binary, "BIN"},
                                                                       {DataType::genotype10, "GT"},
+                                                                      {DataType::genotype16, "GP"},
                                                                       {DataType::multistate, "MULTI"},
                                                                       {DataType::autodetect, "AUTO"}
                                                                     };
@@ -220,6 +223,8 @@ std::string Model::data_type_name() const
       return "AA";
     case DataType::genotype10:
       return "GT";
+    case DataType::genotype16:
+      return "GP";
     case DataType::multistate:
       return "MULTI" + std::to_string(_num_states);
     case DataType::autodetect:
@@ -233,9 +238,13 @@ void Model::autodetect_data_type(const std::string &model_name)
 {
   if (_data_type == DataType::autodetect)
   {
-    if (pllmod_util_model_exists_genotype(model_name.c_str()))
+    if (pllmod_util_model_exists_genotype10(model_name.c_str()))
     {
       _data_type = DataType::genotype10;
+    }
+    else if (pllmod_util_model_exists_genotype16(model_name.c_str()))
+    {
+      _data_type = DataType::genotype16;
     }
     else if (pllmod_util_model_exists_mult(model_name.c_str()))
     {
@@ -298,7 +307,7 @@ pllmod_mixture_model_t * Model::init_mix_model(const std::string &model_name)
     {
       modinfo =  pllmod_util_model_create_custom("BIN", 2, NULL, NULL, NULL, NULL);
     }
-    else if (_data_type == DataType::genotype10)
+    else if (_data_type == DataType::genotype10 || _data_type == DataType::genotype16)
     {
       modinfo =  pllmod_util_model_info_genotype(model_cstr);
     }
@@ -798,6 +807,13 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
            _error_model.reset(new PT19GenotypeErrorModel());
          else
            throw runtime_error("Unknown error model: " + err_model);
+        }
+        else if (_data_type == DataType::genotype16)
+        {
+          if (err_model == "P20")
+            _error_model.reset(new P20GenotypeErrorModel());
+          else
+            throw runtime_error("Unknown error model: " + err_model);
         }
         else
           _error_model.reset(new UniformErrorModel(_num_states, 0.01));

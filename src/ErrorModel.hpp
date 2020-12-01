@@ -6,7 +6,7 @@
 class ErrorModel
 {
 public:
-  ErrorModel(unsigned int states, std::string name) : _states(states), _name(name) {};
+  ErrorModel(unsigned int states, std::string name);
   virtual ~ErrorModel() {};
 
   const std::string& name() const { return _name; }
@@ -16,14 +16,15 @@ public:
   virtual doubleVector params() const = 0;
   virtual void params(const doubleVector& pv) = 0;
 
-  void state_probs(unsigned int state, doubleVector::iterator &clvp) const
+  void state_probs(pll_state_t state, doubleVector::iterator &clvp) const
   { compute_state_probs(state, clvp); }
 
 protected:
   unsigned int _states;
   std::string _name;
+  pll_state_t _undef_state;
 
-  virtual void compute_state_probs(unsigned int state, doubleVector::iterator &clvp) const = 0;
+  virtual void compute_state_probs(pll_state_t state, doubleVector::iterator &clvp) const = 0;
 };
 
 class UniformErrorModel: public ErrorModel
@@ -43,14 +44,14 @@ protected:
   double _seq_error_rate;
 
 private:
-  void compute_state_probs(unsigned int state, doubleVector::iterator &clvp) const override;
+  void compute_state_probs(pll_state_t state, doubleVector::iterator &clvp) const override;
 };
 
 class GenotypeErrorModel: public ErrorModel
 {
 protected:
-  GenotypeErrorModel(std::string name) :  ErrorModel(10, name), _seq_error_rate(RAXML_SEQ_ERROR_MIN),
-    _dropout_rate(RAXML_ADO_RATE_MIN), _freqs() {}
+  GenotypeErrorModel(std::string name, bool phased) :  ErrorModel(phased ? 16 : 10, name),
+   _seq_error_rate(RAXML_SEQ_ERROR_MIN), _dropout_rate(RAXML_ADO_RATE_MIN), _freqs() {}
 
 public:
   void freqs(const doubleVector& fv) { _freqs = fv; };
@@ -70,21 +71,29 @@ protected:
 class P17GenotypeErrorModel: public GenotypeErrorModel
 {
 public:
-  P17GenotypeErrorModel() : GenotypeErrorModel("P17") {}
+  P17GenotypeErrorModel() : GenotypeErrorModel("P17", false) {}
 
 protected:
-    void compute_state_probs(unsigned int state, doubleVector::iterator &clvp) const override;
+    void compute_state_probs(pll_state_t state, doubleVector::iterator &clvp) const override;
 };
 
 class PT19GenotypeErrorModel: public GenotypeErrorModel
 {
 public:
-  PT19GenotypeErrorModel() : GenotypeErrorModel("PT19") {}
+  PT19GenotypeErrorModel() : GenotypeErrorModel("PT19", false) {}
 
 protected:
-    void compute_state_probs(unsigned int state, doubleVector::iterator &clvp) const override;
+    void compute_state_probs(pll_state_t state, doubleVector::iterator &clvp) const override;
 };
 
+class P20GenotypeErrorModel: public GenotypeErrorModel
+{
+public:
+  P20GenotypeErrorModel() : GenotypeErrorModel("P20", true) {}
+
+protected:
+    void compute_state_probs(pll_state_t state, doubleVector::iterator &clvp) const override;
+};
 
 LogStream& operator<<(LogStream& stream, const ErrorModel& m);
 

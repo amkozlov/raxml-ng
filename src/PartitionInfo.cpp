@@ -146,14 +146,14 @@ void PartitionInfo::fill_tip_clv(unsigned int tip_id, doubleVector& clv) const
 
   for (size_t j = 0; j < _msa.length(); ++j)
   {
-    auto charstate = (unsigned int) seq[j];
-    unsigned int state = charmap ? charmap[(int) charstate] : charstate;
+    auto charstate = (pll_state_t) seq[j];
+    pll_state_t state = charmap ? charmap[(int) charstate] : charstate;
 
     errmodel->state_probs(state, clvp);
 
     if (j == 0 && 0)
     {
-      printf("state: %u ", state);
+      printf("state: %llu ", state);
       for (size_t k = 0; k < states; ++k)
         printf("%lf ", clvp[k]);
       printf("\n");
