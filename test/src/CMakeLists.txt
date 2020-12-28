@@ -26,6 +26,11 @@ if(GMP_FOUND)
   target_link_libraries(raxml_test_module ${GMP_LIBRARIES})
 endif()
 
+if(USE_TERRAPHAST)
+  target_link_libraries(raxml_test_module ${RAXML_LOCALDEPS_DIR}/lib/libterraces.a)
+  add_dependencies(raxml_test_module terraces)
+endif()
+
 target_link_libraries (raxml_test_module ${GTEST_BOTH_LIBRARIES} -pthread)
 
 target_link_libraries (raxml_test_module ${MPI_CXX_LIBRARIES})
