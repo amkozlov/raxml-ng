@@ -499,6 +499,13 @@ void set_sample_probs(MSA& msa, SNVRecord& snv, size_t snv_id, size_t sample_id,
       site_probs[k] = 1.;
   }
 
+  /* adjustment for 16-state phased model: pYX = pXY */
+  if (msa.states() == 16)
+  {
+    for (size_t k = 10; k < 16; ++k)
+      site_probs[k] = site_probs[k-6];
+  }
+
 #ifdef _RAXML_VCF_DEBUG
   if (!sample_id)
   {
@@ -546,8 +553,8 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
 
   assert(msa.size() == sample_count);
 
-  // TODO hardcoded for now: diploid unphased
-  msa.states(10);
+  // TODO hardcoded for now: diploid phased
+  msa.states(16);
 
   init_maps();
 

@@ -612,7 +612,7 @@ void assign(Model& model, const TreeInfo& treeinfo, size_t partition_id)
     model.brlen_scaler(pll_treeinfo.brlen_scalers[partition_id]);
 }
 
-void build_clv(ProbVector::const_iterator probs, size_t sites, WeightVector::const_iterator weights,
+void build_clv(ProbVector::const_iterator probs, size_t msa_states, size_t sites, WeightVector::const_iterator weights,
                pll_partition_t* partition, bool normalize, bool weighted, std::vector<double>& clv)
 {
   const auto states = partition->states;
@@ -638,7 +638,7 @@ void build_clv(ProbVector::const_iterator probs, size_t sites, WeightVector::con
     }
 
     /* NB: clv has to be padded, but msa arrays are not! */
-    probs += states;
+    probs += msa_states;
   }
 
   assert(clvp == clv.end());
@@ -655,7 +655,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
   if (opts.use_prob_msa && msa.probabilistic())
   {
     assert(!(partition->attributes & PLL_ATTRIB_PATTERN_TIP));
-    assert(partition->states == msa.states());
+    assert(partition->states <= msa.states());
 
     auto normalize = !msa.normalized();
     auto weights_start = msa.weights().cbegin() + part_region.start;
@@ -667,7 +667,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
     {
       auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
       auto prob_start = msa.probs(seq_id, part_region.start);
-      build_clv(prob_start, partition->sites, weights_start, partition, normalize, false, tmp_clv);
+      build_clv(prob_start, msa.states(), partition->sites, weights_start, partition, normalize, false, tmp_clv);
       pll_set_tip_clv(partition, tip_id, tmp_clv.data(), PLL_FALSE);
     }
   }
@@ -707,7 +707,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
   if (opts.use_prob_msa && msa.probabilistic())
   {
     assert(!(partition->attributes & PLL_ATTRIB_PATTERN_TIP));
-    assert(partition->states == msa.states());
+    assert(partition->states <= msa.states());
 
     auto normalize = !msa.normalized();
     auto weights_start = weights.cbegin() + part_region.start;
@@ -719,7 +719,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
     {
       auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
       auto prob_start = msa.probs(seq_id, part_region.start);
-      build_clv(prob_start, part_region.length, weights_start, partition, normalize, true, tmp_clv);
+      build_clv(prob_start, msa.states(), part_region.length, weights_start, partition, normalize, true, tmp_clv);
       pll_set_tip_clv(partition, tip_id, tmp_clv.data(), PLL_FALSE);
     }
   }
