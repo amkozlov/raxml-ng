@@ -113,8 +113,12 @@ bool EnergyMonitor::add_package(RAPLPackage& pkg)
   auto pkg_path = pkg.sub_id < 0 ? pkg_energy_path(pkg.pkg_id) :
                                    pkg_subdomain_path(pkg.pkg_id, pkg.sub_id);
   pkg.energy_fname = pkg_energy_fname(pkg_path);
-  if (!sysutil_file_exists(pkg.energy_fname))
-    return false;
+
+  /* Check if we have permissions to read energy_uj file.
+   * Starting from kernel 5.10 (and earlier with patch) it requires root privileges!
+   */
+  if (!sysutil_file_exists(pkg.energy_fname, R_OK))
+    return sysutil_file_exists(pkg.energy_fname, F_OK);
 
   pkg.name = read_value<string>(pkg_name_fname(pkg_path));
 
