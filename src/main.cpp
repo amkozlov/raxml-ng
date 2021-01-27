@@ -2750,7 +2750,8 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
   ParallelContext::global_master_broadcast(&bs_batch_start, sizeof(unsigned int));
 
   auto bs_batch_offset = bs_batch_start % opts.bootstop_interval;
-  unsigned int  bs_batch_end = bs_batch_start - bs_batch_offset + opts.bootstop_interval;
+  unsigned int  bs_batch_end = std::min(bs_batch_start - bs_batch_offset + opts.bootstop_interval,
+                                        opts.num_bootstraps);
   auto bs_num = worker.bs_trees.cbegin();
 
   auto ckp_tree_index = instance.run_phase == RaxmlRunPhase::bootstrap ? checkp.tree_index : 0;
@@ -2807,8 +2808,8 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
     ParallelContext::thread_barrier();
   }
 
-  /* special case: if this worker has no bsreps to infer, it still must synchronize! */
-  if (worker.bs_trees.empty())
+  /* special case: if this worker had no bsreps in last batch, it still must synchronize! */
+  if (!instance.bs_converged && bs_batch_start < bs_batch_end)
     gather_bs_trees(bs_batch_start, bs_batch_end);
 }
 
