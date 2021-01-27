@@ -130,13 +130,13 @@ void MSA::compress_patterns(const pll_state_t * charmap, bool store_backmap)
   _length = _pll_msa->length;
 
   if (_weights.empty())
-    _weights = WeightVector(w, w + _pll_msa->length);
+    _weights = FloatWeightVector(w, w + _pll_msa->length);
   else
   {
     /* external weights specified -> use site_pattern_map to generate a compressed weight vector */
     assert(_weights.size() == uncompressed_length);
     assert(!_site_pattern_map.empty());
-    WeightVector new_weights(_length, 0);
+    FloatWeightVector new_weights(_length, 0);
     for (size_t i = 0; i < _site_pattern_map.size(); ++i)
       new_weights[_site_pattern_map[i]] += _weights[i];
     _weights = std::move(new_weights);
@@ -326,13 +326,13 @@ void MSA::update_num_sites()
     _num_sites =  std::accumulate(_weights.begin(), _weights.end(), 0);
 }
 
-void MSA::weights(const WeightVector& v)
+void MSA::weights(const FloatWeightVector& v)
 {
   _weights = v;
    update_num_sites();
 }
 
-void MSA::weights(WeightVector&& v)
+void MSA::weights(FloatWeightVector&& v)
 {
   _weights = std::move(v);
   update_num_sites();

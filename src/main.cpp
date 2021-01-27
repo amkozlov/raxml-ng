@@ -985,12 +985,12 @@ void load_msa_weights(MSA& msa, const Options& opts)
     if (!f)
       throw runtime_error("Unable to open site weights file: " + opts.weights_file);
 
-    WeightVector w;
+    FloatWeightVector w;
     w.reserve(msa.length());
-    const auto maxw = std::numeric_limits<WeightVector::value_type>::max();
+    const auto maxw = std::numeric_limits<FloatWeightVector::value_type>::max();
     int fres;
-    intmax_t x;
-    while ((fres = fscanf(f,"%jd", &x)) != EOF)
+    double x;
+    while ((fres = fscanf(f,"%lf", &x)) != EOF)
     {
       if (!fres)
       {
@@ -1000,7 +1000,7 @@ void load_msa_weights(MSA& msa, const Options& opts)
         fclose(f);
         throw runtime_error("Invalid site weight entry found near: " + string(buf));
       }
-      else if (x <= 0)
+      else if (x < 0)
       {
         fclose(f);
         throw runtime_error("Non-positive site weight found: " + to_string(x) +
@@ -1013,7 +1013,7 @@ void load_msa_weights(MSA& msa, const Options& opts)
                             " (max: " + to_string(maxw) + ")");
       }
       else
-        w.push_back((WeightType) x);
+        w.push_back((FloatWeightType) x);
     }
     fclose(f);
 
@@ -1587,7 +1587,7 @@ void balance_load(RaxmlInstance& instance)
   LOG_VERB << endl << instance.proc_part_assign;
 }
 
-PartitionAssignmentList balance_load(RaxmlInstance& instance, WeightVectorList part_site_weights)
+PartitionAssignmentList balance_load(RaxmlInstance& instance, FloatWeightVectorList part_site_weights)
 {
   /* This function is used to re-distribute sites across processes for each bootstrap replicate.
    * Since during bootstrapping alignment sites are sampled with replacement, some sites will be
@@ -1598,7 +1598,7 @@ PartitionAssignmentList balance_load(RaxmlInstance& instance, WeightVectorList p
 
   PartitionAssignmentList assign_list;
   PartitionAssignment part_sizes;
-  WeightVectorList comp_pos_map(part_site_weights.size());
+  FloatWeightVectorList comp_pos_map(part_site_weights.size());
 
   /* init list of partition sizes */
   size_t i = 0;

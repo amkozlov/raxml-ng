@@ -141,6 +141,11 @@ typedef std::vector<WeightType> WeightVector;
 typedef std::vector<WeightVector> WeightVectorList;
 typedef std::unordered_map<size_t, WeightVector> WeightVectorMap;
 
+typedef double FloatWeightType;
+typedef std::vector<FloatWeightType> FloatWeightVector;
+typedef std::vector<FloatWeightVector> FloatWeightVectorList;
+typedef std::unordered_map<size_t, FloatWeightVector> FloatVectorMap;
+
 typedef std::default_random_engine RandomGenerator;
 
 /*

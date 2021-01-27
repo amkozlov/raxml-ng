@@ -2,6 +2,7 @@
 
 #include "TreeInfo.hpp"
 #include "ParallelContext.hpp"
+#include "types.hpp"
 
 using namespace std;
 
@@ -9,13 +10,13 @@ TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA&
                     const IDVector& tip_msa_idmap,
                     const PartitionAssignment& part_assign)
 {
-  init(opts, tree, parted_msa, tip_msa_idmap, part_assign, std::vector<uintVector>());
+  init(opts, tree, parted_msa, tip_msa_idmap, part_assign, FloatWeightVectorList());
 }
 
 TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
                     const IDVector& tip_msa_idmap,
                     const PartitionAssignment& part_assign,
-                    const std::vector<uintVector>& site_weights)
+                    const FloatWeightVectorList& site_weights)
 {
   init(opts, tree, parted_msa, tip_msa_idmap, part_assign, site_weights);
 }
@@ -23,7 +24,7 @@ TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA&
 void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
                     const IDVector& tip_msa_idmap,
                     const PartitionAssignment& part_assign,
-                    const std::vector<uintVector>& site_weights)
+                    const FloatWeightVectorList& site_weights)
 {
   _brlen_min = opts.brlen_min;
   _brlen_max = opts.brlen_max;
@@ -458,7 +459,7 @@ void assign(Model& model, const TreeInfo& treeinfo, size_t partition_id)
     model.brlen_scaler(pll_treeinfo.brlen_scalers[partition_id]);
 }
 
-void build_clv(ProbVector::const_iterator probs, size_t sites, WeightVector::const_iterator weights,
+void build_clv(ProbVector::const_iterator probs, size_t sites, FloatWeightVector::const_iterator weights,
                pll_partition_t* partition, bool normalize, std::vector<double>& clv)
 {
   const auto states = partition->states;
@@ -535,7 +536,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
 void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip_msa_idmap,
                         const PartitionRange& part_region,
                         pll_partition_t* partition, const pll_state_t * charmap,
-                        const WeightVector& weights)
+                        const FloatWeightVector& weights)
 {
   assert(!weights.empty());
 
@@ -544,7 +545,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
   const auto pend = pstart + plen;
 
   /* compress weights array by removing all zero entries */
-  uintVector comp_weights;
+  FloatWeightVector comp_weights;
   for (size_t j = pstart; j < pend; ++j)
   {
     if (weights[j] > 0)
@@ -595,7 +596,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
 
 pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& pinfo,
                                       const IDVector& tip_msa_idmap,
-                                      const PartitionRange& part_region, const uintVector& weights)
+                                      const PartitionRange& part_region, const FloatWeightVector& weights)
 {
   const MSA& msa = pinfo.msa();
   const Model& model = pinfo.model();

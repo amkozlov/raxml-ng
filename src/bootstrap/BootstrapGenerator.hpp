@@ -5,7 +5,7 @@
 
 struct BootstrapReplicate
 {
-  WeightVectorList site_weights;
+  FloatWeightVectorList site_weights;
 };
 
 typedef std::vector<BootstrapReplicate> BootstrapReplicateList;
@@ -20,10 +20,10 @@ public:
   ~BootstrapGenerator ();
 
   BootstrapReplicate generate(const PartitionedMSA& parted_msa, unsigned long random_seed);
-  WeightVector generate(const MSA& msa, unsigned long random_seed);
+  FloatWeightVector generate(const MSA& msa, unsigned long random_seed);
 
 private:
-  WeightVector generate(const MSA& msa, RandomGenerator& gen);
+  FloatWeightVector generate(const MSA& msa, RandomGenerator& gen);
 };
 
 #endif /* RAXML_BOOTSTRAP_BOOTSTRAPGENERATOR_HPP_ */

@@ -99,7 +99,7 @@ TEST(PartitionedMSAViewTest, view_dummy_patcomp)
 }
 
 void check_vmsa_part(PartitionedMSA& pmsa, PartitionedMSAView& vmsa, size_t p,
-                     size_t num_ex, size_t weight_ex, WeightVector weights = WeightVector())
+                     size_t num_ex, size_t weight_ex, FloatWeightVector weights = FloatWeightVector())
 {
   auto& msa = pmsa.part_info(p).msa();
   size_t num_sites = weights.empty() ? msa.num_sites() :
@@ -233,7 +233,7 @@ void view_weight_test_p1(bool compress)
   auto pmsa = part_msa_p1(compress);
   PartitionedMSAView vmsa(pmsa);
 
-  WeightVector w(pmsa.part_info(0).msa().length(), 1);
+  FloatWeightVector w(pmsa.part_info(0).msa().length(), 1);
 
   for (size_t s = 0; s < pmsa.part_info(0).msa().length(); ++s)
     w[s] = s % 5;
@@ -257,14 +257,14 @@ void view_weight_test_p3(bool compress)
   auto pmsa = part_msa_p3(compress);
   PartitionedMSAView vmsa(pmsa);
 
-  WeightVectorList ww(3);
+  FloatWeightVectorList ww(3);
 
   auto total_sites = 0;
 
   for (size_t p = 0; p < vmsa.part_count(); ++p)
   {
     auto& w = ww[p];
-    w = WeightVector(pmsa.part_info(p).msa().length(), 1);
+    w = FloatWeightVector(pmsa.part_info(p).msa().length(), 1);
 
     for (size_t s = 0; s < w.size(); ++s)
       w[s] = s % 5;

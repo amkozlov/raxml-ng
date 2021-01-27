@@ -46,7 +46,7 @@ public:
   size_t length() const { return _length; }
   size_t num_sites() const { return _num_sites; }
   size_t num_patterns() const { return _weights.size(); }
-  const WeightVector& weights() const {return _weights; }
+  const FloatWeightVector& weights() const {return _weights; }
   const NameIdMap& label_id_map() const { return _label_id_map; }
   const WeightVector site_pattern_map() const { return _site_pattern_map; }
   const pll_msa_t * pll_msa() const;
@@ -71,8 +71,8 @@ public:
   doubleVector state_freqs() const;
 
   void num_sites(const unsigned int sites) { _num_sites = sites; }
-  void weights(const WeightVector& v);
-  void weights(WeightVector&& v);
+  void weights(const FloatWeightVector& v);
+  void weights(FloatWeightVector&& v);
 
   void remove_sites(const std::vector<size_t>& site_indices);
 
@@ -97,7 +97,7 @@ private:
   container _sequences;
   container _labels;
   NameIdMap _label_id_map;
-  WeightVector _weights;
+  FloatWeightVector _weights;
   WeightVector _site_pattern_map;
   ProbVectorList _probs;
   RangeList _local_seq_ranges;

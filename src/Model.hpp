@@ -139,7 +139,7 @@ public:
   bool param_estimated(int param) const;
 
   AscBiasCorrection ascbias_type() const { return _ascbias_type; }
-  const WeightVector& ascbias_weights() const { return _ascbias_weights; }
+  const FloatWeightVector& ascbias_weights() const { return _ascbias_weights; }
 
   /* per alignment site, given in elements (NOT in bytes) */
   size_t clv_entry_size() const { return _num_states * _num_ratecats; }
@@ -192,7 +192,7 @@ private:
   double _brlen_scaler;
 
   AscBiasCorrection _ascbias_type;
-  WeightVector _ascbias_weights;
+  FloatWeightVector _ascbias_weights;
 
   std::vector<SubstitutionModel> _submodels;
 

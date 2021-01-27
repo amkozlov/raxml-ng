@@ -312,7 +312,7 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, MSA& m)
 
   m = MSA(pat_count);
 
-  m.weights(stream.get<WeightVector>());
+  m.weights(stream.get<FloatWeightVector>());
 
   std::string seq(pat_count, 0);
   for (size_t i = 0; i < taxa_count; ++i)
@@ -355,7 +355,7 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, MSARange mr)
   assert(local_len <= pat_count);
   assert(local_len <= weight_count);
 
-  WeightVector w(local_len);
+  FloatWeightVector w(local_len);
   read_vector_range(stream, &w[0], rl, pat_count);
 
   m.weights(std::move(w));
