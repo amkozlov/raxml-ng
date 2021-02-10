@@ -1352,13 +1352,15 @@ void load_constraint(RaxmlInstance& instance)
 
     NewickStream nw_cons(instance.opts.constraint_tree_file, std::ios::in);
     Tree& cons_tree = instance.constraint_tree;
+
+    LOG_INFO_TS << "Loading constraint tree from: " << opts.constraint_tree_file  << endl;
     nw_cons >> cons_tree;
 
     LOG_INFO_TS << "Loaded " <<
         (cons_tree.num_tips() == parted_msa.taxon_count() ? "" : "non-") <<
         "comprehensive constraint tree with " << cons_tree.num_tips() << " taxa" << endl;
 
-    // check if taxa names are consistent between contraint tree and MSA
+    // check if taxa names are consistent between constraint tree and MSA
     {
       NameList missing_taxa;
       for (const auto& l: cons_tree.tip_labels())
