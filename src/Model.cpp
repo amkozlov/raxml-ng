@@ -108,8 +108,9 @@ static bool read_param(istringstream& s, std::vector<T>& vec)
 }
 
 template<typename T>
-static bool read_param_file(istringstream& s, std::vector<T>& vec)
+static bool read_param_file(istringstream& s, std::vector<T>& vec, bool& file_found)
 {
+  file_found = false;
   if (s.peek() == '{' || s.peek() == '[')
   {
     // first, try to interpret parameter value as a file name
@@ -123,6 +124,7 @@ static bool read_param_file(istringstream& s, std::vector<T>& vec)
     std::getline(s, fname, delim);
     if (sysutil_file_exists(fname))
     {
+      file_found = true;
       ifstream fs(fname);
       while (!fs.eof())
       {
@@ -413,7 +415,8 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
   try
   {
     doubleVector user_srates;
-    if (read_param_file(ss, user_srates))
+    bool param_file = false;
+    if (read_param_file(ss, user_srates, param_file))
     {
       // TODO support multi-matrix models
       if (_submodels.size() > 0)
@@ -421,7 +424,7 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
 
       auto smodel = _submodels[0];
       auto num_uniq_rates = smodel.num_uniq_rates();
-      if (user_srates.size() == num_uniq_rates + _num_states)
+      if (param_file && user_srates.size() == num_uniq_rates + _num_states)
       {
         // read as PAML file (rates + frequencies)
         doubleVector rates(num_uniq_rates);
@@ -453,9 +456,11 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
       }
       else
       {
-        throw runtime_error("Invalid number of substitution rates specified: " +
-                            std::to_string(user_srates.size()) + " (expected: " +
-                            std::to_string(num_uniq_rates) + ")\n");
+        throw runtime_error(string("Invalid number of substitution rates specified: ") +
+                            "expected " + std::to_string(num_uniq_rates) +
+                            ", found " + std::to_string(user_srates.size()) + "\n" +
+                            "Context: " + _name + s + "\n");
+
       }
     }
   }
@@ -579,14 +584,16 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
 
               /* for now, read single set of frequencies */
               doubleVector user_freqs;
-              if (read_param_file(ss, user_freqs))
+              bool param_file = false;
+              if (read_param_file(ss, user_freqs, param_file))
               {
                 if (user_freqs.size() != _num_states)
                 {
                   throw runtime_error("Invalid number of user frequencies specified: " +
                            std::to_string(user_freqs.size()) + "\n" +
                            "Number of frequencies must be equal to the number of states: " +
-                           std::to_string(_num_states) + "\n");
+                           std::to_string(_num_states) + "\n" +
+                           "Context: " + _name + model_opts + "\n");
                 }
 
                 set_user_freqs(user_freqs);
