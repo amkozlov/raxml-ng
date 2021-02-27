@@ -105,7 +105,8 @@ void CommandLineParser::check_options(Options &opts)
 
   if (opts.command == Command::evaluate || opts.command == Command::support ||
       opts.command == Command::terrace || opts.command == Command::rfdist ||
-      opts.command == Command::sitelh || opts.command == Command::ancestral)
+      opts.command == Command::sitelh || opts.command == Command::ancestral ||
+      opts.command == Command::consense)
   {
     if (opts.tree_file.empty())
       throw OptionException("Please provide a valid Newick file as an argument of --tree option.");
@@ -127,7 +128,8 @@ void CommandLineParser::check_options(Options &opts)
     }
   }
 
-  if (opts.command == Command::support || opts.command == Command::rfdist)
+  if (opts.command == Command::support || opts.command == Command::rfdist ||
+      opts.command == Command::consense)
   {
     assert(!opts.tree_file.empty());
 
