@@ -608,7 +608,7 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
   const size_t part_length = weights.empty() ? part_region.length :
                              std::count_if(weights.begin() + pstart,
                                            weights.begin() + pstart + part_region.length,
-                                           [](uintVector::value_type w) -> bool
+                                           [](FloatWeightVector::value_type w) -> bool
                                              { return w > 0; }
                                            );
 
