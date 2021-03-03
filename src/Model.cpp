@@ -1137,10 +1137,17 @@ void Model::init_state_names() const
 
       _full_state_namemap[state] = state_name;
 
-      if (popcnt == 1)
+      if (popcnt < _num_states)
       {
-        auto idx = PLL_STATE_CTZ(state);
-        _state_names[idx] = state_name;
+        auto s = state;
+        while (s)
+        {
+          auto idx = PLL_STATE_CTZ(s);
+          if (popcnt == 1 || _state_names[idx].empty())
+            _state_names[idx] = state_name;
+          s &= ~(1u << idx);
+          printf("char: %s, state: %lu, popcnt: %u\n", state_name.c_str(), idx, popcnt);
+        }
       }
     }
   }
