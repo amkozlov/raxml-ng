@@ -1146,7 +1146,7 @@ void Model::init_state_names() const
           if (popcnt == 1 || _state_names[idx].empty())
             _state_names[idx] = state_name;
           s &= ~(1u << idx);
-          printf("char: %s, state: %lu, popcnt: %u\n", state_name.c_str(), idx, popcnt);
+//          printf("char: %s, state: %lu, popcnt: %u\n", state_name.c_str(), idx, popcnt);
         }
       }
     }
