@@ -789,12 +789,9 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
     }
   }
 
-  /* error models compute tip CLVS, so cannot use site repeats / tip-inner */
+  /* error models compute tip CLVS, so cannot use tip-inner */
   if(pinfo.model().error_model())
-  {
-    attrs &= ~PLL_ATTRIB_SITE_REPEATS;
     attrs &= ~PLL_ATTRIB_PATTERN_TIP;
-  }
 
   // NOTE: if partition is split among multiple threads, asc. bias correction must be applied only once!
   if (model.ascbias_type() == AscBiasCorrection::lewis ||
