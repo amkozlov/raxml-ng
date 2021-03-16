@@ -387,6 +387,7 @@ void Model::set_user_freqs(doubleVector& freqs)
 void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_model_t& mix_model)
 {
   _gamma_mode = PLL_GAMMA_RATES_MEAN;
+  _freqs_init_empirical = false;
   _alpha = 1.0;
   _pinv = 0.0;
   _brlen_scaler = 1.0;
@@ -580,6 +581,11 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
               break;
             case 'O':
               param_mode = ParamValue::ML;
+              _freqs_init_empirical = false;
+              break;
+            case 'X':
+              param_mode = ParamValue::ML;
+              _freqs_init_empirical = true;
               break;
             case 'E':
               param_mode = ParamValue::equal;
@@ -810,7 +816,7 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
         }
         else if (_data_type == DataType::genotype16)
         {
-          if (err_model == "P20")
+          if (err_model == "E" || err_model == "P20")
             _error_model.reset(new P20GenotypeErrorModel());
           else
             throw runtime_error("Unknown error model: " + err_model);

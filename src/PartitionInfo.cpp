@@ -188,13 +188,16 @@ void assign(Model& model, const PartitionStats& stats)
    /* assign empirical base frequencies */
   switch (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES))
   {
+    case ParamValue::ML:
+      if (!model.freqs_init_empirical())
+          break;
+      /* fall through */
     case ParamValue::empirical:
       assert(stats.emp_base_freqs.size() == model.num_states());
       model.base_freqs(stats.emp_base_freqs);
       break;
     case ParamValue::user:
     case ParamValue::equal:
-    case ParamValue::ML:
     case ParamValue::model:
       /* nothing to do here */
       break;
@@ -211,9 +214,9 @@ void assign(Model& model, const PartitionStats& stats)
       model.subst_rates(stats.emp_subst_rates);
       break;
     }
+    case ParamValue::ML:
     case ParamValue::equal:
     case ParamValue::user:
-    case ParamValue::ML:
     case ParamValue::model:
       /* nothing to do here */
       break;

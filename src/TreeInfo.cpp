@@ -326,7 +326,7 @@ double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor
                                                     PLLMOD_OPT_BRLEN_OPTIMIZE_ALL
                                                     );
 
-    LOG_DEBUG << "\t - after brlen: logLH = " << new_loglh << endl;
+    LOG_DEBUG_TS << "\t - after brlen: logLH = " << new_loglh << endl;
 
     libpll_check_error("ERROR in branch length optimization");
     assert(isfinite(new_loglh));
@@ -343,7 +343,7 @@ double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor
                                                             _brlen_max,
                                                             RAXML_PARAM_EPSILON);
 
-    LOG_DEBUG << "\t - after brlen scalers: logLH = " << new_loglh << endl;
+    LOG_DEBUG_TS << "\t - after brlen scalers: logLH = " << new_loglh << endl;
 
     libpll_check_error("ERROR in brlen scaler optimization");
     assert(isfinite(new_loglh));
@@ -370,7 +370,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                           RAXML_BFGS_FACTOR,
                                                           RAXML_PARAM_EPSILON);
 
-    LOG_DEBUG << "\t - after rates: logLH = " << new_loglh << endl;
+    LOG_DEBUG_TS << "\t - after rates: logLH = " << new_loglh << endl;
 
     libpll_check_error("ERROR in substitution rates optimization");
     assert_lh_improvement(cur_loglh, new_loglh, "RATES");
@@ -387,7 +387,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                           RAXML_BFGS_FACTOR,
                                                           RAXML_PARAM_EPSILON);
 
-    LOG_DEBUG << "\t - after freqs: logLH = " << new_loglh << endl;
+    LOG_DEBUG_TS << "\t - after freqs: logLH = " << new_loglh << endl;
 
     libpll_check_error("ERROR in base frequencies optimization");
     assert_lh_improvement(cur_loglh, new_loglh, "FREQS");
@@ -408,7 +408,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                          RAXML_BFGS_FACTOR,
                                                          RAXML_PARAM_EPSILON);
 
-    LOG_DEBUG << "\t - after a+i  : logLH = " << new_loglh << endl;
+    LOG_DEBUG_TS << "\t - after a+i  : logLH = " << new_loglh << endl;
 
     libpll_check_error("ERROR in alpha/p-inv parameter optimization");
     assert_lh_improvement(cur_loglh, new_loglh, "ALPHA+PINV");
@@ -425,7 +425,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                         PLLMOD_OPT_MAX_ALPHA,
                                                         RAXML_PARAM_EPSILON);
 
-     LOG_DEBUG << "\t - after alpha: logLH = " << new_loglh << endl;
+      LOG_DEBUG_TS << "\t - after alpha: logLH = " << new_loglh << endl;
 
      libpll_check_error("ERROR in alpha parameter optimization");
      assert_lh_improvement(cur_loglh, new_loglh, "ALPHA");
@@ -441,7 +441,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                         PLLMOD_OPT_MAX_PINV,
                                                         RAXML_PARAM_EPSILON);
 
-      LOG_DEBUG << "\t - after p-inv: logLH = " << new_loglh << endl;
+      LOG_DEBUG_TS << "\t - after p-inv: logLH = " << new_loglh << endl;
 
       libpll_check_error("ERROR in p-inv optimization");
       assert_lh_improvement(cur_loglh, new_loglh, "PINV");
@@ -460,7 +460,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                           RAXML_BFGS_FACTOR,
                                                           RAXML_PARAM_EPSILON);
 
-    LOG_DEBUG << "\t - after freeR: logLH = " << new_loglh << endl;
+    LOG_DEBUG_TS << "\t - after freeR: logLH = " << new_loglh << endl;
 //    LOG_DEBUG << "\t - after freeR/crosscheck: logLH = " << loglh() << endl;
 
     libpll_check_error("ERROR in FreeRate rates/weights optimization");
@@ -480,7 +480,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                             RAXML_SEQ_ERROR_MAX,
                                                             1e-3);
 
-    LOG_DEBUG << "\t - after SEQ ERROR: logLH = " << new_loglh << endl;
+    LOG_DEBUG_TS << "\t - after SEQ ERROR: logLH = " << new_loglh << endl;
 
     if (std::isinf((double) new_loglh))
     {
@@ -508,7 +508,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                             RAXML_ADO_RATE_MAX,
                                                             1e-3);
 
-    LOG_DEBUG << "\t - after ADO RATE: logLH = " << new_loglh << endl;
+    LOG_DEBUG_TS << "\t - after ADO RATE: logLH = " << new_loglh << endl;
 
 //    printf("\t - OPT error rate: %lf, logLH = %lf\n", global_seq_error, new_loglh);
 
