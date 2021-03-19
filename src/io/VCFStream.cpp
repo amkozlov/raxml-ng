@@ -47,7 +47,7 @@ struct SNVRecord
                                     /* AA AC AG AT CC CG CT GG GT TT */
 static const int vcf_to_rax_map[10] = {0, 4, 5, 6, 1, 7, 8, 2, 9, 3 };
 
-char gt_to_char[4][4];
+char gt10_to_char[4][4];
 
 #ifdef _RAXML_VCF_DEBUG
 static const char gt_inv_map[][3] = {"AA", "CC", "GG", "TT", "AC", "AG", "AT", "CG", "CT", "GT"};
@@ -70,6 +70,8 @@ static VCFLikelihoodMode detect_likelihood_mode(VCFStream& stream, bcf_hdr_t *hd
     lh_mode = VCFLikelihoodMode::pl;
   else if ((hrec = bcf_hdr_get_hrec(hdr, BCF_HL_FMT, "ID", "FPL", NULL)) != NULL)
     lh_mode = VCFLikelihoodMode::fpl;
+  else if ((hrec = bcf_hdr_get_hrec(hdr, BCF_HL_FMT, "ID", "GL", NULL)) != NULL)
+    lh_mode = VCFLikelihoodMode::gl;
   else
     lh_mode = VCFLikelihoodMode::none;
 
@@ -129,7 +131,7 @@ static void init_maps()
   {
     for (size_t j = 0; j < 4; ++j)
     {
-      gt_to_char[i][j] = inv_charmap[ (1u << i) | (1u << j)];
+      gt10_to_char[i][j] = inv_charmap[ (1u << i) | (1u << j)];
     }
   }
 }
@@ -147,6 +149,34 @@ static void free_snv_rec(SNVRecord& snv)
 {
   free(snv.sample_lh);
   free(snv.sample_plh);
+}
+
+static void init_pl_d10_map(SNVRecord& snv)
+{
+  unsigned int i, k;
+  unsigned int g = 0;
+
+  for (i = 0; i < 10; ++i)
+    snv.pl_d10_map[i] = -1;
+
+  /* - genotype order in PL field differs for every line and depends on REF/ALT alleles
+   * - hence, we build a mapping between PL field index and genotype state index used in raxml-ng
+   * - eg. if REF=A and ALT=T,C -> pl_d10_map = [ 0 6 3 4 8 1 -1 -1 -1 -1 ]  */
+  for (i = 0; i < snv.al_count; ++i)
+  {
+    for (k = 0; k <= i; ++k)
+    {
+      int c1 = PLL_STATE_CTZ(snv.al_states[k]);
+      int c2 = PLL_STATE_CTZ(snv.al_states[i]);
+      int d10 = PLL_STATE_CTZ(pll_map_gt10[(int) gt10_to_char[c1][c2]]);
+      snv.pl_d10_map[g++] = d10;
+#ifdef _RAXML_VCF_DEBUG
+      printf("%s ", gt_inv_map[d10]);
+#endif
+    }
+  }
+
+  assert(g == snv.pl_per_sample);
 }
 
 static void read_snv_fixed(SNVRecord& snv, bcf_hdr_t * hdr, bcf1_t * rec)
@@ -198,32 +228,12 @@ static void read_snv_fixed(SNVRecord& snv, bcf_hdr_t * hdr, bcf1_t * rec)
     }
   }
 
+  init_pl_d10_map(snv);
+
 #ifdef _RAXML_VCF_DEBUG
   printf("chrom: %s, pos: %u, ref/het/alt: ", chr, pos);
 #endif
 
-  for (i = 0; i < 10; ++i)
-    snv.pl_d10_map[i] = -1;
-
-  /* - genotype order in PL field differs for every line and depends on REF/ALT alleles
-   * - hence, we build a mapping between PL field index and genotype state index used in raxml-ng
-   * - eg. if REF=A and ALT=T,C -> pl_d10_map = [ 0 6 3 4 8 1 -1 -1 -1 -1 ]  */
-  unsigned int g = 0;
-  for (i = 0; i < snv.al_count; ++i)
-  {
-    for (k = 0; k <= i; ++k)
-    {
-      int c1 = PLL_STATE_CTZ(snv.al_states[k]);
-      int c2 = PLL_STATE_CTZ(snv.al_states[i]);
-      int d10 = PLL_STATE_CTZ(pll_map_gt10[(int) gt_to_char[c1][c2]]);
-      snv.pl_d10_map[g++] = d10;
-#ifdef _RAXML_VCF_DEBUG
-      printf("%s ", gt_inv_map[d10]);
-#endif
-    }
-  }
-
-  assert(g == snv.pl_per_sample);
 
 #ifdef _RAXML_VCF_DEBUG
   printf("\n");
@@ -453,12 +463,15 @@ void set_sample_probs(MSA& msa, SNVRecord& snv, size_t snv_id, size_t sample_id,
   const int al1 = bcf_gt_allele(snv.sample_gt->p[sample_id * 2]);
   const int al2 = bcf_gt_allele(snv.sample_gt->p[sample_id * 2 + 1]);
 
+//  int phased2 = bcf_gt_is_phased(snv.sample_gt->p[sample_id * 2 + 1]);
+//  printf("phased: %d \n", phased2);
+
   auto gt1 = PLL_STATE_CTZ(snv.al_states[al1]);
   auto gt2 = PLL_STATE_CTZ(snv.al_states[al2]);
 
   char c = '-';
   if (al1 >= 0 && al2 >= 0)
-    c = gt_to_char[gt1][gt2];
+    c = gt10_to_char[gt1][gt2];
 
   msa[sample_id][snv_id] = c;
 
@@ -473,8 +486,10 @@ void set_sample_probs(MSA& msa, SNVRecord& snv, size_t snv_id, size_t sample_id,
         set_g10_probs(msa, snv, snv_id, sample_id);
         break;
       case VCFLikelihoodMode::pl:
-      case VCFLikelihoodMode::gl:
         set_pl_probs(msa, snv, snv_id, sample_id);
+        break;
+      case VCFLikelihoodMode::gl:
+        set_gl_probs(msa, snv, snv_id, sample_id);
         break;
       case VCFLikelihoodMode::fpl:
         set_fpl_probs(msa, snv, snv_id, sample_id);
