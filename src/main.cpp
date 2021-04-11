@@ -2441,7 +2441,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
           auto lh = tree_slh[coord.first][coord.second];
 
           /* NB: loglh was already multiplied with pattern weight -> undo it */
-          auto w = parted_msa.part_info(coord.first).msa().weights();
+          auto& w = parted_msa.part_info(coord.first).msa().weights();
           if (!w.empty())
             lh /= w[coord.second];
           fs << " " << lh;
