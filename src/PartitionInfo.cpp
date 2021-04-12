@@ -81,7 +81,7 @@ void PartitionInfo::compress_patterns(bool store_backmap)
 
 pllmod_msa_stats_t * PartitionInfo::compute_stats(unsigned long stats_mask) const
 {
-  const unsigned int * weights = _msa.weights().empty() ? nullptr : _msa.weights().data();
+  const double * weights = _msa.weights().empty() ? nullptr : _msa.weights().data();
   pllmod_msa_stats_t * stats = pllmod_msa_compute_stats(_msa.pll_msa(), _model.num_states(),
                                                         _model.charmap(), weights, stats_mask);
 

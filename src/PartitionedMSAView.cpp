@@ -97,7 +97,7 @@ const IDSet& PartitionedMSAView::exclude_sites(size_t part_id) const
   return _excluded_sites.at(part_id);
 }
 
-void PartitionedMSAView::site_weights(const WeightVectorList& weights)
+void PartitionedMSAView::site_weights(const FloatWeightVectorList& weights)
 {
   if (weights.size() != part_count())
     throw runtime_error("PartitionedMSAView: invalid weight vector size");
@@ -105,7 +105,7 @@ void PartitionedMSAView::site_weights(const WeightVectorList& weights)
   _site_weights.clear();
   _site_weights.resize(part_count());
   size_t part_id = 0;
-  for (const WeightVector& v: weights)
+  for (const auto& v: weights)
   {
     site_weights(part_id, v);
     part_id++;
@@ -113,7 +113,7 @@ void PartitionedMSAView::site_weights(const WeightVectorList& weights)
   assert(_site_weights.size() == part_count());
 }
 
-void PartitionedMSAView::site_weights(size_t part_id, const WeightVector& weights)
+void PartitionedMSAView::site_weights(size_t part_id, const FloatWeightVector& weights)
 {
   _site_weights.resize(part_count());
 

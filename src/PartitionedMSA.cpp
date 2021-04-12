@@ -165,7 +165,7 @@ void PartitionedMSA::split_msa()
       if (!_full_msa.weights().empty())
       {
         auto& msa = _part_list[p].msa();
-        WeightVector w(msa.length());
+        FloatWeightVector w(msa.length());
         const auto full_weights = _full_msa.weights();
         assert(full_weights.size() == site_part_map().size());
 

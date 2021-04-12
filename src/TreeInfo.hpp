@@ -6,6 +6,7 @@
 #include "Options.hpp"
 #include "AncestralStates.hpp"
 #include "loadbalance/PartitionAssignment.hpp"
+#include "types.hpp"
 
 struct spr_round_params
 {
@@ -31,7 +32,7 @@ public:
             const IDVector& tip_msa_idmap, const PartitionAssignment& part_assign);
   TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
             const IDVector& tip_msa_idmap, const PartitionAssignment& part_assign,
-            const std::vector<uintVector>& site_weights);
+            const FloatWeightVectorList& site_weights);
   virtual
   ~TreeInfo ();
 
@@ -74,7 +75,7 @@ private:
 
   void init(const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
             const IDVector& tip_msa_idmap, const PartitionAssignment& part_assign,
-            const std::vector<uintVector>& site_weights);
+            const FloatWeightVectorList& site_weights);
 
   void assert_lh_improvement(double old_lh, double new_lh, const std::string& where = "");
 };
@@ -85,6 +86,6 @@ void assign(Model& model, const TreeInfo& treeinfo, size_t partition_id);
 
 pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& pinfo,
                                       const IDVector& tip_msa_idmap,
-                                      const PartitionRange& part_region, const uintVector& weights);
+                                      const PartitionRange& part_region, const FloatWeightVector& weights);
 
 #endif /* RAXML_TREEINFO_HPP_ */

@@ -36,8 +36,8 @@ public:
   void exclude_sites(size_t part_id, IDVector site_ids);
   const IDSet& exclude_sites(size_t part_id) const;
 
-  void site_weights(const WeightVectorList& site_weights);
-  void site_weights(size_t part_id, const WeightVector& site_weights);
+  void site_weights(const FloatWeightVectorList& site_weights);
+  void site_weights(size_t part_id, const FloatWeightVector& site_weights);
 
 private:
   const PartitionedMSA * _parted_msa;
@@ -45,7 +45,7 @@ private:
   NameMap _taxon_name_map;
   IDSet _excluded_taxa;
   std::vector<IDSet> _excluded_sites;
-  WeightVectorList _site_weights;
+  FloatWeightVectorList _site_weights;
 
   mutable IDVector _orig_taxon_ids;
 

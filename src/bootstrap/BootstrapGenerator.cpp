@@ -24,19 +24,19 @@ BootstrapReplicate BootstrapGenerator::generate(const PartitionedMSA& parted_msa
   return result;
 }
 
-WeightVector BootstrapGenerator::generate(const MSA& msa, unsigned long random_seed)
+FloatWeightVector BootstrapGenerator::generate(const MSA& msa, unsigned long random_seed)
 {
   RandomGenerator gen(random_seed);
 
   return generate(msa, gen);
 }
 
-WeightVector BootstrapGenerator::generate(const MSA& msa, RandomGenerator& gen)
+FloatWeightVector BootstrapGenerator::generate(const MSA& msa, RandomGenerator& gen)
 {
   unsigned int orig_len = msa.num_sites();
   unsigned int comp_len = msa.length();
 
-  WeightVector w_buf(orig_len, 0);
+  FloatWeightVector w_buf(orig_len, 0);
 
   std::uniform_int_distribution<unsigned int> distr(0, orig_len-1);
 
@@ -50,7 +50,7 @@ WeightVector BootstrapGenerator::generate(const MSA& msa, RandomGenerator& gen)
     return w_buf;
   else
   {
-    WeightVector result(comp_len, 0);
+    FloatWeightVector result(comp_len, 0);
     auto orig_weights = msa.weights();
 
     assert(!orig_weights.empty());
