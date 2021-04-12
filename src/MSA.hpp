@@ -48,7 +48,7 @@ public:
   size_t num_patterns() const { return _weights.size(); }
   const FloatWeightVector& weights() const {return _weights; }
   const NameIdMap& label_id_map() const { return _label_id_map; }
-  const WeightVector site_pattern_map() const { return _site_pattern_map; }
+  const WeightVector& site_pattern_map() const { return _site_pattern_map; }
   const pll_msa_t * pll_msa() const;
 
   const container& labels() const { return _labels; };

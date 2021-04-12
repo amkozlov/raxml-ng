@@ -199,7 +199,7 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::tuple<Model&, Mode
     m = Model(DataType::autodetect, s);
 
     auto param_mode_map = stream.get<Model::ParamModeMap>();
-    for (auto e: param_mode_map)
+    for (auto& e: param_mode_map)
       m.param_mode(e.first, e.second);
   }
 
@@ -271,7 +271,7 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, TreeTopology& t)
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const ScoredTopologyMap& c)
 {
   stream << c.size();
-  for (const auto tree: c)
+  for (const auto& tree: c)
     stream << tree.first << tree.second.first << tree.second.second;
   return stream;
 }
@@ -329,7 +329,7 @@ void read_vector_range(BasicBinaryStream& stream, T* dest, const RangeList& rl, 
 {
   auto dptr = dest;
   size_t pos = 0;
-  for (auto r: rl)
+  for (auto& r: rl)
   {
     stream.skip((r.start - pos) * sizeof(T));
     stream.read(dptr, r.length * sizeof(T));

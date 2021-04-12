@@ -519,7 +519,7 @@ bool check_msa(RaxmlInstance& instance)
   if (!parted_msa_view.taxon_name_map().empty())
   {
     LOG_ERROR << endl;
-    for (auto it: parted_msa_view.taxon_name_map())
+    for (auto& it: parted_msa_view.taxon_name_map())
       LOG_ERROR << "ERROR: Following taxon name contains invalid characters: " << it.first << endl;
 
     LOG_ERROR << endl;
@@ -1263,7 +1263,7 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
     if (instance.bootstop_checker)
     {
       auto bs_tree = instance.random_tree;
-      for (auto it: ckpfile.bs_trees)
+      for (auto& it: ckpfile.bs_trees)
       {
         bs_tree.topology(it.second.second);
 
@@ -1352,13 +1352,15 @@ void load_constraint(RaxmlInstance& instance)
 
     NewickStream nw_cons(instance.opts.constraint_tree_file, std::ios::in);
     Tree& cons_tree = instance.constraint_tree;
+
+    LOG_INFO_TS << "Loading constraint tree from: " << opts.constraint_tree_file  << endl;
     nw_cons >> cons_tree;
 
     LOG_INFO_TS << "Loaded " <<
         (cons_tree.num_tips() == parted_msa.taxon_count() ? "" : "non-") <<
         "comprehensive constraint tree with " << cons_tree.num_tips() << " taxa" << endl;
 
-    // check if taxa names are consistent between contraint tree and MSA
+    // check if taxa names are consistent between constraint tree and MSA
     {
       NameList missing_taxa;
       for (const auto& l: cons_tree.tip_labels())
@@ -1796,7 +1798,7 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree,
         assert(0);
 
       Tree tree = ref_tree;
-      for (auto bs: bs_trees)
+      for (auto& bs: bs_trees)
       {
         tree.topology(bs);
         sup_tree->add_replicate_tree(tree);
@@ -1837,7 +1839,7 @@ bool check_bootstop(const RaxmlInstance& instance, const TreeTopologyList& bs_tr
   Tree bs_tree = instance.random_tree;
   size_t bs_num = 0;
   bool converged = false;
-  for (auto it: bs_trees)
+  for (auto& it: bs_trees)
   {
     bs_tree.topology(it);
 
@@ -2121,7 +2123,7 @@ void check_terrace(const RaxmlInstance& instance, const Tree& tree)
 void save_ml_trees(const Options& opts, const CheckpointFile& checkp)
 {
   NewickStream nw(opts.ml_trees_file(), std::ios::out);
-  for (auto topol: checkp.ml_trees)
+  for (auto& topol: checkp.ml_trees)
   {
     Tree ml_tree = checkp.tree();
     ml_tree.topology(topol.second.second);
@@ -2316,7 +2318,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
   //    NewickStream nw(opts.bootstrap_trees_file(), std::ios::out | std::ios::app);
       NewickStream nw(opts.bootstrap_trees_file(), std::ios::out);
 
-      for (auto topol: checkp.bs_trees)
+      for (auto& topol: checkp.bs_trees)
       {
         Tree bs_tree = checkp.tree();
         bs_tree.topology(topol.second.second);
@@ -2439,7 +2441,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
           auto lh = tree_slh[coord.first][coord.second];
 
           /* NB: loglh was already multiplied with pattern weight -> undo it */
-          auto w = parted_msa.part_info(coord.first).msa().weights();
+          auto& w = parted_msa.part_info(coord.first).msa().weights();
           if (!w.empty())
             lh /= w[coord.second];
           fs << " " << lh;
@@ -2750,7 +2752,8 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
   ParallelContext::global_master_broadcast(&bs_batch_start, sizeof(unsigned int));
 
   auto bs_batch_offset = bs_batch_start % opts.bootstop_interval;
-  unsigned int  bs_batch_end = bs_batch_start - bs_batch_offset + opts.bootstop_interval;
+  unsigned int  bs_batch_end = std::min(bs_batch_start - bs_batch_offset + opts.bootstop_interval,
+                                        opts.num_bootstraps);
   auto bs_num = worker.bs_trees.cbegin();
 
   auto ckp_tree_index = instance.run_phase == RaxmlRunPhase::bootstrap ? checkp.tree_index : 0;
@@ -2807,8 +2810,8 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
     ParallelContext::thread_barrier();
   }
 
-  /* special case: if this worker has no bsreps to infer, it still must synchronize! */
-  if (worker.bs_trees.empty())
+  /* special case: if this worker had no bsreps in last batch, it still must synchronize! */
+  if (!instance.bs_converged && bs_batch_start < bs_batch_end)
     gather_bs_trees(bs_batch_start, bs_batch_end);
 }
 

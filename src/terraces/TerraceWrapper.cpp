@@ -33,7 +33,7 @@ void set(terraces::bitmatrix& bm, bool val)
 
 void set(terraces::bitmatrix& bm, terraces::index_map indices, bool val)
 {
-  for (auto it: indices)
+  for (auto& it: indices)
     for (auto col = terraces::index_t{}; col < bm.cols(); ++col)
       bm.set(it.second, col, val);
 }
@@ -71,7 +71,7 @@ TerraceWrapper::TerraceWrapper (const PartitionedMSA& parted_msa, const Tree& tr
   auto terra_tree = parse_nwk(newick_str, _indices);
 
   LOG_DEBUG << "Names:" << std::endl;
-  for (auto n: _names)
+  for (const auto& n: _names)
     LOG_DEBUG << n << std::endl;
   LOG_DEBUG << std::endl;
 

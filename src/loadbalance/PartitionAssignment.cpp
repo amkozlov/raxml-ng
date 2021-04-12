@@ -8,7 +8,7 @@ PartitionAssignmentStats::PartitionAssignmentStats(const PartitionAssignmentList
   max_thread_weight = 0.;
   min_thread_sites = min_thread_parts = std::numeric_limits<size_t>::max();
   min_thread_weight = std::numeric_limits<double>::max();
-  for (auto pa: part_assign)
+  for (const auto& pa: part_assign)
   {
     min_thread_parts = std::min(min_thread_parts, pa.num_parts());
     max_thread_parts = std::max(max_thread_parts, pa.num_parts());
@@ -25,7 +25,7 @@ PartitionAssignmentStats::PartitionAssignmentStats(const PartitionAssignmentList
 std::ostream& operator<<(std::ostream& stream, const PartitionAssignment& pa)
 {
   stream << "part#\tstart\tlength" << std::endl;
-  for (auto const& range: pa)
+  for (const auto& range: pa)
     stream << range.part_id << "\t" << range.start << "\t" << range.length << std::endl;
   return stream;
 }
@@ -34,9 +34,9 @@ std::ostream& operator<<(std::ostream& stream, const PartitionAssignmentList& pa
 {
   stream << "thread#\tpart#\tstart\tlength\tweight" << std::endl;
   size_t i = 0;
-  for (auto const& pa: pal)
+  for (const auto& pa: pal)
   {
-    for (auto const& range: pa)
+    for (const auto& range: pa)
     {
       stream << i << "\t" << range.part_id << "\t"
              << range.start << "\t" << range.length

@@ -103,11 +103,11 @@ void CheckpointManager::init_checkpoints(const Tree& tree, const ModelCRefMap& m
   for (auto& ckp: _checkp_file.checkp_list)
   {
     ckp.tree = tree;
-    for (auto it: models)
+    for (auto& it: models)
       ckp.models[it.first] = it.second;
   }
 
-  for (auto it: models)
+  for (auto& it: models)
     _checkp_file.best_models[it.first] = it.second;
 }
 
