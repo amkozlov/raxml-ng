@@ -766,6 +766,15 @@ void check_options_early(Options& opts)
                         "NOTE:  Multiple MPI ranks per worker are not allowed in coarse-grained mode.\n");
   }
 
+  if (opts.coarse() && (opts.num_ranks * opts.num_threads % opts.num_workers != 0))
+  {
+    throw OptionException("The specified number of threads (" +
+                          to_string(opts.num_ranks * opts.num_threads) +
+                          ") is not a multiple of the number of parallel tree searches (" +
+                          to_string(opts.num_workers) + ")\n" +
+                          "HINT:  Consider using --workers auto{" + to_string(opts.num_workers) + "}");
+  }
+
   /* writing interim result files is not supported in coarse+MPI mode -> too much hassle */
   if (opts.coarse() && opts.num_ranks > 1)
     opts.write_interim_results = false;
