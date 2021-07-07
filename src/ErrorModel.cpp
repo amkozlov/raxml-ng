@@ -283,7 +283,7 @@ void P20GenotypeErrorModel::compute_state_probs(pll_state_t state,
     for (size_t k = 0; k < _states; ++k)
       clvp[k] = 0.;
 
-    while ((ctz = PLL_STATE_CTZ(tstate)) < _states)
+    while (tstate && (ctz = PLL_STATE_CTZ(tstate)) < _states)
     {
       state_id = state_id ?  state_id + ctz + 1 : ctz;
       tstate >>= ctz + 1;
