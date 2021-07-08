@@ -58,7 +58,7 @@ int ErrorParamVisitor::get_errmodel_param(const pllmod_treeinfo_t * treeinfo,
       param_vals[i++] = params[j];
   }
 
-//  printf("get paramval: %.17lf\n", param_vals[0]);
+//  printf("get paramval[%u]: %.17lf  \n", ParallelContext::thread_id(), param_vals[0]);
 
   assert(i == param_count);
 
@@ -84,6 +84,8 @@ int ErrorParamVisitor::set_errmodel_param(pllmod_treeinfo_t * treeinfo,
 
   assert(param_count <= params.size());
 
+  ParallelContext::barrier();
+
   size_t i = 0;
   for (size_t j = 0; j < ids.size(); ++j)
   {
@@ -96,8 +98,8 @@ int ErrorParamVisitor::set_errmodel_param(pllmod_treeinfo_t * treeinfo,
   if (ParallelContext::master_thread())
     global_pinfo->model().error_model_params(params);
 
-//  printf("set paramval: %.17lf %.17lf\n", global_pinfo->model().error_model()->params()[0],
-//         global_pinfo->model().error_model()->params()[1]);
+//  printf("set paramval[%lu]: %.17lf %.17lf\n",  ParallelContext::thread_id(),
+//          params[0], params[1]);
 
 //  printf("error rate: %lf\n", param_vals[0]);
 
@@ -494,6 +496,8 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
 
     if (std::isinf((double) new_loglh))
       throw runtime_error(pll_errmsg);
+
+    assert_lh_improvement(cur_loglh, new_loglh, "SEQ ERROR");
   }
 
   if (params_to_optimize & RAXML_OPT_PARAM_ADO_RATE)
@@ -521,6 +525,8 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
       else
         throw runtime_error(pll_errmsg);
     }
+
+    assert_lh_improvement(cur_loglh, new_loglh, "ADO RATE");
   }
 
   if (params_to_optimize & PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE)
