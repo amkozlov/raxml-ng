@@ -2339,7 +2339,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
     }
   }
 
-  if (opts.command == Command::bsmsa)
+  if (opts.command == Command::bsmsa || opts.write_bs_msa == true)
   {
     if (!opts.bootstrap_msa_file(1).empty())
     {
@@ -3010,6 +3010,7 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
         parted_msa.model(p, ml_models.at(p));
     }
   }
+
 }
 
 int clean_exit(int retval)

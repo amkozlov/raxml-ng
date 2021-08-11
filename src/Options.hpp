@@ -68,6 +68,7 @@ public:
   bool redo_mode;
   bool nofiles_mode;
   bool write_interim_results;
+  bool write_bs_msa;
 
   LogLevel log_level;
   FileFormat msa_format;
