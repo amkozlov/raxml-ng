@@ -165,6 +165,14 @@ void CommandLineParser::check_options(Options &opts)
         "but the current command does not perform bootstrapping.\n"
         "Did you forget --all option?");
   }
+    
+  if (opts.write_bs_msa && opts.command != Command::bsmsa &&
+      opts.command != Command::bootstrap && opts.command != Command::all)
+  {
+    throw OptionException("You specified to write out boostrap alignments with --bs-write-msa option, "
+      "but the current command does not perform bootstrapping.\n"
+      "Did you forget --all option?");
+  }
 
   if (opts.simd_arch > sysutil_simd_autodetect())
   {
