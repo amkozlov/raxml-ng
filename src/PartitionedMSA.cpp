@@ -118,7 +118,7 @@ IdPairVector PartitionedMSA::full_to_parted_sitemap() const
   {
     auto pid = site_part_map().empty() ? 0 : site_part_map()[i] - 1;
     auto sid = part_site_idx[pid]++;
-    auto spmap = part_info(pid).msa().site_pattern_map();
+    auto& spmap = part_info(pid).msa().site_pattern_map();
     sitemap[i].first = pid;
     sitemap[i].second = spmap.empty() ? sid : spmap[sid];
   }

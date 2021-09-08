@@ -151,6 +151,10 @@ void ParallelContext::init_pthreads(const Options& opts, const std::function<voi
       pin_thread(i, handle);
     }
   }
+#else
+  _local_thread_id = 0;
+  _thread_group = &(*_thread_groups.begin());
+  RAXML_UNUSED(thread_main);
 #endif
 }
 
@@ -255,6 +259,10 @@ void ParallelContext::finalize(bool force)
   }
   else
     MPI_Barrier(_comm);
+#endif
+
+#if !defined(_RAXML_PTHREADS) && !defined(_RAXML_MPI)
+  RAXML_UNUSED(force);
 #endif
 }
 
@@ -432,6 +440,12 @@ void ParallelContext::parallel_reduce(double * data, size_t size, int op)
 
 #ifdef _RAXML_MPI
   mpi_allreduce(data, size, op);
+#endif
+
+#if !defined(_RAXML_PTHREADS) && !defined(_RAXML_MPI)
+  RAXML_UNUSED(data);
+  RAXML_UNUSED(size);
+  RAXML_UNUSED(op);
 #endif
 }
 

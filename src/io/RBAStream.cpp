@@ -55,7 +55,7 @@ RBAStream& operator<<(RBAStream& stream, const PartitionedMSA& part_msa)
   bos << header;
 
   // taxon labels
-  for (auto label: part_msa.taxon_names())
+  for (const auto& label: part_msa.taxon_names())
   {
     bos << label;
   }

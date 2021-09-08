@@ -351,7 +351,7 @@ void MSA::local_seq_ranges(const RangeList& rl)
             [](const Range& a, const Range& b) { return a.start < b.start; });
 
   _num_sites = 0;
-  for (auto r: _local_seq_ranges)
+  for (const auto& r: _local_seq_ranges)
     _num_sites += r.length;
 }
 
