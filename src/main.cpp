@@ -45,6 +45,7 @@
 #include "autotune/ResourceEstimator.hpp"
 #include "ICScoreCalculator.hpp"
 #include "topology/RFDistCalculator.hpp"
+#include "topology/ConstraintTree.hpp"
 #include "util/EnergyMonitor.hpp"
 
 #ifdef _RAXML_TERRAPHAST
@@ -108,7 +109,7 @@ struct RaxmlInstance
   Tree random_tree;
 
   /* topological constraint */
-  Tree constraint_tree;
+  ConstraintTree constraint_tree;
 
   MLTree ml_tree;
 
@@ -743,8 +744,8 @@ void check_options_early(Options& opts)
     throw runtime_error("Site weights file not found: " + opts.weights_file);
 
   if (!opts.constraint_tree_file.empty() &&
-      (opts.start_trees.count(StartingTree::parsimony) > 0 ||
-       opts.start_trees.count(StartingTree::user)))
+      (opts.start_trees.count(StartingTree::parsimony) > 0 /*||
+       opts.start_trees.count(StartingTree::user)*/))
   {
     throw runtime_error(" User and parsimony starting trees are not supported in combination with "
                         "constrained tree inference.\n"
@@ -1173,6 +1174,15 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
 
       check_tree(parted_msa, tree, true);
 
+      if (!instance.constraint_tree.empty())
+      {
+        tree.reset_tip_ids(instance.tip_id_map);
+        if (!instance.constraint_tree.compatible(tree))
+        {
+          throw runtime_error("User starting tree incompatible with the specified topological constraint!");
+        }
+      }
+
       break;
     }
     case StartingTree::random:
@@ -1411,6 +1421,29 @@ void load_constraint(RaxmlInstance& instance)
       assert(cons_tip_id == cons_tree.num_tips());
       assert(free_tip_id == instance.tip_id_map.size());
       assert(instance.tip_id_map.size() == parted_msa.taxon_count());
+
+      // TMP: remove taxa not in constraint tree
+      if (0)
+      {
+        PartitionedMSAView parted_msa_view(parted_msa);
+        auto cons_tips = instance.constraint_tree.tip_ids();
+        for (auto i = cons_tree.num_tips(); i < parted_msa.taxon_count(); ++i)
+        {
+          parted_msa_view.exclude_taxon(instance.tip_msa_idmap[i]);
+        }
+        print_reduced_msa(instance, parted_msa_view);
+      }
+
+      if (0)
+      {
+        ofstream fs("extra.txt");
+        for (auto i = cons_tree.num_tips(); i < parted_msa.taxon_count(); ++i)
+        {
+          auto id = instance.tip_msa_idmap[i];
+          fs << parted_msa.taxon_names().at(id) << "\n";
+        }
+      }
+
     }
     else if (cons_tree.binary() && !instance.opts.force_mode)
     {
@@ -1421,8 +1454,8 @@ void load_constraint(RaxmlInstance& instance)
     /* make sure tip indices are consistent between MSA and pll_tree */
     cons_tree.reset_tip_ids(instance.tip_id_map);
 
-//    pll_utree_show_ascii(&cons_tree.pll_utree_root(), PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH |
-//                                     PLL_UTREE_SHOW_CLV_INDEX );
+    pll_utree_show_ascii(&cons_tree.pll_utree_root(), PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH |
+                                     PLL_UTREE_SHOW_CLV_INDEX );
   }
 }
 
@@ -3178,6 +3211,7 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::parse:
       {
         load_parted_msa(instance);
+        load_constraint(instance);
         if (!opts.tree_file.empty())
         {
           LOG_INFO << "Loading tree from: " << opts.tree_file << endl << endl;

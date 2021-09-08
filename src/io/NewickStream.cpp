@@ -89,7 +89,8 @@ NewickStream& operator>>(NewickStream& stream, Tree& tree)
     if (utree->edge_count > 2 * utree->tip_count - 3)
       throw runtime_error("Tree contains unifurcations (watch for an extra pair of parentheses)!");
 
-    tree = Tree(*utree);
+//    tree = Tree(*utree);
+    tree.pll_utree(*utree);
 
     pll_utree_destroy(utree, nullptr);
   }
