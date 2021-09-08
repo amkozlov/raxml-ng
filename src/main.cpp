@@ -2339,7 +2339,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
     }
   }
 
-  if (opts.command == Command::bsmsa)
+  if (opts.command == Command::bsmsa || opts.write_bs_msa)
   {
     if (!opts.bootstrap_msa_file(1).empty())
     {
@@ -2347,6 +2347,9 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
 
       bool print_part_file = instance.parted_msa->part_count() > 1;
 
+      // Figure out how many bs msa to write out, max
+      auto max_bs_trees = opts.write_bs_msa ? checkp.bs_trees.size() : opts.num_bootstraps;
+        
       size_t bsnum = 0;
       for (const auto& bsrep: instance.bs_reps)
       {
@@ -2355,13 +2358,17 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
 
         bs_msa_view.site_weights(bsrep.site_weights);
         ps << bs_msa_view;
+          
+        // We've reached max number of bootstrap msa to write out
+        if (bsnum >= max_bs_trees)
+          break;
       }
 
       LOG_INFO << "Bootstrap replicate MSAs saved to: "
                << sysutil_realpath(opts.bootstrap_msa_file(1))
                << "  ... " << endl
                << "                                   "
-               << sysutil_realpath(opts.bootstrap_msa_file(opts.num_bootstraps)) << endl;
+               << sysutil_realpath(opts.bootstrap_msa_file(max_bs_trees)) << endl;
 
       if (print_part_file)
       {
@@ -3010,6 +3017,7 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
         parted_msa.model(p, ml_models.at(p));
     }
   }
+
 }
 
 int clean_exit(int retval)

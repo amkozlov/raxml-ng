@@ -78,6 +78,7 @@ static struct option long_options[] =
   {"workers",            required_argument, 0, 0 },  /*  54 */
   {"sitelh",             no_argument, 0, 0 },        /*  55 */
   {"site-weights",       required_argument, 0, 0 },  /*  56 */
+  {"bs-write-msa",       no_argument, 0, 0 },        /*  57 */
 
   { 0, 0, 0, 0 }
 };
@@ -163,6 +164,14 @@ void CommandLineParser::check_options(Options &opts)
     throw OptionException("You specified the number of bootstrap replicates with --bs-trees option, "
         "but the current command does not perform bootstrapping.\n"
         "Did you forget --all option?");
+  }
+    
+  if (opts.write_bs_msa && opts.command != Command::bsmsa &&
+      opts.command != Command::bootstrap && opts.command != Command::all)
+  {
+    throw OptionException("You specified to write out boostrap alignments with --bs-write-msa option, "
+      "but the current command does not perform bootstrapping.\n"
+      "Did you forget --all option?");
   }
 
   if (opts.simd_arch > sysutil_simd_autodetect())
@@ -318,6 +327,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   opts.num_searches = 0;
   opts.num_bootstraps = 0;
+  opts.write_bs_msa = false;
 
   opts.force_mode = false;
   opts.safety_checks = SafetyCheck::all;
@@ -905,7 +915,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.weights_file = optarg;
         break;
 
-
+      case 57: /* write bootstrap alignments*/
+        opts.write_bs_msa = true;
+        break;
+            
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -1019,7 +1032,8 @@ void CommandLineParser::print_help()
             "  --bs-trees     autoMRE{N}                  use MRE-based bootstrap convergence criterion, up to N replicates (default: 1000)\n"
             "  --bs-trees     FILE                        Newick file containing set of bootstrap replicate trees (with --support)\n"
             "  --bs-cutoff    VALUE                       cutoff threshold for the MRE-based bootstopping criteria (default: 0.03)\n"
-            "  --bs-metric    fbp | tbe                   branch support metric: fbp = Felsenstein bootstrap (default), tbe = transfer distance\n";
+            "  --bs-metric    fbp | tbe                   branch support metric: fbp = Felsenstein bootstrap (default), tbe = transfer distance\n"
+            "  --bs-write-msa on | off                    write all bootstrap alignments (default: OFF)\n";
 
   cout << "\n"
             "EXAMPLES:\n"
