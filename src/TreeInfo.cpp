@@ -29,6 +29,8 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
   _brlen_max = opts.brlen_max;
   _brlen_opt_method = opts.brlen_opt_method;
   _check_lh_impr = opts.safety_checks.isset(SafetyCheck::model_lh_impr);
+  _use_old_constraint = opts.use_old_constraint;
+
   _partition_contributions.resize(parted_msa.part_count());
   double total_weight = 0;
 
@@ -400,7 +402,8 @@ void TreeInfo::set_topology_constraint(const Tree& cons_tree)
 {
   if (!cons_tree.empty())
   {
-    int retval = pllmod_treeinfo_set_constraint_tree(_pll_treeinfo, &cons_tree.pll_utree());
+    int retval = pllmod_treeinfo_set_constraint_tree(_pll_treeinfo, &cons_tree.pll_utree(),
+                                                     _use_old_constraint ? 1 : 0);
     if (!retval)
       libpll_check_error("ERROR: Cannot set topological constraint");
   }

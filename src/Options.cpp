@@ -6,10 +6,10 @@ using namespace std;
 
 Options::Options() : opt_version(RAXML_OPT_VERSION), cmdline(""), command(Command::none),
 use_tip_inner(true), use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false),
-use_repeats(true), use_rba_partload(true), use_energy_monitor(true),
+use_repeats(true), use_rba_partload(true), use_energy_monitor(true), use_old_constraint(false),
 optimize_model(true), optimize_brlen(true), force_mode(false), safety_checks(SafetyCheck::all),
-redo_mode(false), nofiles_mode(false), write_interim_results(true), log_level(LogLevel::progress),
-msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
+redo_mode(false), nofiles_mode(false), write_interim_results(true), write_bs_msa(false),
+log_level(LogLevel::progress), msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
 random_seed(0), start_trees(), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
 spr_cutoff(1.0),
 brlen_linkage(PLLMOD_COMMON_BRLEN_SCALED), brlen_opt_method(PLLMOD_OPT_BLO_NEWTON_FAST),
@@ -380,7 +380,11 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   }
 
   if (!opts.constraint_tree_file.empty())
-    stream << "  topological constraint: " << opts.constraint_tree_file << endl;
+  {
+    stream << "  topological constraint: " << opts.constraint_tree_file;
+    stream <<  " (algorithm: " << (opts.use_old_constraint ? "OLD" : "NEW") << ")";
+    stream << endl;
+  }
 
   if (!opts.weights_file.empty())
     stream << "  site weights: " << opts.weights_file << endl;

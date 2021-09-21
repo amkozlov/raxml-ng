@@ -448,6 +448,8 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Options& o)
   stream << o.simd_arch << o.thread_pinning;
   stream << o.load_balance_method;
 
+  stream << o.write_bs_msa << o.use_old_constraint;
+
   return stream;
 }
 
@@ -491,6 +493,9 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, Options& o)
   stream >> o.num_threads >> o.num_ranks >> o.num_workers >> o.num_threads_max >> o.num_workers_max;
   stream >> o.simd_arch >> o.thread_pinning;
   stream >> o.load_balance_method;
+
+  if (o.opt_version >= 2)
+    stream >> o.write_bs_msa >> o.use_old_constraint;
 
   return stream;
 }

@@ -67,6 +67,11 @@ bool Tree::binary() const
   return _pll_utree ? _pll_utree->binary : BasicTree::binary();
 }
 
+bool Tree::compatible(const Tree& other) const
+{
+  return pllmod_utree_constraint_check_tree(&pll_utree(), &other.pll_utree()) == PLL_SUCCESS;
+}
+
 pll_utree_t * Tree::pll_utree_copy() const
 {
   return _pll_utree ? pll_utree_clone(_pll_utree.get()) : nullptr;

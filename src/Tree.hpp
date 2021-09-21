@@ -117,6 +117,7 @@ public:
 
   const pll_unode_t& pll_utree_root() const { return *_pll_utree->vroot; }
   bool empty() const { return _num_tips == 0; }
+  bool compatible(const Tree& other) const;
 
   void fix_outbound_brlens(double min_brlen, double max_brlen);
   void fix_missing_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);

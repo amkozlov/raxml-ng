@@ -276,6 +276,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* use RBA partial loading whenever appropriate/possible */
   opts.use_rba_partload = true;
 
+  /* use new split-based constraint checking method -> slightly slower, but more reliable */
+  opts.use_old_constraint = false;
+
   /* optimize model and branch lengths */
   opts.optimize_model = true;
   opts.optimize_brlen = true;
@@ -796,6 +799,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_rba_partload = false;
             else if (eopt == "energy-off")
               opts.use_energy_monitor = false;
+            else if (eopt == "constraint-old")
+              opts.use_old_constraint = true;
+            else if (eopt == "constraint-new")
+              opts.use_old_constraint = false;
             else
               throw InvalidOptionValueException("Unknown extra option: " + string(eopt));
           }

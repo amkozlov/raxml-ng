@@ -5,7 +5,7 @@
 #include "PartitionedMSA.hpp"
 #include "util/SafetyCheck.hpp"
 
-constexpr int RAXML_OPT_VERSION = 1;
+constexpr int RAXML_OPT_VERSION = 2;
 
 struct OutputFileNames
 {
@@ -58,6 +58,7 @@ public:
   bool use_repeats;
   bool use_rba_partload;
   bool use_energy_monitor;
+  bool use_old_constraint;
 
   bool optimize_model;
   bool optimize_brlen;

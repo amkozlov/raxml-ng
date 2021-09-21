@@ -109,7 +109,7 @@ struct RaxmlInstance
   Tree random_tree;
 
   /* topological constraint */
-  ConstraintTree constraint_tree;
+  Tree constraint_tree;
 
   MLTree ml_tree;
 
@@ -744,8 +744,8 @@ void check_options_early(Options& opts)
     throw runtime_error("Site weights file not found: " + opts.weights_file);
 
   if (!opts.constraint_tree_file.empty() &&
-      (opts.start_trees.count(StartingTree::parsimony) > 0 /*||
-       opts.start_trees.count(StartingTree::user)*/))
+      (opts.start_trees.count(StartingTree::parsimony) > 0 ||
+       (opts.start_trees.count(StartingTree::user) > 0 && opts.use_old_constraint)))
   {
     throw runtime_error(" User and parsimony starting trees are not supported in combination with "
                         "constrained tree inference.\n"
@@ -1454,8 +1454,8 @@ void load_constraint(RaxmlInstance& instance)
     /* make sure tip indices are consistent between MSA and pll_tree */
     cons_tree.reset_tip_ids(instance.tip_id_map);
 
-    pll_utree_show_ascii(&cons_tree.pll_utree_root(), PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH |
-                                     PLL_UTREE_SHOW_CLV_INDEX );
+//    pll_utree_show_ascii(&cons_tree.pll_utree_root(), PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH |
+//                                     PLL_UTREE_SHOW_CLV_INDEX );
   }
 }
 
