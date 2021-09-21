@@ -219,6 +219,13 @@ void CommandLineParser::compute_num_searches(Options &opts)
     for (const auto& it: opts.start_trees)
       opts.num_searches += it.second;
   }
+  else if (opts.command == Command::parse || opts.command == Command::check)
+  {
+    /* ignore random and parsimony starting trees in check/parse mode */
+    opts.start_trees.clear();
+    if (!opts.tree_file.empty())
+      opts.num_searches = opts.start_trees[StartingTree::user] = 1;
+  }
 }
 
 void CommandLineParser::parse_start_trees(Options &opts, const string& arg)

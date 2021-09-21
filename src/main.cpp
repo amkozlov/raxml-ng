@@ -1377,7 +1377,7 @@ void load_constraint(RaxmlInstance& instance)
 
     LOG_INFO_TS << "Loaded " <<
         (cons_tree.num_tips() == parted_msa.taxon_count() ? "" : "non-") <<
-        "comprehensive constraint tree with " << cons_tree.num_tips() << " taxa" << endl;
+        "comprehensive constraint tree with " << cons_tree.num_tips() << " taxa" << endl << endl;
 
     // check if taxa names are consistent between constraint tree and MSA
     {
@@ -3220,18 +3220,21 @@ int internal_main(int argc, char** argv, void* comm)
       {
         load_parted_msa(instance);
         load_constraint(instance);
-        if (!opts.tree_file.empty())
-        {
-          LOG_INFO << "Loading tree from: " << opts.tree_file << endl << endl;
-          if (!sysutil_file_exists(opts.tree_file))
-            throw runtime_error("File not found: " + opts.tree_file);
-          instance.start_tree_stream.reset(new NewickStream(opts.tree_file, std::ios::in));
-          Tree tree = generate_tree(instance, StartingTree::user);
-        }
+        build_start_trees(instance, 0);
+
+        LOG_INFO << endl;
+
         if (opts.command == Command::parse)
           print_resources(instance);
 
-        LOG_INFO << "Alignment can be successfully read by RAxML-NG." << endl << endl;
+        LOG_INFO  << "Alignment can be successfully read by RAxML-NG." << endl << endl;
+
+        if (!opts.tree_file.empty() && !instance.constraint_tree.empty())
+        {
+          LOG_INFO << "All starting trees (" << opts.num_searches
+                   << ") are compatible with the topological constraint." << endl << endl;
+        }
+
         break;
       }
       case Command::start:
