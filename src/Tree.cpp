@@ -150,15 +150,22 @@ Tree Tree::buildRandomConstrained(const NameList& taxon_names, unsigned int rand
   return tree;
 }
 
-
 Tree Tree::buildParsimony(const PartitionedMSA& parted_msa, unsigned int random_seed,
                            unsigned int attributes, unsigned int * score)
+{
+  return buildParsimonyConstrained(parted_msa, random_seed, attributes, score, Tree(), IDVector());
+}
+
+Tree Tree::buildParsimonyConstrained(const PartitionedMSA& parted_msa, unsigned int random_seed,
+                           unsigned int attributes, unsigned int * score,
+                           const Tree& constrained_tree, const IDVector& tip_msa_idmap)
 {
   unsigned int lscore;
   unsigned int *pscore = score ? score : &lscore;
 
   LOG_DEBUG << "Parsimony seed: " << random_seed << endl;
 
+  Tree tree;
   auto taxon_names = parted_msa.taxon_names();
   auto taxon_count = taxon_names.size();
   std::vector<const char*> tip_labels(taxon_names.size(), nullptr);
@@ -197,20 +204,74 @@ Tree Tree::buildParsimony(const PartitionedMSA& parted_msa, unsigned int random_
   }
   assert(i == pars_partitions.size());
 
-  PllUTreeUniquePtr pll_utree(pllmod_utree_create_parsimony_multipart(taxon_count,
-                                                                      (char* const*) tip_labels.data(),
-                                                                      pars_partitions.size(),
-                                                                      pars_partitions.data(),
-                                                                      random_seed,
-                                                                      pscore));
+  PllUTreeUniquePtr pll_utree;
+  if (constrained_tree.empty())
+  {
+    pll_utree.reset(pllmod_utree_create_parsimony_multipart(taxon_count,
+                                                            (char* const*) tip_labels.data(),
+                                                            pars_partitions.size(),
+                                                            pars_partitions.data(),
+                                                            random_seed,
+                                                            pscore));
+
+    tree = Tree(pll_utree);
+  }
+  else
+  {
+    // stupid type conversion
+    uintVector tip_idmap;
+    if (!tip_msa_idmap.empty())
+    {
+      tip_idmap.assign(tip_msa_idmap.cbegin(), tip_msa_idmap.cend());
+    }
+
+    intVector clv_index_map(taxon_count * 2);
+    pll_utree.reset(pllmod_utree_resolve_parsimony_multipart(&constrained_tree.pll_utree(),
+                                                             pars_partitions.size(),
+                                                             pars_partitions.data(),
+                                                             tip_idmap.data(),
+                                                             10,
+                                                             random_seed,
+                                                             clv_index_map.data(),
+                                                             pscore));
+
+    if (!pll_utree)
+    {
+      assert(pll_errno);
+      libpll_check_error("ERROR in building a constrained parsimony tree");
+    }
+
+    tree = Tree(pll_utree);
+
+    if (taxon_names.size() > tree.num_tips())
+    {
+      // constraint tree is not comprehensive -> add free taxa
+      auto free_tip_count = taxon_names.size() - tree.num_tips();
+      auto cons_tips = tree.tip_ids();
+      NameList free_tips;
+      free_tips.reserve(free_tip_count);
+
+      for (const auto& t: taxon_names)
+      {
+        if (!cons_tips.count(t))
+          free_tips.push_back(t);
+      }
+
+      assert(free_tips.size() == free_tip_count);
+
+      tree.insert_tips_pasimony(free_tips, pars_partitions, tip_msa_idmap, random_seed, pscore);
+    }
+
+//    pll_utree_show_ascii(tree.pll_utree().vroot, PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH | PLL_UTREE_SHOW_CLV_INDEX);
+  }
 
   for (auto p: pars_partitions)
     pll_partition_destroy(p);
 
   libpll_check_error("ERROR building parsimony tree");
-  assert(pll_utree);
+  assert(!tree.empty());
 
-  return Tree(pll_utree);
+  return tree;
 }
 
 Tree Tree::loadFromFile(const std::string& file_name)
@@ -306,6 +367,43 @@ void Tree::insert_tips_random(const NameList& tip_names, unsigned int random_see
     libpll_check_error("ERROR in randomized tree extension");
   }
 }
+
+void Tree::insert_tips_pasimony(const NameList& tip_names, std::vector<pll_partition*>& pars_partitions,
+                                const IDVector& tip_msa_idmap,
+                                unsigned int random_seed, unsigned int * score)
+{
+  _pll_utree_tips.clear();
+
+  std::vector<const char*> tip_labels(tip_names.size(), nullptr);
+  for (size_t i = 0; i < tip_names.size(); ++i)
+    tip_labels[i] = tip_names[i].data();
+
+  // stupid type conversion
+  uintVector tip_idmap;
+  if (!tip_msa_idmap.empty())
+  {
+    tip_idmap.assign(tip_msa_idmap.cbegin(), tip_msa_idmap.cend());
+  }
+
+
+  int retval = pllmod_utree_extend_parsimony_multipart(_pll_utree.get(),
+                                          tip_labels.size(),
+                                          (char * const*) tip_labels.data(),
+                                          tip_idmap.data(),
+                                          pars_partitions.size(),
+                                          pars_partitions.data(),
+                                          random_seed,
+                                          score);
+
+  if (retval)
+    _num_tips = _pll_utree->tip_count;
+  else
+  {
+    assert(pll_errno);
+    libpll_check_error("ERROR in randomized tree extension");
+  }
+}
+
 
 void Tree::reset_tip_ids(const NameIdMap& label_id_map)
 {

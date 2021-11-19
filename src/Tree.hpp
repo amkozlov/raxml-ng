@@ -93,6 +93,9 @@ public:
                                      const Tree& constrained_tree);
   static Tree buildParsimony(const PartitionedMSA& parted_msa, unsigned int random_seed,
                              unsigned int attributes, unsigned int * score = nullptr);
+  static Tree buildParsimonyConstrained(const PartitionedMSA& parted_msa, unsigned int random_seed,
+                             unsigned int attributes, unsigned int * score,
+                             const Tree& constrained_tree, const IDVector& tip_msa_idmap);
   static Tree loadFromFile(const std::string& file_name);
 
   std::vector<const char*> tip_labels_cstr() const;
@@ -129,6 +132,9 @@ public:
   void reset_tip_ids(const NameIdMap& label_id_map);
   void reroot(const NameList& outgroup_taxa, bool add_root_node = false);
   void insert_tips_random(const NameList& tip_names, unsigned int random_seed = 0);
+  void insert_tips_pasimony(const NameList& tip_names, std::vector<pll_partition*>& pars_partitions,
+                            const IDVector& tip_msa_idmap,
+                            unsigned int random_seed, unsigned int * score);
 
 public:
   bool binary() const;

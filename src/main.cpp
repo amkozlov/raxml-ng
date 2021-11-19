@@ -744,8 +744,8 @@ void check_options_early(Options& opts)
     throw runtime_error("Site weights file not found: " + opts.weights_file);
 
   if (!opts.constraint_tree_file.empty() &&
-      (opts.start_trees.count(StartingTree::parsimony) > 0 ||
-       (opts.start_trees.count(StartingTree::user) > 0 && opts.use_old_constraint)))
+      ((opts.start_trees.count(StartingTree::parsimony) > 0 ||
+       opts.start_trees.count(StartingTree::user) > 0) && opts.use_old_constraint))
   {
     throw runtime_error(" User and parsimony starting trees are not supported in combination with "
                         "constrained tree inference.\n"
@@ -1211,7 +1211,8 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
 
       const PartitionedMSA& pars_msa = instance.parted_msa_parsimony ?
                                     *instance.parted_msa_parsimony.get() : *instance.parted_msa;
-      tree = Tree::buildParsimony(pars_msa, tree_rand_seed, attrs, &score);
+      tree = Tree::buildParsimonyConstrained(pars_msa, tree_rand_seed, attrs, &score,
+                                             instance.constraint_tree, instance.tip_msa_idmap);
 
       LOG_DEBUG << "Parsimony score of the starting tree: " << score << endl;
 
@@ -3240,6 +3241,7 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::start:
       {
         load_parted_msa(instance);
+        load_constraint(instance);
         build_start_trees(instance, 0);
         if (!opts.start_tree_file().empty())
         {
