@@ -195,8 +195,8 @@ void CommandLineParser::compute_num_searches(Options &opts)
   {
     if (opts.start_trees.empty())
     {
-      /* parsimony starting trees are not supported with topological constraint! */
-      if (opts.constraint_tree_file.empty())
+      /* parsimony starting trees are not supported with old-style topological constraint! */
+      if (opts.constraint_tree_file.empty() || !opts.use_old_constraint)
       {
         opts.start_trees[StartingTree::random] = 10;
         opts.start_trees[StartingTree::parsimony] = 10;
