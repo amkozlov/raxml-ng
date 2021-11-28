@@ -1266,10 +1266,10 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
     if (cm.read())
     {
       // read start trees from file to avoid re-generation
-      // NOTE: doesn't work for constrained tree search
+      // NOTE: doesn't work for OLD constrained tree search
       if (sysutil_file_exists(instance.opts.start_tree_file()) &&
           instance.opts.num_searches > 0 &&
-          instance.opts.constraint_tree_file.empty())
+          !(instance.opts.constraint_tree_file.empty() && instance.opts.use_old_constraint))
       {
         load_start_trees(instance);
       }
@@ -2963,10 +2963,10 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   /* load/create starting tree if not already loaded from checkpoint */
   if (instance.start_trees.size() < opts.num_searches)
   {
-    if (ParallelContext::master_rank() || !opts.constraint_tree_file.empty() ||
-        opts.start_tree_file().empty())
+    if (ParallelContext::master_rank() || opts.start_tree_file().empty() ||
+        (!opts.constraint_tree_file.empty() && opts.use_old_constraint))
     {
-      /* only master MPI rank generates starting trees (doesn't work with constrained search) */
+      /* only master MPI rank generates starting trees (doesn't work with old constrained search) */
       build_start_trees(instance, 0);
       ParallelContext::global_mpi_barrier();
     }
