@@ -225,12 +225,15 @@ Tree Tree::buildParsimonyConstrained(const PartitionedMSA& parted_msa, unsigned 
       tip_idmap.assign(tip_msa_idmap.cbegin(), tip_msa_idmap.cend());
     }
 
+    // TODO something less adhoc ...
+    unsigned int max_rounds = std::max(std::min(int(10000 / constrained_tree.num_tips()), 10), 1);
+//    printf("max_spr_rounds: %u\n", max_rounds);
     intVector clv_index_map(taxon_count * 2);
     pll_utree.reset(pllmod_utree_resolve_parsimony_multipart(&constrained_tree.pll_utree(),
                                                              pars_partitions.size(),
                                                              pars_partitions.data(),
                                                              tip_idmap.data(),
-                                                             10,
+                                                             max_rounds,
                                                              random_seed,
                                                              clv_index_map.data(),
                                                              pscore));
