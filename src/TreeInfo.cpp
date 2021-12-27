@@ -461,7 +461,7 @@ void assign(Model& model, const TreeInfo& treeinfo, size_t partition_id)
     model.brlen_scaler(pll_treeinfo.brlen_scalers[partition_id]);
 }
 
-void build_clv(ProbVector::const_iterator probs, size_t sites, WeightVector::const_iterator weights,
+void build_clv(ProbVector::const_iterator probs, size_t sites, const WeightVector& weights, size_t seq_offset,
                pll_partition_t* partition, bool normalize, std::vector<double>& clv)
 {
   const auto states = partition->states;
@@ -469,7 +469,7 @@ void build_clv(ProbVector::const_iterator probs, size_t sites, WeightVector::con
 
   for (size_t i = 0; i < sites; ++i)
   {
-    if (weights[i] > 0)
+    if (weights.empty() || weights[seq_offset + i] > 0)
     {
       double sum = 0.;
       for (size_t j = 0; j < states; ++j)
@@ -512,7 +512,6 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
     assert(partition->states == msa.states());
 
     auto normalize = !msa.normalized();
-    auto weights_start = msa.weights().cbegin() + seq_offset;
 
     // we need a libpll function for that!
     auto clv_size = partition->sites * partition->states;
@@ -521,7 +520,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
     {
       auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
       auto prob_start = msa.probs(seq_id, seq_offset);
-      build_clv(prob_start, partition->sites, weights_start, partition, normalize, tmp_clv);
+      build_clv(prob_start, partition->sites, msa.weights(), seq_offset, partition, normalize, tmp_clv);
       pll_set_tip_clv(partition, tip_id, tmp_clv.data(), PLL_FALSE);
     }
   }
@@ -561,16 +560,15 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
     assert(partition->states == msa.states());
 
     auto normalize = !msa.normalized();
-    auto weights_start = msa.weights().cbegin() + pstart;
 
     // we need a libpll function for that!
-    auto clv_size = plen * partition->states;
+    auto clv_size = comp_weights.size() * partition->states;
     std::vector<double> tmp_clv(clv_size);
     for (size_t tip_id = 0; tip_id < partition->tips; ++tip_id)
     {
       auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
       auto prob_start = msa.probs(seq_id, pstart);
-      build_clv(prob_start, plen, weights_start, partition, normalize, tmp_clv);
+      build_clv(prob_start, plen, weights, pstart, partition, normalize, tmp_clv);
       pll_set_tip_clv(partition, tip_id, tmp_clv.data(), PLL_FALSE);
     }
   }
