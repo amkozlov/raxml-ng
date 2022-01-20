@@ -867,14 +867,18 @@ void check_options(RaxmlInstance& instance)
     }
   }
 
-  if (instance.parted_msa->taxon_count() > RAXML_RATESCALERS_TAXA &&
-      !instance.opts.use_rate_scalers && opts.command != Command::ancestral)
+  /* auto-enable rate scalers for >2000 taxa */
+  if (opts.safety_checks.isset(SafetyCheck::model_rate_scalers))
   {
-    LOG_INFO << "\nNOTE: Per-rate scalers were automatically enabled to prevent numerical issues "
-        "on taxa-rich alignments." << endl;
-    LOG_INFO << "NOTE: You can use --force switch to skip this check "
-        "and fall back to per-site scalers." << endl << endl;
-    instance.opts.use_rate_scalers = true;
+    if (instance.parted_msa->taxon_count() > RAXML_RATESCALERS_TAXA &&
+        !instance.opts.use_rate_scalers && opts.command != Command::ancestral)
+    {
+      LOG_INFO << "\nNOTE: Per-rate scalers were automatically enabled to prevent numerical issues "
+          "on taxa-rich alignments." << endl;
+      LOG_INFO << "NOTE: You can use --force switch to skip this check "
+          "and fall back to per-site scalers." << endl << endl;
+      instance.opts.use_rate_scalers = true;
+    }
   }
 
   /* make sure we do not check for convergence too often in coarse-grained parallelization mode */

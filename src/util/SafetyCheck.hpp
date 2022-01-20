@@ -24,8 +24,9 @@ struct SafetyCheck
     model_asc_bias       = 1 << 24,
     model_overfit        = 1 << 25,
     model_lh_impr        = 1 << 26,
+    model_rate_scalers   = 1 << 27,
     model                = model_zero_freqs | model_invalid_freqs | model_lg4_freqs |
-                           model_asc_bias | model_overfit | model_lh_impr
+                           model_asc_bias | model_overfit | model_lh_impr | model_rate_scalers
   };
 
 
