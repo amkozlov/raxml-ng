@@ -924,22 +924,24 @@ void autotune_threads(RaxmlInstance& instance)
 
   StaticResourceEstimator resEstimator(*instance.parted_msa, instance.opts);
   auto res = resEstimator.estimate();
+  unsigned int est_threads_throughput = (unsigned int) res.num_threads_throughput;
+  unsigned int est_threads_response = (unsigned int) res.num_threads_response;
   auto num_ranks = opts.num_ranks;
 
   LOG_DEBUG << "Recommended threads (response/balanced/throughput): " <<
       res.num_threads_response << " / " << res.num_threads_balanced <<
       " / " << res.num_threads_throughput << endl << endl;
 
-  size_t max_workers = std::max(opts.num_searches, opts.num_bootstraps);
-  size_t max_workers_mem = 0.9 * num_ranks * sysutil_get_memtotal() / res.total_mem_size;
+  unsigned int max_workers = std::max(opts.num_searches, opts.num_bootstraps);
+  unsigned int max_workers_mem = 0.9 * num_ranks * sysutil_get_memtotal() / res.total_mem_size;
   max_workers = std::min(max_workers, max_workers_mem);
-  max_workers = std::min(max_workers, (size_t) opts.num_workers_max);
+  max_workers = std::min(max_workers, opts.num_workers_max);
   if (opts.num_workers == 0)
   {
     if (max_workers > 1)
     {
       auto rank_threads = opts.num_threads > 0 ? opts.num_threads : opts.num_threads_max;
-      auto opt_workers = std::max(rank_threads / res.num_threads_throughput, 1ul);
+      auto opt_workers = std::max(rank_threads / est_threads_throughput, 1u);
       opt_workers *= num_ranks;
       opts.num_workers = std::min(opt_workers, max_workers);
 
@@ -967,11 +969,11 @@ void autotune_threads(RaxmlInstance& instance)
   assert(opts.num_workers > 0);
   assert(opts.num_workers == 1 || opts.num_workers % num_ranks == 0);
 
-  size_t workers_per_rank = std::max(opts.num_workers / num_ranks, 1u);
+  unsigned int workers_per_rank = std::max(opts.num_workers / num_ranks, 1u);
   if (opts.num_threads == 0)
   {
-    auto opt_rank_threads = std::max(res.num_threads_response * opts.num_workers / num_ranks, 1lu);
-    opts.num_threads = opt_rank_threads <= (size_t) opts.num_threads_max ?
+    auto opt_rank_threads = std::max(est_threads_response * opts.num_workers / num_ranks, 1u);
+    opts.num_threads = opt_rank_threads <= opts.num_threads_max ?
         opt_rank_threads : (opts.num_threads_max / workers_per_rank) * workers_per_rank;
 
     opts.safety_checks.unset(SafetyCheck::perf_threads);
@@ -2585,7 +2587,7 @@ void init_parallel_buffers(const RaxmlInstance& instance)
 
   // we need 2 doubles for each partition AND threads to perform parallel reduction,
   // so resize the buffer accordingly
-  const size_t reduce_buffer_size = std::max(1024lu, 2 * sizeof(double) *
+  const size_t reduce_buffer_size = std::max<size_t>(1024u, 2 * sizeof(double) *
                                      parted_msa.part_count() * ParallelContext::num_threads());
 
   size_t worker_buf_size = 0;
