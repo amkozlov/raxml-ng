@@ -3226,22 +3226,28 @@ int internal_main(int argc, char** argv, void* comm)
         /* fall through */
       case Command::parse:
       {
-        load_parted_msa(instance);
-        load_constraint(instance);
-        build_start_trees(instance, 0);
-
-        LOG_INFO << endl;
-
-        if (opts.command == Command::parse)
-          print_resources(instance);
-
-        LOG_INFO  << "Alignment can be successfully read by RAxML-NG." << endl << endl;
-
-        if (!opts.tree_file.empty() && !instance.constraint_tree.empty())
+        if (ParallelContext::master_rank())
         {
-          LOG_INFO << "All starting trees (" << opts.num_searches
-                   << ") are compatible with the topological constraint." << endl << endl;
+          load_parted_msa(instance);
+          load_constraint(instance);
+          build_start_trees(instance, 0);
+
+          LOG_INFO << endl;
+
+          if (opts.command == Command::parse)
+            print_resources(instance);
+
+          LOG_INFO  << "Alignment can be successfully read by RAxML-NG." << endl << endl;
+
+          if (!opts.tree_file.empty() && !instance.constraint_tree.empty())
+          {
+            LOG_INFO << "All starting trees (" << opts.num_searches
+                     << ") are compatible with the topological constraint." << endl << endl;
+          }
         }
+
+        if (ParallelContext::num_nodes() > 1)
+          LOG_WARN  << "WARNING: Running --parse on multiple nodes is wasting resources!" << endl << endl;
 
         break;
       }
