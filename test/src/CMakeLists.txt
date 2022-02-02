@@ -49,4 +49,5 @@ set_target_properties (raxml_test_module PROPERTIES OUTPUT_NAME raxml_test)
 set_target_properties (raxml_test_module PROPERTIES PREFIX "")
 
 
-add_test (raxml_test ${PROJECT_SOURCE_DIR}/test/bin/raxml_test)
+add_test (raxml_test ${PROJECT_SOURCE_DIR}/test/bin/raxml_test
+          --gtest_output=xml:${CMAKE_BINARY_DIR}/test/RAxMLTest.xml)
