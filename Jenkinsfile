@@ -26,9 +26,10 @@ pipeline {
       parallel {
         stage('clang-10') {
           agent {
-            docker {
+            dockerfile {
               reuseNode true
-              image 'braintwister/ubuntu-20.04-clang-10:0.5'
+              filename 'dockerfile-clang-10'
+              dir 'docker'
             }
           }
           steps {

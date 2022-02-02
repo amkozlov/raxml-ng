@@ -1,0 +1,12 @@
+FROM braintwister/ubuntu-20.04-clang-10:0.5
+
+LABEL maintainer="Bernd Doser <bernd.doser@h-its.org>"
+
+RUN apt-get update \
+ && apt-get install -y \
+      flex \
+      bison \
+      libgmp3-dev \
+      libgtest-dev \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
