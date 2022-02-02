@@ -44,6 +44,31 @@ pipeline {
         }
       }
     }
+    stage('Unit-Tests') {
+      parallel {
+        stage('clang-10') {
+          agent {
+            dockerfile {
+              reuseNode true
+              filename 'dockerfile-clang-10'
+              dir 'docker'
+            }
+          }
+          steps {
+            sh 'cd build-clang-10 && make test'
+          }
+          post {
+            always {
+              step([
+                $class: 'XUnitPublisher',
+                thresholds: [[$class: 'FailedThreshold', unstableThreshold: '1']],
+                tools: [[$class: 'GoogleTestType', pattern: 'build-clang-10/Testing/*.xml']]
+              ])
+            }
+          }
+        }
+      }
+    }
   }
   post {
     success {
