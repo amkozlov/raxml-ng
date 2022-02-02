@@ -3,7 +3,7 @@
 pipeline {
 
   agent {
-    label 'docker-host'
+    label 'docker-host || docker-jenkins'
   }
 
   options {
@@ -11,6 +11,18 @@ pipeline {
   }  
 
   stages {
+    stage('submodules') {
+      agent {
+        docker {
+          reuseNode true
+            image 'braintwister/ubuntu-20.04-clang-10:0.5'
+          }
+        }
+        steps {
+          sh 'git submodule update --init --recursive'
+        }
+      }
+    }
     stage('Build') {
       parallel {
         stage('clang-10') {
