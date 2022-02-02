@@ -15,12 +15,11 @@ pipeline {
       agent {
         docker {
           reuseNode true
-            image 'braintwister/ubuntu-20.04-clang-10:0.5'
-          }
+          image 'braintwister/ubuntu-20.04-clang-10:0.5'
         }
-        steps {
-          sh 'git submodule update --init --recursive'
-        }
+      }
+      steps {
+        sh 'git submodule update --init --recursive'
       }
     }
     stage('Build') {
