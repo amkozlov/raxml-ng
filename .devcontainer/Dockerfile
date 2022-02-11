@@ -8,6 +8,7 @@ RUN apt-get update \
     && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --no-install-recommends \
        ninja-build \
+       python-dev \
        python3-dev \
        python3-pip \
        vim \
@@ -20,8 +21,8 @@ RUN pip install \
     cmake==3.20.3 \
     conan==1.37.2
 
-RUN useradd --uid 1026 -m bernd
-USER bernd
+RUN useradd --uid 1026 -m user
+USER user
 
 RUN conan remote add braintwister https://braintwister.jfrog.io/artifactory/api/conan/braintwister-conan \
  && conan config set general.revisions_enabled=1 \
