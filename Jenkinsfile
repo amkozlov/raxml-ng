@@ -11,7 +11,7 @@ pipeline {
   }  
 
   stages {
-    stage('submodules') {
+    stage('Submodules') {
       agent {
         docker {
           reuseNode true
@@ -19,7 +19,10 @@ pipeline {
         }
       }
       steps {
-        sh 'git submodule update --init --recursive'
+        sh '''
+          git submodule update --init --recursive
+          git submodule add -b BerndDoser-patch-1 https://github.com/BerndDoser/ngtest.git
+        '''
       }
     }
     stage('Build') {
@@ -44,7 +47,7 @@ pipeline {
         }
       }
     }
-    stage('Unit-Tests') {
+    stage('Unit tests') {
       parallel {
         stage('clang-10') {
           agent {
@@ -65,6 +68,22 @@ pipeline {
                 tools: [[$class: 'GoogleTestType', pattern: 'build-clang-10/test/*.xml']]
               ])
             }
+          }
+        }
+      }
+    }
+    stage('Regression tests') {
+      parallel {
+        stage('clang-10') {
+          agent {
+            dockerfile {
+              reuseNode true
+              filename 'dockerfile-clang-10'
+              dir 'docker'
+            }
+          }
+          steps {
+            sh './ngtest/runtest.py ./bin/raxml-ng'
           }
         }
       }
