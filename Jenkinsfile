@@ -21,7 +21,7 @@ pipeline {
       steps {
         sh '''
           git submodule update --init --recursive
-          git submodule add -b BerndDoser-patch-1 https://github.com/BerndDoser/ngtest.git
+          git submodule add https://github.com/amkozlov/ngtest.git
         '''
       }
     }
@@ -83,7 +83,13 @@ pipeline {
             }
           }
           steps {
-            sh './ngtest/runtest.py ./bin/raxml-ng'
+            sh '''
+              git clone https://github.com/jeetsukumaran/DendroPy.git
+              cd DendroPy
+              python setup.py install --user
+              cd ..
+              ./ngtest/runtest.py ./bin/raxml-ng
+            '''
           }
         }
       }
