@@ -45,6 +45,24 @@ pipeline {
             }
           }
         }
+        stage('gcc-11') {
+          agent {
+            dockerfile {
+              reuseNode true
+              filename 'dockerfile-gcc-11'
+              dir 'docker'
+            }
+          }
+          steps {
+            sh './build.sh gcc-11 Release'
+          }
+          post {
+            always {
+              recordIssues enabledForFailure: true, aggregatingResults: false,
+                tool: clang(id: 'gcc-11', pattern: 'build-gcc-11/make.out')
+            }
+          }
+        }
       }
     }
     stage('Unit tests') {
@@ -70,6 +88,27 @@ pipeline {
             }
           }
         }
+        stage('gcc-11') {
+          agent {
+            dockerfile {
+              reuseNode true
+              filename 'dockerfile-gcc-11'
+              dir 'docker'
+            }
+          }
+          steps {
+            sh 'cd build-gcc-11 && make test'
+          }
+          post {
+            always {
+              step([
+                $class: 'XUnitPublisher',
+                thresholds: [[$class: 'FailedThreshold', unstableThreshold: '1']],
+                tools: [[$class: 'GoogleTestType', pattern: 'build-gcc-11/test/*.xml']]
+              ])
+            }
+          }
+        }
       }
     }
     stage('Regression tests') {
@@ -79,6 +118,18 @@ pipeline {
             dockerfile {
               reuseNode true
               filename 'dockerfile-clang-10'
+              dir 'docker'
+            }
+          }
+          steps {
+            sh './ngtest/runtest.py ./bin/raxml-ng'
+          }
+        }
+        stage('gcc-11') {
+          agent {
+            dockerfile {
+              reuseNode true
+              filename 'dockerfile-gcc-11'
               dir 'docker'
             }
           }

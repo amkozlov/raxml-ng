@@ -1,0 +1,22 @@
+FROM braintwister/ubuntu-20.04-gcc-11:0.5
+
+LABEL maintainer="Bernd Doser <bernd.doser@h-its.org>"
+
+RUN apt-get update \
+ && apt-get install -y \
+      flex \
+      bison \
+      libgmp3-dev \
+      libgtest-dev \
+      python-dev \
+      python-setuptools \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+
+
+RUN git clone https://github.com/jeetsukumaran/DendroPy.git \
+ && cd DendroPy \
+ && python setup.py install \
+ && cd .. \
+ && rm -rf DendroPy
+ 
