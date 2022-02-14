@@ -83,13 +83,7 @@ pipeline {
             }
           }
           steps {
-            sh '''
-              git clone https://github.com/jeetsukumaran/DendroPy.git
-              cd DendroPy
-              python setup.py install --user
-              cd ..
-              ./ngtest/runtest.py ./bin/raxml-ng
-            '''
+            sh './ngtest/runtest.py ./bin/raxml-ng'
           }
         }
       }
