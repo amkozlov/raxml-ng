@@ -122,7 +122,7 @@ pipeline {
             }
           }
           steps {
-            sh './ngtest/runtest.py ./bin/raxml-ng'
+            sh 'ngtest/runtest.py build-clang-10/bin/raxml-ng'
           }
         }
         stage('gcc-11') {
@@ -134,7 +134,7 @@ pipeline {
             }
           }
           steps {
-            sh './ngtest/runtest.py ./bin/raxml-ng'
+            sh 'ngtest/runtest.py build-gcc-11/bin/raxml-ng'
           }
         }
       }
