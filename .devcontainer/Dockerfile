@@ -15,7 +15,10 @@ RUN apt-get update \
        flex \
        bison \
        libgmp3-dev \
-       libgtest-dev
+       libgtest-dev \
+       openmpi-bin \
+       openmpi-common \
+       libopenmpi-dev
 
 RUN pip install \
     cmake==3.20.3 \
