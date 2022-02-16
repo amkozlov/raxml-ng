@@ -10,6 +10,9 @@ RUN apt-get update \
       libgtest-dev \
       python-dev \
       python-setuptools \
+      openmpi-bin \
+      openmpi-common \
+      libopenmpi-dev \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 

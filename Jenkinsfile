@@ -13,6 +13,7 @@ pipeline {
   parameters {
     string(name: 'BUILD_DIR_CLANG', defaultValue: 'build-clang-10')
     string(name: 'BUILD_DIR_GCC', defaultValue: 'build-gcc-11')
+    string(name: 'BUILD_DIR_GCC_OPENMPI', defaultValue: 'build-gcc-11-openmpi')
   }
 
   stages {
@@ -73,6 +74,28 @@ pipeline {
             always {
               recordIssues enabledForFailure: true, aggregatingResults: false,
                 tool: clang(id: 'gcc-11', pattern: "${params.BUILD_DIR_GCC}/make.out")
+            }
+          }
+        }
+        stage('gcc-11-openmpi') {
+          agent {
+            dockerfile {
+              reuseNode true
+              filename 'dockerfile-gcc-11'
+              dir 'docker'
+            }
+          }
+          steps {
+            sh """
+              rm -fr ${params.BUILD_DIR_GCC_OPENMPI} && mkdir -p ${params.BUILD_DIR_GCC_OPENMPI} && cd ${params.BUILD_DIR_GCC_OPENMPI}
+              cmake -DCMAKE_BUILD_TYPE=Release -DUSE_MPI=ON .. 2>&1 |tee cmake.out
+              make 2>&1 |tee make.out
+            """
+          }
+          post {
+            always {
+              recordIssues enabledForFailure: true, aggregatingResults: false,
+                tool: clang(id: "${STAGE_NAME}", pattern: "${params.BUILD_DIR_GCC_OPENMPI}/make.out")
             }
           }
         }
