@@ -175,6 +175,38 @@ pipeline {
         }
       }
     }
+    stage('Test matrix') {
+      matrix {
+        axes {
+          axis {
+            name 'TESTCASE'
+            values 'all', 'search', 'parse'
+          }
+          axis {
+              name 'DATASET'
+              values 'dna8.fa', 'prot21.fa'
+          }
+          axis {
+              name 'BRLEN'
+              values 'linked', 'scaled', 'unlinked'
+          }
+        }
+        stages {
+          stage('clang-10') {
+            agent {
+              dockerfile {
+                reuseNode true
+                filename "dockerfile-${STAGE_NAME}"
+                dir 'docker'
+              }
+            }
+            steps {
+              sh "build-${STAGE_NAME}/bin/raxml-ng --${TESTCASE} --msa ngtest/data/${DATASET} --brlen ${BRLEN} --workers 1 --threads 1"
+            }
+          }
+        }
+      }
+    }
   }
   post {
     success {
