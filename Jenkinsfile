@@ -41,16 +41,16 @@ pipeline {
             }
           }
           steps {
-            sh '''
+            sh """
               rm -fr ${params.BUILD_DIR_CLANG} && mkdir -p ${params.BUILD_DIR_CLANG} && cd ${params.BUILD_DIR_CLANG}
               cmake -DCMAKE_BUILD_TYPE=Release .. 2>&1 |tee cmake.out
               make 2>&1 |tee make.out
-            '''
+            """
           }
           post {
             always {
               recordIssues enabledForFailure: true, aggregatingResults: false,
-                tool: clang(id: 'clang-10', pattern: '${params.BUILD_DIR_CLANG}/make.out')
+                tool: clang(id: 'clang-10', pattern: "${params.BUILD_DIR_CLANG}/make.out")
             }
           }
         }
@@ -63,16 +63,16 @@ pipeline {
             }
           }
           steps {
-            sh '''
+            sh """
               rm -fr ${params.BUILD_DIR_GCC} && mkdir -p ${params.BUILD_DIR_GCC} && cd ${params.BUILD_DIR_GCC}
               cmake -DCMAKE_BUILD_TYPE=Release .. 2>&1 |tee cmake.out
               make 2>&1 |tee make.out
-            '''
+            """
           }
           post {
             always {
               recordIssues enabledForFailure: true, aggregatingResults: false,
-                tool: clang(id: 'gcc-11', pattern: '${params.BUILD_DIR_GCC}/make.out')
+                tool: clang(id: 'gcc-11', pattern: "${params.BUILD_DIR_GCC}/make.out")
             }
           }
         }
@@ -89,14 +89,14 @@ pipeline {
             }
           }
           steps {
-            sh 'cd ${params.BUILD_DIR_CLANG} && make test'
+            sh "cd ${params.BUILD_DIR_CLANG} && make test"
           }
           post {
             always {
               step([
                 $class: 'XUnitPublisher',
                 thresholds: [[$class: 'FailedThreshold', unstableThreshold: '1']],
-                tools: [[$class: 'GoogleTestType', pattern: '${params.BUILD_DIR_CLANG}/test/*.xml']]
+                tools: [[$class: 'GoogleTestType', pattern: "${params.BUILD_DIR_CLANG}/test/*.xml"]]
               ])
             }
           }
@@ -110,14 +110,14 @@ pipeline {
             }
           }
           steps {
-            sh 'cd ${params.BUILD_DIR_GCC} && make test'
+            sh "cd ${params.BUILD_DIR_GCC} && make test"
           }
           post {
             always {
               step([
                 $class: 'XUnitPublisher',
                 thresholds: [[$class: 'FailedThreshold', unstableThreshold: '1']],
-                tools: [[$class: 'GoogleTestType', pattern: '${params.BUILD_DIR_GCC}/test/*.xml']]
+                tools: [[$class: 'GoogleTestType', pattern: "${params.BUILD_DIR_GCC}/test/*.xml"]]
               ])
             }
           }
@@ -135,7 +135,7 @@ pipeline {
             }
           }
           steps {
-            sh 'ngtest/runtest.py ${params.BUILD_DIR_CLANG}/bin/raxml-ng'
+            sh "ngtest/runtest.py ${params.BUILD_DIR_CLANG}/bin/raxml-ng"
           }
         }
         stage('gcc-11') {
@@ -147,7 +147,7 @@ pipeline {
             }
           }
           steps {
-            sh 'ngtest/runtest.py ${params.BUILD_DIR_GCC}/bin/raxml-ng'
+            sh "ngtest/runtest.py ${params.BUILD_DIR_GCC}/bin/raxml-ng"
           }
         }
       }
