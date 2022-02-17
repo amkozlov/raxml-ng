@@ -184,7 +184,7 @@ pipeline {
           }
           axis {
               name 'DATASET'
-              values 'dna8.fa', 'prot21.fa'
+              values '--msa ngtest/data/dna8.fa --model GTR+G', '--msa ngtest/data/prot21.fa --model LG'
           }
           axis {
               name 'BRLEN'
@@ -200,17 +200,8 @@ pipeline {
                 dir 'docker'
               }
             }
-            when {
-                expression { TESTCASE == 'dna8.fa' }
-            }
             steps {
-              sh "build-${STAGE_NAME}/bin/raxml-ng --${TESTCASE} --msa ngtest/data/${DATASET} --model GTR+G --brlen ${BRLEN} --workers 1 --threads 1"
-            }
-            when {
-                expression { TESTCASE == 'prot21.fa' }
-            }
-            steps {
-              sh "build-${STAGE_NAME}/bin/raxml-ng --${TESTCASE} --msa ngtest/data/${DATASET} --model LG --brlen ${BRLEN} --workers 1 --threads 1"
+              sh "build-${STAGE_NAME}/bin/raxml-ng --${TESTCASE} ${DATASET} --brlen ${BRLEN} --workers 1 --threads 1"
             }
           }
         }
