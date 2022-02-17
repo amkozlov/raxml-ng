@@ -201,7 +201,7 @@ pipeline {
               }
             }
             steps {
-              sh "build-${STAGE_NAME}/bin/raxml-ng --${TESTCASE} --msa ngtest/data/${DATASET} --brlen ${BRLEN} --workers 1 --threads 1"
+              sh "build-${STAGE_NAME}/bin/raxml-ng --${TESTCASE} --msa ngtest/data/${DATASET} --model GTR+G --brlen ${BRLEN} --workers 1 --threads 1"
             }
           }
         }
