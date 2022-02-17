@@ -200,8 +200,17 @@ pipeline {
                 dir 'docker'
               }
             }
+            when {
+                expression { TESTCASE == 'dna8.fa' }
+            }
             steps {
               sh "build-${STAGE_NAME}/bin/raxml-ng --${TESTCASE} --msa ngtest/data/${DATASET} --model GTR+G --brlen ${BRLEN} --workers 1 --threads 1"
+            }
+            when {
+                expression { TESTCASE == 'prot21.fa' }
+            }
+            steps {
+              sh "build-${STAGE_NAME}/bin/raxml-ng --${TESTCASE} --msa ngtest/data/${DATASET} --model LG --brlen ${BRLEN} --workers 1 --threads 1"
             }
           }
         }
