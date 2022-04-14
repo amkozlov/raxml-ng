@@ -11,7 +11,7 @@ pipeline {
   }
 
   parameters {
-    string(name: 'BUILD_DIR_CLANG', defaultValue: 'build-clang-10')
+    string(name: 'BUILD_DIR_CLANG', defaultValue: 'build-clang-12')
     string(name: 'BUILD_DIR_GCC', defaultValue: 'build-gcc-11')
     string(name: 'BUILD_DIR_GCC_OPENMPI', defaultValue: 'build-gcc-11-openmpi')
   }
@@ -21,7 +21,8 @@ pipeline {
       agent {
         docker {
           reuseNode true
-          image 'braintwister/ubuntu-20.04-clang-10:0.5'
+          filename 'dockerfile-clang-12'
+          dir 'docker'
         }
       }
       steps {
@@ -33,11 +34,11 @@ pipeline {
     }
     stage('Build') {
       parallel {
-        stage('clang-10') {
+        stage('clang-12') {
           agent {
             dockerfile {
               reuseNode true
-              filename 'dockerfile-clang-10'
+              filename 'dockerfile-clang-12'
               dir 'docker'
             }
           }
@@ -51,7 +52,7 @@ pipeline {
           post {
             always {
               recordIssues enabledForFailure: true, aggregatingResults: false,
-                tool: clang(id: 'clang-10', pattern: "${params.BUILD_DIR_CLANG}/make.out")
+                tool: clang(id: 'clang-12', pattern: "${params.BUILD_DIR_CLANG}/make.out")
             }
           }
         }
@@ -103,11 +104,11 @@ pipeline {
     }
     stage('Unit tests') {
       parallel {
-        stage('clang-10') {
+        stage('clang-12') {
           agent {
             dockerfile {
               reuseNode true
-              filename 'dockerfile-clang-10'
+              filename 'dockerfile-clang-12'
               dir 'docker'
             }
           }
@@ -149,11 +150,11 @@ pipeline {
     }
     stage('Regression tests') {
       parallel {
-        stage('clang-10') {
+        stage('clang-12') {
           agent {
             dockerfile {
               reuseNode true
-              filename 'dockerfile-clang-10'
+              filename 'dockerfile-clang-12'
               dir 'docker'
             }
           }
@@ -192,7 +193,7 @@ pipeline {
           }
         }
         stages {
-          stage('clang-10') {
+          stage('clang-12') {
             agent {
               dockerfile {
                 reuseNode true

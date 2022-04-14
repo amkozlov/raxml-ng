@@ -27,8 +27,7 @@ RUN pip install \
 RUN useradd --uid 1026 -m user
 USER user
 
-RUN conan remote add braintwister https://braintwister.jfrog.io/artifactory/api/conan/braintwister-conan \
- && conan config set general.revisions_enabled=1 \
+RUN conan config set general.revisions_enabled=1 \
  && conan profile new default --detect \
  && conan profile update settings.compiler=clang default \
  && conan profile update settings.compiler.libcxx=libstdc++11 default \
