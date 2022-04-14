@@ -19,7 +19,7 @@ pipeline {
   stages {
     stage('Submodules') {
       agent {
-        docker {
+        dockerfile {
           reuseNode true
           filename 'dockerfile-clang-12'
           dir 'docker'
