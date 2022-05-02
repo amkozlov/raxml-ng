@@ -178,10 +178,13 @@ pipeline {
           }
           post {
             always {
-              plot csvFileName: 'plot-8d41db20-6490-4bce-8552-0698a4ef2ed6.csv',
-                csvSeries: [[displayTableFlag: false, exclusionValues: '', file: 'test_timings.csv',
-                inclusionFlag: 'OFF', url: '']], group: 'timings', numBuilds: '2', style: 'bar',
-                title: 'Test timings', yaxis: 'Time/s'
+              publishHTML(target : [allowMissing: false,
+              alwaysLinkToLastBuild: true,
+              keepAll: true,
+              reportDir: '.j',
+              reportFiles: 'benchmark.html',
+              reportName: 'Benchmark',
+              reportTitles: 'benchmark'])
             }
           }
         }
