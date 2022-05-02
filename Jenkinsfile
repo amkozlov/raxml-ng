@@ -172,7 +172,7 @@ pipeline {
           }
           steps {
             sh """
-              ngtest/runtest.py ${params.BUILD_DIR_GCC}/bin/raxml-ng"
+              ngtest/runtest.py ${params.BUILD_DIR_GCC}/bin/raxml-ng
               docker/print_time.py
             """
           }
