@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
 from bs4 import BeautifulSoup as bs
+import csv
 import os
 
-def write_html(data):
+def write_html(data, last_timing):
+
     header = '<h1>Benchmark</h1>'
     parser = 'lxml'
     soup = bs(header, parser)
@@ -30,11 +32,15 @@ def write_html(data):
     tr.append(th)
     th.append('Time/s')
 
+    th = soup.new_tag('th')
+    tr.append(th)
+    th.append('Change')
+
     tbody = soup.new_tag('tbody')
     table.append(tbody)
 
     line_type = 'odd'
-    for name, time in data:
+    for test in data:
 
         tr = soup.new_tag('tr', **{'class':line_type})
         tbody.append(tr)
@@ -43,20 +49,47 @@ def write_html(data):
 
         th = soup.new_tag('th')
         tr.append(th)
-        th.append(name)
+        th.append(test)
 
         th = soup.new_tag('th')
         tr.append(th)
-        th.append(time)
+        th.append(data[test])
+
+        th = soup.new_tag('th')
+        tr.append(th)
+        if test in last_timing:
+            th.append(str(float(data[test]) - float(last_timing[test])))
+        else:
+            th.append('N/A')
 
     html_file = open('benchmark.html', 'w')
     html_file.write(soup.prettify(formatter=None))
 
 
+def write_csv(data):
+
+    timing_file = open('last_timing.csv', mode='w')
+    writer = csv.writer(timing_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    writer.writerows(data.items())
+
+
+def read_csv(filename):
+
+    data = dict()
+    if not os.path.exists(filename):
+        return data
+
+    timing_file = open(filename, mode='r')
+    reader = csv.reader(timing_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    for row in reader:
+        data[row[0]] = row[1]
+    return data
+
+
 def main():
 
-    data = []
     location = '../ngtest/out/1.1.0-master/T1W1'
+    current_timing = dict()
 
     for dirname in os.listdir(location):
         filename = os.path.join(location, dirname, 'test.raxml.log')
@@ -66,11 +99,13 @@ def main():
             while line:
                 if 'Elapsed time:' in line:
                     time = line.split()[2]
-                    data.append([dirname, time])
+                    current_timing[dirname] = time
                     break
                 line = f.readline()
 
-    write_html(data)
+    last_timing = read_csv('last_timing.csv')
+    write_html(current_timing, last_timing)
+    write_csv(current_timing)
 
 
 if __name__ == "__main__":
