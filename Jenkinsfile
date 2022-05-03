@@ -181,7 +181,7 @@ pipeline {
               publishHTML(target : [allowMissing: false,
               alwaysLinkToLastBuild: true,
               keepAll: true,
-              reportDir: '.j',
+              reportDir: '.',
               reportFiles: 'benchmark.html',
               reportName: 'Benchmark',
               reportTitles: 'benchmark'])
