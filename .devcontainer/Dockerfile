@@ -25,7 +25,9 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 RUN pip install \
-    cmake==3.20.3
+    beautifulsoup4 \
+    cmake \
+    lxml
 
 RUN git clone https://github.com/jeetsukumaran/DendroPy.git \
  && cd DendroPy \
