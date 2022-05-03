@@ -149,32 +149,30 @@ pipeline {
       }
     }
     stage('Regression tests') {
-      stage('clang-12') {
-        agent {
-          dockerfile {
-            reuseNode true
-            filename 'dockerfile-clang-12'
-            dir 'ci'
-          }
+      agent {
+        dockerfile {
+          reuseNode true
+          filename 'dockerfile-clang-12'
+          dir 'ci'
         }
-        steps {
-          sh """
-            ngtest/runtest.py ${params.BUILD_DIR_GCC}/bin/raxml-ng
-            cd ci
-            generate_html.py
-          """
-        }
-        post {
-          always {
-            publishHTML(target : [
-            allowMissing: false,
-            alwaysLinkToLastBuild: true,
-            keepAll: true,
-            reportDir: 'ci',
-            reportFiles: 'benchmark.html',
-            reportName: 'Benchmark',
-            reportTitles: 'benchmark'])
-          }
+      }
+      steps {
+        sh """
+          ngtest/runtest.py ${params.BUILD_DIR_GCC}/bin/raxml-ng
+          cd ci
+          generate_html.py
+        """
+      }
+      post {
+        always {
+          publishHTML(target : [
+          allowMissing: false,
+          alwaysLinkToLastBuild: true,
+          keepAll: true,
+          reportDir: 'ci',
+          reportFiles: 'benchmark.html',
+          reportName: 'Benchmark',
+          reportTitles: 'benchmark'])
         }
       }
     }
