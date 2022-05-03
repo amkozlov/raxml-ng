@@ -58,7 +58,7 @@ def write_html(data, last_timing):
         th = soup.new_tag('th')
         tr.append(th)
         if test in last_timing:
-            th.append(str(float(data[test]) - float(last_timing[test])))
+            th.append("{:.3f}".format(float(data[test]) - float(last_timing[test])))
         else:
             th.append('N/A')
 
