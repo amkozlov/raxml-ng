@@ -150,6 +150,7 @@ pipeline {
     }
     stage('Regression tests') {
       agent {
+        label docker-gpu-host
         dockerfile {
           reuseNode true
           filename 'dockerfile-clang-12'
