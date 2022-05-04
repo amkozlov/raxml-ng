@@ -24,23 +24,23 @@ def write_html(data, last_data):
     tr = soup.new_tag('tr')
     thead.append(tr)
 
-    th = soup.new_tag('th', width='70%')
+    th = soup.new_tag('th', width='40%')
     tr.append(th)
     th.append('Test name')
 
-    th = soup.new_tag('th')
+    th = soup.new_tag('th', width='15%')
     tr.append(th)
     th.append('Time/s')
 
-    th = soup.new_tag('th')
+    th = soup.new_tag('th', width='15%')
     tr.append(th)
     th.append('Change')
 
-    th = soup.new_tag('th')
+    th = soup.new_tag('th', width='15%')
     tr.append(th)
     th.append('LogLikelihood')
 
-    th = soup.new_tag('th')
+    th = soup.new_tag('th', width='15%')
     tr.append(th)
     th.append('Change')
 
