@@ -3,7 +3,7 @@
 pipeline {
 
   agent {
-    label 'docker-host || docker-jenkins'
+    label 'docker-gpu-host'
   }
 
   options {
@@ -150,7 +150,6 @@ pipeline {
     }
     stage('Regression tests') {
       agent {
-        label docker-gpu-host
         dockerfile {
           reuseNode true
           filename 'dockerfile-clang-12'
