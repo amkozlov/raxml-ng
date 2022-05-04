@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup as bs
 import csv
 import os
 
-def write_html(data, last_timing):
+def write_html(data, last_data):
 
     header = '<h1>Benchmark</h1>'
     parser = 'lxml'
@@ -36,6 +36,14 @@ def write_html(data, last_timing):
     tr.append(th)
     th.append('Change')
 
+    th = soup.new_tag('th')
+    tr.append(th)
+    th.append('LogLikelihood')
+
+    th = soup.new_tag('th')
+    tr.append(th)
+    th.append('Change')
+
     tbody = soup.new_tag('tbody')
     table.append(tbody)
 
@@ -53,12 +61,23 @@ def write_html(data, last_timing):
 
         th = soup.new_tag('th')
         tr.append(th)
-        th.append(data[test])
+        th.append("{:.3f}".format(data[test][0]))
 
         th = soup.new_tag('th')
         tr.append(th)
-        if test in last_timing:
-            th.append("{:.3f}".format(float(data[test]) - float(last_timing[test])))
+        if test in last_data:
+            th.append("{:.3f}".format(data[test][0] - last_data[test][0]))
+        else:
+            th.append('N/A')
+
+        th = soup.new_tag('th')
+        tr.append(th)
+        th.append("{:.3f}".format(data[test][1]))
+
+        th = soup.new_tag('th')
+        tr.append(th)
+        if test in last_data:
+            th.append("{:.3f}".format(data[test][1] - last_data[test][1]))
         else:
             th.append('N/A')
 
@@ -68,9 +87,10 @@ def write_html(data, last_timing):
 
 def write_csv(data):
 
-    timing_file = open('last_timing.csv', mode='w')
+    timing_file = open('last_data.csv', mode='w')
     writer = csv.writer(timing_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-    writer.writerows(data.items())
+    for k, v in data.items():
+       writer.writerow([k, v[0], v[1]])
 
 
 def read_csv(filename):
@@ -82,30 +102,38 @@ def read_csv(filename):
     timing_file = open(filename, mode='r')
     reader = csv.reader(timing_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
     for row in reader:
-        data[row[0]] = row[1]
+        data[row[0]] = [float(row[1]), float(row[2])]
     return data
 
 
 def main():
 
     location = '../ngtest/out/1.1.0-master/T1W1'
-    current_timing = dict()
+    current_data = dict()
 
     for dirname in os.listdir(location):
         filename = os.path.join(location, dirname, 'test.raxml.log')
         if os.path.exists(filename):
             f  = open(filename, "r")
             line = f.readline()
+            found = 0
+            likelihood = 0
+            time = 0
             while line:
+                if 'Final LogLikelihood:' in line:
+                    likelihood = float(line.split()[2])
+                    found += 1
                 if 'Elapsed time:' in line:
-                    time = line.split()[2]
-                    current_timing[dirname] = time
+                    time = float(line.split()[2])
+                    found += 1
+                if found == 2:
                     break
                 line = f.readline()
+            current_data[dirname] = [time, likelihood]
 
-    last_timing = read_csv('last_timing.csv')
-    write_html(current_timing, last_timing)
-    write_csv(current_timing)
+    last_data = read_csv('last_data.csv')
+    write_html(current_data, last_data)
+    write_csv(current_data)
 
 
 if __name__ == "__main__":

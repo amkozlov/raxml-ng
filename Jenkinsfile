@@ -171,7 +171,7 @@ pipeline {
           reportDir: 'ci',
           reportFiles: 'benchmark.html',
           reportName: 'Benchmark',
-          reportTitles: 'benchmark'])
+          reportTitles: 'Benchmark'])
         }
       }
     }
