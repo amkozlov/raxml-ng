@@ -54,8 +54,7 @@ pipeline {
             }
             steps {
               sh """#!/bin/bash
-                  build/bin/raxml-ng-mpi all --msa ngtest/data/dna8.fa --model GTR+G --brlen linked \
-                    ${PARALLEL} --prefix ${PARALLEL//[^[:alnum:]]/}
+                  build/bin/raxml-ng-mpi all --msa ngtest/data/dna8.fa --model GTR+G --brlen linked ${PARALLEL}
               """
             }
           }
