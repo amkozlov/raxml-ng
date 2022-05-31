@@ -1,69 +1,68 @@
 pipeline {
 
-  agent {
-      label 'cme-eastwatch'
-  }
+    agent {
+        label 'cme-eastwatch'
+    }
 
-  stages {
-    stage('Checkout') {
-      steps {
-        // Get some code from a GitHub repository
-        git branch: 'ci',
-            url: 'https://github.com/BerndDoser/raxml-ng.git'
-        sh '''
-            git submodule update --init --recursive
-            git submodule add https://github.com/amkozlov/ngtest.git
-        '''
-      }
-    }
-    stage('Build') {
-      agent {
-        dockerfile {
-          reuseNode true
-          filename 'dockerfile-gcc-11'
-          dir 'ci'
+    stages {
+        stage('Checkout') {
+            steps {
+                // Get some code from a GitHub repository
+                git branch: 'ci',
+                    url: 'https://github.com/BerndDoser/raxml-ng.git'
+                sh '''
+                    git submodule update --init --recursive
+                    git submodule add https://github.com/amkozlov/ngtest.git
+                '''
+            }
         }
-      }
-      steps {
-        sh '''
-          rm -fr build && mkdir -p build && cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DUSE_MPI=ON .. 2>&1 |tee cmake.out
-          make 2>&1 |tee make.out
-        '''
-      }
-    }
-    stage('Test matrix') {
-      def parallel_settings = ['--threads 1',
-                               '--threads 4 --workers 1',
-                               '--threads 4 --workers 4',
-                               '--threads 4 --workers 2']
-      matrix {
-        axes {
-          axis {
-            name 'PARALLEL'
-            values '0', '1', '2', '3'
-          }
-        }
-        stages {
-          stage('Test') {
+        stage('Build') {
             agent {
-              dockerfile {
-                reuseNode true
-                filename 'dockerfile-gcc-11'
-                dir 'ci'
-              }
+                dockerfile {
+                    reuseNode true
+                    filename 'dockerfile-gcc-11'
+                    dir 'ci'
+                }
             }
             steps {
-              def cur_par = parallel_settings[PARALLEL]
-              sh """
-                  mkdir parallel-${PARALLEL}
-                  cd parallel-${PARALLEL}
-                  ../build/bin/raxml-ng-mpi all --msa ../ngtest/data/dna8.fa --model GTR+G --brlen linked ${cur_par}
-              """
+                sh '''
+                    rm -fr build && mkdir -p build && cd build
+                    cmake -DCMAKE_BUILD_TYPE=Release -DUSE_MPI=ON .. 2>&1 |tee cmake.out
+                    make 2>&1 |tee make.out
+                '''
             }
-          }
         }
-      }
+        stage('Test matrix') {
+            matrix {
+                axes {
+                    axis {
+                        name 'PARALLEL'
+                        values '--threads 1',
+                               '--threads 4 --workers 1',
+                               '--threads 4 --workers 4',
+                               '--threads 4 --workers 2'
+                    }
+                }
+                stages {
+                    stage('Test') {
+                        agent {
+                            dockerfile {
+                                reuseNode true
+                                filename 'dockerfile-gcc-11'
+                                dir 'ci'
+                            }
+                        }
+                        environment { 
+                            PREFIX = sh (returnStdout: true, script: "${PARALLEL//[^[:alnum:]]/}").trim()
+                        }
+                        steps {
+                            sh """
+                                build/bin/raxml-ng-mpi all --msa ngtest/data/dna8.fa --model GTR+G --brlen linked ${PARALLEL} --prefix ${PREFIX}
+                            """
+                        }
+                    }
+                }
+            }
+        }
     }
-  }
 }
