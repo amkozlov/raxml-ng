@@ -53,11 +53,11 @@ pipeline {
                             }
                         }
                         environment { 
-                            PREFIX = sh (returnStdout: true, script: "${PARALLEL//[^[:alnum:]]/}").trim()
+                            PREFIX = sh (returnStdout: true, script: "ci/get_parallel_prefix.sh \"$PARALLEL\"").trim()
                         }
                         steps {
                             sh """
-                                build/bin/raxml-ng-mpi all --msa ngtest/data/dna8.fa --model GTR+G --brlen linked ${PARALLEL} --prefix ${PREFIX}
+                                build/bin/raxml-ng-mpi all --msa ngtest/data/dna8.fa --model GTR+G --brlen linked ${PARALLEL} --prefix out-${PREFIX}
                             """
                         }
                     }
