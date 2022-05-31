@@ -3,7 +3,7 @@
 pipeline {
 
   agent {
-    label 'docker-gpu-host'
+    label 'docker-host'
   }
 
   options {
