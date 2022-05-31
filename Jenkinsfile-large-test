@@ -33,15 +33,15 @@ pipeline {
       }
     }
     stage('Test matrix') {
+      def parallel_settings = ['--threads 1',
+                               '--threads 4 --workers 1',
+                               '--threads 4 --workers 4',
+                               '--threads 4 --workers 2']
       matrix {
         axes {
           axis {
             name 'PARALLEL'
-            values '0 --threads 1',
-                   '1 --threads 4 --workers 1',
-                   '2 --threads 4 --workers 4',
-                   '3 --threads 4 --workers 2'
-          }
+            values '0', '1', '2', '3'
         }
         stages {
           stage('Test') {
@@ -53,10 +53,11 @@ pipeline {
               }
             }
             steps {
+              def cur_par = parallel_settings[PARALLEL]
               sh """
-                  mkdir out-${PARALLEL:0:1}
-                  cd out-${PARALLEL:0:1}
-                  ../build/bin/raxml-ng-mpi all --msa ../ngtest/data/dna8.fa --model GTR+G --brlen linked ${PARALLEL:2}
+                  mkdir parallel-${PARALLEL}
+                  cd parallel-${PARALLEL}
+                  ../build/bin/raxml-ng-mpi all --msa ../ngtest/data/dna8.fa --model GTR+G --brlen linked ${cur_par}
               """
             }
           }
