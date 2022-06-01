@@ -1,3 +1,5 @@
+#!groovy
+
 pipeline {
 
     agent {
@@ -57,6 +59,7 @@ pipeline {
                         }
                         steps {
                             sh """
+                                rm out-${PREFIX}.*
                                 build/bin/raxml-ng-mpi all --msa ngtest/data/dna8.fa --model GTR+G --brlen linked ${PARALLEL} --prefix out-${PREFIX}
                             """
                         }
