@@ -55,13 +55,27 @@ pipeline {
                             }
                         }
                         environment { 
-                            PREFIX = sh (returnStdout: true, script: "ci/get_parallel_prefix.sh \"$PARALLEL\"").trim()
+                            LOCATION = sh (returnStdout: true, script: "ci/get_parallel_prefix.sh \"$PARALLEL\"").trim()
                         }
                         steps {
                             sh """
-                                rm out-${PREFIX}.*
-                                build/bin/raxml-ng-mpi all --msa ngtest/data/dna8.fa --model GTR+G --brlen linked ${PARALLEL} --prefix out-${PREFIX}
+                                mkdir -p out/${LOCATION}
+                                build/bin/raxml-ng-mpi --all --msa ngtest/data/dna8.fa --model GTR+G --brlen linked ${PARALLEL} \
+                                  --prefix out/${LOCATION}/test --redo
+                                cd ci && ./generate_html.py ../out
                             """
+                        }
+                        post {
+                            always {
+                            publishHTML(target : [
+                            allowMissing: false,
+                            alwaysLinkToLastBuild: true,
+                            keepAll: true,
+                            reportDir: 'ci',
+                            reportFiles: 'benchmark.html',
+                            reportName: 'Benchmark',
+                            reportTitles: 'Benchmark'])
+                            }
                         }
                     }
                 }

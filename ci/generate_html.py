@@ -3,6 +3,7 @@
 from bs4 import BeautifulSoup as bs
 import csv
 import os
+import sys
 
 def write_html(data, last_data):
 
@@ -108,7 +109,11 @@ def read_csv(filename):
 
 def main():
 
-    location = '../ngtest/out/1.1.0-master/T1W1'
+    try:
+        location = sys.argv[1]
+    except IndexError:
+        raise SystemExit(f"Usage: {sys.argv[0]} <location>")
+
     current_data = dict()
 
     for dirname in os.listdir(location):

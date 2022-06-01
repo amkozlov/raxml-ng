@@ -159,7 +159,7 @@ pipeline {
       steps {
         sh """
           ngtest/runtest.py ${params.BUILD_DIR_CLANG}/bin/raxml-ng
-          cd ci && ./generate_html.py
+          cd ci && ./generate_html.py ../ngtest/out/1.1.0-master/T1W1
         """
       }
       post {
