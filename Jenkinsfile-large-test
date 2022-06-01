@@ -70,6 +70,8 @@ pipeline {
                     }
                 }
             }
+        }
+        stage('Publish benchmarks') {
             steps {
                 sh "cd ci && ./generate_html.py ../out"
             }
