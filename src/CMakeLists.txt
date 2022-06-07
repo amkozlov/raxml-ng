@@ -104,4 +104,9 @@ endif()
 
 set_target_properties(raxml_module PROPERTIES PREFIX "")
 
+# The binary will be copied to the old bin directory for backward compatibility.
+add_custom_command(TARGET raxml_module 
+                   POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:raxml_module> ${PROJECT_SOURCE_DIR}/bin/$<TARGET_FILE_NAME:raxml_module>)
+
 install(TARGETS raxml_module DESTINATION bin)
