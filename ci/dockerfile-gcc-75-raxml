@@ -32,5 +32,5 @@ RUN git clone https://github.com/BerndDoser/raxml-ng.git \
  && git submodule add https://github.com/amkozlov/ngtest.git \
  && mkdir -p build \
  && cd build \
- && cmake -DCMAKE_BUILD_TYPE=Release .. 2>&1 |tee cmake.out \
+ && cmake -DCMAKE_BUILD_TYPE=Release -DUSE_MPI=ON .. 2>&1 |tee cmake.out \
  && make 2>&1 |tee make.out
