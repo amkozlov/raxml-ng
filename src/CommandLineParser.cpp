@@ -590,6 +590,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       case 25:
         opts.command = Command::all;
+        /* quickfix: TBE-nature implementation requires traversal-based CLV IDs assignment! */
+        opts.tbe_naive = true;
         num_commands++;
         break;
       case 26:  /* number of bootstrap replicates */
