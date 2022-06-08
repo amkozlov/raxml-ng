@@ -3,7 +3,7 @@
 pipeline {
 
   agent {
-    label 'docker-host'
+    label 'cme-eastwatch'
   }
 
   options {
