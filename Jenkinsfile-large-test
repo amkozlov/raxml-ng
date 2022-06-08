@@ -64,7 +64,7 @@ pipeline {
                             sh """
                                 mkdir -p out/${LOCATION}
                                 build/bin/raxml-ng-mpi --all --msa ngtest/data/dna8.fa --model GTR+G --brlen linked ${PARALLEL} \
-                                  --prefix out/${LOCATION}/test --redo
+                                  --prefix out/${LOCATION}/test --redo --seed 1
                             """
                         }
                     }
