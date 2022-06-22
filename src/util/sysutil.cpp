@@ -1,4 +1,4 @@
-#ifndef _WIN32
+#if (!defined(_WIN32) && !defined(__aarch64__)) 
 #include <cpuid.h>
 #endif
 #include <sys/time.h>
@@ -170,7 +170,9 @@ unsigned long sysutil_get_memtotal(bool ignore_errors)
 
 static void get_cpuid(int32_t out[4], int32_t x)
 {
-#ifdef _WIN32
+#ifdef __aarch64__
+// not supported
+#elif defined(_WIN32)
   __cpuid(out, x);
 #else
   __cpuid_count(x, 0, out[0], out[1], out[2], out[3]);
