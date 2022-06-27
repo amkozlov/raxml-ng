@@ -31,7 +31,7 @@ TEST(ModelTest, defaults)
   auto model = Model();
 
   // tests
-  EXPECT_EQ(model.to_string(), "GTR+FO");
+  EXPECT_EQ(model.to_string(), "GTR");
   EXPECT_EQ(model.data_type(), DataType::dna);
   EXPECT_EQ(model.name(), "GTR");
   EXPECT_EQ(model.num_states(), 4);
