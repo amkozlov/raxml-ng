@@ -34,7 +34,7 @@ pipeline {
                 '''
             }
         }
-        stage('Test matrix') {
+        stage('Benchmark matrix') {
             matrix {
                 axes {
                     axis {
@@ -46,7 +46,7 @@ pipeline {
                     }
                 }
                 stages {
-                    stage('Test') {
+                    stage('Benchmark') {
                         agent {
                             dockerfile {
                                 reuseNode true
@@ -54,17 +54,44 @@ pipeline {
                                 dir 'ci'
                             }
                         }
+                        options {
+                            lock('synchronous-matrix')
+                        }
                         environment { 
-                            PREFIX = sh (returnStdout: true, script: "ci/get_parallel_prefix.sh \"$PARALLEL\"").trim()
+                            LOCATION = sh (returnStdout: true, script: "ci/get_parallel_prefix.sh \"$PARALLEL\"").trim()
                         }
                         steps {
                             sh """
-                                build/bin/raxml-ng-mpi all --msa ngtest/data/dna8.fa --model GTR+G --brlen linked ${PARALLEL} --prefix out-${PREFIX}
+                                mkdir -p out/${LOCATION}
+                                build/bin/raxml-ng-mpi --all --msa ngtest/data/dna8.fa --model GTR+G --brlen linked ${PARALLEL} \
+                                  --prefix out/${LOCATION}/test --redo --seed 1
                             """
                         }
                     }
                 }
             }
+        }
+        stage('Publish benchmarks') {
+            steps {
+                sh "cd ci && ./generate_html.py ../out"
+            }
+            post {
+                always {
+                publishHTML(target : [
+                allowMissing: false,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: 'ci',
+                reportFiles: 'benchmark.html',
+                reportName: 'Benchmark',
+                reportTitles: 'Benchmark'])
+                }
+            }
+        }
+    }
+    post {
+        failure {
+            mail to: 'bernd.doser@h-its.org', subject: "FAILURE: ${currentBuild.fullDisplayName}", body: "Failed."
         }
     }
 }
