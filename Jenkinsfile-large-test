@@ -40,8 +40,8 @@ pipeline {
                     axis {
                         name 'PARALLEL'
                         values '-np 1 build/bin/raxml-ng-mpi --threads 1',
-                               '-np 2 build/bin/raxml-ng-mpi --threads 4 --workers 1',
-                               '-np 3 build/bin/raxml-ng-mpi --threads 2 --workers 1'
+                               '-np 3 build/bin/raxml-ng-mpi --threads 2 --workers 1',
+                               '-np 3 build/bin/raxml-ng-mpi --threads 2 --workers 3'
                     }
                 }
                 stages {
