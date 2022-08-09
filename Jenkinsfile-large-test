@@ -39,10 +39,10 @@ pipeline {
                 axes {
                     axis {
                         name 'PARALLEL'
-                        values '--threads 1',
-                               '--threads 4 --workers 1',
-                               '--threads 4 --workers 4',
-                               '--threads 4 --workers 2'
+                        values '-np 1 build/bin/raxml-ng-mpi --threads 1',
+                               '-np 2 build/bin/raxml-ng-mpi --threads 4 --workers 1',
+                               '-np 2 build/bin/raxml-ng-mpi --threads 2 --workers 4',
+                               '-np 4 build/bin/raxml-ng-mpi --threads 2 --workers 2'
                     }
                 }
                 stages {
@@ -63,7 +63,7 @@ pipeline {
                         steps {
                             sh """
                                 mkdir -p out/${LOCATION}
-                                build/bin/raxml-ng-mpi --all --msa ngtest/data/dna8.fa --model GTR+G --brlen linked ${PARALLEL} \
+                                mpirun ${PARALLEL} --all --msa ngtest/data/dna8.fa --model GTR+G --brlen linked \
                                   --prefix out/${LOCATION}/test --redo --seed 1
                             """
                         }
