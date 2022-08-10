@@ -1,0 +1,5 @@
+{
+    "cmake.configureSettings": {
+        "USE_MPI": "ON"
+    }
+}

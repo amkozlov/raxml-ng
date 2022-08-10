@@ -1,0 +1,21 @@
+table.list {
+  border-collapse: collapse;
+  font-size: 90%;
+  width: 100%;
+}
+
+table.list th {
+  border: 1px solid #dddddd;
+}
+
+table.list td {
+  border: 1px solid #dddddd;
+}
+
+table.list tr.even {
+  background-color: #ffffff;
+}
+
+table.list tr.odd {
+  background-color: #dddddd;
+}

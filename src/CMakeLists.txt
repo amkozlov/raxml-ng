@@ -16,8 +16,9 @@ endif()
 # export to the parent dir to use in GTest makefile
 set(RAXML_SOURCES ${RAXML_SOURCES} PARENT_SCOPE)
 
-set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
-set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 # enable static linking
 if(STATIC_BUILD)
@@ -102,5 +103,10 @@ else()
 endif()
 
 set_target_properties(raxml_module PROPERTIES PREFIX "")
+
+# The binary will be copied to the old bin directory for backward compatibility.
+add_custom_command(TARGET raxml_module 
+                   POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:raxml_module> ${PROJECT_SOURCE_DIR}/bin/$<TARGET_FILE_NAME:raxml_module>)
 
 install(TARGETS raxml_module DESTINATION bin)

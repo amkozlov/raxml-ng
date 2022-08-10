@@ -16,8 +16,6 @@ list(REMOVE_ITEM RAXML_TEST_SOURCES "${PROJECT_SOURCE_DIR}/src/main.cpp")
 include_directories (${PROJECT_SOURCE_DIR})
 include_directories (${GTEST_INCLUDE_DIRS})
 
-set (EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/test/bin)
-
 add_executable        (raxml_test_module ${RAXML_TEST_SOURCES})
 
 target_link_libraries (raxml_test_module ${RAXML_LIBS})
@@ -48,5 +46,4 @@ endif()
 set_target_properties (raxml_test_module PROPERTIES OUTPUT_NAME raxml_test)
 set_target_properties (raxml_test_module PROPERTIES PREFIX "")
 
-
-add_test (raxml_test ${PROJECT_SOURCE_DIR}/test/bin/raxml_test)
+add_test (raxml_test raxml_test --gtest_output=xml:${CMAKE_BINARY_DIR}/test/RAxMLTest.xml)
