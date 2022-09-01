@@ -80,7 +80,7 @@ public:
   const MSA& msa() const { return _msa; };
   MSA& msa() { return _msa; };
   const PartitionStats& stats() const;
-  pllmod_msa_stats_t * compute_stats(unsigned long stats_mask) const;
+  corax_msa_stats_t * compute_stats(unsigned long stats_mask) const;
 
   size_t length() const;
 

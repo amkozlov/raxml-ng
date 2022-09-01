@@ -2,11 +2,11 @@
 
 using namespace std;
 
-const vector<int> ALL_MODEL_PARAMS = {PLLMOD_OPT_PARAM_FREQUENCIES, PLLMOD_OPT_PARAM_SUBST_RATES,
-                                      PLLMOD_OPT_PARAM_PINV, PLLMOD_OPT_PARAM_ALPHA,
-                                      PLLMOD_OPT_PARAM_FREE_RATES, PLLMOD_OPT_PARAM_RATE_WEIGHTS,
-                                      PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER,
-                                      PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE};
+const vector<int> ALL_MODEL_PARAMS = {CORAX_OPT_PARAM_FREQUENCIES, CORAX_OPT_PARAM_SUBST_RATES,
+                                      CORAX_OPT_PARAM_PINV, CORAX_OPT_PARAM_ALPHA,
+                                      CORAX_OPT_PARAM_FREE_RATES, CORAX_OPT_PARAM_RATE_WEIGHTS,
+                                      CORAX_OPT_PARAM_BRANCH_LEN_SCALER,
+                                      CORAX_OPT_PARAM_BRANCHES_ITERATIVE};
 
 const unordered_map<DataType,unsigned int,EnumClassHash>  DATATYPE_STATES { {DataType::dna, 4},
                                                                             {DataType::protein, 20},
@@ -14,11 +14,11 @@ const unordered_map<DataType,unsigned int,EnumClassHash>  DATATYPE_STATES { {Dat
                                                                             {DataType::genotype10, 10}
                                                                           };
 
-const unordered_map<DataType,const pll_state_t*,EnumClassHash>  DATATYPE_MAPS {
-  {DataType::dna, pll_map_nt},
-  {DataType::protein, pll_map_aa},
-  {DataType::binary, pll_map_bin},
-  {DataType::genotype10, pll_map_gt10}
+const unordered_map<DataType,const corax_state_t*,EnumClassHash>  DATATYPE_MAPS {
+  {DataType::dna, corax_map_nt},
+  {DataType::protein, corax_map_aa},
+  {DataType::binary, corax_map_bin},
+  {DataType::genotype10, corax_map_gt10}
 };
 
 const unordered_map<DataType,string,EnumClassHash>  DATATYPE_PREFIX { {DataType::dna, "DNA"},
@@ -173,7 +173,7 @@ Model::Model (DataType data_type, const std::string &model_string) :
   init_from_string(model_string_tmp);
 }
 
-const pll_state_t * Model::charmap() const
+const corax_state_t * Model::charmap() const
 {
   return _custom_charmap ? _custom_charmap.get() : DATATYPE_MAPS.at(_data_type);
 }
@@ -192,8 +192,8 @@ void Model::init_from_string(const std::string &model_string)
   /* set number of states based on datatype */
   if (_data_type == DataType::multistate)
   {
-    _num_states = pllmod_util_model_numstates_mult(model_name.c_str());
-    _custom_charmap = shared_ptr<pll_state_t>(pllmod_util_model_charmap_mult(_num_states), free);
+    _num_states = corax_util_model_numstates_mult(model_name.c_str());
+    _custom_charmap = shared_ptr<corax_state_t>(corax_util_model_charmap_mult(_num_states), free);
 
     libpll_check_error("ERROR in model specification |" + model_name + "|");
     assert(_custom_charmap);
@@ -201,11 +201,11 @@ void Model::init_from_string(const std::string &model_string)
   else
     _num_states = DATATYPE_STATES.at(_data_type);
 
-  pllmod_mixture_model_t * mix_model = init_mix_model(model_name);
+  corax_mixture_model_t * mix_model = init_mix_model(model_name);
 
   init_model_opts(model_opts, *mix_model);
 
-  pllmod_util_model_mixture_destroy(mix_model);
+  corax_util_model_mixture_destroy(mix_model);
 }
 
 std::string Model::data_type_name() const
@@ -233,11 +233,11 @@ void Model::autodetect_data_type(const std::string &model_name)
 {
   if (_data_type == DataType::autodetect)
   {
-    if (pllmod_util_model_exists_genotype(model_name.c_str()))
+    if (corax_util_model_exists_genotype(model_name.c_str()))
     {
       _data_type = DataType::genotype10;
     }
-    else if (pllmod_util_model_exists_mult(model_name.c_str()))
+    else if (corax_util_model_exists_mult(model_name.c_str()))
     {
       _data_type = DataType::multistate;
     }
@@ -245,12 +245,12 @@ void Model::autodetect_data_type(const std::string &model_name)
     {
       _data_type = DataType::binary;
     }
-    else if (pllmod_util_model_exists_protein(model_name.c_str()) ||
-             pllmod_util_model_exists_protmix(model_name.c_str()))
+    else if (corax_util_model_exists_protein(model_name.c_str()) ||
+             corax_util_model_exists_protmix(model_name.c_str()))
     {
       _data_type = DataType::protein;
     }
-    else if (pllmod_util_model_exists_dna(model_name.c_str()))
+    else if (corax_util_model_exists_dna(model_name.c_str()))
     {
       _data_type = DataType::dna;
     }
@@ -271,65 +271,65 @@ void Model::autodetect_data_type(const std::string &model_name)
   }
 }
 
-pllmod_mixture_model_t * Model::init_mix_model(const std::string &model_name)
+corax_mixture_model_t * Model::init_mix_model(const std::string &model_name)
 {
   const char * model_cstr = model_name.c_str();
   const std::string& prefix = DATATYPE_PREFIX.at(_data_type);
-  pllmod_mixture_model_t * mix_model = nullptr;
+  corax_mixture_model_t * mix_model = nullptr;
 
-  if (pllmod_util_model_exists_protmix(model_cstr))
+  if (corax_util_model_exists_protmix(model_cstr))
   {
-    mix_model = pllmod_util_model_info_protmix(model_cstr);
+    mix_model = corax_util_model_info_protmix(model_cstr);
   }
   else
   {
-    pllmod_subst_model_t * modinfo =  NULL;
+    corax_subst_model_t * modinfo =  NULL;
 
     /* initialize parameters from the model */
     if (_data_type == DataType::protein)
     {
-      modinfo =  pllmod_util_model_info_protein(model_cstr);
+      modinfo =  corax_util_model_info_protein(model_cstr);
     }
     else if (_data_type == DataType::dna)
     {
-      modinfo =  pllmod_util_model_info_dna(model_cstr);
+      modinfo =  corax_util_model_info_dna(model_cstr);
     }
     else if (_data_type == DataType::binary)
     {
-      modinfo =  pllmod_util_model_create_custom("BIN", 2, NULL, NULL, NULL, NULL);
+      modinfo =  corax_util_model_create_custom("BIN", 2, NULL, NULL, NULL, NULL);
     }
     else if (_data_type == DataType::genotype10)
     {
-      modinfo =  pllmod_util_model_info_genotype(model_cstr);
+      modinfo =  corax_util_model_info_genotype(model_cstr);
     }
     else if (_data_type == DataType::multistate)
     {
-      modinfo =  pllmod_util_model_info_mult(model_cstr);
+      modinfo =  corax_util_model_info_mult(model_cstr);
     }
 
     /* pre-defined model not found; assume model string encodes rate symmetries */
     if (!modinfo && isprefix(model_name, prefix) && _data_type != DataType::multistate)
     {
-      pllmod_reset_error();
+      corax_reset_error();
 
       const char * custom_sym_cstr = model_cstr + prefix.size();
-      modinfo =  pllmod_util_model_create_custom(model_cstr, _num_states, NULL, NULL,
+      modinfo =  corax_util_model_create_custom(model_cstr, _num_states, NULL, NULL,
                                                  custom_sym_cstr, NULL);
     }
 
     if (!modinfo)
     {
-      if (pll_errno)
+      if (corax_errno)
         libpll_check_error("ERROR model initialization |" + model_name + "|");
       else
         throw runtime_error("Invalid model name: " + model_name);
     }
 
     /* create pseudo-mixture with 1 component */
-    mix_model = pllmod_util_model_mixture_create(modinfo->name, 1, &modinfo, NULL, NULL,
-                                                  PLLMOD_UTIL_MIXTYPE_FIXED);
+    mix_model = corax_util_model_mixture_create(modinfo->name, 1, &modinfo, NULL, NULL,
+                                                  CORAX_UTIL_MIXTYPE_FIXED);
 
-    pllmod_util_model_destroy(modinfo);
+    corax_util_model_destroy(modinfo);
   }
 
   return mix_model;
@@ -351,7 +351,7 @@ void Model::set_user_srates(doubleVector& srates, bool normalize)
   for (auto& m: _submodels)
     m.uniq_subst_rates(srates);
 
-  _param_mode[PLLMOD_OPT_PARAM_SUBST_RATES] = ParamValue::user;
+  _param_mode[CORAX_OPT_PARAM_SUBST_RATES] = ParamValue::user;
 }
 
 void Model::set_user_freqs(doubleVector& freqs)
@@ -371,13 +371,13 @@ void Model::set_user_freqs(doubleVector& freqs)
   for (auto& m: _submodels)
     m.base_freqs(freqs);
 
-  _param_mode[PLLMOD_OPT_PARAM_FREQUENCIES] = ParamValue::user;
+  _param_mode[CORAX_OPT_PARAM_FREQUENCIES] = ParamValue::user;
 }
 
 
-void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_model_t& mix_model)
+void Model::init_model_opts(const std::string &model_opts, const corax_mixture_model_t& mix_model)
 {
-  _gamma_mode = PLL_GAMMA_RATES_MEAN;
+  _gamma_mode = CORAX_GAMMA_RATES_MEAN;
   _alpha = 1.0;
   _pinv = 0.0;
   _brlen_scaler = 1.0;
@@ -402,10 +402,10 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
   for (auto param: ALL_MODEL_PARAMS)
     _param_mode[param] = ParamValue::undefined;
 
-  _param_mode[PLLMOD_OPT_PARAM_FREQUENCIES] =
+  _param_mode[CORAX_OPT_PARAM_FREQUENCIES] =
       mix_model.models[0]->freqs ? ParamValue::model : ParamValue::ML;
 
-  _param_mode[PLLMOD_OPT_PARAM_SUBST_RATES] =
+  _param_mode[CORAX_OPT_PARAM_SUBST_RATES] =
       mix_model.models[0]->rates ? ParamValue::model : ParamValue::ML;
 
   const char *s = model_opts.c_str();
@@ -553,7 +553,7 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
             default:
               throw parse_error();
           }
-          _param_mode[PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER] = param_mode;
+          _param_mode[CORAX_OPT_PARAM_BRANCH_LEN_SCALER] = param_mode;
         }
         catch(parse_error& e)
         {
@@ -605,7 +605,7 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
             default:
               throw parse_error();
           }
-          _param_mode[PLLMOD_OPT_PARAM_FREQUENCIES] = param_mode;
+          _param_mode[CORAX_OPT_PARAM_FREQUENCIES] = param_mode;
         }
         catch(parse_error& e)
         {
@@ -636,7 +636,7 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
             default:
               throw parse_error();
           }
-          _param_mode[PLLMOD_OPT_PARAM_PINV] = param_mode;
+          _param_mode[CORAX_OPT_PARAM_PINV] = param_mode;
         }
         catch(parse_error& e)
         {
@@ -647,7 +647,7 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
         try
         {
           /* allow to override mixture ratehet mode for now */
-          _rate_het = PLLMOD_UTIL_MIXTYPE_GAMMA;
+          _rate_het = CORAX_UTIL_MIXTYPE_GAMMA;
           if (isdigit(ss.peek()))
           {
             ss >> _num_ratecats;
@@ -658,17 +658,17 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
           if (ss.peek() == 'a' || ss.peek() == 'A')
           {
             ss.get();
-            _gamma_mode = PLL_GAMMA_RATES_MEDIAN;
+            _gamma_mode = CORAX_GAMMA_RATES_MEDIAN;
           }
           else if (ss.peek() == 'm' || ss.peek() == 'M')
           {
             ss.get();
-            _gamma_mode = PLL_GAMMA_RATES_MEAN;
+            _gamma_mode = CORAX_GAMMA_RATES_MEAN;
           }
 
           if (read_param(ss, _alpha))
           {
-            _param_mode[PLLMOD_OPT_PARAM_ALPHA] = ParamValue::user;
+            _param_mode[CORAX_OPT_PARAM_ALPHA] = ParamValue::user;
           }
         }
         catch(parse_error& e)
@@ -695,8 +695,8 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
           if (sysutil_file_exists(_custom_states) && _custom_gaps.empty())
           {
             /* read custom character map from a file */
-            _custom_charmap = shared_ptr<pll_state_t>(
-                pllmod_util_charmap_parse(_num_states,
+            _custom_charmap = shared_ptr<corax_state_t>(
+                corax_util_charmap_parse(_num_states,
                                           _custom_states.c_str(),
                                           _custom_case_sensitive ? 1 : 0,
                                           nullptr),
@@ -704,8 +704,8 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
           }
           else
           {
-            _custom_charmap = shared_ptr<pll_state_t>(
-                pllmod_util_charmap_create(_num_states,
+            _custom_charmap = shared_ptr<corax_state_t>(
+                corax_util_charmap_create(_num_states,
                                            _custom_states.c_str(),
                                            _custom_gaps.c_str(),
                                            _custom_case_sensitive ? 1 : 0),
@@ -714,8 +714,8 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
 
           if (!_custom_charmap)
           {
-            assert(pll_errno);
-            throw parse_error(pll_errmsg);
+            assert(corax_errno);
+            throw parse_error(corax_errmsg);
           }
         }
         catch(parse_error& e)
@@ -725,7 +725,7 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
         }
         break;
       case 'R':
-        _rate_het = PLLMOD_UTIL_MIXTYPE_FREE;
+        _rate_het = CORAX_UTIL_MIXTYPE_FREE;
         if (isdigit(ss.peek()))
         {
           ss >> _num_ratecats;
@@ -746,8 +746,8 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
             }
 
             // TODO: maybe allow to optimize rates and weights separately
-            _param_mode[PLLMOD_OPT_PARAM_RATE_WEIGHTS] = ParamValue::user;
-            _param_mode[PLLMOD_OPT_PARAM_FREE_RATES] = ParamValue::user;
+            _param_mode[CORAX_OPT_PARAM_RATE_WEIGHTS] = ParamValue::user;
+            _param_mode[CORAX_OPT_PARAM_FREE_RATES] = ParamValue::user;
 
             _ratecat_rates = v;
 
@@ -794,7 +794,7 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
     }
   }
 
-  switch (_param_mode.at(PLLMOD_OPT_PARAM_FREQUENCIES))
+  switch (_param_mode.at(CORAX_OPT_PARAM_FREQUENCIES))
   {
     case ParamValue::user:
     case ParamValue::empirical:
@@ -811,7 +811,7 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
       assert(0);
   }
 
-  switch (_param_mode.at(PLLMOD_OPT_PARAM_SUBST_RATES))
+  switch (_param_mode.at(CORAX_OPT_PARAM_SUBST_RATES))
   {
     case ParamValue::user:
       break;
@@ -841,30 +841,30 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
     /* init rate & weights according to the selected mode */
     switch (_rate_het)
     {
-      case PLLMOD_UTIL_MIXTYPE_FIXED:
+      case CORAX_UTIL_MIXTYPE_FIXED:
         assert(_num_ratecats == mix_model.ncomp);
         /* set rates and weights from the mixture model definition */
         _ratecat_rates.assign(mix_model.mix_rates, mix_model.mix_rates + _num_ratecats);
         _ratecat_weights.assign(mix_model.mix_weights, mix_model.mix_weights + _num_ratecats);
         break;
 
-      case PLLMOD_UTIL_MIXTYPE_GAMMA:
+      case CORAX_UTIL_MIXTYPE_GAMMA:
         /* compute the discretized category rates from a gamma distribution
            with given alpha shape and store them in rate_cats  */
-        pll_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _gamma_mode);
-        if (_param_mode[PLLMOD_OPT_PARAM_ALPHA] == ParamValue::undefined)
-          _param_mode[PLLMOD_OPT_PARAM_ALPHA] = ParamValue::ML;
+        corax_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _gamma_mode);
+        if (_param_mode[CORAX_OPT_PARAM_ALPHA] == ParamValue::undefined)
+          _param_mode[CORAX_OPT_PARAM_ALPHA] = ParamValue::ML;
         break;
 
-      case PLLMOD_UTIL_MIXTYPE_FREE:
-        if (_param_mode[PLLMOD_OPT_PARAM_FREE_RATES] == ParamValue::undefined)
+      case CORAX_UTIL_MIXTYPE_FREE:
+        if (_param_mode[CORAX_OPT_PARAM_FREE_RATES] == ParamValue::undefined)
         {
           /* use GAMMA rates as initial values -> can be changed */
-          pll_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _gamma_mode);
-          _param_mode[PLLMOD_OPT_PARAM_FREE_RATES] = ParamValue::ML;
+          corax_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _gamma_mode);
+          _param_mode[CORAX_OPT_PARAM_FREE_RATES] = ParamValue::ML;
         }
-        if (_param_mode[PLLMOD_OPT_PARAM_RATE_WEIGHTS] == ParamValue::undefined)
-          _param_mode[PLLMOD_OPT_PARAM_RATE_WEIGHTS] = ParamValue::ML;
+        if (_param_mode[CORAX_OPT_PARAM_RATE_WEIGHTS] == ParamValue::undefined)
+          _param_mode[CORAX_OPT_PARAM_RATE_WEIGHTS] = ParamValue::ML;
         break;
 
       default:
@@ -895,10 +895,10 @@ std::string Model::to_string(bool print_params, unsigned int precision) const
   if (precision)
     model_string << fixed << setprecision(precision);
 
-  if (out_param_mode.at(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::user)
+  if (out_param_mode.at(CORAX_OPT_PARAM_SUBST_RATES) == ParamValue::user)
     print_param(model_string, submodel(0).uniq_subst_rates());
 
-  switch(out_param_mode.at(PLLMOD_OPT_PARAM_FREQUENCIES))
+  switch(out_param_mode.at(CORAX_OPT_PARAM_FREQUENCIES))
   {
     case ParamValue::empirical:
       model_string << "+FC";
@@ -919,7 +919,7 @@ std::string Model::to_string(bool print_params, unsigned int precision) const
       break;
   }
 
-  switch(out_param_mode.at(PLLMOD_OPT_PARAM_PINV))
+  switch(out_param_mode.at(CORAX_OPT_PARAM_PINV))
   {
     case ParamValue::empirical:
       model_string << "+IC";
@@ -936,17 +936,17 @@ std::string Model::to_string(bool print_params, unsigned int precision) const
 
   if (_num_ratecats > 1)
   {
-    if (_rate_het == PLLMOD_UTIL_MIXTYPE_GAMMA)
+    if (_rate_het == CORAX_UTIL_MIXTYPE_GAMMA)
     {
       model_string << "+G" << _num_ratecats;
-      model_string << (_gamma_mode == PLL_GAMMA_RATES_MEDIAN ? "a" : "m");
-      if (out_param_mode.at(PLLMOD_OPT_PARAM_ALPHA) == ParamValue::user)
+      model_string << (_gamma_mode == CORAX_GAMMA_RATES_MEDIAN ? "a" : "m");
+      if (out_param_mode.at(CORAX_OPT_PARAM_ALPHA) == ParamValue::user)
         model_string << "{" << _alpha << "}";
     }
-    else if (_rate_het == PLLMOD_UTIL_MIXTYPE_FREE)
+    else if (_rate_het == CORAX_UTIL_MIXTYPE_FREE)
     {
       model_string << "+R" << _num_ratecats;
-      if (out_param_mode.at(PLLMOD_OPT_PARAM_FREE_RATES) == ParamValue::user)
+      if (out_param_mode.at(CORAX_OPT_PARAM_FREE_RATES) == ParamValue::user)
       {
         print_param(model_string, _ratecat_rates);
         print_param(model_string, _ratecat_weights);
@@ -954,7 +954,7 @@ std::string Model::to_string(bool print_params, unsigned int precision) const
     }
   }
 
-  switch(out_param_mode.at(PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER))
+  switch(out_param_mode.at(CORAX_OPT_PARAM_BRANCH_LEN_SCALER))
   {
     case ParamValue::ML:
       model_string << "+B";
@@ -1016,37 +1016,37 @@ unsigned int Model::num_free_params() const
 {
   unsigned int  free_params = 0;
 
-  if (param_estimated(PLLMOD_OPT_PARAM_FREQUENCIES))
+  if (param_estimated(CORAX_OPT_PARAM_FREQUENCIES))
   {
-    assert(num_submodels() == 1 || param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) != ParamValue::ML);
+    assert(num_submodels() == 1 || param_mode(CORAX_OPT_PARAM_FREQUENCIES) != ParamValue::ML);
     free_params += _num_states - 1;
   }
 
-  if (param_mode(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::empirical)
+  if (param_mode(CORAX_OPT_PARAM_SUBST_RATES) == ParamValue::empirical)
   {
     free_params += submodel(0).num_rates() - 1;
   }
-  else if (param_mode(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::ML)
+  else if (param_mode(CORAX_OPT_PARAM_SUBST_RATES) == ParamValue::ML)
   {
     assert(num_submodels() == 1);
     free_params += submodel(0).num_uniq_rates() - 1;
   }
 
-  if (param_estimated(PLLMOD_OPT_PARAM_PINV))
+  if (param_estimated(CORAX_OPT_PARAM_PINV))
     free_params += 1;
 
   if (_num_ratecats > 1)
   {
     switch(_rate_het)
     {
-    case PLLMOD_UTIL_MIXTYPE_GAMMA:
-      if (param_estimated(PLLMOD_OPT_PARAM_ALPHA))
+    case CORAX_UTIL_MIXTYPE_GAMMA:
+      if (param_estimated(CORAX_OPT_PARAM_ALPHA))
         free_params += 1;
       break;
-    case PLLMOD_UTIL_MIXTYPE_FREE:
-      if (param_estimated(PLLMOD_OPT_PARAM_FREE_RATES))
+    case CORAX_UTIL_MIXTYPE_FREE:
+      if (param_estimated(CORAX_OPT_PARAM_FREE_RATES))
         free_params += _num_ratecats - 1;
-      if (param_estimated(PLLMOD_OPT_PARAM_RATE_WEIGHTS))
+      if (param_estimated(CORAX_OPT_PARAM_RATE_WEIGHTS))
         free_params += _num_ratecats - 1;
       break;
     }
@@ -1064,10 +1064,10 @@ void Model::init_state_names() const
 
   _state_names.resize(_num_states);
 
-  for (size_t i = 0; i < PLL_ASCII_SIZE; ++i)
+  for (size_t i = 0; i < CORAX_ASCII_SIZE; ++i)
   {
     auto state = map[i];
-    auto popcnt = PLL_STATE_POPCNT(state);
+    auto popcnt = CORAX_STATE_POPCNT(state);
     if (popcnt > 0 && !_full_state_namemap.count(state))
     {
       string state_name;
@@ -1077,7 +1077,7 @@ void Model::init_state_names() const
 
       if (popcnt == 1)
       {
-        auto idx = PLL_STATE_CTZ(state);
+        auto idx = CORAX_STATE_CTZ(state);
         _state_names[idx] = state_name;
       }
     }
@@ -1100,7 +1100,7 @@ const StateNameMap& Model::full_state_namemap() const
   return _full_state_namemap;
 }
 
-void assign(Model& model, const pll_partition_t * partition)
+void assign(Model& model, const corax_partition_t * partition)
 {
   if (model.num_states() == partition->states &&
       model.num_submodels() == partition->rate_matrices)
@@ -1111,7 +1111,7 @@ void assign(Model& model, const pll_partition_t * partition)
       model.base_freqs(i, doubleVector(partition->frequencies[i],
                                        partition->frequencies[i] + partition->states));
 
-      size_t n_subst_rates = pllmod_util_subst_rate_count(partition->states);
+      size_t n_subst_rates = CORAX_SUBST_RATE_COUNT(partition->states);
       model.subst_rates(i, doubleVector(partition->subst_params[i],
                                         partition->subst_params[i] + n_subst_rates));
     }
@@ -1128,28 +1128,28 @@ void assign(Model& model, const pll_partition_t * partition)
     throw runtime_error("incompatible partition!");
 }
 
-void assign(pll_partition_t * partition, const Model& model)
+void assign(corax_partition_t * partition, const Model& model)
 {
   if (model.num_states() == partition->states &&
       model.num_submodels() == partition->rate_matrices)
   {
     /* set rate categories & weights */
-    pll_set_category_rates(partition, model.ratecat_rates().data());
-    pll_set_category_weights(partition, model.ratecat_weights().data());
+    corax_set_category_rates(partition, model.ratecat_rates().data());
+    corax_set_category_weights(partition, model.ratecat_weights().data());
 
     /* now iterate over rate matrices and set all params */
     for (size_t i = 0; i < partition->rate_matrices; ++i)
     {
       /* set base frequencies */
       assert(!model.base_freqs(i).empty());
-      pll_set_frequencies(partition, i, model.base_freqs(i).data());
+      corax_set_frequencies(partition, i, model.base_freqs(i).data());
 
       /* set substitution rates */
       assert(!model.subst_rates(i).empty());
-      pll_set_subst_params(partition, i, model.subst_rates(i).data());
+      corax_set_subst_params(partition, i, model.subst_rates(i).data());
 
       /* set p-inv value */
-      pll_update_invariant_sites_proportion (partition, i, model.pinv());
+      corax_update_invariant_sites_proportion (partition, i, model.pinv());
     }
   }
   else
@@ -1166,15 +1166,15 @@ static string get_ratehet_mode_str(const Model& m)
   if (m.num_ratecats() == 1)
     return "NONE";
   else
-    return (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_GAMMA) ? "GAMMA" :
-            (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_FREE) ? "FREE" : "FIXED";
+    return (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA) ? "GAMMA" :
+            (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_FREE) ? "FREE" : "FIXED";
 }
 
 LogStream& operator<<(LogStream& stream, const Model& m)
 {
-  if (m.param_mode(PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER) != ParamValue::undefined)
+  if (m.param_mode(CORAX_OPT_PARAM_BRANCH_LEN_SCALER) != ParamValue::undefined)
   {
-    stream << "   Speed ("  << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER))
+    stream << "   Speed ("  << get_param_mode_str(m.param_mode(CORAX_OPT_PARAM_BRANCH_LEN_SCALER))
              << "): " << FMT_MOD(m.brlen_scaler()) << endl;
   }
 
@@ -1182,10 +1182,10 @@ LogStream& operator<<(LogStream& stream, const Model& m)
   if (m.num_ratecats() > 1)
   {
     stream << " (" << m.num_ratecats() << " cats, " <<
-        (m.gamma_mode() == PLL_GAMMA_RATES_MEDIAN ? "median" : "mean") << ")";
-    if (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_GAMMA)
+        (m.gamma_mode() == CORAX_GAMMA_RATES_MEDIAN ? "median" : "mean") << ")";
+    if (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA)
       stream << ",  alpha: " << FMT_MOD(m.alpha()) << " ("
-             << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_ALPHA)) << ")";
+             << get_param_mode_str(m.param_mode(CORAX_OPT_PARAM_ALPHA)) << ")";
     stream << ",  weights&rates: ";
     for (size_t i = 0; i < m.num_ratecats(); ++i)
     {
@@ -1195,14 +1195,14 @@ LogStream& operator<<(LogStream& stream, const Model& m)
   }
   stream << endl;
 
-  if (m.param_mode(PLLMOD_OPT_PARAM_PINV) != ParamValue::undefined)
+  if (m.param_mode(CORAX_OPT_PARAM_PINV) != ParamValue::undefined)
   {
-    stream << "   P-inv (" << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_PINV)) << "): "
+    stream << "   P-inv (" << get_param_mode_str(m.param_mode(CORAX_OPT_PARAM_PINV)) << "): "
            << FMT_MOD(m.pinv()) << endl;
   }
 
   stream << "   Base frequencies ("
-         << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES)) << "): ";
+         << get_param_mode_str(m.param_mode(CORAX_OPT_PARAM_FREQUENCIES)) << "): ";
   for (size_t i = 0; i < m.num_submodels(); ++i)
   {
     if (m.num_submodels() > 1)
@@ -1214,7 +1214,7 @@ LogStream& operator<<(LogStream& stream, const Model& m)
   stream << endl;
 
   stream << "   Substitution rates ("
-         << get_param_mode_str(m.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES)) << "): ";
+         << get_param_mode_str(m.param_mode(CORAX_OPT_PARAM_SUBST_RATES)) << "): ";
   for (size_t i = 0; i < m.num_submodels(); ++i)
   {
     if (m.num_submodels() > 1)

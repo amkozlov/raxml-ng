@@ -372,21 +372,21 @@ void ParallelContext::thread_reduce(double * data, size_t size, int op)
   {
     switch(op)
     {
-      case PLLMOD_COMMON_REDUCE_SUM:
+      case CORAX_REDUCE_SUM:
       {
         data[i] = 0.;
         for (j = 0; j < num_group_threads; ++j)
           data[i] += double_buf[j * size + i];
       }
       break;
-      case PLLMOD_COMMON_REDUCE_MAX:
+      case CORAX_REDUCE_MAX:
       {
         data[i] = double_buf[i];
         for (j = 1; j < num_group_threads; ++j)
           data[i] = max(data[i], double_buf[j * size + i]);
       }
       break;
-      case PLLMOD_COMMON_REDUCE_MIN:
+      case CORAX_REDUCE_MIN:
       {
         data[i] = double_buf[i];
         for (j = 1; j < num_group_threads; ++j)

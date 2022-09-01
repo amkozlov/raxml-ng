@@ -12,7 +12,7 @@ redo_mode(false), nofiles_mode(false), write_interim_results(true), write_bs_msa
 log_level(LogLevel::progress), msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
 random_seed(0), start_trees(), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
 spr_cutoff(1.0),
-brlen_linkage(PLLMOD_COMMON_BRLEN_SCALED), brlen_opt_method(PLLMOD_OPT_BLO_NEWTON_FAST),
+brlen_linkage(CORAX_BRLEN_SCALED), brlen_opt_method(CORAX_OPT_BLO_NEWTON_FAST),
 brlen_min(RAXML_BRLEN_MIN), brlen_max(RAXML_BRLEN_MAX),
 num_searches(1), terrace_maxsize(100),
 num_bootstraps(1000), bootstop_criterion(BootstopCriterion::none), bootstop_cutoff(0.03),
@@ -20,7 +20,7 @@ bootstop_interval(RAXML_BOOTSTOP_INTERVAL), bootstop_permutations(RAXML_BOOTSTOP
 tbe_naive(false), consense_cutoff(ConsenseCutoff::MR), tree_file(""), constraint_tree_file(""),
 msa_file(""), model_file(""), weights_file(""), outfile_prefix(""),
 num_threads(1), num_threads_max(1), num_ranks(1), num_workers(1), num_workers_max(UINT_MAX),
-simd_arch(PLL_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(LoadBalancing::benoit)
+simd_arch(CORAX_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(LoadBalancing::benoit)
 {}
 
 string Options::output_fname(const string& suffix) const
@@ -204,19 +204,19 @@ string Options::simd_arch_name() const
 {
   switch(simd_arch)
   {
-    case PLL_ATTRIB_ARCH_CPU:
+    case CORAX_ATTRIB_ARCH_CPU:
       return "NONE";
       break;
-    case PLL_ATTRIB_ARCH_SSE:
+    case CORAX_ATTRIB_ARCH_SSE:
       return "SSE3";
       break;
-    case PLL_ATTRIB_ARCH_AVX:
+    case CORAX_ATTRIB_ARCH_AVX:
       return "AVX";
       break;
-    case PLL_ATTRIB_ARCH_AVX2:
+    case CORAX_ATTRIB_ARCH_AVX2:
       return "AVX2";
       break;
-    case PLL_ATTRIB_ARCH_AVX512:
+    case CORAX_ATTRIB_ARCH_AVX512:
       return "AVX512";
       break;
     default:
@@ -426,9 +426,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     }
 
     stream << "  branch lengths: ";
-    if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_SCALED)
+    if (opts.brlen_linkage == CORAX_BRLEN_SCALED)
       stream << "proportional";
-    else if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED)
+    else if (opts.brlen_linkage == CORAX_BRLEN_UNLINKED)
       stream << "unlinked";
     else
       stream << "linked";
@@ -440,19 +440,19 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       stream << "ML estimate, algorithm: ";
       switch(opts.brlen_opt_method)
       {
-        case PLLMOD_OPT_BLO_NEWTON_FAST:
+        case CORAX_OPT_BLO_NEWTON_FAST:
           stream << "NR-FAST";
           break;
-        case PLLMOD_OPT_BLO_NEWTON_SAFE:
+        case CORAX_OPT_BLO_NEWTON_SAFE:
           stream << "NR-SAFE";
           break;
-        case PLLMOD_OPT_BLO_NEWTON_GLOBAL:
+        case CORAX_OPT_BLO_NEWTON_GLOBAL:
           stream << "NR-GLOBAL";
           break;
-        case PLLMOD_OPT_BLO_NEWTON_OLDFAST:
+        case CORAX_OPT_BLO_NEWTON_OLDFAST:
           stream << "legacy NR-FAST";
           break;
-        case PLLMOD_OPT_BLO_NEWTON_OLDSAFE:
+        case CORAX_OPT_BLO_NEWTON_OLDSAFE:
           stream << "legacy NR-SAFE";
           break;
       }

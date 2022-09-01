@@ -34,18 +34,18 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
   _partition_contributions.resize(parted_msa.part_count());
   double total_weight = 0;
 
-  _pll_treeinfo = pllmod_treeinfo_create(pll_utree_graph_clone(&tree.pll_utree_root()),
+  _pll_treeinfo = corax_treeinfo_create(corax_utree_graph_clone(&tree.pll_utree_root()),
                                          tree.num_tips(),
                                          parted_msa.part_count(), opts.brlen_linkage);
 
   libpll_check_error("ERROR creating treeinfo structure");
   assert(_pll_treeinfo);
 
-  pllmod_treeinfo_set_parallel_context(_pll_treeinfo, (void *) nullptr,
+  corax_treeinfo_set_parallel_context(_pll_treeinfo, (void *) nullptr,
                                        ParallelContext::parallel_reduce_cb);
 
   // init partitions
-  int optimize_branches = opts.optimize_brlen ? PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE : 0;
+  int optimize_branches = opts.optimize_brlen ? CORAX_OPT_PARAM_BRANCHES_ITERATIVE : 0;
 
   for (size_t p = 0; p < parted_msa.part_count(); ++p)
   {
@@ -61,10 +61,10 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
     if (part_range != part_assign.end())
     {
       /* create and init PLL partition structure */
-      pll_partition_t * partition = create_pll_partition(opts, pinfo, tip_msa_idmap,
+      corax_partition_t * partition = create_pll_partition(opts, pinfo, tip_msa_idmap,
                                                          *part_range, weights);
 
-      int retval = pllmod_treeinfo_init_partition(_pll_treeinfo, p, partition,
+      int retval = corax_treeinfo_init_partition(_pll_treeinfo, p, partition,
                                                   params_to_optimize,
                                                   pinfo.model().gamma_mode(),
                                                   pinfo.model().alpha(),
@@ -73,17 +73,17 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
 
       if (!retval)
       {
-        assert(pll_errno);
+        assert(corax_errno);
         libpll_check_error("ERROR adding treeinfo partition");
       }
 
       // set per-partition branch lengths or scalers
-      if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_SCALED)
+      if (opts.brlen_linkage == CORAX_BRLEN_SCALED)
       {
         assert (_pll_treeinfo->brlen_scalers);
         _pll_treeinfo->brlen_scalers[p] = pinfo.model().brlen_scaler();
       }
-      else if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED && !tree.partition_brlens().empty())
+      else if (opts.brlen_linkage == CORAX_BRLEN_UNLINKED && !tree.partition_brlens().empty())
       {
         assert(_pll_treeinfo->branch_lengths[p]);
         memcpy(_pll_treeinfo->branch_lengths[p], tree.partition_brlens(p).data(),
@@ -113,11 +113,11 @@ TreeInfo::~TreeInfo ()
     for (unsigned int i = 0; i < _pll_treeinfo->partition_count; ++i)
     {
       if (_pll_treeinfo->partitions[i])
-        pll_partition_destroy(_pll_treeinfo->partitions[i]);
+        corax_partition_destroy(_pll_treeinfo->partitions[i]);
     }
 
-    pll_utree_graph_destroy(_pll_treeinfo->root, NULL);
-    pllmod_treeinfo_destroy(_pll_treeinfo);
+    corax_utree_graph_destroy(_pll_treeinfo->root, NULL);
+    corax_treeinfo_destroy(_pll_treeinfo);
   }
 }
 
@@ -141,7 +141,7 @@ Tree TreeInfo::tree() const
 
   Tree tree(*_pll_treeinfo->tree);
 
-  if (_pll_treeinfo->brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED)
+  if (_pll_treeinfo->brlen_linkage == CORAX_BRLEN_UNLINKED)
   {
     // set per-partition branch lengths
     for (unsigned int i = 0; i < _pll_treeinfo->partition_count; ++i)
@@ -167,11 +167,11 @@ Tree TreeInfo::tree(size_t partition_id) const
   if (partition_id >= _pll_treeinfo->partition_count)
     throw out_of_range("Partition ID out of range");
 
-  PllUTreeUniquePtr pll_utree(pllmod_treeinfo_get_partition_tree(_pll_treeinfo, partition_id));
+  PllUTreeUniquePtr pll_utree(corax_treeinfo_get_partition_tree(_pll_treeinfo, partition_id));
 
   if (!pll_utree)
   {
-    assert(pll_errno);
+    assert(corax_errno);
     libpll_check_error("treeinfo: cannot get partition tree");
   }
 
@@ -180,18 +180,18 @@ Tree TreeInfo::tree(size_t partition_id) const
 
 void TreeInfo::tree(const Tree& tree)
 {
-  _pll_treeinfo->root = pll_utree_graph_clone(&tree.pll_utree_root());
+  _pll_treeinfo->root = corax_utree_graph_clone(&tree.pll_utree_root());
 }
 
 double TreeInfo::loglh(bool incremental)
 {
-  return pllmod_treeinfo_compute_loglh(_pll_treeinfo, incremental ? 1 : 0);
+  return corax_treeinfo_compute_loglh(_pll_treeinfo, incremental ? 1 : 0);
 }
 
 double TreeInfo::persite_loglh(std::vector<double*> part_site_lh, bool incremental)
 {
   assert(part_site_lh.size() == _pll_treeinfo->partition_count);
-  return pllmod_treeinfo_compute_loglh_persite(_pll_treeinfo, incremental ? 1 : 0,
+  return corax_treeinfo_compute_loglh_persite(_pll_treeinfo, incremental ? 1 : 0, 1, 
       part_site_lh.data());
 }
 
@@ -217,16 +217,16 @@ double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor
   /* update all CLVs and p-matrices before calling BLO */
   double new_loglh = loglh();
 
-  if (_pll_treeinfo->params_to_optimize[0] & PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE)
+  if (_pll_treeinfo->params_to_optimize[0] & CORAX_OPT_PARAM_BRANCHES_ITERATIVE)
   {
     int max_iters = brlen_smooth_factor * RAXML_BRLEN_SMOOTHINGS;
-    new_loglh = -1 * pllmod_algo_opt_brlen_treeinfo(_pll_treeinfo,
+    new_loglh = -1 * corax_algo_opt_brlen_treeinfo(_pll_treeinfo,
                                                     _brlen_min,
                                                     _brlen_max,
                                                     lh_epsilon,
                                                     max_iters,
                                                     _brlen_opt_method,
-                                                    PLLMOD_OPT_BRLEN_OPTIMIZE_ALL
+                                                    CORAX_OPT_BRLEN_OPTIMIZE_ALL
                                                     );
 
     LOG_DEBUG << "\t - after brlen: logLH = " << new_loglh << endl;
@@ -236,10 +236,10 @@ double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor
   }
 
   /* optimize brlen scalers, if needed */
-  if (_pll_treeinfo->brlen_linkage == PLLMOD_COMMON_BRLEN_SCALED &&
+  if (_pll_treeinfo->brlen_linkage == CORAX_BRLEN_SCALED &&
       _pll_treeinfo->partition_count > 1)
   {
-    new_loglh = -1 * pllmod_algo_opt_brlen_scalers_treeinfo(_pll_treeinfo,
+    new_loglh = -1 * corax_algo_opt_brlen_scalers_treeinfo(_pll_treeinfo,
                                                             RAXML_BRLEN_SCALER_MIN,
                                                             RAXML_BRLEN_SCALER_MAX,
                                                             _brlen_min,
@@ -257,19 +257,19 @@ double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor
 
 double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
 {
-  assert(!pll_errno);
+  assert(!corax_errno);
 
   double
     cur_loglh = loglh(),
     new_loglh = cur_loglh;
 
   /* optimize SUBSTITUTION RATES */
-  if (params_to_optimize & PLLMOD_OPT_PARAM_SUBST_RATES)
+  if (params_to_optimize & CORAX_OPT_PARAM_SUBST_RATES)
   {
-    new_loglh = -1 * pllmod_algo_opt_subst_rates_treeinfo(_pll_treeinfo,
+    new_loglh = -1 * corax_algo_opt_subst_rates_treeinfo(_pll_treeinfo,
                                                           0,
-                                                          PLLMOD_OPT_MIN_SUBST_RATE,
-                                                          PLLMOD_OPT_MAX_SUBST_RATE,
+                                                          CORAX_OPT_MIN_SUBST_RATE,
+                                                          CORAX_OPT_MAX_SUBST_RATE,
                                                           RAXML_BFGS_FACTOR,
                                                           RAXML_PARAM_EPSILON);
 
@@ -281,12 +281,12 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
   }
 
   /* optimize BASE FREQS */
-  if (params_to_optimize & PLLMOD_OPT_PARAM_FREQUENCIES)
+  if (params_to_optimize & CORAX_OPT_PARAM_FREQUENCIES)
   {
-    new_loglh = -1 * pllmod_algo_opt_frequencies_treeinfo(_pll_treeinfo,
+    new_loglh = -1 * corax_algo_opt_frequencies_treeinfo(_pll_treeinfo,
                                                           0,
-                                                          PLLMOD_OPT_MIN_FREQ,
-                                                          PLLMOD_OPT_MAX_FREQ,
+                                                          CORAX_OPT_MIN_FREQ,
+                                                          CORAX_OPT_MAX_FREQ,
                                                           RAXML_BFGS_FACTOR,
                                                           RAXML_PARAM_EPSILON);
 
@@ -299,15 +299,15 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
 
   // TODO: co-optimization of PINV and ALPHA, mb with multiple starting points
   if (0 &&
-      (params_to_optimize & PLLMOD_OPT_PARAM_ALPHA) &&
-      (params_to_optimize & PLLMOD_OPT_PARAM_PINV))
+      (params_to_optimize & CORAX_OPT_PARAM_ALPHA) &&
+      (params_to_optimize & CORAX_OPT_PARAM_PINV))
   {
-    new_loglh = -1 * pllmod_algo_opt_alpha_pinv_treeinfo(_pll_treeinfo,
+    new_loglh = -1 * corax_algo_opt_alpha_pinv_treeinfo(_pll_treeinfo,
                                                          0,
-                                                         PLLMOD_OPT_MIN_ALPHA,
-                                                         PLLMOD_OPT_MAX_ALPHA,
-                                                         PLLMOD_OPT_MIN_PINV,
-                                                         PLLMOD_OPT_MAX_PINV,
+                                                         CORAX_OPT_MIN_ALPHA,
+                                                         CORAX_OPT_MAX_ALPHA,
+                                                         CORAX_OPT_MIN_PINV,
+                                                         CORAX_OPT_MAX_PINV,
                                                          RAXML_BFGS_FACTOR,
                                                          RAXML_PARAM_EPSILON);
 
@@ -320,12 +320,12 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
   else
   {
     /* optimize ALPHA */
-    if (params_to_optimize & PLLMOD_OPT_PARAM_ALPHA)
+    if (params_to_optimize & CORAX_OPT_PARAM_ALPHA)
     {
-      new_loglh = -1 * pllmod_algo_opt_onedim_treeinfo(_pll_treeinfo,
-                                                        PLLMOD_OPT_PARAM_ALPHA,
-                                                        PLLMOD_OPT_MIN_ALPHA,
-                                                        PLLMOD_OPT_MAX_ALPHA,
+      new_loglh = -1 * corax_algo_opt_onedim_treeinfo(_pll_treeinfo,
+                                                        CORAX_OPT_PARAM_ALPHA,
+                                                        CORAX_OPT_MIN_ALPHA,
+                                                        CORAX_OPT_MAX_ALPHA,
                                                         RAXML_PARAM_EPSILON);
 
      LOG_DEBUG << "\t - after alpha: logLH = " << new_loglh << endl;
@@ -336,12 +336,12 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
     }
 
     /* optimize PINV */
-    if (params_to_optimize & PLLMOD_OPT_PARAM_PINV)
+    if (params_to_optimize & CORAX_OPT_PARAM_PINV)
     {
-      new_loglh = -1 * pllmod_algo_opt_onedim_treeinfo(_pll_treeinfo,
-                                                        PLLMOD_OPT_PARAM_PINV,
-                                                        PLLMOD_OPT_MIN_PINV,
-                                                        PLLMOD_OPT_MAX_PINV,
+      new_loglh = -1 * corax_algo_opt_onedim_treeinfo(_pll_treeinfo,
+                                                        CORAX_OPT_PARAM_PINV,
+                                                        CORAX_OPT_MIN_PINV,
+                                                        CORAX_OPT_MAX_PINV,
                                                         RAXML_PARAM_EPSILON);
 
       LOG_DEBUG << "\t - after p-inv: logLH = " << new_loglh << endl;
@@ -353,9 +353,9 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
   }
 
   /* optimize FREE RATES and WEIGHTS */
-  if (params_to_optimize & PLLMOD_OPT_PARAM_FREE_RATES)
+  if (params_to_optimize & CORAX_OPT_PARAM_FREE_RATES)
   {
-    new_loglh = -1 * pllmod_algo_opt_rates_weights_treeinfo (_pll_treeinfo,
+    new_loglh = -1 * corax_algo_opt_rates_weights_treeinfo (_pll_treeinfo,
                                                           RAXML_FREERATE_MIN,
                                                           RAXML_FREERATE_MAX,
                                                           _brlen_min,
@@ -371,7 +371,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
     cur_loglh = new_loglh;
   }
 
-  if (params_to_optimize & PLLMOD_OPT_PARAM_BRANCHES_ITERATIVE)
+  if (params_to_optimize & CORAX_OPT_PARAM_BRANCHES_ITERATIVE)
   {
     new_loglh = optimize_branches(lh_epsilon, 0.25);
 
@@ -384,14 +384,34 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
 
 double TreeInfo::spr_round(spr_round_params& params)
 {
-  double loglh = pllmod_algo_spr_round(_pll_treeinfo, params.radius_min, params.radius_max,
+  
+  double loglh = corax_algo_spr_round(_pll_treeinfo, params.radius_min, params.radius_max,
                                params.ntopol_keep, params.thorough, _brlen_opt_method,
                                _brlen_min, _brlen_max, RAXML_BRLEN_SMOOTHINGS,
                                0.1,
                                params.subtree_cutoff > 0. ? &params.cutoff_info : nullptr,
-                               params.subtree_cutoff);
+                               params.subtree_cutoff, params.optimized);
 
   libpll_check_error("ERROR in SPR round");
+
+  assert(isfinite(loglh) && loglh);
+
+  return loglh;
+}
+
+double TreeInfo::nni_round(nni_round_params& params)
+{
+
+  double loglh = corax_algo_nni_round(_pll_treeinfo, 
+                                        params.tolerance, 
+                                        _brlen_opt_method, 
+                                        _brlen_min, 
+                                        _brlen_max, 
+                                        RAXML_BRLEN_SMOOTHINGS, 
+                                        params.lh_epsilon,
+                                        false);
+  
+  libpll_check_error("ERROR in NNI round");
 
   assert(isfinite(loglh) && loglh);
 
@@ -402,8 +422,8 @@ void TreeInfo::set_topology_constraint(const Tree& cons_tree)
 {
   if (!cons_tree.empty())
   {
-    int retval = pllmod_treeinfo_set_constraint_tree(_pll_treeinfo, &cons_tree.pll_utree(),
-                                                     _use_old_constraint ? 1 : 0);
+    int retval = corax_treeinfo_set_constraint_tree(_pll_treeinfo, &cons_tree.pll_utree());
+
     if (!retval)
       libpll_check_error("ERROR: Cannot set topological constraint");
   }
@@ -412,7 +432,7 @@ void TreeInfo::set_topology_constraint(const Tree& cons_tree)
 void TreeInfo::compute_ancestral(const AncestralStatesSharedPtr& ancestral,
                                  const PartitionAssignment& part_assign)
 {
-  pllmod_ancestral_t * pll_ancestral = pllmod_treeinfo_compute_ancestral(_pll_treeinfo);
+  corax_ancestral_t * pll_ancestral = corax_treeinfo_compute_ancestral(_pll_treeinfo);
 
   if (!pll_ancestral)
     libpll_check_error("Unable to compute ancestral states", true);
@@ -424,12 +444,12 @@ void TreeInfo::compute_ancestral(const AncestralStatesSharedPtr& ancestral,
 
   assign_probs(*ancestral, *pll_ancestral, part_assign);
 
-  pllmod_treeinfo_destroy_ancestral(pll_ancestral);
+  corax_treeinfo_destroy_ancestral(pll_ancestral);
 }
 
 void assign(PartitionedMSA& parted_msa, const TreeInfo& treeinfo)
 {
-  const pllmod_treeinfo_t& pll_treeinfo = treeinfo.pll_treeinfo();
+  const corax_treeinfo_t& pll_treeinfo = treeinfo.pll_treeinfo();
 
   if (parted_msa.part_count() != pll_treeinfo.partition_count)
     throw runtime_error("Incompatible arguments");
@@ -447,7 +467,7 @@ void assign(PartitionedMSA& parted_msa, const TreeInfo& treeinfo)
 
 void assign(Model& model, const TreeInfo& treeinfo, size_t partition_id)
 {
-  const pllmod_treeinfo_t& pll_treeinfo = treeinfo.pll_treeinfo();
+  const corax_treeinfo_t& pll_treeinfo = treeinfo.pll_treeinfo();
 
   if (partition_id >= pll_treeinfo.partition_count)
     throw out_of_range("Partition ID out of range");
@@ -462,7 +482,7 @@ void assign(Model& model, const TreeInfo& treeinfo, size_t partition_id)
 }
 
 void build_clv(ProbVector::const_iterator probs, size_t sites, const WeightVector& weights, size_t seq_offset,
-               pll_partition_t* partition, bool normalize, std::vector<double>& clv)
+               corax_partition_t* partition, bool normalize, std::vector<double>& clv)
 {
   const auto states = partition->states;
   auto clvp = clv.begin();
@@ -495,7 +515,7 @@ void build_clv(ProbVector::const_iterator probs, size_t sites, const WeightVecto
 
 void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip_msa_idmap,
                         const PartitionRange& part_region,
-                        pll_partition_t* partition, const pll_state_t * charmap)
+                        corax_partition_t* partition, const corax_state_t * charmap)
 {
   /* get "true" sequence offset considering that MSA can be partially loaded */
   auto seq_offset = msa.get_local_offset(part_region.start);
@@ -504,11 +524,11 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
 
   /* set pattern weights */
   if (!msa.weights().empty())
-    pll_set_pattern_weights(partition, msa.weights().data() + seq_offset);
+    corax_set_pattern_weights(partition, msa.weights().data() + seq_offset);
 
   if (opts.use_prob_msa && msa.probabilistic())
   {
-    assert(!(partition->attributes & PLL_ATTRIB_PATTERN_TIP));
+    assert(!(partition->attributes & CORAX_ATTRIB_PATTERN_TIP));
     assert(partition->states == msa.states());
 
     auto normalize = !msa.normalized();
@@ -521,7 +541,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
       auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
       auto prob_start = msa.probs(seq_id, seq_offset);
       build_clv(prob_start, partition->sites, msa.weights(), seq_offset, partition, normalize, tmp_clv);
-      pll_set_tip_clv(partition, tip_id, tmp_clv.data(), PLL_FALSE);
+      corax_set_tip_clv(partition, tip_id, tmp_clv.data(), CORAX_FALSE);
     }
   }
   else
@@ -529,14 +549,14 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
     for (size_t tip_id = 0; tip_id < partition->tips; ++tip_id)
     {
       auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
-      pll_set_tip_states(partition, tip_id, charmap, msa.at(seq_id).c_str() + seq_offset);
+      corax_set_tip_states(partition, tip_id, charmap, msa.at(seq_id).c_str() + seq_offset);
     }
   }
 }
 
 void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip_msa_idmap,
                         const PartitionRange& part_region,
-                        pll_partition_t* partition, const pll_state_t * charmap,
+                        corax_partition_t* partition, const corax_state_t * charmap,
                         const WeightVector& weights)
 {
   assert(!weights.empty());
@@ -556,7 +576,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
   /* now set tip sequences, ignoring all columns with zero weights */
   if (opts.use_prob_msa && msa.probabilistic())
   {
-    assert(!(partition->attributes & PLL_ATTRIB_PATTERN_TIP));
+    assert(!(partition->attributes & CORAX_ATTRIB_PATTERN_TIP));
     assert(partition->states == msa.states());
 
     auto normalize = !msa.normalized();
@@ -569,7 +589,7 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
       auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
       auto prob_start = msa.probs(seq_id, pstart);
       build_clv(prob_start, plen, weights, pstart, partition, normalize, tmp_clv);
-      pll_set_tip_clv(partition, tip_id, tmp_clv.data(), PLL_FALSE);
+      corax_set_tip_clv(partition, tip_id, tmp_clv.data(), CORAX_FALSE);
     }
   }
   else
@@ -587,14 +607,14 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
       }
       assert(pos == comp_weights.size());
 
-      pll_set_tip_states(partition, tip_id, charmap, bs_seq.data());
+      corax_set_tip_states(partition, tip_id, charmap, bs_seq.data());
     }
   }
 
-  pll_set_pattern_weights(partition, comp_weights.data());
+  corax_set_pattern_weights(partition, comp_weights.data());
 }
 
-pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& pinfo,
+corax_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& pinfo,
                                       const IDVector& tip_msa_idmap,
                                       const PartitionRange& part_region, const uintVector& weights)
 {
@@ -616,25 +636,25 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
 
   if (opts.use_rate_scalers && model.num_ratecats() > 1)
   {
-    attrs |= PLL_ATTRIB_RATE_SCALERS;
+    attrs |= CORAX_ATTRIB_RATE_SCALERS;
   }
 
   if (opts.use_repeats)
   {
     assert(!(opts.use_prob_msa));
-    attrs |= PLL_ATTRIB_SITE_REPEATS;
+    attrs |= CORAX_ATTRIB_SITE_REPEATS;
   }
   else if (opts.use_tip_inner)
   {
     assert(!(opts.use_prob_msa));
     // 1) SSE3 tip-inner kernels are not implemented so far, so generic version will be faster
     // 2) same for state-rich models
-    if (opts.simd_arch != PLL_ATTRIB_ARCH_SSE && model.num_states() <= 20)
+    if (opts.simd_arch != CORAX_ATTRIB_ARCH_SSE && model.num_states() <= 20)
     {
       // TODO: use proper auto-tuning
       const unsigned long min_len_ti = model.num_states() > 4 ? 40 : 100;
       if ((unsigned long) part_length > min_len_ti)
-        attrs |= PLL_ATTRIB_PATTERN_TIP;
+        attrs |= CORAX_ATTRIB_PATTERN_TIP;
     }
   }
 
@@ -642,12 +662,12 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
   if (model.ascbias_type() == AscBiasCorrection::lewis ||
       (model.ascbias_type() != AscBiasCorrection::none && part_region.master()))
   {
-    attrs |=  PLL_ATTRIB_AB_FLAG;
+    attrs |=  CORAX_ATTRIB_AB_FLAG;
     attrs |= (unsigned int) model.ascbias_type();
   }
 
   BasicTree tree(msa.size());
-  pll_partition_t * partition = pll_partition_create(
+  corax_partition_t * partition = corax_partition_create(
       tree.num_tips(),         /* number of tip sequences */
       tree.num_inner(),        /* number of CLV buffers */
       model.num_states(),      /* number of states in the data */
@@ -663,7 +683,7 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
   assert(partition);
 
   if (part_region.master() && !model.ascbias_weights().empty())
-    pll_set_asc_state_weights(partition, model.ascbias_weights().data());
+    corax_set_asc_state_weights(partition, model.ascbias_weights().data());
 
   if (part_length == part_region.length)
     set_partition_tips(opts, msa, tip_msa_idmap, part_region, partition, model.charmap());
@@ -674,3 +694,82 @@ pll_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& 
 
   return partition;
 }
+
+
+/* 
+int TreeInfo::savePartition(const char* filename, int partIndex){
+    
+  int retval = CORAX_SUCCESS;
+  char *file = new char[strlen(filename)+1];
+  strcat(file,filename);
+
+  FILE * bin_file;
+  corax_binary_header_t bin_header;
+  const char * bin_fname = file;
+
+  bin_file = corax_binary_create(bin_fname, &bin_header, CORAX_BIN_ACCESS_SEQUENTIAL, 0);
+
+  if(!bin_file){
+      std::cout << "Error. Couldn't create bin file. Exit." << std::endl;
+      return CORAX_FAILURE;
+  }
+
+  if(!corax_binary_partition_dump(bin_file,
+                              BLOCK_ID_PARTITION,
+                              pll_treeinfo().partitions[partIndex],
+                              CORAX_BIN_ATTRIB_PARTITION_DUMP_CLV |
+                              CORAX_BIN_ATTRIB_PARTITION_DUMP_WGT))
+  {
+      std::cout << "Error. Couldn't dump partition. Exit" << std::endl;
+      return CORAX_FAILURE;
+  }
+
+  corax_binary_close(bin_file);
+  delete[] file;
+
+  return retval;
+
+}
+
+corax_partition_t* TreeInfo::loadPartition(const char* bin_fname){
+
+  corax_partition_t* _partition;
+  corax_binary_header_t input_header;
+  unsigned int bin_attributes = 0;
+  corax_block_map_t * block_map;
+  unsigned int n_blocks;
+
+  FILE * bin_file;
+
+  bin_file = corax_binary_open(bin_fname, &input_header);
+
+  block_map = corax_binary_get_map(bin_file, &n_blocks);
+
+  //printf("There are %d blocks in the map\n", n_blocks);
+  int partition_offset = 0;
+  for (unsigned int i=0; i<n_blocks; ++i)
+  {
+    // we cannot print the offset for the test since PATTERN_TIP
+    // affects the size of the CLVs
+    
+    //printf("%5ld\n", block_map[i].block_id);
+    
+    // printf("%5ld %20ld\n", block_map[i].block_id, block_map[i].block_offset);
+    //
+    if (block_map[i].block_id == BLOCK_ID_PARTITION)
+    {
+      partition_offset = block_map[i].block_offset;
+    }
+  }
+
+  // For the offset we can use the actual offset (from the block_map),
+  //   or CORAX_BIN_ACCESS_SEEK 
+  _partition = corax_binary_partition_load(bin_file,
+                                        BLOCK_ID_PARTITION,
+                                        NULL, // in order to create a new partition
+                                        &bin_attributes,
+                                        partition_offset);
+
+  //cout << "Done inside" << endl;
+  return _partition;
+} */

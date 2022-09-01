@@ -29,16 +29,16 @@ SupportTree::SupportTree(const Tree& tree) : Tree(tree), _num_bs_trees(0)
 SupportTree::~SupportTree ()
 {
   if (_pll_splits_hash)
-    pllmod_utree_split_hashtable_destroy(_pll_splits_hash);
+    corax_utree_split_hashtable_destroy(_pll_splits_hash);
 }
 
-PllSplitSharedPtr SupportTree::extract_splits_from_tree(const pll_unode_t& root,
-                                                        pll_unode_t ** node_split_map)
+PllSplitSharedPtr SupportTree::extract_splits_from_tree(const corax_unode_t& root,
+                                                        corax_unode_t ** node_split_map)
 {
-  PllSplitSharedPtr splits(pllmod_utree_split_create((pll_unode_t*) &root,
+  PllSplitSharedPtr splits(corax_utree_split_create((corax_unode_t*) &root,
                                                        _num_tips,
                                                        node_split_map),
-                           pllmod_utree_split_destroy);
+                           corax_utree_split_destroy);
 
   return splits;
 }
@@ -46,7 +46,7 @@ PllSplitSharedPtr SupportTree::extract_splits_from_tree(const pll_unode_t& root,
 void SupportTree::add_splits_to_hashtable(const PllSplitSharedPtr& splits,
                                           const doubleVector& support, bool update_only)
 {
-  _pll_splits_hash = pllmod_utree_split_hashtable_insert(_pll_splits_hash,
+  _pll_splits_hash = corax_utree_split_hashtable_insert(_pll_splits_hash,
                                                          splits.get(),
                                                          _num_tips,
                                                          num_splits(),
@@ -121,8 +121,8 @@ void SupportTree::draw_support(bool support_in_pct)
 //    printf("node_id %d, split_id %d\n", _node_split_map[i]->node_index, i);
 //  printf("\n\n");
 
-  pll_unode_t ** node_map = _node_split_map.empty() ? nullptr : _node_split_map.data();
-  pllmod_utree_draw_support(_pll_utree.get(), _support.data(), node_map,
+  corax_unode_t ** node_map = _node_split_map.empty() ? nullptr : _node_split_map.data();
+  corax_utree_draw_support(_pll_utree.get(), _support.data(), node_map,
                             support_in_pct ? support_fmt_pct : support_fmt_prop);
 
   LOG_DEBUG_TS << "Done!" << endl << endl;

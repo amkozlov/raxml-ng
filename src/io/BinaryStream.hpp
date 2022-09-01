@@ -5,7 +5,6 @@
 #include <fstream>
 #include <stdexcept>
 
-
 class BasicBinaryStream
 {
 public:

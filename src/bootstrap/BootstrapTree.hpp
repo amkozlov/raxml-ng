@@ -12,7 +12,7 @@ public:
   ~BootstrapTree ();
 
 protected:
-  virtual void add_tree(const pll_unode_t& root);
+  virtual void add_tree(const corax_unode_t& root);
 };
 
 #endif /* RAXML_BOOTSTRAP_BOOTSTRAPTREE_HPP_ */

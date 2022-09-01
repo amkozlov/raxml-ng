@@ -1,9 +1,11 @@
 #include "Optimizer.hpp"
+#include "topology/RFDistCalculator.hpp"
 
 using namespace std;
 
 Optimizer::Optimizer (const Options &opts) :
-    _lh_epsilon(opts.lh_epsilon), _spr_radius(opts.spr_radius), _spr_cutoff(opts.spr_cutoff)
+    _lh_epsilon(opts.lh_epsilon), _spr_radius(opts.spr_radius), _spr_cutoff(opts.spr_cutoff), 
+    _optimized_spr(opts.spr_optimized), _nni_epsilon(opts.nni_epsilon), _nni_tolerance(opts.nni_tolerance)
 {
 }
 
@@ -39,6 +41,13 @@ double Optimizer::optimize_model(TreeInfo& treeinfo, double lh_epsilon)
   return new_loglh;
 }
 
+void Optimizer::nni(TreeInfo& treeinfo, nni_round_params& nni_params, double& loglh){
+  // nni round
+  LOG_PROGRESS(loglh) << "NNI round tolerance = " <<  nni_params.tolerance << ", epsilon = " << nni_params.lh_epsilon << endl;
+  loglh = treeinfo.nni_round(nni_params);
+  
+}
+
 double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
 {
   const double fast_modopt_eps = 10.;
@@ -52,6 +61,7 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
   double &loglh = search_state.loglh;
   int& iter = search_state.iteration;
   spr_round_params& spr_params = search_state.spr_params;
+  spr_params.optimized = _optimized_spr;
   int& best_fast_radius = search_state.fast_spr_radius;
 
   CheckpointStep resume_step = search_state.step;
@@ -239,6 +249,178 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
   return loglh;
 }
 
+double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManager& cm, double difficulty)
+{
+  // TODO: connect the command line arguments for nni-epsilon and nni-tolerance with nni_params.lh_epsilon and 
+  // nni_params.tolerance
+  const double fast_modopt_eps = 10.;
+  const double interim_modopt_eps = 3.;
+  _optimized_spr = true;
+
+  // to store all the intermediate trees
+  TreeList intermediate_trees;
+
+  SearchState local_search_state = cm.search_state();
+  auto& search_state = ParallelContext::group_master_thread() ? cm.search_state() : local_search_state;
+  ParallelContext::barrier();
+
+  /* set references such that we can work directly with checkpoint values */
+  double &loglh = search_state.loglh;
+  
+  // spr round - basics
+  spr_round_params& spr_params = search_state.spr_params;
+  int slow_spr_radius = adaptive_slow_spr_radius(difficulty); // slow spr radius is determined by difficulty
+  slow_spr_radius = min(slow_spr_radius, (int) treeinfo.pll_treeinfo().tip_count - 3 );
+  int iter = 0;
+
+  // nni round - basics
+  nni_round_params& nni_params = search_state.nni_params;
+  nni_params.tolerance = _nni_tolerance;
+  nni_params.lh_epsilon = _nni_epsilon;
+
+  // rf distance calculator
+  std::unique_ptr<RFDistCalculator> rfDist(new RFDistCalculator());
+
+  /* Compute initial LH of the starting tree */
+  loglh = treeinfo.loglh();
+
+  /* Initial branch length optimization */
+  cm.update_and_write(treeinfo);
+  LOG_PROGRESS(loglh) << "Initial branch length optimization" << endl;
+  loglh = treeinfo.optimize_branches(fast_modopt_eps, 1);
+  
+  /* Initial fast model optimization */
+  cm.update_and_write(treeinfo);
+  LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << fast_modopt_eps << ")" << endl;
+  loglh = optimize_model(treeinfo, fast_modopt_eps);
+  
+  /* push back the initial tree */
+  intermediate_trees.emplace_back(treeinfo.tree());
+  rfDist->set_tree_list(intermediate_trees);
+
+  // If the dataset is "easy" or "difficult", start with an NNI round
+  if(difficulty < 0.3 || difficulty > 0.7){
+    
+    cm.update_and_write(treeinfo);
+    nni(treeinfo, nni_params, loglh);
+
+    // + model parameter optimization
+    LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << interim_modopt_eps << ")" << endl;
+    loglh = optimize_model(treeinfo, fast_modopt_eps);
+
+    intermediate_trees.emplace_back(treeinfo.tree());
+
+  }
+
+  // do SPRs
+  const int radius_limit = min(22, (int) treeinfo.pll_treeinfo().tip_count - 3 );
+  const int radius_step = 5; // HAVE TO CHANGE THAT
+
+  // setting up fast SPR parameters
+  spr_params.thorough = 0;
+  spr_params.radius_min = 1;
+  spr_params.radius_max = 5;
+  spr_params.ntopol_keep = 0;
+  spr_params.subtree_cutoff = 0.;
+
+  size_t rf_distance = 1;
+  bool skip_intermid_model_opt = false;
+  bool impr = true;
+  double old_loglh;
+
+  if(converged(cm, loglh, 0.01)) skip_intermid_model_opt = true;
+
+  /* Fast SPR-NNI rounds */
+  while( !converged(cm, loglh, 0.01) && rf_distance != 0 && impr) {
+
+    ++iter;
+    old_loglh = loglh;
+    cm.update_and_write(treeinfo);
+    
+    // spr round
+    LOG_PROGRESS(loglh) << "SPR round " << iter << " (radius: " <<
+        spr_params.radius_max << ")" << endl;
+    loglh = treeinfo.spr_round(spr_params);
+    
+    // nni round
+    nni(treeinfo, nni_params, loglh);
+
+    if(intermediate_trees.size() == 1){
+      
+      intermediate_trees.emplace_back(treeinfo.tree());
+      rfDist->recalculate_rf();
+      rf_distance = rfDist->rf(0,1);
+        
+    } else {
+
+      intermediate_trees.emplace_back(treeinfo.tree());
+      intermediate_trees.erase(intermediate_trees.begin());
+      assert(intermediate_trees.size() == 2);
+
+      rfDist->recalculate_rf();
+      rf_distance = rfDist->rf(0,1);
+    
+    }
+
+    if (spr_params.radius_min + radius_step < radius_limit)
+    {
+      spr_params.radius_min += radius_step;
+      spr_params.radius_max += radius_step;
+    }
+
+    impr = (loglh - old_loglh > _lh_epsilon);
+
+  }
+  
+  
+  if (!skip_intermid_model_opt)
+  {
+
+    cm.update_and_write(treeinfo);
+
+    /* optimize model parameters a bit more thoroughly */
+    LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " <<
+                                                            interim_modopt_eps << ")" << endl;
+    loglh = optimize_model(treeinfo, interim_modopt_eps);
+
+  }
+
+  // slow spr setup
+  iter = 0;
+  spr_params.thorough = 1;
+  spr_params.radius_min = 1;
+  spr_params.radius_max = slow_spr_radius;
+  spr_params.ntopol_keep = 20;
+  spr_params.subtree_cutoff = _spr_cutoff;
+  spr_params.reset_cutoff_info(loglh);
+
+  do
+  {
+    cm.update_and_write(treeinfo);
+    ++iter;
+    old_loglh = loglh;
+
+    LOG_PROGRESS(old_loglh) << (spr_params.thorough ? "SLOW" : "FAST") <<
+        " spr round " << iter << " (radius: " << spr_params.radius_max << ")" << endl;
+    loglh = treeinfo.spr_round(spr_params);
+    nni(treeinfo, nni_params, loglh);
+    
+    /* optimize ALL branches */
+    loglh = treeinfo.optimize_branches(_lh_epsilon, 1);
+
+    impr = (loglh - old_loglh > _lh_epsilon);
+    
+  } while (impr);
+  
+  cm.update_and_write(treeinfo);
+  LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << _lh_epsilon << ")" << endl;
+  loglh = optimize_model(treeinfo, _lh_epsilon);
+
+  cm.update_and_write(treeinfo);
+
+  return loglh;
+}
+
 double Optimizer::evaluate(TreeInfo& treeinfo, CheckpointManager& cm)
 {
   const double fast_modopt_eps = 10.;
@@ -283,4 +465,39 @@ double Optimizer::evaluate(TreeInfo& treeinfo, CheckpointManager& cm)
     cm.update_and_write(treeinfo);
 
   return loglh;
+}
+
+double Optimizer::convergence_rate(CheckpointManager& cm, double test_loglh){
+  
+  double retval;
+
+  if (cm.best_loglh() == -INFINITY){
+    retval = -INFINITY;
+  } else {
+    if(test_loglh > cm.best_loglh()) retval = 0;
+    else {
+      retval = (cm.best_loglh() - test_loglh) / fabs(cm.best_loglh());
+    }
+  }
+
+  return retval;
+}
+
+bool Optimizer::first_search_done(CheckpointManager& cm){
+  return (cm.best_loglh() != -INFINITY);
+}
+
+bool Optimizer::converged(CheckpointManager& cm, double test_loglh, double epsilon){
+  if(first_search_done(cm)){
+    return convergence_rate(cm,test_loglh) < epsilon ? true : false;
+  } 
+  else return false;
+}
+
+int Optimizer::adaptive_slow_spr_radius(double difficulty){
+  if (difficulty <= 0.5){
+    return (int) (50*difficulty + 5);
+  } else {
+    return (int) (-50*difficulty + 55);
+  }
 }

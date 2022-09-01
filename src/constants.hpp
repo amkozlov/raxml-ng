@@ -32,6 +32,8 @@
 #define RAXML_BOOTSTOP_INTERVAL   50
 #define RAXML_BOOTSTOP_PERMUTES   1000
 
+#define RAXML_CPYTHIA_TREES_NUM   100
+
 // cpu features
 #define RAXML_CPU_SSE3  (1<<0)
 #define RAXML_CPU_AVX   (1<<1)

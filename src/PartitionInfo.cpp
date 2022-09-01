@@ -79,17 +79,17 @@ void PartitionInfo::compress_patterns(bool store_backmap)
   _msa.compress_patterns(model().charmap(), store_backmap);
 }
 
-pllmod_msa_stats_t * PartitionInfo::compute_stats(unsigned long stats_mask) const
+corax_msa_stats_t * PartitionInfo::compute_stats(unsigned long stats_mask) const
 {
   const unsigned int * weights = _msa.weights().empty() ? nullptr : _msa.weights().data();
-  pllmod_msa_stats_t * stats = pllmod_msa_compute_stats(_msa.pll_msa(), _model.num_states(),
+  corax_msa_stats_t * stats = corax_msa_compute_stats(_msa.pll_msa(), _model.num_states(),
                                                         _model.charmap(), weights, stats_mask);
 
   libpll_check_error("ERROR computing MSA stats");
   assert(stats);
 
-  if ((stats_mask & PLLMOD_MSA_STATS_FREQS) &&_msa.probabilistic() &&
-      _model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::empirical)
+  if ((stats_mask & CORAX_MSA_STATS_FREQS) &&_msa.probabilistic() &&
+      _model.param_mode(CORAX_OPT_PARAM_FREQUENCIES) == ParamValue::empirical)
   {
     assert(stats->states == _msa.states());
     assert(stats->freqs);
@@ -105,13 +105,13 @@ const PartitionStats& PartitionInfo::stats() const
 {
   if (_stats.empty() && !_msa.empty())
   {
-    unsigned long stats_mask = PLLMOD_MSA_STATS_GAP_PROP;
-    stats_mask |= PLLMOD_MSA_STATS_FREQS;
-    stats_mask |= PLLMOD_MSA_STATS_INV_PROP;
-    stats_mask |= PLLMOD_MSA_STATS_GAP_SEQS;
+    unsigned long stats_mask = CORAX_MSA_STATS_GAP_PROP;
+    stats_mask |= CORAX_MSA_STATS_FREQS;
+    stats_mask |= CORAX_MSA_STATS_INV_PROP;
+    stats_mask |= CORAX_MSA_STATS_GAP_SEQS;
 
-    if (_model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::empirical)
-      stats_mask |= PLLMOD_MSA_STATS_SUBST_RATES;
+    if (_model.param_mode(CORAX_OPT_PARAM_SUBST_RATES) == ParamValue::empirical)
+      stats_mask |= CORAX_MSA_STATS_SUBST_RATES;
 
     auto pll_stats = compute_stats(stats_mask);
     auto states = _model.num_states();
@@ -127,10 +127,10 @@ const PartitionStats& PartitionInfo::stats() const
     if (pll_stats->subst_rates)
     {
       _stats.emp_subst_rates.assign(pll_stats->subst_rates,
-                                    pll_stats->subst_rates + pllmod_util_subst_rate_count(states));
+                                    pll_stats->subst_rates + CORAX_SUBST_RATE_COUNT(states));
     }
 
-    pllmod_msa_destroy_stats(pll_stats);
+    corax_msa_destroy_stats(pll_stats);
   }
 
   return _stats;
@@ -144,7 +144,7 @@ void PartitionInfo::set_model_empirical_params()
 void assign(Model& model, const PartitionStats& stats)
 {
   /* either compute empirical P-inv, or set the fixed user-specified value */
-  switch (model.param_mode(PLLMOD_OPT_PARAM_PINV))
+  switch (model.param_mode(CORAX_OPT_PARAM_PINV))
   {
     case ParamValue::empirical:
       model.pinv(stats.inv_prop);
@@ -162,7 +162,7 @@ void assign(Model& model, const PartitionStats& stats)
   }
 
    /* assign empirical base frequencies */
-  switch (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES))
+  switch (model.param_mode(CORAX_OPT_PARAM_FREQUENCIES))
   {
     case ParamValue::empirical:
       assert(stats.emp_base_freqs.size() == model.num_states());
@@ -179,11 +179,11 @@ void assign(Model& model, const PartitionStats& stats)
   }
 
   /* assign empirical substitution rates */
-  switch (model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES))
+  switch (model.param_mode(CORAX_OPT_PARAM_SUBST_RATES))
   {
     case ParamValue::empirical:
     {
-      assert(stats.emp_subst_rates.size() == pllmod_util_subst_rate_count(model.num_states()));
+      assert(stats.emp_subst_rates.size() == CORAX_SUBST_RATE_COUNT(model.num_states()));
       model.subst_rates(stats.emp_subst_rates);
       break;
     }

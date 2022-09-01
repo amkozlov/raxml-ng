@@ -9,8 +9,8 @@
 namespace std
 {
   template<>
-  struct default_delete<pll_utree_t> {
-    void operator()(pll_utree_t* ptr) { pll_utree_destroy(ptr, nullptr); }
+  struct default_delete<corax_utree_t> {
+    void operator()(corax_utree_t* ptr) { corax_utree_destroy(ptr, nullptr); }
   };
 }
 
@@ -44,8 +44,8 @@ struct TreeTopology
   std::vector<doubleVector> brlens;
 };
 
-typedef std::unique_ptr<pll_utree_t> PllUTreeUniquePtr;
-typedef std::vector<pll_unode_t*> PllNodeVector;
+typedef std::unique_ptr<corax_utree_t> PllUTreeUniquePtr;
+typedef std::vector<corax_unode_t*> PllNodeVector;
 
 class BasicTree
 {
@@ -70,14 +70,14 @@ class Tree : public BasicTree
 {
 public:
   Tree() : BasicTree(0), _pll_utree(nullptr) {}
-  Tree(unsigned int tip_count, const pll_unode_t& root) :
+  Tree(unsigned int tip_count, const corax_unode_t& root) :
     BasicTree(tip_count),
-    _pll_utree(pll_utree_wraptree(pll_utree_graph_clone(&root), tip_count)) {}
-  Tree(const pll_utree_t& pll_utree) :
-    BasicTree(pll_utree.tip_count), _pll_utree(pll_utree_clone(&pll_utree)) {}
-  Tree(std::unique_ptr<pll_utree_t>&  pll_utree) :
+    _pll_utree(corax_utree_wraptree(corax_utree_graph_clone(&root), tip_count)) {}
+  Tree(const corax_utree_t& pll_utree) :
+    BasicTree(pll_utree.tip_count), _pll_utree(corax_utree_clone(&pll_utree)) {}
+  Tree(std::unique_ptr<corax_utree_t>&  pll_utree) :
     BasicTree(pll_utree ? pll_utree->tip_count : 0), _pll_utree(pll_utree.release()) {}
-  Tree(std::unique_ptr<pll_utree_t>&&  pll_utree) :
+  Tree(std::unique_ptr<corax_utree_t>&&  pll_utree) :
     BasicTree(pll_utree ? pll_utree->tip_count : 0), _pll_utree(pll_utree.release()) {}
 
   Tree (const Tree& other);
@@ -113,12 +113,12 @@ public:
   void add_partition_brlens(doubleVector&& brlens);
 
   // TODO: use move semantics to transfer ownership?
-  const pll_utree_t& pll_utree() const { return *_pll_utree; }
-  pll_utree_t * pll_utree_copy() const;
-  void pll_utree(const pll_utree_t&);
-  void pll_utree(unsigned int tip_count, const pll_unode_t& root);
+  const corax_utree_t& pll_utree() const { return *_pll_utree; }
+  corax_utree_t * pll_utree_copy() const;
+  void pll_utree(const corax_utree_t&);
+  void pll_utree(unsigned int tip_count, const corax_unode_t& root);
 
-  const pll_unode_t& pll_utree_root() const { return *_pll_utree->vroot; }
+  const corax_unode_t& pll_utree_root() const { return *_pll_utree->vroot; }
   bool empty() const { return _num_tips == 0; }
   bool compatible(const Tree& other) const;
 
@@ -132,7 +132,7 @@ public:
   void reset_tip_ids(const NameIdMap& label_id_map);
   void reroot(const NameList& outgroup_taxa, bool add_root_node = false);
   void insert_tips_random(const NameList& tip_names, unsigned int random_seed = 0);
-  void insert_tips_pasimony(const NameList& tip_names, std::vector<pll_partition*>& pars_partitions,
+  void insert_tips_pasimony(const NameList& tip_names, std::vector<corax_partition*>& pars_partitions,
                             const IDVector& tip_msa_idmap,
                             unsigned int random_seed, unsigned int * score);
 

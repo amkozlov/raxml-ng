@@ -100,6 +100,10 @@ If still in doubt, please feel free to post to the [RAxML google group](https://
 
      `./raxml-ng --support --tree bestML.tree --bs-trees bootstraps.tree`
 
+  5. To execute the **adaptive** version, the user needs to add the `--adaptive` option:
+
+    ./raxml-ng --adaptive --msa testDNA.fa --model GTR+G
+
 ## License and citation
 
 The code is currently licensed under the GNU Affero General Public License version 3.

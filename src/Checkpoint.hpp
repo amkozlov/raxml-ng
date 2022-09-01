@@ -37,7 +37,9 @@ struct SearchState
   double loglh;
 
   int iteration;
+  nni_round_params nni_params;
   spr_round_params spr_params;
+  
   int fast_spr_radius;
 };
 
@@ -122,12 +124,15 @@ public:
   void gather_ml_trees();
   void gather_bs_trees();
 
+  double best_loglh() {return _best_loglh; }
+
 private:
   bool _active;
   std::string _ckp_fname;
   CheckpointFile _checkp_file;
   IDSet _updated_models;
   SearchState _empty_search_state;
+  double _best_loglh;
 
   void gather_model_params();
   std::string backup_fname() const { return _ckp_fname + ".bk"; }

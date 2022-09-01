@@ -42,7 +42,7 @@ public:
   // setters
   void full_msa(MSA&& msa);
   void part_msa(size_t index, MSA&& msa) { _part_list.at(index).msa(std::move(msa)); };
-  void part_msa(size_t index, const pll_msa_t * pll_msa)
+  void part_msa(size_t index, const corax_msa_t * pll_msa)
   {
     _part_list.at(index).msa(MSA(pll_msa));
   };
@@ -61,6 +61,7 @@ public:
   void split_msa();
   void compress_patterns(bool store_backmap = false);
   void set_model_empirical_params();
+  //void predict_difficulty(int n_trees){ _difficuly = (part_count() == 1) ? _part_list.at(0).msa().predictDifficulty(n_trees) : _full_msa.predictDifficulty(n_trees); };
 
 private:
   std::vector<PartitionInfo> _part_list;

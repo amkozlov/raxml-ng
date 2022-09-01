@@ -35,9 +35,9 @@ TEST(ModelTest, defaults)
   EXPECT_EQ(model.data_type(), DataType::dna);
   EXPECT_EQ(model.name(), "GTR");
   EXPECT_EQ(model.num_states(), 4);
-  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_FIXED);
+  EXPECT_EQ(model.ratehet_mode(), CORAX_UTIL_MIXTYPE_FIXED);
   EXPECT_EQ(model.num_ratecats(), 1);
-  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_FREQUENCIES);
+  EXPECT_EQ(model.params_to_optimize(), CORAX_OPT_PARAM_SUBST_RATES | CORAX_OPT_PARAM_FREQUENCIES);
   EXPECT_EQ(model.num_free_params(), 8);
   EXPECT_EQ(list_to_string(model.state_names()), "ACGT");
   EXPECT_EQ(map_to_string(model.full_state_namemap()), "-ABCDGHKMRSTVWY");
@@ -53,9 +53,9 @@ TEST(ModelTest, GTR)
   EXPECT_EQ(model.data_type(), DataType::dna);
   EXPECT_EQ(model.name(), "GTR");
   EXPECT_EQ(model.num_states(), 4);
-  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_GAMMA);
+  EXPECT_EQ(model.ratehet_mode(), CORAX_UTIL_MIXTYPE_GAMMA);
   EXPECT_EQ(model.num_ratecats(), 4);
-  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_ALPHA);
+  EXPECT_EQ(model.params_to_optimize(), CORAX_OPT_PARAM_SUBST_RATES | CORAX_OPT_PARAM_ALPHA);
   EXPECT_EQ(model.num_free_params(), 9);
 }
 
@@ -72,10 +72,10 @@ TEST(ModelTest, GTR_R_user)
   EXPECT_EQ(model.data_type(), DataType::dna);
   EXPECT_EQ(model.name(), "GTR");
   EXPECT_EQ(model.num_states(), 4);
-  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_FREE);
+  EXPECT_EQ(model.ratehet_mode(), CORAX_UTIL_MIXTYPE_FREE);
   EXPECT_EQ(model.num_ratecats(), 3);
-  EXPECT_EQ(model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES), ParamValue::user);
-  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_RATE_WEIGHTS | PLLMOD_OPT_PARAM_FREE_RATES);
+  EXPECT_EQ(model.param_mode(CORAX_OPT_PARAM_SUBST_RATES), ParamValue::user);
+  EXPECT_EQ(model.params_to_optimize(), CORAX_OPT_PARAM_RATE_WEIGHTS | CORAX_OPT_PARAM_FREE_RATES);
   EXPECT_EQ(model.num_free_params(), 7);
 }
 
@@ -90,9 +90,9 @@ TEST(ModelTest, JCI_user)
   EXPECT_EQ(model.data_type(), DataType::dna);
   EXPECT_EQ(model.name(), "JC");
   EXPECT_EQ(model.num_states(), 4);
-  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_GAMMA);
+  EXPECT_EQ(model.ratehet_mode(), CORAX_UTIL_MIXTYPE_GAMMA);
   EXPECT_EQ(model.num_ratecats(), 4);
-  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_ALPHA);
+  EXPECT_EQ(model.params_to_optimize(), CORAX_OPT_PARAM_ALPHA);
   EXPECT_EQ(model.pinv(), 0.7);
   EXPECT_EQ(model.num_free_params(), 1);
 }
@@ -107,10 +107,10 @@ TEST(ModelTest, JCFG_user)
   EXPECT_EQ(model.data_type(), DataType::dna);
   EXPECT_EQ(model.name(), "JC");
   EXPECT_EQ(model.num_states(), 4);
-  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_GAMMA);
+  EXPECT_EQ(model.ratehet_mode(), CORAX_UTIL_MIXTYPE_GAMMA);
   EXPECT_EQ(model.num_ratecats(), 4);
-  EXPECT_EQ(model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES), ParamValue::empirical);
-  EXPECT_EQ(model.param_mode(PLLMOD_OPT_PARAM_ALPHA), ParamValue::user);
+  EXPECT_EQ(model.param_mode(CORAX_OPT_PARAM_FREQUENCIES), ParamValue::empirical);
+  EXPECT_EQ(model.param_mode(CORAX_OPT_PARAM_ALPHA), ParamValue::user);
   EXPECT_EQ(model.params_to_optimize(), 0);
   EXPECT_EQ(model.alpha(), 2.5);
   EXPECT_EQ(model.num_free_params(), 3);
@@ -126,10 +126,10 @@ TEST(ModelTest, HKY_user_freqs)
   EXPECT_EQ(model.data_type(), DataType::dna);
   EXPECT_EQ(model.name(), "HKY");
   EXPECT_EQ(model.num_states(), 4);
-  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_FIXED);
+  EXPECT_EQ(model.ratehet_mode(), CORAX_UTIL_MIXTYPE_FIXED);
   EXPECT_EQ(model.num_ratecats(), 1);
-  EXPECT_EQ(model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES), ParamValue::user);
-  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES);
+  EXPECT_EQ(model.param_mode(CORAX_OPT_PARAM_FREQUENCIES), ParamValue::user);
+  EXPECT_EQ(model.params_to_optimize(), CORAX_OPT_PARAM_SUBST_RATES);
   EXPECT_EQ(model.base_freqs(0).size(), 4);
   EXPECT_EQ(model.base_freqs(0)[0], 0.1);
   EXPECT_EQ(model.base_freqs(0)[1], 0.299);
@@ -148,10 +148,10 @@ TEST(ModelTest, HKY_user_rates)
   EXPECT_EQ(model.data_type(), DataType::dna);
   EXPECT_EQ(model.name(), "HKY");
   EXPECT_EQ(model.num_states(), 4);
-  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_FIXED);
+  EXPECT_EQ(model.ratehet_mode(), CORAX_UTIL_MIXTYPE_FIXED);
   EXPECT_EQ(model.num_ratecats(), 1);
-  EXPECT_EQ(model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES), ParamValue::empirical);
-  EXPECT_EQ(model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES), ParamValue::user);
+  EXPECT_EQ(model.param_mode(CORAX_OPT_PARAM_FREQUENCIES), ParamValue::empirical);
+  EXPECT_EQ(model.param_mode(CORAX_OPT_PARAM_SUBST_RATES), ParamValue::user);
   EXPECT_EQ(model.params_to_optimize(), 0);
   EXPECT_EQ(model.subst_rates(0).size(), 6);
   EXPECT_EQ(model.subst_rates(0)[0], 1.0);
@@ -173,9 +173,9 @@ TEST(ModelTest, LGFI)
   EXPECT_EQ(model.data_type(), DataType::protein);
   EXPECT_EQ(model.name(), "LG");
   EXPECT_EQ(model.num_states(), 20);
-  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_GAMMA);
+  EXPECT_EQ(model.ratehet_mode(), CORAX_UTIL_MIXTYPE_GAMMA);
   EXPECT_EQ(model.num_ratecats(), 8);
-  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_PINV | PLLMOD_OPT_PARAM_ALPHA);
+  EXPECT_EQ(model.params_to_optimize(), CORAX_OPT_PARAM_PINV | CORAX_OPT_PARAM_ALPHA);
   EXPECT_EQ(list_to_string(model.state_names()), "ARNDCQEGHILKMFPSTWYV");
   EXPECT_EQ(map_to_string(model.full_state_namemap()), "*ABCDEFGHIJKLMNPQRSTVWYZ");
 }
@@ -190,9 +190,9 @@ TEST(ModelTest, LG4X)
   EXPECT_EQ(model.data_type(), DataType::protein);
   EXPECT_EQ(model.name(), "LG4X");
   EXPECT_EQ(model.num_states(), 20);
-  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_FREE);
+  EXPECT_EQ(model.ratehet_mode(), CORAX_UTIL_MIXTYPE_FREE);
   EXPECT_EQ(model.num_ratecats(), 4);
-  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_FREE_RATES | PLLMOD_OPT_PARAM_RATE_WEIGHTS);
+  EXPECT_EQ(model.params_to_optimize(), CORAX_OPT_PARAM_FREE_RATES | CORAX_OPT_PARAM_RATE_WEIGHTS);
   EXPECT_EQ(model.num_free_params(), 6);
 }
 
@@ -206,11 +206,11 @@ TEST(ModelTest, LG_R4_user)
   EXPECT_EQ(model.data_type(), DataType::protein);
   EXPECT_EQ(model.name(), "LG");
   EXPECT_EQ(model.num_states(), 20);
-  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_FREE);
+  EXPECT_EQ(model.ratehet_mode(), CORAX_UTIL_MIXTYPE_FREE);
   EXPECT_EQ(model.num_ratecats(), 4);
   EXPECT_EQ(model.params_to_optimize(), 0);
-  EXPECT_EQ(model.param_mode(PLLMOD_OPT_PARAM_FREE_RATES), ParamValue::user);
-  EXPECT_EQ(model.param_mode(PLLMOD_OPT_PARAM_RATE_WEIGHTS), ParamValue::user);
+  EXPECT_EQ(model.param_mode(CORAX_OPT_PARAM_FREE_RATES), ParamValue::user);
+  EXPECT_EQ(model.param_mode(CORAX_OPT_PARAM_RATE_WEIGHTS), ParamValue::user);
   EXPECT_EQ(model.ratecat_weights().size(), 4);
   EXPECT_EQ(model.ratecat_weights()[0], 1. / 4.);
   EXPECT_EQ(model.ratecat_weights()[1], 1. / 4.);
@@ -234,9 +234,9 @@ TEST(ModelTest, aliases)
   EXPECT_EQ(model.data_type(), DataType::dna);
   EXPECT_EQ(model.name(), "TN93ef");
   EXPECT_EQ(model.num_states(), 4);
-  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_GAMMA);
+  EXPECT_EQ(model.ratehet_mode(), CORAX_UTIL_MIXTYPE_GAMMA);
   EXPECT_EQ(model.num_ratecats(), 4);
-  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_ALPHA);
+  EXPECT_EQ(model.params_to_optimize(), CORAX_OPT_PARAM_SUBST_RATES | CORAX_OPT_PARAM_ALPHA);
   EXPECT_EQ(model.num_free_params(), 3);
 
   model = Model(DataType::autodetect, "TrN");
@@ -260,9 +260,9 @@ TEST(ModelTest, multistate)
   EXPECT_EQ(DataType::multistate, model.data_type());
   EXPECT_EQ("MULTI8_MK", model.name());
   EXPECT_EQ(8, model.num_states());
-  EXPECT_EQ(PLLMOD_UTIL_MIXTYPE_GAMMA, model.ratehet_mode());
+  EXPECT_EQ(CORAX_UTIL_MIXTYPE_GAMMA, model.ratehet_mode());
   EXPECT_EQ(4, model.num_ratecats());
-  EXPECT_EQ(PLLMOD_OPT_PARAM_ALPHA, model.params_to_optimize());
+  EXPECT_EQ(CORAX_OPT_PARAM_ALPHA, model.params_to_optimize());
   EXPECT_NE(nullptr, model.charmap());
   EXPECT_EQ(model.num_free_params(), 1);
   EXPECT_EQ(list_to_string(model.state_names()), "01234567");
@@ -270,7 +270,7 @@ TEST(ModelTest, multistate)
   model = Model(DataType::autodetect, "MULTI53_GTR");
   EXPECT_EQ(DataType::multistate, model.data_type());
   EXPECT_EQ(53, model.num_states());
-  EXPECT_EQ(PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_FREQUENCIES,
+  EXPECT_EQ(CORAX_OPT_PARAM_SUBST_RATES | CORAX_OPT_PARAM_FREQUENCIES,
             model.params_to_optimize());
   EXPECT_EQ(model.num_free_params(), (53*(53-1) / 2 - 1) + (53-1));
   EXPECT_EQ(list_to_string(model.state_names()), "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#$%&'()*+,/:;<=");
@@ -286,9 +286,9 @@ TEST(ModelTest, multistate_custom)
   EXPECT_EQ(DataType::multistate, model.data_type());
   EXPECT_EQ("MULTI6_GTR", model.name());
   EXPECT_EQ(6, model.num_states());
-  EXPECT_EQ(PLLMOD_UTIL_MIXTYPE_FIXED, model.ratehet_mode());
+  EXPECT_EQ(CORAX_UTIL_MIXTYPE_FIXED, model.ratehet_mode());
   EXPECT_EQ(1, model.num_ratecats());
-  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_FREQUENCIES);
+  EXPECT_EQ(model.params_to_optimize(), CORAX_OPT_PARAM_SUBST_RATES | CORAX_OPT_PARAM_FREQUENCIES);
   EXPECT_NE(nullptr, model.charmap());
   EXPECT_EQ(model.num_free_params(), 19);
   EXPECT_EQ(list_to_string(model.state_names()), "AbCDef");
@@ -299,9 +299,9 @@ TEST(ModelTest, multistate_custom)
   EXPECT_EQ(DataType::multistate, model.data_type());
   EXPECT_EQ("MULTI5_MK", model.name());
   EXPECT_EQ(5, model.num_states());
-  EXPECT_EQ(PLLMOD_UTIL_MIXTYPE_GAMMA, model.ratehet_mode());
+  EXPECT_EQ(CORAX_UTIL_MIXTYPE_GAMMA, model.ratehet_mode());
   EXPECT_EQ(4, model.num_ratecats());
-  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_ALPHA | PLLMOD_OPT_PARAM_PINV);
+  EXPECT_EQ(model.params_to_optimize(), CORAX_OPT_PARAM_ALPHA | CORAX_OPT_PARAM_PINV);
   EXPECT_NE(nullptr, model.charmap());
   EXPECT_EQ(6, model.num_free_params());
   EXPECT_EQ(list_to_string(model.state_names()), "ABCDF");
@@ -318,9 +318,9 @@ TEST(ModelTest, genotype)
   EXPECT_EQ(DataType::genotype10, model.data_type());
   EXPECT_EQ("GTGTR4", model.name());
   EXPECT_EQ(10, model.num_states());
-  EXPECT_EQ(PLLMOD_UTIL_MIXTYPE_FIXED, model.ratehet_mode());
+  EXPECT_EQ(CORAX_UTIL_MIXTYPE_FIXED, model.ratehet_mode());
   EXPECT_EQ(1, model.num_ratecats());
-  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_FREQUENCIES);
+  EXPECT_EQ(model.params_to_optimize(), CORAX_OPT_PARAM_SUBST_RATES | CORAX_OPT_PARAM_FREQUENCIES);
   EXPECT_NE(nullptr, model.charmap());
   EXPECT_EQ(model.num_free_params(), 15);
   EXPECT_EQ(list_to_string(model.state_names()), "ACGTMRWSYK");
@@ -338,10 +338,10 @@ TEST(ModelTest, DNA_usersym)
   EXPECT_EQ(model.data_type(), DataType::dna);
   EXPECT_EQ(model.name(), "DNA001122");
   EXPECT_EQ(model.num_states(), 4);
-  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_FIXED);
+  EXPECT_EQ(model.ratehet_mode(), CORAX_UTIL_MIXTYPE_FIXED);
   EXPECT_EQ(model.num_ratecats(), 1);
-  EXPECT_EQ(model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES), ParamValue::ML);
-  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_FREQUENCIES);
+  EXPECT_EQ(model.param_mode(CORAX_OPT_PARAM_SUBST_RATES), ParamValue::ML);
+  EXPECT_EQ(model.params_to_optimize(), CORAX_OPT_PARAM_SUBST_RATES | CORAX_OPT_PARAM_FREQUENCIES);
   EXPECT_EQ(model.num_free_params(), 5);
 }
 
@@ -355,10 +355,10 @@ TEST(ModelTest, multistate_usersym)
   EXPECT_EQ(model.data_type(), DataType::multistate);
   EXPECT_EQ(model.name(), "MULTI5_USER1234561231");
   EXPECT_EQ(model.num_states(), 5);
-  EXPECT_EQ(model.ratehet_mode(), PLLMOD_UTIL_MIXTYPE_GAMMA);
+  EXPECT_EQ(model.ratehet_mode(), CORAX_UTIL_MIXTYPE_GAMMA);
   EXPECT_EQ(model.num_ratecats(), 4);
-  EXPECT_EQ(model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES), ParamValue::ML);
-  EXPECT_EQ(model.params_to_optimize(), PLLMOD_OPT_PARAM_SUBST_RATES | PLLMOD_OPT_PARAM_ALPHA);
+  EXPECT_EQ(model.param_mode(CORAX_OPT_PARAM_SUBST_RATES), ParamValue::ML);
+  EXPECT_EQ(model.params_to_optimize(), CORAX_OPT_PARAM_SUBST_RATES | CORAX_OPT_PARAM_ALPHA);
   EXPECT_EQ(model.num_free_params(), 10);
 }
 

@@ -79,7 +79,11 @@ static struct option long_options[] =
   {"sitelh",             no_argument, 0, 0 },        /*  55 */
   {"site-weights",       required_argument, 0, 0 },  /*  56 */
   {"bs-write-msa",       no_argument, 0, 0 },        /*  57 */
-
+  {"adaptive",           no_argument, 0, 0 },        /*  58 */
+  {"diff_pred_trees",    required_argument, 0, 0},   /*  59 */
+  {"nni-tolerance",      required_argument, 0, 0 },  /*  60 */
+  {"nni-epsilon",        required_argument, 0, 0 },  /*  61 */
+  {"spr-optimized",      no_argument, 0, 0},         /*  62 */
   { 0, 0, 0, 0 }
 };
 
@@ -98,7 +102,7 @@ void CommandLineParser::check_options(Options &opts)
       opts.command == Command::bootstrap || opts.command == Command::all ||
       opts.command == Command::terrace || opts.command == Command::check ||
       opts.command == Command::parse || opts.command == Command::start ||
-      opts.command == Command::ancestral)
+      opts.command == Command::ancestral || opts.command == Command::adaptive)
   {
     if (opts.msa_file.empty())
       throw OptionException("You must specify a multiple alignment file with --msa switch");
@@ -177,7 +181,7 @@ void CommandLineParser::check_options(Options &opts)
   if (opts.simd_arch > sysutil_simd_autodetect())
   {
     if (opts.force_mode)
-      pll_hardware_ignore();
+      corax_hardware_ignore();
     else
     {
       throw OptionException("Cannot detect " + opts.simd_arch_name() +
@@ -259,6 +263,7 @@ void CommandLineParser::parse_start_trees(Options &opts, const string& arg)
 
 void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 {
+
   opts.cmdline = get_cmdline(argc, argv);
 
   /* if no command specified, default to --search (or --help if no args were given) */
@@ -296,6 +301,11 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* default: autodetect best SPR radius */
   opts.spr_radius = -1;
   opts.spr_cutoff = 1.0;
+  opts.spr_optimized = false;
+
+  /* default: nni parameters */
+  opts.nni_tolerance = 0.1;
+  opts.nni_epsilon = 0.1;
 
   /* bootstrapping / bootstopping */
   opts.bs_metrics.push_back(BranchSupportMetric::fbp);
@@ -305,13 +315,16 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.bootstop_permutations = RAXML_BOOTSTOP_PERMUTES;
 
   /* default: linked branch lengths */
-  opts.brlen_linkage = PLLMOD_COMMON_BRLEN_SCALED;
+  opts.brlen_linkage = CORAX_BRLEN_SCALED;
   opts.brlen_min = RAXML_BRLEN_MIN;
   opts.brlen_max = RAXML_BRLEN_MAX;
 
   /* by default, autodetect optimal number of threads and workers for the dataset */
   opts.num_threads = 0;
   opts.num_workers = 0;
+
+  /* Difficulty preditction num trees */
+  opts.diff_pred_pars_trees = RAXML_CPYTHIA_TREES_NUM;
 
   /* max #threads = # available CPU cores */
 #if !defined(_RAXML_PTHREADS)
@@ -459,11 +472,11 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
       case 14: /* branch length linkage mode */
         if (strcasecmp(optarg, "scaled") == 0 || strcasecmp(optarg, "proportional") == 0)
-          opts.brlen_linkage = PLLMOD_COMMON_BRLEN_SCALED;
+          opts.brlen_linkage = CORAX_BRLEN_SCALED;
         else if (strcasecmp(optarg, "linked") == 0)
-          opts.brlen_linkage = PLLMOD_COMMON_BRLEN_LINKED;
+          opts.brlen_linkage = CORAX_BRLEN_LINKED;
         else if (strcasecmp(optarg, "unlinked") == 0)
-          opts.brlen_linkage = PLLMOD_COMMON_BRLEN_UNLINKED;
+          opts.brlen_linkage = CORAX_BRLEN_UNLINKED;
         else
           throw InvalidOptionValueException("Unknown branch linkage mode: " + string(optarg));
         break;
@@ -513,19 +526,19 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 20: /* SIMD instruction set */
         if (strcasecmp(optarg, "none") == 0 || strcasecmp(optarg, "scalar") == 0)
         {
-          opts.simd_arch = PLL_ATTRIB_ARCH_CPU;
+          opts.simd_arch = CORAX_ATTRIB_ARCH_CPU;
         }
         else if (strcasecmp(optarg, "sse3") == 0 || strcasecmp(optarg, "sse") == 0)
         {
-          opts.simd_arch = PLL_ATTRIB_ARCH_SSE;
+          opts.simd_arch = CORAX_ATTRIB_ARCH_SSE;
         }
         else if (strcasecmp(optarg, "avx") == 0)
         {
-          opts.simd_arch = PLL_ATTRIB_ARCH_AVX;
+          opts.simd_arch = CORAX_ATTRIB_ARCH_AVX;
         }
         else if (strcasecmp(optarg, "avx2") == 0)
         {
-          opts.simd_arch = PLL_ATTRIB_ARCH_AVX2;
+          opts.simd_arch = CORAX_ATTRIB_ARCH_AVX2;
         }
         else
         {
@@ -651,7 +664,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 31: /* terrace */
 #ifdef _RAXML_TERRAPHAST
         opts.command = Command::terrace;
-        opts.brlen_linkage = PLLMOD_COMMON_BRLEN_UNLINKED;
+        opts.brlen_linkage = CORAX_BRLEN_UNLINKED;
         num_commands++;
 #else
         throw  OptionException("Unsupported command: --terrace.\n"
@@ -675,17 +688,17 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       case 35: /* branch length optimization method */
         if (strcasecmp(optarg, "nr_fast") == 0)
-          opts.brlen_opt_method = PLLMOD_OPT_BLO_NEWTON_FAST;
+          opts.brlen_opt_method = CORAX_OPT_BLO_NEWTON_FAST;
         else if (strcasecmp(optarg, "nr_oldfast") == 0)
-          opts.brlen_opt_method = PLLMOD_OPT_BLO_NEWTON_OLDFAST;
+          opts.brlen_opt_method = CORAX_OPT_BLO_NEWTON_OLDFAST;
         else if (strcasecmp(optarg, "nr_safe") == 0)
-          opts.brlen_opt_method = PLLMOD_OPT_BLO_NEWTON_SAFE;
+          opts.brlen_opt_method = CORAX_OPT_BLO_NEWTON_SAFE;
         else if (strcasecmp(optarg, "nr_oldsafe") == 0)
-          opts.brlen_opt_method = PLLMOD_OPT_BLO_NEWTON_OLDSAFE;
+          opts.brlen_opt_method = CORAX_OPT_BLO_NEWTON_OLDSAFE;
         else if (strcasecmp(optarg, "nr_fallback") == 0)
-          opts.brlen_opt_method = PLLMOD_OPT_BLO_NEWTON_FALLBACK;
+          opts.brlen_opt_method = CORAX_OPT_BLO_NEWTON_FALLBACK;
         else if (strcasecmp(optarg, "nr_global") == 0)
-          opts.brlen_opt_method = PLLMOD_OPT_BLO_NEWTON_GLOBAL;
+          opts.brlen_opt_method = CORAX_OPT_BLO_NEWTON_GLOBAL;
         else if (strcasecmp(optarg, "off") == 0 || strcasecmp(optarg, "none") == 0)
           opts.optimize_brlen = false;
         else
@@ -934,6 +947,40 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 57: /* write bootstrap alignments*/
         opts.write_bs_msa = true;
         break;
+      
+      case 58: /* Adaptive RAxML-ng analysis with difficulty prediction */
+        opts.command = Command::adaptive;
+        num_commands++;
+        break;
+      
+      case 59: /* Number of parsimony trees in difficulty prediction */
+        
+        if (sscanf(optarg, "%d", &opts.diff_pred_pars_trees) != 1 || opts.diff_pred_pars_trees <= 0)
+        {
+          throw InvalidOptionValueException("Invalid number of parsimony trees for difficulty prediction: " + string(optarg) +
+                                            ", please provide a positive integer!");
+        }
+        break;
+
+      case 60: /* NNI tolerance */
+        if(sscanf(optarg, "%lf", &opts.nni_tolerance) != 1 || opts.nni_tolerance <= 0.)
+        {
+          throw InvalidOptionValueException("Invalid NNI tolerance: " + string(optarg) +
+                                            ", please provide a positive real number!\n");
+        }
+        break;
+      
+      case 61: /* NNI epsilon */
+        if(sscanf(optarg, "%lf", &opts.nni_epsilon) != 1 || opts.nni_epsilon <= 0.)
+        {
+          throw InvalidOptionValueException("Invalid NNI epsilon  : " + string(optarg) +
+                                            ", please provide a positive real number!\n");
+        }
+        break;
+      
+      case 62: /* Optimized SPR-round; will have to delete this option later */
+        opts.spr_optimized = true;
+        break;
             
       default:
         throw  OptionException("Internal error in option parsing");
@@ -955,7 +1002,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
     opts.num_bootstraps = (opts.bootstop_criterion == BootstopCriterion::none) ? 100 : 1000;
   }
 
-  compute_num_searches(opts);
+  compute_num_searches(opts); // FOR ADAPTIVE RAXML
 
   /* set default log output level  */
   if (!log_level_set)

@@ -72,8 +72,8 @@ std::string AncestralStates::ml_state(size_t node_idx, size_t site_idx, size_t p
       mstate = k;
   }
 
-  pll_state_t astate = 0;
-  pll_state_t state = 1;
+  corax_state_t astate = 0;
+  corax_state_t state = 1;
 
   for (size_t k = 0; k < num_states; ++k)
   {
@@ -85,7 +85,7 @@ std::string AncestralStates::ml_state(size_t node_idx, size_t site_idx, size_t p
   if (ambiguity)
     return state_namemap.count(astate) ? state_namemap.at(astate) : state_names[mstate];
   else
-    return PLL_STATE_POPCNT(astate) > 1 ? "-" : state_names[mstate];
+    return CORAX_STATE_POPCNT(astate) > 1 ? "-" : state_names[mstate];
 }
 
 std::string AncestralStates::ml_state_seq(size_t node_idx, size_t part_idx) const
@@ -101,7 +101,7 @@ std::string AncestralStates::ml_state_seq(size_t node_idx, size_t part_idx) cons
   return s;
 }
 
-void assign_tree(AncestralStates& ancestral, const pllmod_ancestral_t& pll_ancestral)
+void assign_tree(AncestralStates& ancestral, const corax_ancestral_t& pll_ancestral)
 {
   if (!ancestral.num_nodes)
     ancestral.num_nodes = pll_ancestral.node_count;
@@ -118,7 +118,7 @@ void assign_tree(AncestralStates& ancestral, const pllmod_ancestral_t& pll_ances
     ancestral.node_names.push_back(pll_ancestral.nodes[i]->label);
 }
 
-void assign_probs(AncestralStates& ancestral, const pllmod_ancestral_t& pll_ancestral,
+void assign_probs(AncestralStates& ancestral, const corax_ancestral_t& pll_ancestral,
                   const PartitionAssignment& part_assign)
 {
   if (ancestral.num_nodes != pll_ancestral.node_count)

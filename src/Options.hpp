@@ -79,10 +79,15 @@ public:
   double lh_epsilon;
   int spr_radius;
   double spr_cutoff;
+  bool spr_optimized;
   int brlen_linkage;
   int brlen_opt_method;
   double brlen_min;
   double brlen_max;
+  int diff_pred_pars_trees;
+
+  double nni_tolerance;
+  double nni_epsilon;
 
   unsigned int num_searches;
   unsigned long long terrace_maxsize;

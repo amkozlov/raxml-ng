@@ -7,7 +7,7 @@ class ConstraintTree : public Tree
 {
 public:
   ConstraintTree() : Tree() {};
-  ConstraintTree(const pll_utree_t& pll_utree);
+  ConstraintTree(const corax_utree_t& pll_utree);
 
   virtual ~ConstraintTree ();
 //  ConstraintTree (const ConstraintTree &other);

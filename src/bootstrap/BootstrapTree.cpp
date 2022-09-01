@@ -15,10 +15,10 @@ BootstrapTree::~BootstrapTree ()
 {
 }
 
-void BootstrapTree::add_tree(const pll_unode_t& root)
+void BootstrapTree::add_tree(const corax_unode_t& root)
 {
   bool ref_tree = (_num_bs_trees == 0);
-  pll_unode_t ** node_split_map = ref_tree ? _node_split_map.data() : nullptr;
+  corax_unode_t ** node_split_map = ref_tree ? _node_split_map.data() : nullptr;
   int update_only = ref_tree ? 0 : 1;
   doubleVector support(num_splits(), ref_tree ? 0. : 1.);
 

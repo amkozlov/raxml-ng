@@ -3,6 +3,12 @@
 
 #include "common.h"
 
+#include <vector>
+#include <map>
+#include <tuple>
+#include <math.h>
+#include "difficulty.h"
+
 typedef std::vector<double> ProbVector;
 typedef std::vector<ProbVector> ProbVectorList;
 
@@ -29,7 +35,7 @@ public:
       _states(0), _pll_msa(nullptr), _dirty(false) {};
   MSA(const RangeList& rl);
 
-  MSA(const pll_msa_t * pll_msa);
+  MSA(const corax_msa_t * pll_msa);
   MSA(MSA&& other);
   MSA(const MSA& other) = delete;
 
@@ -39,7 +45,7 @@ public:
   MSA& operator=(const MSA& other) = delete;
 
   void append(const std::string& sequence, const std::string& header = "");
-  void compress_patterns(const pll_state_t * charmap, bool store_backmap = false);
+  void compress_patterns(const corax_state_t * charmap, bool store_backmap = false);
 
   bool empty() const { return _sequences.empty(); }
   size_t size() const { return _sequences.size(); }
@@ -49,7 +55,8 @@ public:
   const WeightVector& weights() const {return _weights; }
   const NameIdMap& label_id_map() const { return _label_id_map; }
   const WeightVector& site_pattern_map() const { return _site_pattern_map; }
-  const pll_msa_t * pll_msa() const;
+  const corax_msa_t * pll_msa() const;
+  corax_msa_t* pll_msa_nonconst() const;
 
   const container& labels() const { return _labels; };
   const std::string& label(size_t index) const { return _labels.at(index); }
@@ -102,7 +109,7 @@ private:
   ProbVectorList _probs;
   RangeList _local_seq_ranges;
   size_t _states;
-  mutable pll_msa_t * _pll_msa;
+  mutable corax_msa_t * _pll_msa;
   mutable bool _dirty;
 
   void update_pll_msa() const;

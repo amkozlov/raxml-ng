@@ -153,13 +153,13 @@ void PartitionedMSA::split_msa()
   if (need_split)
   {
     /* split MSA into partitions */
-    pll_msa_t ** part_msa_list =
-        pllmod_msa_split(_full_msa.pll_msa(), site_part_map().data(), part_count());
+    corax_msa_t ** part_msa_list =
+        corax_msa_split(_full_msa.pll_msa(), site_part_map().data(), part_count());
 
     for (size_t p = 0; p < part_count(); ++p)
     {
       part_msa(p, part_msa_list[p]);
-      pll_msa_destroy(part_msa_list[p]);
+      corax_msa_destroy(part_msa_list[p]);
 
       /* distribute external site weights to per-partition MSAs */
       if (!_full_msa.weights().empty())

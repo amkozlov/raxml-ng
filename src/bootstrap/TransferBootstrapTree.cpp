@@ -11,8 +11,8 @@ TransferBootstrapTree::TransferBootstrapTree(const Tree& tree, bool naive) :
 
   if (!_naive_method)
   {
-    _split_info = pllmod_utree_tbe_nature_init((pll_unode_t*) &pll_utree_root(), _num_tips,
-                                              (const pll_unode_t**) _node_split_map.data());
+    _split_info = corax_utree_tbe_nature_init((corax_unode_t*) &pll_utree_root(), _num_tips,
+                                              (const corax_unode_t**) _node_split_map.data());
   }
 }
 
@@ -22,7 +22,7 @@ TransferBootstrapTree::~TransferBootstrapTree()
     free(_split_info);
 }
 
-void TransferBootstrapTree::add_tree(const pll_unode_t& root)
+void TransferBootstrapTree::add_tree(const corax_unode_t& root)
 {
   bool ref_tree = (_num_bs_trees == 0);
   doubleVector support(num_splits(), 0.);
@@ -41,10 +41,10 @@ void TransferBootstrapTree::add_tree(const pll_unode_t& root)
 
     // compute TBE
     if (_naive_method)
-      pllmod_utree_tbe_naive(_ref_splits.get(), splits.get(), _num_tips, support.data());
+      corax_utree_tbe_naive(_ref_splits.get(), splits.get(), _num_tips, support.data());
     else
     {
-      pllmod_utree_tbe_nature(_ref_splits.get(), splits.get(), (pll_unode_t*) &root,
+      corax_utree_tbe_nature(_ref_splits.get(), splits.get(), (corax_unode_t*) &root,
                                                _num_tips, support.data(), _split_info);
     }
 

@@ -10,7 +10,7 @@ MSA::MSA(const RangeList& rl) : _length(0), _states(0), _pll_msa(NULL), _dirty(f
   local_seq_ranges(rl);
 }
 
-MSA::MSA(const pll_msa_t *pll_msa) :
+MSA::MSA(const corax_msa_t *pll_msa) :
     _length(0), _num_sites(pll_msa->length), _states(0), _pll_msa(nullptr)
 {
   for (auto i = 0; i < pll_msa->count; ++i)
@@ -104,7 +104,7 @@ void MSA::append(const string& sequence, const string& header)
   _dirty = true;
 }
 
-void MSA::compress_patterns(const pll_state_t * charmap, bool store_backmap)
+void MSA::compress_patterns(const corax_state_t * charmap, bool store_backmap)
 {
   update_pll_msa();
 
@@ -119,7 +119,7 @@ void MSA::compress_patterns(const pll_state_t * charmap, bool store_backmap)
     backmap_ptr = _site_pattern_map.data();
   }
 
-  unsigned int * w = pll_compress_site_patterns_msa(_pll_msa,
+  unsigned int * w = corax_compress_site_patterns_msa(_pll_msa,
                                                     charmap,
                                                     backmap_ptr);
 
@@ -146,10 +146,17 @@ void MSA::compress_patterns(const pll_state_t * charmap, bool store_backmap)
     entry.resize(_length);
 
   _dirty = false;
+  free(w);
 }
 
 
-const pll_msa_t * MSA::pll_msa() const
+const corax_msa_t * MSA::pll_msa() const
+{
+  update_pll_msa();
+  return _pll_msa;
+}
+
+corax_msa_t * MSA::pll_msa_nonconst() const
 {
   update_pll_msa();
   return _pll_msa;
@@ -159,7 +166,7 @@ void MSA::update_pll_msa() const
 {
   if (!_pll_msa)
   {
-    _pll_msa = (pll_msa_t *) calloc(1, sizeof(pll_msa_t));
+    _pll_msa = (corax_msa_t *) calloc(1, sizeof(corax_msa_t));
     _dirty = true;
   }
 
@@ -329,7 +336,7 @@ void MSA::update_num_sites()
 void MSA::weights(const WeightVector& v)
 {
   _weights = v;
-   update_num_sites();
+  update_num_sites();
 }
 
 void MSA::weights(WeightVector&& v)
@@ -375,4 +382,3 @@ size_t MSA::get_local_offset(size_t global_offset) const
     throw runtime_error("MSA: offset " + to_string(global_offset) + " is outside of local range!");
   }
 }
-
