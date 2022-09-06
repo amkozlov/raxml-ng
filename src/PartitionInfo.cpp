@@ -34,18 +34,18 @@ size_t PartitionInfo::mark_partition_sites(unsigned int part_num, std::vector<un
 
     int read = 0;
     /* try to parse strided format first */
-    read = sscanf(range, "%lu-%lu\\%lu", &start, &end, &stride);
+    read = sscanf(range, "%zu-%zu\\%zu", &start, &end, &stride);
     if (read != 3)
-      read = sscanf(range, "%lu-%lu/%lu", &start, &end, &stride);
+      read = sscanf(range, "%zu-%zu/%zu", &start, &end, &stride);
     if (read != 3)
     {
       /* try to parse contiguous range format first */
       stride = 1;
-      read = sscanf(range, "%lu-%lu", &start, &end);
+      read = sscanf(range, "%zu-%zu", &start, &end);
       if (read != 2)
       {
         /* finally, check if we have a single column */
-        read = sscanf(range, "%lu", &start);
+        read = sscanf(range, "%zu", &start);
         end = start;
       }
     }
