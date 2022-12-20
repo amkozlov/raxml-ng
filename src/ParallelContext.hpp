@@ -57,8 +57,12 @@ class ParallelContext
 public:
   static void init_mpi(int argc, char * argv[], void * comm);
   static void init_pthreads(const Options& opts, const std::function<void()>& thread_main);
+  static void init_pthreads_custom(const Options& opts, const std::function<void()>& thread_main,
+                                   unsigned int num_threads, unsigned int num_workers);
   static void resize_buffers(size_t reduce_buf_size, size_t worker_buf_size = 0);
 
+  static void finalize_threads(bool force = false);
+  static void finalize_mpi(bool force = false);
   static void finalize(bool force = false);
 
   static size_t num_procs() { return _num_ranks * _num_threads; }

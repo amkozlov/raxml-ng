@@ -32,6 +32,7 @@
 #include "Optimizer.hpp"
 #include "PartitionInfo.hpp"
 #include "PartitionedMSAView.hpp"
+#include "ParsimonyMSA.hpp"
 #include "TreeInfo.hpp"
 #include "io/file_io.hpp"
 #include "io/binary_io.hpp"
@@ -68,7 +69,7 @@ struct RaxmlInstance
 {
   Options opts;
   shared_ptr<PartitionedMSA> parted_msa;
-  unique_ptr<PartitionedMSA> parted_msa_parsimony;
+  unique_ptr<ParsimonyMSA> parted_msa_parsimony;
   map<BranchSupportMetric, shared_ptr<SupportTree> > support_trees;
   shared_ptr<ConsensusTree> consens_tree;
 
@@ -1158,13 +1159,12 @@ void prepare_tree(const RaxmlInstance& instance, Tree& tree)
   tree.reset_tip_ids(instance.tip_id_map);
 }
 
-Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
+Tree generate_tree(const RaxmlInstance& instance, StartingTree type, int random_seed)
 {
   Tree tree;
 
   const auto& opts = instance.opts;
   const auto& parted_msa = *instance.parted_msa;
-  const auto  tree_rand_seed = rand();
 
   switch (type)
   {
@@ -1195,33 +1195,25 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
     case StartingTree::random:
       /* no starting tree provided, generate a random one */
 
-      LOG_DEBUG << "Generating a random starting tree with " << parted_msa.taxon_count()
-                << " taxa" << endl;
-
       if (instance.constraint_tree.empty())
-        tree = Tree::buildRandom(parted_msa.taxon_names(), tree_rand_seed);
+        tree = Tree::buildRandom(parted_msa.taxon_names(), random_seed);
       else
-        tree = Tree::buildRandomConstrained(parted_msa.taxon_names(), tree_rand_seed,
+        tree = Tree::buildRandomConstrained(parted_msa.taxon_names(), random_seed,
                                             instance.constraint_tree);
+
+      LOG_VERB_TS << "Generating a RANDOM starting tree, seed: " << random_seed << endl;
 
       break;
     case StartingTree::parsimony:
     {
-      LOG_DEBUG << "Generating a parsimony starting tree with " << parted_msa.taxon_count()
-                << " taxa" << endl;
-
       unsigned int score;
-      unsigned int attrs = opts.simd_arch;
 
-      // TODO: check if there is any reason not to use tip-inner
-      attrs |= PLL_ATTRIB_PATTERN_TIP;
-
-      const PartitionedMSA& pars_msa = instance.parted_msa_parsimony ?
-                                    *instance.parted_msa_parsimony.get() : *instance.parted_msa;
-      tree = Tree::buildParsimonyConstrained(pars_msa, tree_rand_seed, attrs, &score,
+      const ParsimonyMSA& pars_msa = *instance.parted_msa_parsimony.get();
+      tree = Tree::buildParsimonyConstrained(pars_msa, random_seed, &score,
                                              instance.constraint_tree, instance.tip_msa_idmap);
 
-      LOG_DEBUG << "Parsimony score of the starting tree: " << score << endl;
+      LOG_WORKER_TS(LogLevel::verbose) << "Generated a PARSIMONY starting tree, seed: " << random_seed <<
+          ", score: " << score << endl;
 
       break;
     }
@@ -1272,14 +1264,7 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
   {
     if (cm.read())
     {
-      // read start trees from file to avoid re-generation
-      // NOTE: doesn't work for OLD constrained tree search
-      if (sysutil_file_exists(instance.opts.start_tree_file()) &&
-          instance.opts.num_searches > 0 &&
-          !(instance.opts.constraint_tree_file.empty() && instance.opts.use_old_constraint))
-      {
-        load_start_trees(instance);
-      }
+      LOG_DEBUG << "NOTE: Loaded checkpoint file: " << instance.opts.checkp_file() << endl;
     }
 
     /* collect all trees inferred so far at master rank */
@@ -1469,97 +1454,43 @@ void load_constraint(RaxmlInstance& instance)
 
 void build_parsimony_msa(RaxmlInstance& instance)
 {
-  // create 1 partition per datatype
-  const PartitionedMSA& orig_msa = *instance.parted_msa;
+  unsigned int attrs = instance.opts.simd_arch;
 
-  instance.parted_msa_parsimony.reset(new PartitionedMSA(orig_msa.taxon_names()));
-  PartitionedMSA& pars_msa = *instance.parted_msa_parsimony.get();
+  // TODO: check if there is any reason not to use tip-inner
+  attrs |= PLL_ATTRIB_PATTERN_TIP;
 
-  NameIdMap datatype_pinfo_map;
-  for (const auto& pinfo: orig_msa.part_list())
+  instance.parted_msa_parsimony.reset(new ParsimonyMSA(instance.parted_msa, attrs));
+}
+
+void thread_start_trees(RaxmlInstance& instance, StartingTree st_tree_type,
+                        const intVector& seeds, size_t offset)
+{
+  for (size_t i = 0; i < seeds.size(); ++i)
   {
-    const auto& model = pinfo.model();
-    auto data_type_name = model.data_type_name();
-
-    auto iter = datatype_pinfo_map.find(data_type_name);
-    if (iter == datatype_pinfo_map.end())
-    {
-      pars_msa.emplace_part_info(data_type_name, model.data_type(), model.to_string());
-      auto& pars_pinfo = pars_msa.part_list().back();
-      pars_pinfo.msa(MSA(pinfo.msa().num_sites()));
-      datatype_pinfo_map[data_type_name] = pars_msa.part_count()-1;
-    }
-    else
-    {
-      auto& msa = pars_msa.part_list().at(iter->second).msa();
-      msa.num_sites(msa.num_sites() + pinfo.msa().num_sites());
-    }
-  }
-
-  // set_per-datatype MSA
-  for (size_t j = 0; j < orig_msa.taxon_count(); ++j)
-  {
-    for (auto& pars_pinfo: pars_msa.part_list())
-    {
-      auto pars_datatype = pars_pinfo.model().data_type_name();
-      std::string sequence;
-      sequence.resize(pars_pinfo.msa().num_sites());
-      size_t offset = 0;
-
-      for (const auto& pinfo: orig_msa.part_list())
-      {
-        // different datatype -> skip for now
-        if (pinfo.model().data_type_name() != pars_datatype)
-          continue;
-
-        const auto w = pinfo.msa().weights();
-        const auto s = pinfo.msa().at(j);
-
-        if (w.empty())
-        {
-          for (size_t k = 0; k < s.size(); ++k)
-            sequence[offset++] = s[k];
-        }
-        else
-        {
-          for (size_t k = 0; k < w.size(); ++k)
-          {
-            auto wk = w[k];
-            while(wk-- > 0)
-              sequence[offset++] = s[k];
-          }
-        }
-      }
-
-      assert(offset == sequence.size());
-
-      pars_pinfo.msa().append(sequence);
-    }
-  }
-
-  // compress patterns
-  if (instance.opts.use_pattern_compression)
-  {
-    for (auto& pinfo: pars_msa.part_list())
-    {
-      pinfo.compress_patterns();
-    }
+    if (i % ParallelContext::num_threads() == ParallelContext::thread_id())
+      instance.start_trees[offset + i] = generate_tree(instance, st_tree_type, seeds[i]);
   }
 }
 
-void build_start_trees(RaxmlInstance& instance, size_t skip_trees)
+void build_start_trees(RaxmlInstance& instance, unsigned int num_threads = 1)
 {
   auto& opts = instance.opts;
   const auto& parted_msa = *instance.parted_msa;
 
   /* all start trees were already generated/loaded -> return */
-  if (skip_trees + instance.start_trees.size() >= instance.opts.num_searches)
+  if (instance.start_trees.size() >= instance.opts.num_searches)
     return;
 
   for (auto& st_tree: opts.start_trees)
   {
     auto st_tree_type = st_tree.first;
     auto& st_tree_count = st_tree.second;
+
+    // init seeds
+    intVector seeds(st_tree_count);
+    for (size_t i = 0; i < st_tree_count; ++i)
+      seeds[i] = rand();
+
     switch (st_tree_type)
     {
       case StartingTree::user:
@@ -1573,11 +1504,7 @@ void build_start_trees(RaxmlInstance& instance, size_t skip_trees)
                     << parted_msa.taxon_count() << " taxa" << endl;
         break;
       case StartingTree::parsimony:
-        if (parted_msa.part_count() > 1)
-        {
-          LOG_DEBUG_TS << "Generating MSA partitioned by data type for parsimony computation" << endl;
-          build_parsimony_msa(instance);
-        }
+        build_parsimony_msa(instance);
         LOG_INFO_TS << "Generating " << st_tree_count << " parsimony starting tree(s) with "
                     << parted_msa.taxon_count() << " taxa" << endl;
         break;
@@ -1585,28 +1512,47 @@ void build_start_trees(RaxmlInstance& instance, size_t skip_trees)
         assert(0);
     }
 
-    for (size_t i = 0; i < st_tree_count; ++i)
+    if (num_threads != 1 && st_tree_type == StartingTree::parsimony)
     {
-      auto tree = generate_tree(instance, st_tree_type);
+      auto old_size = instance.start_trees.size();
+      instance.start_trees.resize(old_size + st_tree_count);
 
-      // TODO use universal starting tree generator
-      if (st_tree_type == StartingTree::user)
-      {
-        if (instance.start_tree_stream->peek() != EOF)
-        {
-          st_tree_count++;
-          opts.num_searches++;
-        }
-      }
+      auto thread_fn = std::bind(thread_start_trees,
+                                 std::ref(instance),
+                                 st_tree_type,
+                                 std::cref(seeds),
+                                 old_size);
 
-      if (skip_trees > 0)
-      {
-        skip_trees--;
-        continue;
-      }
-
-      instance.start_trees.emplace_back(tree);
+      assert(num_threads > 0);
+      auto mem_per_thread = instance.parted_msa_parsimony->memsize_estimate();
+      LOG_VERB << "Estimated memory per parsimony thread: " <<  mem_per_thread/1024/1024 << " MB" << endl;
+      unsigned int num_threads_max = 0.7 * sysutil_get_memtotal() / mem_per_thread;
+      num_threads = std::min(num_threads, num_threads_max);
+      LOG_INFO << "Parallel parsimony with " << num_threads << " threads" << endl;
+      ParallelContext::init_pthreads_custom(opts, thread_fn, num_threads, num_threads);
+      thread_fn();
+      ParallelContext::finalize_threads();
     }
+    else
+    {
+      for (size_t i = 0; i < st_tree_count; ++i)
+      {
+        auto tree = generate_tree(instance, st_tree_type, seeds[i]);
+
+        // TODO use universal starting tree generator
+        if (st_tree_type == StartingTree::user)
+        {
+          if (instance.start_tree_stream->peek() != EOF)
+          {
+            st_tree_count++;
+            opts.num_searches++;
+          }
+        }
+
+        instance.start_trees.emplace_back(tree);
+      }
+    }
+
   }
 
   // free memory used for parsimony MSA
@@ -1746,23 +1692,23 @@ void generate_bootstraps(RaxmlInstance& instance, const CheckpointFile& checkp)
   {
     assert(instance.parted_msa);
 
+    intVector seeds(instance.opts.num_bootstraps, rand());
+
     /* generate replicate alignments */
     BootstrapGenerator bg;
     for (size_t b = 0; b < instance.opts.num_bootstraps; ++b)
     {
-      auto seed = rand();
-
 //      /* check if this BS was already computed in the previous run and saved in checkpoint */
 //      if (b < checkp.bs_trees.size())
 //        continue;
 
-      instance.bs_reps.emplace_back(bg.generate(*instance.parted_msa, seed));
+      instance.bs_reps.emplace_back(bg.generate(*instance.parted_msa, seeds[b]));
     }
 
     /* generate starting trees for bootstrap searches */
     for (size_t b = 0; b < instance.opts.num_bootstraps; ++b)
     {
-      auto tree = generate_tree(instance, StartingTree::random);
+      auto tree = generate_tree(instance, StartingTree::random, seeds[b]);
 
 //      if (b < checkp.bs_trees.size())
 //        continue;
@@ -2069,7 +2015,7 @@ void command_rfdist(RaxmlInstance& instance)
     /* generate random/parsimony trees -> we need an MSA for this */
     assert(!opts.msa_file.empty());
     load_parted_msa(instance);
-    build_start_trees(instance, 0);
+    build_start_trees(instance);
   }
   else
   {
@@ -2944,6 +2890,37 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   check_options(instance);
 
+  /* init template tree */
+  srand(instance.opts.random_seed);
+  instance.random_tree = generate_tree(instance, StartingTree::random, rand());
+
+  // read start trees from file to avoid re-generation
+  // NOTE: doesn't work for OLD constrained tree search
+  if (!instance.opts.redo_mode && sysutil_file_exists(instance.opts.start_tree_file()) &&
+      instance.opts.num_searches > 0 &&
+      !(instance.opts.constraint_tree_file.empty() && instance.opts.use_old_constraint))
+  {
+    load_start_trees(instance);
+  }
+
+  /* load/create starting tree if not already loaded from checkpoint */
+  if (instance.start_trees.size() < opts.num_searches)
+  {
+    if (ParallelContext::master_rank() || opts.start_tree_file().empty() ||
+        (!opts.constraint_tree_file.empty() && opts.use_old_constraint))
+    {
+      /* only master MPI rank generates starting trees (doesn't work with old constrained search) */
+      build_start_trees(instance, opts.num_threads);
+      ParallelContext::global_mpi_barrier();
+    }
+    else
+    {
+      /* non-master ranks load starting trees from a file */
+      ParallelContext::global_mpi_barrier();
+      load_start_trees(instance);
+    }
+  }
+
   ParallelContext::init_pthreads(opts, std::bind(thread_main,
                                                  std::ref(instance),
                                                  std::ref(cm)));
@@ -2958,32 +2935,10 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   instance.bs_converged = false;
 
-  /* init template tree */
-  srand(instance.opts.random_seed);
-  instance.random_tree = generate_tree(instance, StartingTree::random);
-
   init_parallel_buffers(instance);
 
   /* load checkpoint */
   load_checkpoint(instance, cm);
-
-  /* load/create starting tree if not already loaded from checkpoint */
-  if (instance.start_trees.size() < opts.num_searches)
-  {
-    if (ParallelContext::master_rank() || opts.start_tree_file().empty() ||
-        (!opts.constraint_tree_file.empty() && opts.use_old_constraint))
-    {
-      /* only master MPI rank generates starting trees (doesn't work with old constrained search) */
-      build_start_trees(instance, 0);
-      ParallelContext::global_mpi_barrier();
-    }
-    else
-    {
-      /* non-master ranks load starting trees from a file */
-      ParallelContext::global_mpi_barrier();
-      load_start_trees(instance);
-    }
-  }
 
   LOG_VERB << endl << "Initial model parameters:" << endl;
   for (size_t p = 0; p < parted_msa.part_count(); ++p)
@@ -3216,7 +3171,7 @@ int internal_main(int argc, char** argv, void* comm)
         if (!sysutil_file_exists(opts.tree_file))
           throw runtime_error("File not found: " + opts.tree_file);
         instance.start_tree_stream.reset(new NewickStream(opts.tree_file, std::ios::in));
-        Tree tree = generate_tree(instance, StartingTree::user);
+        Tree tree = generate_tree(instance, StartingTree::user, 0);
         check_terrace(instance, tree);
         break;
       }
@@ -3230,7 +3185,7 @@ int internal_main(int argc, char** argv, void* comm)
         {
           load_parted_msa(instance);
           load_constraint(instance);
-          build_start_trees(instance, 0);
+          build_start_trees(instance);
 
           LOG_INFO << endl;
 
@@ -3253,9 +3208,10 @@ int internal_main(int argc, char** argv, void* comm)
       }
       case Command::start:
       {
+        auto num_threads = opts.num_threads ? opts.num_threads : opts.num_threads_max;
         load_parted_msa(instance);
         load_constraint(instance);
-        build_start_trees(instance, 0);
+        build_start_trees(instance, num_threads);
         if (!opts.start_tree_file().empty())
         {
           LOG_INFO << "\nAll starting trees saved to: " <<
