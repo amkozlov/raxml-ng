@@ -58,7 +58,7 @@ pipeline {
                             lock('synchronous-matrix')
                         }
                         environment { 
-                            LOCATION = sh (returnStdout: true, script: "ci/get_parallel_prefix.sh \"$PARALLEL\"").trim()
+                            LOCATION = sh (returnStdout: true, script: "ci/get_parallel_prefix.sh $PARALLEL").trim()
                         }
                         steps {
                             sh """
