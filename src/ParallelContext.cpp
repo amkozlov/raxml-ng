@@ -124,7 +124,8 @@ void ParallelContext::init_pthreads_custom(const Options& opts, const std::funct
 
   /* init thread groups */
   size_t groups_per_rank = _num_groups > 1 ? _num_groups / _num_ranks : 1;
-  size_t group_size = num_threads / std::max<size_t>(groups_per_rank, 1u);
+  groups_per_rank = std::max<size_t>(groups_per_rank, 1u);
+  size_t group_size = num_threads / groups_per_rank;
   auto start_grp_id = _num_groups > 1 ? _rank_id * groups_per_rank : 0;
   for (size_t i = 0; i < groups_per_rank; ++i)
     _thread_groups.emplace_back(start_grp_id + i, i, group_size, PARALLEL_BUF_SIZE);
