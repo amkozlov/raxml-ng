@@ -44,8 +44,8 @@ pipeline {
                     }
                     axis {
                         name 'INPUT'
-                        values 'dna8.fa|GTR+G',
-                               'prot21.fa|LG+G'
+                        values 'dna8.fa,GTR+G',
+                               'prot21.fa,LG+G'
                     }
                     axis {
                         name 'PARALLEL'
@@ -69,8 +69,8 @@ pipeline {
                         }
                         environment { 
                             PARSTR = sh (returnStdout: true, script: "ci/get_parallel_prefix.sh $PARALLEL").trim()
-                            MSA = sh (returnStdout: true, script: "echo $INPUT | cut -f1 -d '|'").trim()
-                            MODEL = sh (returnStdout: true, script: "echo $INPUT | cut -f2 -d '|'").trim()
+                            MSA = sh (returnStdout: true, script: "echo $INPUT | cut -f1 -d ','").trim()
+                            MODEL = sh (returnStdout: true, script: "echo $INPUT | cut -f2 -d ','").trim()
                             LOCATION = "${COMMAND}___${MSA}___$PARSTR"
                         }
                         steps {
