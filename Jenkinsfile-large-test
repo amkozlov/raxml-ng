@@ -38,6 +38,16 @@ pipeline {
             matrix {
                 axes {
                     axis {
+                        name 'COMMAND'
+                        values 'all',
+                               'start'
+                    }
+                    axis {
+                        name 'MSA'
+                        values 'dna8.fa',
+                               'prot21.fa'
+                    }
+                    axis {
                         name 'PARALLEL'
                         values '-np 1 build/bin/raxml-ng-mpi --threads 1',
                                '-np 1 build/bin/raxml-ng-mpi --threads 6',
@@ -58,12 +68,13 @@ pipeline {
                             lock('synchronous-matrix')
                         }
                         environment { 
-                            LOCATION = sh (returnStdout: true, script: "ci/get_parallel_prefix.sh $PARALLEL").trim()
+                            PARSTR = sh (returnStdout: true, script: "ci/get_parallel_prefix.sh $PARALLEL").trim()
+                            LOCATION = "${COMMAND}___${MSA}___$PARSTR"
                         }
                         steps {
                             sh """
                                 mkdir -p out/${LOCATION}
-                                mpirun ${PARALLEL} --all --msa ngtest/data/dna8.fa --model GTR+G --brlen linked \
+                                mpirun ${PARALLEL} --${COMMAND} --msa ngtest/data/${MSA} --model GTR+G --brlen linked \
                                   --prefix out/${LOCATION}/test --redo --seed 1
                             """
                         }
