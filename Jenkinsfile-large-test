@@ -43,9 +43,9 @@ pipeline {
                                'start'
                     }
                     axis {
-                        name 'MSA'
-                        values 'dna8.fa',
-                               'prot21.fa'
+                        name 'INPUT'
+                        values 'dna8.fa|GTR+G',
+                               'prot21.fa|LG+G'
                     }
                     axis {
                         name 'PARALLEL'
@@ -69,12 +69,14 @@ pipeline {
                         }
                         environment { 
                             PARSTR = sh (returnStdout: true, script: "ci/get_parallel_prefix.sh $PARALLEL").trim()
+                            MSA = sh (returnStdout: true, script: "echo $INPUT | cut -f1 -d '|'").trim()
+                            MODEL = sh (returnStdout: true, script: "echo $INPUT | cut -f2 -d '|'").trim()
                             LOCATION = "${COMMAND}___${MSA}___$PARSTR"
                         }
                         steps {
                             sh """
                                 mkdir -p out/${LOCATION}
-                                mpirun ${PARALLEL} --${COMMAND} --msa ngtest/data/${MSA} --model GTR+G --brlen linked \
+                                mpirun ${PARALLEL} --${COMMAND} --msa ngtest/data/${MSA} --model ${MODEL} --brlen linked \
                                   --prefix out/${LOCATION}/test --redo --seed 1
                             """
                         }
