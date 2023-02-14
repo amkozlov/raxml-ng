@@ -10,8 +10,8 @@ pipeline {
         stage('Checkout') {
             steps {
                 // Get some code from a GitHub repository
-                git branch: 'ci',
-                    url: 'https://github.com/BerndDoser/raxml-ng.git'
+//                git branch: 'ci',
+//                    url: 'https://github.com/BerndDoser/raxml-ng.git'
                 sh '''
                     git submodule update --init --recursive
                     git submodule add https://github.com/amkozlov/ngtest.git
@@ -38,8 +38,19 @@ pipeline {
             matrix {
                 axes {
                     axis {
+                        name 'COMMAND'
+                        values 'all',
+                               'start'
+                    }
+                    axis {
+                        name 'INPUT'
+                        values 'dna8.fa,GTR+G',
+                               'prot21.fa,LG+G'
+                    }
+                    axis {
                         name 'PARALLEL'
                         values '-np 1 build/bin/raxml-ng-mpi --threads 1',
+                               '-np 1 build/bin/raxml-ng-mpi --threads 6',
                                '-np 3 build/bin/raxml-ng-mpi --threads 2 --workers 1',
                                '-np 3 build/bin/raxml-ng-mpi --threads 2 --workers 3'
                     }
@@ -57,12 +68,15 @@ pipeline {
                             lock('synchronous-matrix')
                         }
                         environment { 
-                            LOCATION = sh (returnStdout: true, script: "ci/get_parallel_prefix.sh \"$PARALLEL\"").trim()
+                            PARSTR = sh (returnStdout: true, script: "ci/get_parallel_prefix.sh $PARALLEL").trim()
+                            MSA = sh (returnStdout: true, script: "echo $INPUT | cut -f1 -d ','").trim()
+                            MODEL = sh (returnStdout: true, script: "echo $INPUT | cut -f2 -d ','").trim()
+                            LOCATION = "${COMMAND}___${MSA}___$PARSTR"
                         }
                         steps {
                             sh """
                                 mkdir -p out/${LOCATION}
-                                mpirun ${PARALLEL} --all --msa ngtest/data/dna8.fa --model GTR+G --brlen linked \
+                                mpirun ${PARALLEL} --${COMMAND} --msa ngtest/data/${MSA} --model ${MODEL} --brlen linked \
                                   --prefix out/${LOCATION}/test --redo --seed 1
                             """
                         }
