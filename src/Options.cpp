@@ -7,6 +7,7 @@ using namespace std;
 Options::Options() : opt_version(RAXML_OPT_VERSION), cmdline(""), command(Command::none),
 use_tip_inner(true), use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false),
 use_repeats(true), use_rba_partload(true), use_energy_monitor(true), use_old_constraint(false),
+use_spr_fastclv(false),
 optimize_model(true), optimize_brlen(true), force_mode(false), safety_checks(SafetyCheck::all),
 redo_mode(false), nofiles_mode(false), write_interim_results(true), write_bs_msa(false),
 log_level(LogLevel::progress), msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
@@ -412,7 +413,8 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     stream << "  per-rate scalers: " << (opts.use_rate_scalers ? "ON" : "OFF") << endl;
     stream << "  site repeats: " << (opts.use_repeats ? "ON" : "OFF") << endl;
 
-    if (opts.command == Command::search)
+    if (opts.command == Command::search || opts.command == Command::all ||
+        opts.command == Command::bootstrap)
     {
       if (opts.spr_radius > 0)
         stream << "  fast spr radius: " << opts.spr_radius << endl;
@@ -423,6 +425,8 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
         stream << "  spr subtree cutoff: " << opts.spr_cutoff << endl;
       else
         stream << "  spr subtree cutoff: OFF" << endl;
+
+      stream << "  fast CLV updates: " << (opts.use_spr_fastclv ? "ON" : "OFF") << endl;
     }
 
     stream << "  branch lengths: ";

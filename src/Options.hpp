@@ -59,6 +59,7 @@ public:
   bool use_rba_partload;
   bool use_energy_monitor;
   bool use_old_constraint;
+  bool use_spr_fastclv;
 
   bool optimize_model;
   bool optimize_brlen;
