@@ -564,6 +564,8 @@ void check_models(const RaxmlInstance& instance)
   {
     auto stats = pinfo.stats();
     auto model = pinfo.model();
+    auto freq_mode = model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES);
+    const auto& freqs = freq_mode == ParamValue::empirical ? stats.emp_base_freqs : model.base_freqs(0);
 
     // check for non-recommended model combinations
     if (opts.safety_checks.isset(SafetyCheck::model_lg4_freqs))
@@ -582,9 +584,8 @@ void check_models(const RaxmlInstance& instance)
     // check for zero state frequencies
     if (opts.safety_checks.isset(SafetyCheck::model_zero_freqs))
     {
-      if (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::empirical)
+      if (freq_mode == ParamValue::empirical || freq_mode == ParamValue::user)
       {
-        const auto& freqs = stats.emp_base_freqs;
         for (unsigned int i = 0; i < freqs.size(); ++i)
         {
           if (freqs[i] < PLL_EIGEN_MINFREQ)
@@ -611,9 +612,8 @@ void check_models(const RaxmlInstance& instance)
     // check for user-defined state frequencies which do not sum up to one
     if (opts.safety_checks.isset(SafetyCheck::model_invalid_freqs))
     {
-      if (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::user)
+      if (freq_mode == ParamValue::user)
       {
-        const auto& freqs = model.base_freqs(0);
         double sum = 0.;
         for (unsigned int i = 0; i < freqs.size(); ++i)
           sum += freqs[i];
