@@ -390,6 +390,7 @@ double TreeInfo::spr_round(spr_round_params& params)
                                _brlen_min, _brlen_max, RAXML_BRLEN_SMOOTHINGS,
                                0.1,
                                params.subtree_cutoff > 0. ? &params.cutoff_info : nullptr,
+                               params.subtree_cutoff,
                                _use_spr_fastclv);
 
   libpll_check_error("ERROR in SPR round");
