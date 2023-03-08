@@ -71,6 +71,7 @@ private:
   double _brlen_max;
   bool _check_lh_impr;
   bool _use_old_constraint;
+  bool _use_spr_fastclv;
   doubleVector _partition_contributions;
 
   void init(const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,

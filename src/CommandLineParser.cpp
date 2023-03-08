@@ -286,6 +286,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* use new split-based constraint checking method -> slightly slower, but more reliable */
   opts.use_old_constraint = false;
 
+  /* disable incremental CLV updates across pruned subtrees in SPR rounds */
+  opts.use_spr_fastclv = false;
+
   /* optimize model and branch lengths */
   opts.optimize_model = true;
   opts.optimize_brlen = true;
@@ -812,6 +815,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_old_constraint = true;
             else if (eopt == "constraint-new")
               opts.use_old_constraint = false;
+            else if (eopt == "fastclv-on")
+              opts.use_spr_fastclv = true;
+            else if (eopt == "fastclv-off")
+              opts.use_spr_fastclv = false;
             else
               throw InvalidOptionValueException("Unknown extra option: " + string(eopt));
           }
