@@ -3,7 +3,8 @@
 using namespace std;
 
 Optimizer::Optimizer (const Options &opts) :
-    _lh_epsilon(opts.lh_epsilon), _spr_radius(opts.spr_radius), _spr_cutoff(opts.spr_cutoff)
+    _lh_epsilon(opts.lh_epsilon), _lh_epsilon_brlen_triplet(opts.lh_epsilon_brlen_triplet),
+    _spr_radius(opts.spr_radius), _spr_cutoff(opts.spr_cutoff)
 {
 }
 
@@ -43,6 +44,7 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
 {
   const double fast_modopt_eps = 10.;
   const double interim_modopt_eps = 3.;
+  const double final_modopt_eps = 0.1;
 
   SearchState local_search_state = cm.search_state();
   auto& search_state = ParallelContext::group_master_thread() ? cm.search_state() : local_search_state;
@@ -53,6 +55,9 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
   int& iter = search_state.iteration;
   spr_round_params& spr_params = search_state.spr_params;
   int& best_fast_radius = search_state.fast_spr_radius;
+
+  spr_params.lh_epsilon_brlen_full = _lh_epsilon;
+  spr_params.lh_epsilon_brlen_triplet = _lh_epsilon_brlen_triplet;
 
   CheckpointStep resume_step = search_state.step;
 
@@ -229,8 +234,8 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
   if (do_step(CheckpointStep::modOpt4))
   {
     cm.update_and_write(treeinfo);
-    LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << _lh_epsilon << ")" << endl;
-    loglh = optimize_model(treeinfo, _lh_epsilon);
+    LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << final_modopt_eps << ")" << endl;
+    loglh = optimize_model(treeinfo, final_modopt_eps);
   }
 
   if (do_step(CheckpointStep::finish))

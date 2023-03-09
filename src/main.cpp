@@ -149,7 +149,7 @@ void print_banner()
       " by The Exelixis Lab." << endl;
   LOG_INFO << "Developed by: Alexey M. Kozlov and Alexandros Stamatakis." << endl;
   LOG_INFO << "Contributors: Diego Darriba, Tomas Flouri, Benoit Morel, "
-              "Sarah Lutteropp, Ben Bettisworth." << endl;
+              "Sarah Lutteropp, Ben Bettisworth, Julia Haag, Anastasis Togkousidis." << endl;
   LOG_INFO << "Latest version: https://github.com/amkozlov/raxml-ng" << endl;
   LOG_INFO << "Questions/problems/suggestions? "
               "Please visit: https://groups.google.com/forum/#!forum/raxml" << endl << endl;

@@ -17,6 +17,7 @@ public:
   double evaluate(TreeInfo& treeinfo, CheckpointManager& cm);
 private:
   double _lh_epsilon;
+  double _lh_epsilon_brlen_triplet;
   int _spr_radius;
   double _spr_cutoff;
 };

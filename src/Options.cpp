@@ -11,8 +11,8 @@ use_spr_fastclv(false),
 optimize_model(true), optimize_brlen(true), force_mode(false), safety_checks(SafetyCheck::all),
 redo_mode(false), nofiles_mode(false), write_interim_results(true), write_bs_msa(false),
 log_level(LogLevel::progress), msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
-random_seed(0), start_trees(), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
-spr_cutoff(1.0),
+random_seed(0), start_trees(), lh_epsilon(DEF_LH_EPSILON), lh_epsilon_brlen_triplet(DEF_LH_EPSILON_BRLEN_TRIPLET),
+spr_radius(-1), spr_cutoff(1.0),
 brlen_linkage(PLLMOD_COMMON_BRLEN_SCALED), brlen_opt_method(PLLMOD_OPT_BLO_NEWTON_FAST),
 brlen_min(RAXML_BRLEN_MIN), brlen_max(RAXML_BRLEN_MAX),
 num_searches(1), terrace_maxsize(100),
@@ -412,6 +412,11 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     stream << "  pattern compression: " << (opts.use_pattern_compression ? "ON" : "OFF") << endl;
     stream << "  per-rate scalers: " << (opts.use_rate_scalers ? "ON" : "OFF") << endl;
     stream << "  site repeats: " << (opts.use_repeats ? "ON" : "OFF") << endl;
+
+    stream << "  logLH epsilon: " ;
+    stream << "general: " << opts.lh_epsilon << ", ";
+    stream << "brlen-triplet: " << opts.lh_epsilon_brlen_triplet;
+    stream << endl;
 
     if (opts.command == Command::search || opts.command == Command::all ||
         opts.command == Command::bootstrap)
