@@ -2547,7 +2547,10 @@ void init_parallel_buffers(const RaxmlInstance& instance)
 
     // for coarse-grained, add extra space to store ML/BS trees sent from workers to master
     if (ParallelContext::num_groups() > 1)
-      worker_buf_size += (opts.bootstop_interval / ParallelContext::num_groups() + 1) * tree_size;
+    {
+      auto max_trees_per_rank = (opts.bootstop_interval / ParallelContext::num_groups() + 1) * ParallelContext::num_local_groups();
+      worker_buf_size +=  max_trees_per_rank * tree_size;
+    }
 
     // add some reserve
     worker_buf_size *= 1.2;
