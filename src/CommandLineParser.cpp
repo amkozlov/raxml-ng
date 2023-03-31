@@ -813,10 +813,15 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_spr_fastclv = true;
             else if (eopt == "fastclv-off")
               opts.use_spr_fastclv = false;
+            else if (eopt == "bs-start-pars")
+              opts.use_bs_pars = true;
+            else if (eopt == "bs-start-rand")
+              opts.use_bs_pars = false;
             else if (eopt == "compat-v11")
             {
               compat_ver = 110;
               opts.use_spr_fastclv = false;
+              opts.use_bs_pars = false;
               opts.lh_epsilon = DEF_LH_EPSILON_V11;
               opts.lh_epsilon_brlen_triplet = DEF_LH_EPSILON_V11;
             }

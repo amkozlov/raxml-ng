@@ -60,6 +60,7 @@ public:
   bool use_energy_monitor;
   bool use_old_constraint;
   bool use_spr_fastclv;
+  bool use_bs_pars;
 
   bool optimize_model;
   bool optimize_brlen;

@@ -1692,7 +1692,10 @@ void generate_bootstraps(RaxmlInstance& instance, const CheckpointFile& checkp)
   {
     assert(instance.parted_msa);
 
-    intVector seeds(instance.opts.num_bootstraps, rand());
+    // init seeds
+    intVector seeds(instance.opts.num_bootstraps);
+    for (size_t i = 0; i < seeds.size(); ++i)
+      seeds[i] = rand();
 
     /* generate replicate alignments */
     BootstrapGenerator bg;
@@ -1706,9 +1709,11 @@ void generate_bootstraps(RaxmlInstance& instance, const CheckpointFile& checkp)
     }
 
     /* generate starting trees for bootstrap searches */
+    build_parsimony_msa(instance);
+    auto start_tree_type = instance.opts.use_bs_pars ? StartingTree::parsimony : StartingTree::random;
     for (size_t b = 0; b < instance.opts.num_bootstraps; ++b)
     {
-      auto tree = generate_tree(instance, StartingTree::random, seeds[b]);
+      auto tree = generate_tree(instance, start_tree_type, seeds[b]);
 
 //      if (b < checkp.bs_trees.size())
 //        continue;
