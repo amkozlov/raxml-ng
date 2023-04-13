@@ -77,6 +77,8 @@ struct RaxmlInstance
   BootstrapReplicateList bs_reps;
   TreeList bs_start_trees;
 
+  intVector bs_seeds;
+
   /* IDs of the trees that have been already inferred (eg after resuming from a checkpoint) */
   IDSet done_ml_trees;
   IDSet done_bs_trees;
@@ -139,6 +141,9 @@ struct RaxmlWorker
   IDVector start_trees;
   IDVector bs_trees;
   PartitionAssignmentList proc_part_assign;
+
+  Tree cur_bs_start_tree;
+  BootstrapReplicate cur_bs_rep;
 
   size_t total_num_searches() const { return start_trees.size() + bs_trees.size(); }
 };
@@ -1657,7 +1662,7 @@ void balance_load_coarse(RaxmlInstance& instance, const CheckpointFile& ckpfile)
       todo_start_trees.push_back(i);
   }
 
-  for (size_t i = 1; i <= instance.bs_start_trees.size(); ++i)
+  for (size_t i = 1; i <= instance.bs_seeds.size(); ++i)
   {
     if (!instance.done_bs_trees.count(i))
       todo_bs_trees.push_back(i);
@@ -1693,9 +1698,28 @@ void generate_bootstraps(RaxmlInstance& instance, const CheckpointFile& checkp)
     assert(instance.parted_msa);
 
     // init seeds
-    intVector seeds(instance.opts.num_bootstraps);
+    auto& seeds = instance.bs_seeds;
+    seeds.resize(instance.opts.num_bootstraps);
     for (size_t i = 0; i < seeds.size(); ++i)
       seeds[i] = rand();
+
+    build_parsimony_msa(instance);
+
+    /* in parallel parsimony mode, starting trees & replicate MSAs will be generated later "just-in-time" */
+    if (instance.opts.use_par_pars)
+      return;
+
+    /* generate starting trees for bootstrap searches */
+    auto start_tree_type = instance.opts.use_bs_pars ? StartingTree::parsimony : StartingTree::random;
+    for (size_t b = 0; b < instance.opts.num_bootstraps; ++b)
+    {
+      auto tree = generate_tree(instance, start_tree_type, seeds[b]);
+
+//      if (b < checkp.bs_trees.size())
+//        continue;
+
+      instance.bs_start_trees.emplace_back(move(tree));
+    }
 
     /* generate replicate alignments */
     BootstrapGenerator bg;
@@ -1706,19 +1730,6 @@ void generate_bootstraps(RaxmlInstance& instance, const CheckpointFile& checkp)
 //        continue;
 
       instance.bs_reps.emplace_back(bg.generate(*instance.parted_msa, seeds[b]));
-    }
-
-    /* generate starting trees for bootstrap searches */
-    build_parsimony_msa(instance);
-    auto start_tree_type = instance.opts.use_bs_pars ? StartingTree::parsimony : StartingTree::random;
-    for (size_t b = 0; b < instance.opts.num_bootstraps; ++b)
-    {
-      auto tree = generate_tree(instance, start_tree_type, seeds[b]);
-
-//      if (b < checkp.bs_trees.size())
-//        continue;
-
-      instance.bs_start_trees.emplace_back(move(tree));
     }
   }
   RAXML_UNUSED(checkp); // might need it again for re-using previously computed replicates
@@ -2598,7 +2609,7 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
     LOG_INFO << "\nEvaluating " << opts.num_searches <<
         " trees" << endl;
   }
-  else
+  else if (instance.run_phase != RaxmlRunPhase::bootstrap)
   {
     LOG_INFO << "\nStarting ML tree search with " << opts.num_searches <<
         " distinct starting trees" << endl;
@@ -2743,7 +2754,13 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
       batch_end = std::min(opts.num_bootstraps, batch_end+opts.bootstop_interval);
     };
 
-  if (!instance.bs_reps.empty())
+  /* infer bootstrap trees if needed */
+  unsigned int bs_batch_start = instance.bootstop_checker ?
+                                instance.bootstop_checker->num_bs_trees() : cm.checkp_file().bs_trees.size();
+
+  ParallelContext::global_master_broadcast(&bs_batch_start, sizeof(unsigned int));
+
+  if (bs_batch_start == 0)
   {
     if (opts.command == Command::all)
     {
@@ -2755,12 +2772,11 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
     LOG_INFO_TS << "Starting bootstrapping analysis with " << opts.num_bootstraps
              << " replicates." << endl << endl;
   }
-
-  /* infer bootstrap trees if needed */
-  unsigned int bs_batch_start = instance.bootstop_checker ?
-                                instance.bootstop_checker->num_bs_trees() : cm.checkp_file().bs_trees.size();
-
-  ParallelContext::global_master_broadcast(&bs_batch_start, sizeof(unsigned int));
+  else
+  {
+    LOG_INFO_TS << "Continuing bootstrapping analysis with " << opts.num_bootstraps
+             << " replicates." << endl << endl;
+  }
 
   auto bs_batch_offset = bs_batch_start % opts.bootstop_interval;
   unsigned int  bs_batch_end = std::min(bs_batch_start - bs_batch_offset + opts.bootstop_interval,
@@ -2771,15 +2787,30 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
 
   ParallelContext::global_thread_barrier();
 
+  BootstrapGenerator bg;
+  auto start_tree_type = instance.opts.use_bs_pars ? StartingTree::parsimony : StartingTree::random;
   while (!instance.bs_converged && bs_num != worker.bs_trees.cend())
   {
-    const auto& bs_start_tree = instance.bs_start_trees.at(*bs_num - 1);
-    auto bs_rep = instance.bs_reps.at(*bs_num - 1);
+    if (instance.opts.use_par_pars)
+    {
+      if (ParallelContext::group_master_thread())
+      {
+        auto bs_seed = instance.bs_seeds.at(*bs_num - 1);
+        worker.cur_bs_start_tree = generate_tree(instance, start_tree_type, bs_seed);
+        worker.cur_bs_rep = bg.generate(*instance.parted_msa, bs_seed);
+      }
+      ParallelContext::thread_barrier();
+    }
+    else
+    {
+      worker.cur_bs_start_tree = instance.bs_start_trees.at(*bs_num - 1);
+      worker.cur_bs_rep = instance.bs_reps.at(*bs_num - 1);
+    }
 
     // rebalance sites
     if (ParallelContext::group_master_thread())
     {
-      worker.proc_part_assign = balance_load(instance, bs_rep.site_weights);
+      worker.proc_part_assign = balance_load(instance, worker.cur_bs_rep.site_weights);
     }
     ParallelContext::thread_barrier();
 
@@ -2789,15 +2820,15 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
     {
       // restore search state from checkpoint (tree + model params)
       treeinfo.reset(new TreeInfo(opts, checkp.tree, master_msa, instance.tip_msa_idmap,
-                                  bs_part_assign, bs_rep.site_weights));
+                                  bs_part_assign, worker.cur_bs_rep .site_weights));
       assign_models(*treeinfo, checkp);
     }
     else
     {
       if (ParallelContext::group_master_thread())
         checkp.tree_index = *bs_num;
-      treeinfo.reset(new TreeInfo(opts, bs_start_tree, master_msa, instance.tip_msa_idmap,
-                                  bs_part_assign, bs_rep.site_weights));
+      treeinfo.reset(new TreeInfo(opts, worker.cur_bs_start_tree, master_msa, instance.tip_msa_idmap,
+                                  bs_part_assign, worker.cur_bs_rep .site_weights));
     }
 
     treeinfo->set_topology_constraint(instance.constraint_tree);
@@ -2918,7 +2949,8 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
         (!opts.constraint_tree_file.empty() && opts.use_old_constraint))
     {
       /* only master MPI rank generates starting trees (doesn't work with old constrained search) */
-      build_start_trees(instance, opts.num_threads);
+      auto pars_threads = opts.use_par_pars ? opts.num_threads : 1;
+      build_start_trees(instance, pars_threads);
       ParallelContext::global_mpi_barrier();
     }
     else

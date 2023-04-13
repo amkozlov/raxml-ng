@@ -817,11 +817,16 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_bs_pars = true;
             else if (eopt == "bs-start-rand")
               opts.use_bs_pars = false;
+            else if (eopt == "pars-par")
+              opts.use_par_pars = true;
+            else if (eopt == "pars-seq")
+              opts.use_par_pars = false;
             else if (eopt == "compat-v11")
             {
               compat_ver = 110;
               opts.use_spr_fastclv = false;
               opts.use_bs_pars = false;
+              opts.use_par_pars = false;
               opts.lh_epsilon = DEF_LH_EPSILON_V11;
               opts.lh_epsilon_brlen_triplet = DEF_LH_EPSILON_V11;
             }
@@ -860,6 +865,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       case 49: /* generate bootstrap replicate MSAs */
         opts.command = Command::bsmsa;
+        opts.use_par_pars = false;
         num_commands++;
         break;
 
