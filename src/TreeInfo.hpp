@@ -16,7 +16,6 @@ struct spr_round_params
   int radius_max;
   int ntopol_keep;
   double subtree_cutoff;
-  bool optimized;
   cutoff_info_t cutoff_info;
 
   void reset_cutoff_info(double loglh)
@@ -86,6 +85,7 @@ private:
   double _brlen_max;
   bool _check_lh_impr;
   bool _use_old_constraint;
+  bool _use_spr_fastclv;
   doubleVector _partition_contributions;
 
   void init(const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,

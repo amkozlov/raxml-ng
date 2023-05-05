@@ -5,7 +5,7 @@ using namespace std;
 
 Optimizer::Optimizer (const Options &opts) :
     _lh_epsilon(opts.lh_epsilon), _spr_radius(opts.spr_radius), _spr_cutoff(opts.spr_cutoff), 
-    _optimized_spr(opts.spr_optimized), _nni_epsilon(opts.nni_epsilon), _nni_tolerance(opts.nni_tolerance)
+    _nni_epsilon(opts.nni_epsilon), _nni_tolerance(opts.nni_tolerance)
 {
 }
 
@@ -61,7 +61,6 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
   double &loglh = search_state.loglh;
   int& iter = search_state.iteration;
   spr_round_params& spr_params = search_state.spr_params;
-  spr_params.optimized = _optimized_spr;
   int& best_fast_radius = search_state.fast_spr_radius;
 
   CheckpointStep resume_step = search_state.step;
@@ -255,7 +254,6 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
   // nni_params.tolerance
   const double fast_modopt_eps = 10.;
   const double interim_modopt_eps = 3.;
-  _optimized_spr = true;
 
   // to store all the intermediate trees
   TreeList intermediate_trees;

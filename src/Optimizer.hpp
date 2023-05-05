@@ -24,7 +24,6 @@ private:
   double _lh_epsilon;
   int _spr_radius;
   double _spr_cutoff;
-  bool _optimized_spr;
 
   // nni params
   double _nni_epsilon;

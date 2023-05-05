@@ -83,7 +83,6 @@ static struct option long_options[] =
   {"diff_pred_trees",    required_argument, 0, 0},   /*  59 */
   {"nni-tolerance",      required_argument, 0, 0 },  /*  60 */
   {"nni-epsilon",        required_argument, 0, 0 },  /*  61 */
-  {"spr-optimized",      no_argument, 0, 0},         /*  62 */
   { 0, 0, 0, 0 }
 };
 
@@ -290,6 +289,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   /* use new split-based constraint checking method -> slightly slower, but more reliable */
   opts.use_old_constraint = false;
+  
+  /* disable incremental CLV updates across pruned subtrees in SPR rounds */
+  opts.use_spr_fastclv = true;
 
   /* optimize model and branch lengths */
   opts.optimize_model = true;
@@ -301,7 +303,6 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* default: autodetect best SPR radius */
   opts.spr_radius = -1;
   opts.spr_cutoff = 1.0;
-  opts.spr_optimized = false;
 
   /* default: nni parameters */
   opts.nni_tolerance = 0.1;
@@ -825,6 +826,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_old_constraint = true;
             else if (eopt == "constraint-new")
               opts.use_old_constraint = false;
+            else if (eopt == "fastclv-on")
+              opts.use_spr_fastclv = true;
+            else if (eopt == "fastclv-off")
+              opts.use_spr_fastclv = false;
             else
               throw InvalidOptionValueException("Unknown extra option: " + string(eopt));
           }
@@ -977,11 +982,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
                                             ", please provide a positive real number!\n");
         }
         break;
-      
-      case 62: /* Optimized SPR-round; will have to delete this option later */
-        opts.spr_optimized = true;
-        break;
-            
+              
       default:
         throw  OptionException("Internal error in option parsing");
     }

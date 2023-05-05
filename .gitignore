@@ -43,3 +43,7 @@ release/
 
 # python scripts
 *.py
+
+# some json files
+.vscode/launch.json
+.vscode/tasks.json
