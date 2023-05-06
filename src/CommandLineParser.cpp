@@ -538,6 +538,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         {
           opts.msa_format = FileFormat::fasta;
         }
+        else if (strcasecmp(optarg, "fasta_longlabels") == 0)
+        {
+          opts.msa_format = FileFormat::fasta_longlabels;
+        }
         else if (strcasecmp(optarg, "phylip") == 0)
         {
           opts.msa_format = FileFormat::phylip;

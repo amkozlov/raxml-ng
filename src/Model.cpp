@@ -419,8 +419,8 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
     if (read_param_file(ss, user_srates, param_file))
     {
       // TODO support multi-matrix models
-      if (_submodels.size() > 0)
-        runtime_error("User-defined rates for multi-matrix models are not supported yet!");
+      if (_submodels.size() > 1)
+        throw runtime_error("User-defined rates for multi-matrix models are not supported yet!");
 
       auto smodel = _submodels[0];
       auto num_uniq_rates = smodel.num_uniq_rates();

@@ -45,6 +45,7 @@ enum class FileFormat
 {
   autodetect = 0,
   fasta,
+  fasta_longlabels,
   phylip,
   iphylip,
   vcf,

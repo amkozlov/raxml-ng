@@ -51,9 +51,23 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
       throw runtime_error{"FASTA file contains empty sequence:" + string(header) };
     }
 
-    /*trim trailing whitespace from the sequence label */
+    /* trim trailing whitespace from the sequence label */
     std::string label(header);
     label.erase(label.find_last_not_of(" \n\r\t")+1);
+
+    /* two ways to deal with spaces in headers: */
+    if (stream.long_labels())
+    {
+      /* 1. replace spaces with underscores -> full header is sequence label */
+      std::replace(label.begin(), label.end(), ' ', '_');
+    }
+    else
+    {
+      /* 2. everything after the first space is considered "comment" and ignored */
+      auto p = label.find(' ');
+      if (p != string::npos)
+        label.erase(p);
+    }
 
     msa.append(sequence, label);
     free(sequence);
@@ -280,6 +294,7 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format)
   static vector<FormatNamePair> msa_formats = { {FileFormat::iphylip, "IPHYLIP"},
                                                 {FileFormat::phylip, "PHYLIP"},
                                                 {FileFormat::fasta, "FASTA"},
+                                                {FileFormat::fasta_longlabels, "FASTA (long labels)"},
                                                 {FileFormat::catg, "CATG"},
                                                 {FileFormat::vcf, "VCF"},
                                                 {FileFormat::binary, "RAxML-binary"} };
@@ -307,6 +322,13 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format)
         case FileFormat::fasta:
         {
           FastaStream s(filename);
+          s >> msa;
+          return msa;
+          break;
+        }
+        case FileFormat::fasta_longlabels:
+        {
+          FastaStream s(filename, true);
           s >> msa;
           return msa;
           break;
