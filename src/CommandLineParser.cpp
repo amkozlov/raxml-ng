@@ -79,10 +79,11 @@ static struct option long_options[] =
   {"sitelh",             no_argument, 0, 0 },        /*  55 */
   {"site-weights",       required_argument, 0, 0 },  /*  56 */
   {"bs-write-msa",       no_argument, 0, 0 },        /*  57 */
-  {"adaptive",           no_argument, 0, 0 },        /*  58 */
-  {"diff_pred_trees",    required_argument, 0, 0},   /*  59 */
-  {"nni-tolerance",      required_argument, 0, 0 },  /*  60 */
-  {"nni-epsilon",        required_argument, 0, 0 },  /*  61 */
+  {"lh-epsilon-triplet", required_argument, 0, 0 },   /* 58 */
+  {"adaptive",           no_argument, 0, 0 },        /*  59 */
+  {"diff_pred_trees",    required_argument, 0, 0},   /*  60 */
+  {"nni-tolerance",      required_argument, 0, 0 },  /*  61 */
+  {"nni-epsilon",        required_argument, 0, 0 },  /*  62 */
   { 0, 0, 0, 0 }
 };
 
@@ -299,6 +300,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   /* initialize LH epsilon with default value */
   opts.lh_epsilon = DEF_LH_EPSILON;
+  opts.lh_epsilon_brlen_triplet = DEF_LH_EPSILON_BRLEN_TRIPLET;
 
   /* default: autodetect best SPR radius */
   opts.spr_radius = -1;
@@ -830,6 +832,12 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_spr_fastclv = true;
             else if (eopt == "fastclv-off")
               opts.use_spr_fastclv = false;
+            else if (eopt == "compat-v11")
+            {
+              opts.use_spr_fastclv = false;
+              opts.lh_epsilon = DEF_LH_EPSILON_V11;
+              opts.lh_epsilon_brlen_triplet = DEF_LH_EPSILON_V11;
+            }
             else
               throw InvalidOptionValueException("Unknown extra option: " + string(eopt));
           }
@@ -953,12 +961,19 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.write_bs_msa = true;
         break;
       
-      case 58: /* Adaptive RAxML-ng analysis with difficulty prediction */
+      case 58: /* LH epsilon triplet */
+        if(sscanf(optarg, "%lf", &opts.lh_epsilon_brlen_triplet) != 1 || opts.lh_epsilon_brlen_triplet < 0.)
+          throw InvalidOptionValueException("Invalid triplet LH epsilon parameter value: " +
+                                            string(optarg) +
+                                            ", please provide a positive real number.");
+        break;
+      
+      case 59: /* Adaptive RAxML-ng analysis with difficulty prediction */
         opts.command = Command::adaptive;
         num_commands++;
         break;
       
-      case 59: /* Number of parsimony trees in difficulty prediction */
+      case 60: /* Number of parsimony trees in difficulty prediction */
         
         if (sscanf(optarg, "%d", &opts.diff_pred_pars_trees) != 1 || opts.diff_pred_pars_trees <= 0)
         {
@@ -967,7 +982,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         }
         break;
 
-      case 60: /* NNI tolerance */
+      case 61: /* NNI tolerance */
         if(sscanf(optarg, "%lf", &opts.nni_tolerance) != 1 || opts.nni_tolerance <= 0.)
         {
           throw InvalidOptionValueException("Invalid NNI tolerance: " + string(optarg) +
@@ -975,7 +990,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         }
         break;
       
-      case 61: /* NNI epsilon */
+      case 62: /* NNI epsilon */
         if(sscanf(optarg, "%lf", &opts.nni_epsilon) != 1 || opts.nni_epsilon <= 0.)
         {
           throw InvalidOptionValueException("Invalid NNI epsilon  : " + string(optarg) +
@@ -1088,8 +1103,9 @@ void CommandLineParser::print_help()
             "  --lh-epsilon   VALUE                       log-likelihood epsilon for optimization/tree search (default: 0.1)\n"
             "\n"
             "Topology search options:\n"
-            "  --spr-radius   VALUE                       SPR re-insertion radius for fast iterations (default: AUTO)\n"
-            "  --spr-cutoff   VALUE | off                 relative LH cutoff for descending into subtrees (default: 1.0)\n"
+            "  --spr-radius           VALUE               SPR re-insertion radius for fast iterations (default: AUTO)\n"
+            "  --spr-cutoff           VALUE | off         relative LH cutoff for descending into subtrees (default: 1.0)\n"
+            "  --lh-epsilon-triplet   VALUE               log-likelihood epsilon for branch length triplet optimization (default: 1000)\n"
             "\n"
             "Bootstrapping options:\n"
             "  --bs-trees     VALUE                       number of bootstraps replicates\n"
