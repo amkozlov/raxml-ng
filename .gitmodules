@@ -3,4 +3,4 @@
 	url = https://github.com/amkozlov/terraphast-one
 [submodule "libs/coraxlib"]
 	path = libs/coraxlib
-	url = https://codeberg.org/togkousa/coraxlib.git
+	url = https://codeberg.org/Exelixis-Lab/coraxlib.git
