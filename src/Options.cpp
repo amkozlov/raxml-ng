@@ -298,6 +298,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     case Command::sitelh:
       stream << "Per-site likelihood computation";
       break;
+    case Command::adaptive:
+      stream << "Adaptive ML tree search";
+      break;
     default:
       break;
   }
@@ -405,7 +408,7 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   stream << "  random seed: " << opts.random_seed << endl;
 
   if (opts.command == Command::bootstrap || opts.command == Command::all ||
-      opts.command == Command::search || opts.command == Command::evaluate ||
+      opts.command == Command::search || opts.command == Command::evaluate || opts.command == Command::adaptive ||
       opts.command == Command::parse || opts.command == Command::ancestral)
   {
     stream << "  tip-inner: " << (opts.use_tip_inner ? "ON" : "OFF") << endl;
@@ -417,7 +420,7 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     stream << "general: " << opts.lh_epsilon << ", ";
     stream << "brlen-triplet: " << opts.lh_epsilon_brlen_triplet;
     stream << endl;
-
+    
     if (opts.command == Command::search || opts.command == Command::adaptive || 
         opts.command == Command::all || opts.command == Command::bootstrap)
     {

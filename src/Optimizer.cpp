@@ -259,6 +259,7 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
   // nni_params.tolerance
   const double fast_modopt_eps = 10.;
   const double interim_modopt_eps = 3.;
+  const double final_modopt_eps = 0.1;
 
   // to store all the intermediate trees
   TreeList intermediate_trees;
@@ -274,6 +275,8 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
   spr_round_params& spr_params = search_state.spr_params;
   int slow_spr_radius = adaptive_slow_spr_radius(difficulty); // slow spr radius is determined by difficulty
   slow_spr_radius = min(slow_spr_radius, (int) treeinfo.pll_treeinfo().tip_count - 3 );
+  spr_params.lh_epsilon_brlen_full = _lh_epsilon;
+  spr_params.lh_epsilon_brlen_triplet = _lh_epsilon_brlen_triplet;
   int iter = 0;
 
   // nni round - basics
@@ -416,8 +419,8 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
   } while (impr);
   
   cm.update_and_write(treeinfo);
-  LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << _lh_epsilon << ")" << endl;
-  loglh = optimize_model(treeinfo, _lh_epsilon);
+  LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << final_modopt_eps << ")" << endl;
+  loglh = optimize_model(treeinfo, final_modopt_eps);
 
   cm.update_and_write(treeinfo);
 
