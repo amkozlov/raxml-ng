@@ -14,6 +14,16 @@
 
 using namespace std;
 
+struct AdaptiveCheckpoint
+{
+    double pythiaScore;
+    double bestScore;
+
+    AdaptiveCheckpoint() : pythiaScore(0.0), bestScore(-INFINITY) {}
+    AdaptiveCheckpoint(double pScore, double mlScore) : 
+            pythiaScore(pScore), bestScore(mlScore) {}
+};
+
 class DifficultyPredictor{
 
     private:
@@ -21,8 +31,12 @@ class DifficultyPredictor{
         double difficulty;
         size_t states;
         bool is_dna;
+        bool ckpt;
+        bool nofiles_mode;
         const corax_state_t *states_map;
         const PartitionedMSA* partitioned_msa_ptr;
+        string outfile;
+        double best_ML;
         
         // Parsimony trees treelist
         TreeList pars_tree_list;
@@ -40,19 +54,28 @@ class DifficultyPredictor{
     public:
 
         // constructors
-        DifficultyPredictor();
+        DifficultyPredictor(const string& _outfile, bool _nofiles_mode = false);        
         ~DifficultyPredictor();
         
-        // getters
+        // getter
         double getDifficulty(){ return difficulty; }
 
         // difficulty prediction
-        double predict_difficulty(unsigned int attrs, int n_trees);
+        double predict_difficulty(unsigned int attrs, int n_trees, bool store_in_file = true);
         int numStartTrees(double difficulty, double amp, double mean = 0.5, double s = 0.2);
 
         // setters
         void set_partitioned_msa_ptr(PartitionedMSA* _pmsa);
         void compute_msa_features(corax_msa_t* original_msa, bool _is_dna);
+
+        void store_difficulty_in_binary_file(double score, const string& out_file);
+        double load_pythiascore_chpt(const string& bin_file);
+
+        void set_checkpoint_true() { ckpt = true; }
+        bool checkpoint_mode() {return ckpt;}
+
+        double get_best_ML () { return best_ML; }
+        void set_best_ML(double _best_ML);
     
 };
 

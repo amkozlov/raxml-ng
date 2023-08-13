@@ -189,7 +189,7 @@ void CheckpointManager::reset_search_state()
   ParallelContext::thread_barrier();
 };
 
-void CheckpointManager::save_ml_tree()
+void CheckpointManager::save_ml_tree(DifficultyPredictor* dPred)
 {
   if (ParallelContext::group_master())
   {
@@ -205,6 +205,10 @@ void CheckpointManager::save_ml_tree()
     if (ml_trees.empty() || ckp.loglh() > ml_trees.best_score()){
       _checkp_file.best_models = ckp.models;
       _best_loglh = ckp.loglh();
+
+      if(dPred) 
+        dPred->set_best_ML(_best_loglh);
+      
     }
 
     ml_trees.insert(ckp.tree_index, ScoredTopology(ckp.loglh(), ckp.tree.topology()));

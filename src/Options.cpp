@@ -64,6 +64,7 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.tmp_best_tree, "lastTree.TMP");
   set_default_outfile(outfile_names.tmp_ml_trees, "mlTrees.TMP");
   set_default_outfile(outfile_names.tmp_bs_trees, "bootstraps.TMP");
+  set_default_outfile(outfile_names.pythiaScore, "pythiaScore");
 }
 
 std::string Options::checkp_file() const
@@ -113,6 +114,9 @@ bool Options::result_files_exist() const
     case Command::search:
       return sysutil_file_exists(best_tree_file()) || sysutil_file_exists(best_tree_collapsed_file()) ||
              sysutil_file_exists(best_model_file()) ||sysutil_file_exists(partition_trees_file());
+    case Command::adaptive:
+      return sysutil_file_exists(best_tree_file()) || sysutil_file_exists(best_tree_collapsed_file()) ||
+             sysutil_file_exists(best_model_file()) ||sysutil_file_exists(partition_trees_file());
     case Command::bootstrap:
       return sysutil_file_exists(bootstrap_trees_file());
     case Command::all:
@@ -144,7 +148,7 @@ bool Options::result_files_exist() const
 
 void Options::remove_result_files() const
 {
-  if (command == Command::search || command == Command::all ||
+  if (command == Command::search || command == Command::adaptive || command == Command::all ||
       command == Command::evaluate)
   {
     sysutil_file_remove(best_tree_file());

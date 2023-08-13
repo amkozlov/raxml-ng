@@ -2,8 +2,12 @@
 #include <memory>
 #include <random>
 
-DifficultyPredictor::DifficultyPredictor(){
+DifficultyPredictor::DifficultyPredictor(const string& _outfile, bool _nofiles_mode){
   rf_dist_calc.reset(new RFDistCalculator());
+  outfile = _outfile;
+  ckpt = false;
+  best_ML = -INFINITY;
+  nofiles_mode = _nofiles_mode;
 }
 
 DifficultyPredictor::~DifficultyPredictor(){
@@ -53,7 +57,7 @@ void DifficultyPredictor::set_partitioned_msa_ptr(PartitionedMSA* _pmsa){
   features->bollback_multinomial -= number_of_sites*log(number_of_sites);
 }
 
-double DifficultyPredictor::predict_difficulty(unsigned int attrs, int n_trees){
+double DifficultyPredictor::predict_difficulty(unsigned int attrs, int n_trees, bool store_in_file){
   
   map<std::string, unsigned int> labelToId;
   unsigned int score;
@@ -90,6 +94,11 @@ double DifficultyPredictor::predict_difficulty(unsigned int attrs, int n_trees){
   difficulty = out_pred;
 
   labelToId.clear();
+
+  // storing in binary file before return
+  if(store_in_file)
+    store_difficulty_in_binary_file(out_pred, outfile);
+
   return out_pred;
 }
 
@@ -161,4 +170,57 @@ void DifficultyPredictor::printFeatures(double avg_rff, double prop_unique){
   cout << "Proportion of unique topologies: " << prop_unique << endl;
   cout << "======================================================" << endl;
 
+}
+
+void DifficultyPredictor::store_difficulty_in_binary_file(double score, const string& out_file){
+
+  if(nofiles_mode) return;
+
+  AdaptiveCheckpoint chpt(score, best_ML);
+  ofstream out(out_file, ios::binary);
+
+  if(!out) {
+    cout << "WARNING!! Error in storing Pythia's score in binary file with suffix '.pythiaScore'. " << endl;
+    cout << "There might be errors when rerunning RAxML-NG from a checkpoint. " << endl;
+  } 
+  else
+  {
+    out.write( reinterpret_cast<char*>( &chpt.pythiaScore), sizeof(double));
+    out.write( reinterpret_cast<char*>( &chpt.bestScore), sizeof(double));
+    out.close();
+  }
+}
+
+
+double DifficultyPredictor::load_pythiascore_chpt(const string& bin_file){
+  
+  AdaptiveCheckpoint chpt;
+  difficulty = -1;
+
+  ifstream file (bin_file, ios::in | ios::binary);
+  if (file.is_open())
+  {
+      file.read((char*)&chpt.pythiaScore, sizeof(double));
+      file.read((char*)&chpt.bestScore, sizeof(double));
+  
+  } else {
+
+    LOG_DEBUG << "Unable to open the binary file with suffi '.pythiaScore'" << endl;
+    return -1;
+
+  }
+
+  if (chpt.pythiaScore >= 0 && chpt.pythiaScore <= 1)
+    difficulty = chpt.pythiaScore;
+
+  best_ML = chpt.bestScore;
+
+  return difficulty;
+}
+
+void DifficultyPredictor::set_best_ML(double _best_ML){
+  if(_best_ML > best_ML){
+    best_ML = _best_ML;
+    store_difficulty_in_binary_file(difficulty, outfile);
+  }
 }

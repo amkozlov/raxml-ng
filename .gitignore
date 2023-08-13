@@ -47,3 +47,6 @@ release/
 # some json files
 .vscode/launch.json
 .vscode/tasks.json
+
+# TODO file
+todo.txt

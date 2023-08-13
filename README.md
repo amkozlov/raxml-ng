@@ -104,6 +104,11 @@ If still in doubt, please feel free to post to the [RAxML google group](https://
 
     ./raxml-ng --adaptive --msa testDNA.fa --model GTR+G
 
+  
+  WARNING! The **adaptive** version has been thoroughly tested only on sequential mode.
+  Parallel execution is not guaranteed to work.
+  Parallelization and Checkpointing are currently under development.
+
 ## License and citation
 
 The code is currently licensed under the GNU Affero General Public License version 3.

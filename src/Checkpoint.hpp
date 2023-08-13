@@ -4,6 +4,7 @@
 #include "common.h"
 #include "TreeInfo.hpp"
 #include "io/binary_io.hpp"
+#include "adaptive/DifficultyPredictor.hpp"
 
 constexpr int RAXML_CKP_VERSION = 5;
 constexpr int RAXML_CKP_MIN_SUPPORTED_VERSION = 5;
@@ -20,7 +21,7 @@ enum class CheckpointStep
   start,
   brlenOpt,
   modOpt1,
-  radiusDetect,
+  radiusDetectOrNNI,
   modOpt2,
   fastSPR,
   modOpt3,
@@ -109,7 +110,7 @@ public:
 
   void update_and_write(const TreeInfo& treeinfo);
 
-  void save_ml_tree();
+  void save_ml_tree(DifficultyPredictor* dPred = nullptr);
   void save_bs_tree();
 
   bool read() { return read(_ckp_fname); }
@@ -125,6 +126,7 @@ public:
   void gather_bs_trees();
 
   double best_loglh() {return _best_loglh; }
+  void   set_best_lh_from_chkp(double lh) { if(lh > _best_loglh) _best_loglh = lh; }
 
 private:
   bool _active;
