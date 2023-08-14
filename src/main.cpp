@@ -454,8 +454,18 @@ bool check_msa(RaxmlInstance& instance)
       {
         total_gap_cols += stats->gap_cols_count;
         std::vector<size_t> gap_cols(stats->gap_cols, stats->gap_cols + stats->gap_cols_count);
-        pinfo.msa().remove_sites(gap_cols);
-  //      parted_msa_view.exclude_sites(part_num, gap_cols);
+        if (gap_cols.size() < pinfo.msa().length())
+        {
+          /* Normally, we just remove all-gap columns immediately */
+          pinfo.msa().remove_sites(gap_cols);
+        }
+        else
+        {
+          /* Special case: partition consists of all-gap columns only (no informative sites) ->
+           * remove all-gap partition from the .reduced file, BUT keep it for the current run.
+           * NOTE: all gap columns will be compressed into a single pattern -> no performance loss */
+          parted_msa_view.exclude_sites(part_num, gap_cols);
+        }
       }
 
       std::set<size_t> cur_gap_seq(stats->gap_seqs, stats->gap_seqs + stats->gap_seqs_count);
