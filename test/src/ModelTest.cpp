@@ -311,12 +311,12 @@ TEST(ModelTest, multistate_custom)
 TEST(ModelTest, genotype)
 {
   // buildup
-  auto model = Model(DataType::autodetect, "GTGTR4");
+  auto model = Model(DataType::autodetect, "GT10");
 
   // tests
-  EXPECT_EQ("GTGTR4+FO", model.to_string());
+  EXPECT_EQ("GT10+FO", model.to_string());
   EXPECT_EQ(DataType::genotype10, model.data_type());
-  EXPECT_EQ("GTGTR4", model.name());
+  EXPECT_EQ("GT10", model.name());
   EXPECT_EQ(10, model.num_states());
   EXPECT_EQ(PLLMOD_UTIL_MIXTYPE_FIXED, model.ratehet_mode());
   EXPECT_EQ(1, model.num_ratecats());
