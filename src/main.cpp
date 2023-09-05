@@ -1291,9 +1291,9 @@ void load_parted_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullp
 
     if (difficulty >= 0.7){ // add printout statement
       
-      cout << "WARNING! This dataset is considered hard-to-analyze in the sense that the phylogenetic signal is poor." << endl
+      LOG_INFO << "WARNING! This dataset is considered hard-to-analyze in the sense that the phylogenetic signal is insufficient." << endl
             << "Adaptive RAxML-NG will execute a fast heuristic to quickly infer only a few out of the many equally likely topologies." << endl
-            << "However, the result should not be considered as representative for the true tree" << endl << endl ;
+            << "However, the results should not be considered as representatives for the true tree" << endl << endl ;
     }
 
     if (opts.constraint_tree_file.empty() || !opts.use_old_constraint)
