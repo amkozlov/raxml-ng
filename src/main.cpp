@@ -1164,7 +1164,7 @@ double load_pythia_score_from_log_file(const string& oldLogFile){
     for(unsigned int curLine = 0; getline(fileInput, line); curLine++) {
       size_t pos = line.find(query_line);
       if (pos != string::npos) {
-          string score_string = line.substr(pos+22);
+          string score_string = line.substr(pos+22); // position of pythia score
           pythia_score = std::stod(score_string);
       }
     }
@@ -1228,19 +1228,19 @@ void load_parted_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullp
                 << "unless the invocation corresponds to checkpoint mode. " 
                 << "The input should be either a PHYLIP or FASTA file " << endl;
 
-      if(sysutil_file_exists(instance.opts.log_file())){
-        difficulty = load_pythia_score_from_log_file(instance.opts.log_file());
-        load_best_ML_from_logfile(instance.opts.log_file(), dPred);
-      }
-
+      if(sysutil_file_exists(instance.opts.adaptive_chkpt_file()))
+        difficulty = dPred->load_adaptive_chkpt(instance.opts.adaptive_chkpt_file());
+      
       if(difficulty == -1){ // This is naive, I might change that implemenation later
         
-        cout << "WARNING! The pythia score could not be retrieved from RAxML-NG's logfile. " << endl;
-        cout << "RAxML-NG will try to retrieve the difficulty score from the checkpoint file with suffix '.adaptiveCkp'\n";
+        cout << "WARNING! The pythia score could not be retrieved from the checkpoint file with suffix '.adaptiveCkp'" << endl;
+        cout << "RAxML-NG will make an attempt to retrieve the pythia score from RAxML-NG's logfile.'\n";
       
-        if(sysutil_file_exists(instance.opts.adaptive_chkpt_file()))
-          difficulty = dPred->load_adaptive_chkpt(instance.opts.adaptive_chkpt_file());
-        
+        if(sysutil_file_exists(instance.opts.log_file())){
+          difficulty = load_pythia_score_from_log_file(instance.opts.log_file());
+          load_best_ML_from_logfile(instance.opts.log_file(), dPred);
+        }
+
         else
         {
           throw runtime_error("The file with suffix '.adaptiveCkp' seems to be missing from the checkpoint files. "
@@ -1251,9 +1251,9 @@ void load_parted_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullp
 
       if(difficulty == -1)
       {
-        throw runtime_error("daptive RAxML-NG failed to rettrieve the difficulty score "
+        throw runtime_error("Adaptive RAxML-NG failed to rettrieve the difficulty score "
                             "either from the logfile or from the file with suffix '.adaptiveCkp'. "
-                              "Unfortunately, you will have to rerun RAxML-NG in --redo mode");
+                            "Unfortunately, you will have to rerun RAxML-NG in --redo mode");
       }
     
     }
@@ -1291,7 +1291,7 @@ void load_parted_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullp
 
     LOG_INFO_TS << "Predicted difficulty: " << difficulty << "\n" << endl;
 
-    if (difficulty >= 0.7){ // add printout statement
+    if (difficulty > 0.7){ // Warning printout statement for difficult dataset 
       
       LOG_INFO << "WARNING! This dataset is considered hard-to-analyze in the sense that the phylogenetic signal is insufficient." << endl
             << "Adaptive RAxML-NG will execute a fast heuristic to quickly infer only a few out of the many equally likely topologies." << endl

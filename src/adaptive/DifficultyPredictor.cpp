@@ -181,7 +181,7 @@ void DifficultyPredictor::store_difficulty_in_chkpt_file(double score, const str
 
   if(!out) {
     cout << "WARNING!! Error in storing Pythia's score in binary file with suffix '.adaptiveCkp'. " << endl;
-    cout << "There might be errors when rerunning RAxML-NG from a checkpoint. " << endl;
+    cout << "There might occur errors when rerunning RAxML-NG from a checkpoint. " << endl;
   } 
   else
   {
