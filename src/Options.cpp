@@ -64,7 +64,7 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.tmp_best_tree, "lastTree.TMP");
   set_default_outfile(outfile_names.tmp_ml_trees, "mlTrees.TMP");
   set_default_outfile(outfile_names.tmp_bs_trees, "bootstraps.TMP");
-  set_default_outfile(outfile_names.pythiaScore, "pythiaScore");
+  set_default_outfile(outfile_names.adaptiveCkp, "adaptiveCkp");
 }
 
 std::string Options::checkp_file() const

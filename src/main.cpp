@@ -1062,11 +1062,11 @@ void load_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullptr)
 
   /* load MSA */
   auto msa = msa_load_from_file(opts.msa_file, opts.msa_format);
-  if(dPred){
-    bool isDna = instance.parted_msa->models().at(0).data_type() == DataType::dna ? true : false;
-    dPred->compute_msa_features(msa.pll_msa_nonconst(), isDna);
-  }
-
+  
+  if(dPred) // adaptive mode
+    dPred->compute_msa_features(msa.pll_msa_nonconst(), 
+              instance.parted_msa->models().at(0).data_type() == DataType::dna ? true : false);
+  
   if (!msa.size())
     throw runtime_error("Alignment file is empty!");
 
@@ -1224,7 +1224,8 @@ void load_parted_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullp
   { 
     if (dPred){
 
-      LOG_DEBUG << "WARNING: You cannot invoke Adaptive RAxML-NG with input MSA a binary file. " 
+      LOG_DEBUG << "WARNING: You cannot invoke Adaptive RAxML-NG with input MSA a binary file, "
+                << "unless the invocation corresponds to checkpoint mode. " 
                 << "The input should be either a PHYLIP or FASTA file " << endl;
 
       if(sysutil_file_exists(instance.opts.log_file())){
@@ -1235,22 +1236,23 @@ void load_parted_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullp
       if(difficulty == -1){ // This is naive, I might change that implemenation later
         
         cout << "WARNING! The pythia score could not be retrieved from RAxML-NG's logfile. " << endl;
-        cout << "RAxML-NG will try to retrieve the difficulty score from the checkpoint file with suffix '.pythiaScore'\n\n";
+        cout << "RAxML-NG will try to retrieve the difficulty score from the checkpoint file with suffix '.adaptiveCkp'\n";
       
-        if(sysutil_file_exists(instance.opts.pythia_score_file()))
-          difficulty = dPred->load_pythiascore_chpt(instance.opts.pythia_score_file());
+        if(sysutil_file_exists(instance.opts.adaptive_chkpt_file()))
+          difficulty = dPred->load_adaptive_chkpt(instance.opts.adaptive_chkpt_file());
         
         else
         {
-          throw runtime_error("The file with suffix '.pythiaScore' seems to be missing from the checkpoint files. "
-                              "Unfortunately, you will have to rerun RAxML-NG in --redo mode");  
+          throw runtime_error("The file with suffix '.adaptiveCkp' seems to be missing from the checkpoint files. "
+                              "Unfortunately, you will have to rerun RAxML-NG in --redo mode");
+          
         }
       }
 
       if(difficulty == -1)
       {
         throw runtime_error("daptive RAxML-NG failed to rettrieve the difficulty score "
-                            "either from the logfile or from the file with suffix '.pythiaScore'. "
+                            "either from the logfile or from the file with suffix '.adaptiveCkp'. "
                               "Unfortunately, you will have to rerun RAxML-NG in --redo mode");
       }
     
@@ -3143,7 +3145,7 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   // Difficulty Predictor for adaptive RAxML-NG
   // The Difficulty Predictor is one object shared by all threads (in any parallelization scheme)
   shared_ptr<DifficultyPredictor> dPred = 
-    make_shared<DifficultyPredictor>(instance.opts.pythia_score_file(), opts.nofiles_mode);
+    make_shared<DifficultyPredictor>(instance.opts.adaptive_chkpt_file(), opts.nofiles_mode);
 
   /* If resuming from a checkpoint on adaptive mode*/
   // Still single thread execution
@@ -3161,8 +3163,8 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   
   } catch(const runtime_error& error){
     
-    cout << "ERROR! " << error.what() << endl;
     throw error;
+
   }
 
   assert(instance.parted_msa);

@@ -97,7 +97,7 @@ double DifficultyPredictor::predict_difficulty(unsigned int attrs, int n_trees, 
 
   // storing in binary file before return
   if(store_in_file)
-    store_difficulty_in_binary_file(out_pred, outfile);
+    store_difficulty_in_chkpt_file(out_pred, outfile);
 
   return out_pred;
 }
@@ -172,7 +172,7 @@ void DifficultyPredictor::printFeatures(double avg_rff, double prop_unique){
 
 }
 
-void DifficultyPredictor::store_difficulty_in_binary_file(double score, const string& out_file){
+void DifficultyPredictor::store_difficulty_in_chkpt_file(double score, const string& out_file){
 
   if(nofiles_mode) return;
 
@@ -180,19 +180,19 @@ void DifficultyPredictor::store_difficulty_in_binary_file(double score, const st
   ofstream out(out_file, ios::binary);
 
   if(!out) {
-    cout << "WARNING!! Error in storing Pythia's score in binary file with suffix '.pythiaScore'. " << endl;
+    cout << "WARNING!! Error in storing Pythia's score in binary file with suffix '.adaptiveCkp'. " << endl;
     cout << "There might be errors when rerunning RAxML-NG from a checkpoint. " << endl;
   } 
   else
   {
     out.write( reinterpret_cast<char*>( &chpt.pythiaScore), sizeof(double));
-    out.write( reinterpret_cast<char*>( &chpt.bestScore), sizeof(double));
+    out.write( reinterpret_cast<char*>( &chpt.bestML), sizeof(double));
     out.close();
   }
 }
 
 
-double DifficultyPredictor::load_pythiascore_chpt(const string& bin_file){
+double DifficultyPredictor::load_adaptive_chkpt(const string& bin_file){
   
   AdaptiveCheckpoint chpt;
   difficulty = -1;
@@ -201,11 +201,11 @@ double DifficultyPredictor::load_pythiascore_chpt(const string& bin_file){
   if (file.is_open())
   {
       file.read((char*)&chpt.pythiaScore, sizeof(double));
-      file.read((char*)&chpt.bestScore, sizeof(double));
+      file.read((char*)&chpt.bestML, sizeof(double));
   
   } else {
 
-    LOG_DEBUG << "Unable to open the binary file with suffi '.pythiaScore'" << endl;
+    LOG_DEBUG << "Unable to open the binary file with suffix '.adaptiveCkp'" << endl;
     return -1;
 
   }
@@ -213,7 +213,7 @@ double DifficultyPredictor::load_pythiascore_chpt(const string& bin_file){
   if (chpt.pythiaScore >= 0 && chpt.pythiaScore <= 1)
     difficulty = chpt.pythiaScore;
 
-  best_ML = chpt.bestScore;
+  best_ML = chpt.bestML;
 
   return difficulty;
 }
@@ -221,6 +221,6 @@ double DifficultyPredictor::load_pythiascore_chpt(const string& bin_file){
 void DifficultyPredictor::set_best_ML(double _best_ML){
   if(_best_ML > best_ML){
     best_ML = _best_ML;
-    store_difficulty_in_binary_file(difficulty, outfile);
+    store_difficulty_in_chkpt_file(difficulty, outfile);
   }
 }

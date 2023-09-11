@@ -17,11 +17,11 @@ using namespace std;
 struct AdaptiveCheckpoint
 {
     double pythiaScore;
-    double bestScore;
+    double bestML;
 
-    AdaptiveCheckpoint() : pythiaScore(0.0), bestScore(-INFINITY) {}
+    AdaptiveCheckpoint() : pythiaScore(0.0), bestML(-INFINITY) {}
     AdaptiveCheckpoint(double pScore, double mlScore) : 
-            pythiaScore(pScore), bestScore(mlScore) {}
+            pythiaScore(pScore), bestML(mlScore) {}
 };
 
 class DifficultyPredictor{
@@ -68,8 +68,8 @@ class DifficultyPredictor{
         void set_partitioned_msa_ptr(PartitionedMSA* _pmsa);
         void compute_msa_features(corax_msa_t* original_msa, bool _is_dna);
 
-        void store_difficulty_in_binary_file(double score, const string& out_file);
-        double load_pythiascore_chpt(const string& bin_file);
+        void store_difficulty_in_chkpt_file(double score, const string& out_file);
+        double load_adaptive_chkpt(const string& bin_file);
 
         void set_checkpoint_true() { ckpt = true; }
         bool checkpoint_mode() {return ckpt;}
