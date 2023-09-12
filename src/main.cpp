@@ -81,9 +81,6 @@ struct RaxmlInstance
   BootstrapReplicateList bs_reps;
   TreeList bs_start_trees;
 
-  // Maximum Likelihood trees - adaptive search
-  // TreeList ML_trees;
-
   /* IDs of the trees that have been already inferred (eg after resuming from a checkpoint) */
   IDSet done_ml_trees;
   IDSet done_bs_trees;
@@ -3079,25 +3076,6 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm, DifficultyPredi
     ParallelContext::global_barrier();
   }
 
-  /* if (ParallelContext::master() && opts.command == Command::adaptive){
-
-    cout << "\nNumber of trees = " << instance.ML_trees.size() << endl;
-    RFDistCalculator rf_calc(instance.ML_trees);
-    cout << "Average RF distance = " << rf_calc.avg_rrf() << endl;
-    cout << "Number of unique topologies " << rf_calc.num_uniq_trees() << endl;
-
-    cout << "\n-----------------------------------------\n" << endl;
-    unsigned max_freq_i = rf_calc.get_topology_with_highest_freq();
-    cout << "Topology of highest frequency: " << max_freq_i << endl;
-    cout << "ML searces: "; 
-
-    for(size_t i = 0; i< instance.ML_trees.size(); i++)
-      if(rf_calc.map_tree_into_topology(i) == max_freq_i) cout << i << ", ";
-    
-    
-    cout << "\b\b are mapped into topology " << max_freq_i << endl;
-  } */
-
   ParallelContext::global_barrier();
 
   if ((opts.command == Command::bootstrap || opts.command == Command::all))
@@ -3112,6 +3090,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm, DifficultyPredi
 void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 {
   auto const& opts = instance.opts;
+  shared_ptr<DifficultyPredictor> dPred;
 
   /* init load balancer */
   switch(opts.load_balance_method)
@@ -3144,8 +3123,8 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   // Difficulty Predictor for adaptive RAxML-NG
   // The Difficulty Predictor is one object shared by all threads (in any parallelization scheme)
-  shared_ptr<DifficultyPredictor> dPred = 
-    make_shared<DifficultyPredictor>(instance.opts.adaptive_chkpt_file(), opts.nofiles_mode);
+  if(opts.command == Command::adaptive)
+    dPred = make_shared<DifficultyPredictor>(instance.opts.adaptive_chkpt_file(), opts.nofiles_mode);
 
   /* If resuming from a checkpoint on adaptive mode*/
   // Still single thread execution
