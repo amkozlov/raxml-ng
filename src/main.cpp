@@ -310,12 +310,21 @@ void print_reduced_msa(const RaxmlInstance& instance, const PartitionedMSAView& 
   }
 }
 
-bool check_msa_global(const MSA& msa)
+bool command_involves_search(const Command& command)
+{
+  return command == Command::bootstrap 
+    || command == Command::search
+    || command == Command::bsmsa
+    || command == Command::start
+    || command == Command::bsconverge;
+}
+
+bool check_msa_global(const MSA& msa, const Command& command)
 {
   bool msa_valid = true;
 
   /* check taxa count */
-  if (msa.size() < 4)
+  if (msa.size() < 4 && command_involves_search(command))
   {
     LOG_ERROR << "\nERROR: Your alignment contains less than 4 sequences! " << endl;
     msa_valid = false;
@@ -1088,7 +1097,7 @@ void load_msa(RaxmlInstance& instance)
   else
     instance.opts.use_prob_msa = false;
 
-  if (!check_msa_global(msa))
+  if (!check_msa_global(msa, instance.opts.command))
     throw runtime_error("Alignment check failed (see details above)!");
 
   load_msa_weights(msa, opts);
