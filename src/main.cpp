@@ -310,15 +310,23 @@ void print_reduced_msa(const RaxmlInstance& instance, const PartitionedMSAView& 
   }
 }
 
-bool check_msa_global(const MSA& msa)
+bool check_msa_global(const MSA& msa, const Options& opts)
 {
   bool msa_valid = true;
 
   /* check taxa count */
   if (msa.size() < 4)
   {
-    LOG_ERROR << "\nERROR: Your alignment contains less than 4 sequences! " << endl;
-    msa_valid = false;
+    if (msa.size() == 3 && opts.command == Command::evaluate)
+    {
+      /* explicitly allow --evaluate for 3-taxa trees */
+      LOG_WARN << "\nWARNING: Your alignment contains less than 4 sequences! " << endl;
+    }
+    else
+    {
+      LOG_ERROR << "\nERROR: Your alignment contains less than 4 sequences! " << endl;
+      msa_valid = false;
+    }
   }
 
   /* check for duplicate taxon names */
@@ -1088,7 +1096,7 @@ void load_msa(RaxmlInstance& instance)
   else
     instance.opts.use_prob_msa = false;
 
-  if (!check_msa_global(msa))
+  if (!check_msa_global(msa, instance.opts))
     throw runtime_error("Alignment check failed (see details above)!");
 
   load_msa_weights(msa, opts);
