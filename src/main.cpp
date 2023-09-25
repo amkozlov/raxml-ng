@@ -462,7 +462,7 @@ bool check_msa(RaxmlInstance& instance)
       {
         total_gap_cols += stats->gap_cols_count;
         std::vector<size_t> gap_cols(stats->gap_cols, stats->gap_cols + stats->gap_cols_count);
-        if (gap_cols.size() < pinfo.msa().length())
+        if (gap_cols.size() < pinfo.msa().length() && opts.command != Command::sitelh)
         {
           /* Normally, we just remove all-gap columns immediately */
           pinfo.msa().remove_sites(gap_cols);
