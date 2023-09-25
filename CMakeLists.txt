@@ -131,7 +131,10 @@ message(STATUS "Using flags: ${CMAKE_CXX_FLAGS}")
 
 # build dependencies
 set(RAXML_LOCALDEPS_DIR ${PROJECT_BINARY_DIR}/localdeps)
+set(CORAX_BUILD_DIFFICULTY_PREDICTION ON CACHE BOOL "Build difficulty prediction module")
 add_subdirectory(${PROJECT_SOURCE_DIR}/libs)
+# set(CORAX_BUILD_DIFFICULTY_PREDICTION ON)
+
 
 include_directories(${RAXML_LOCALDEPS_DIR}/include ${TERRACES_INCLUDE_DIR} ${PROJECT_SOURCE_DIR}/libs/coraxlib/src)
 
