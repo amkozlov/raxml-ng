@@ -261,9 +261,6 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
   const double interim_modopt_eps = 3.;
   const double final_modopt_eps = 0.1;
 
-  // to store all the intermediate trees
-  TreeList intermediate_trees;
-
   SearchState local_search_state = cm.search_state();
   auto& search_state = ParallelContext::group_master_thread() ? cm.search_state() : local_search_state;
   ParallelContext::barrier();
@@ -304,10 +301,6 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
           return false;;
       };
 
-
-  // rf distance calculator
-  std::unique_ptr<RFDistCalculator> rfDist(new RFDistCalculator());
-
   /* Compute initial LH of the starting tree */
   loglh = treeinfo.loglh();
 
@@ -330,10 +323,6 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
     iter = 0;
   }
 
-  /* push back the initial tree */
-  intermediate_trees.emplace_back(treeinfo.tree());
-  rfDist->set_tree_list(intermediate_trees);
-
   // If the dataset is "easy" or "difficult", start with an NNI round
   if (do_step(CheckpointStep::radiusDetectOrNNI)){
     cm.update_and_write(treeinfo);
@@ -347,7 +336,6 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
     if(difficulty < 0.3 || difficulty > 0.7){
       LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << interim_modopt_eps << ")" << endl;
       loglh = optimize_model(treeinfo, fast_modopt_eps);
-      intermediate_trees.emplace_back(treeinfo.tree());
     }
   }
 
@@ -372,10 +360,8 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
 
     }
     
-    size_t rf_distance = 1;
-
     /* Fast SPR-NNI rounds */
-    while(!converged(cm, loglh, 0.01) && rf_distance != 0 && impr) {
+    while(!converged(cm, loglh, 0.01) && impr) {
 
       cm.update_and_write(treeinfo);
       ++iter;
@@ -388,24 +374,6 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
       
       // nni round
       nni(treeinfo, nni_params, loglh);
-
-
-      if(intermediate_trees.size() == 1){
-        
-        intermediate_trees.emplace_back(treeinfo.tree());
-        rfDist->recalculate_rf();
-        rf_distance = rfDist->rf(0,1);
-          
-      } else {
-
-        intermediate_trees.emplace_back(treeinfo.tree());
-        intermediate_trees.erase(intermediate_trees.begin());
-        assert(intermediate_trees.size() == 2);
-
-        rfDist->recalculate_rf();
-        rf_distance = rfDist->rf(0,1);
-      
-      }
 
       if (spr_params.radius_min + radius_step < radius_limit)
       {
@@ -542,16 +510,17 @@ bool Optimizer::first_search_done(CheckpointManager& cm){
 }
 
 bool Optimizer::converged(CheckpointManager& cm, double test_loglh, double epsilon){
-  if(first_search_done(cm)){
+  return false;
+  /* if(first_search_done(cm)){
     return convergence_rate(cm,test_loglh) < epsilon ? true : false;
   } 
-  else return false;
+  else return false; */
 }
 
 int Optimizer::adaptive_slow_spr_radius(double difficulty){
   if (difficulty <= 0.5){
-    return (int) (50*difficulty + 5);
+    return (int) (30*difficulty + 5);
   } else {
-    return (int) (-50*difficulty + 55);
+    return (int) (-30*difficulty + 35);
   }
 }

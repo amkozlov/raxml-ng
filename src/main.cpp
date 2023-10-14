@@ -1285,7 +1285,7 @@ void load_parted_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullp
                                             instance.opts.diff_pred_pars_trees,
                                             instance.opts.nofiles_mode? false : true);
     } 
-
+  
     LOG_INFO_TS << "Predicted difficulty: " << difficulty << "\n" << endl;
 
     if (difficulty > 0.7){ // Warning printout statement for difficult dataset 
@@ -1297,8 +1297,8 @@ void load_parted_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullp
 
     if (opts.constraint_tree_file.empty() || !opts.use_old_constraint)
     {
+      opts.start_trees[StartingTree::random] = dPred->numStartTrees(difficulty, 4  , 0.5, 0.25);
       opts.start_trees[StartingTree::parsimony] = dPred->numStartTrees(difficulty, 7.0, 0.5, 0.25);
-      opts.start_trees[StartingTree::random] = dPred->numStartTrees(difficulty, 5.5  , 0.5, 0.2);
     }
     else
       opts.start_trees[StartingTree::random] = 2*dPred->numStartTrees(difficulty, 8.0, 0.5, 0.3);
@@ -2812,13 +2812,13 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm, DifficultyP
         " distinct starting trees" << endl;
   }
 
-  if(opts.command == Command::adaptive && dPred->checkpoint_mode()) {
+  /* if(opts.command == Command::adaptive && dPred->checkpoint_mode()) {
     if (ParallelContext::group_master_thread())
     {
       ParallelContext::UniqueLock lock;
       cm.set_best_lh_from_chkp(dPred->get_best_ML());
     }
-  }
+  } */
 
   (instance.start_trees.size() > 1 ? LOG_RESULT : LOG_INFO) << endl;
 
