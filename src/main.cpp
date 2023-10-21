@@ -1173,39 +1173,6 @@ double load_pythia_score_from_log_file(const string& oldLogFile){
   return pythia_score;
 }
 
-void load_best_ML_from_logfile(const string& oldLogFile, DifficultyPredictor* dPred){
-  
-  LOG_DEBUG << "Trying to load best likelihood score found so far from log file " << endl;
-  ifstream fileInput;
-  string line;
-  string query_line = "ML tree search #"; // search in log files
-  double ml_score;
-
-  // open file to search
-  fileInput.open(oldLogFile.c_str());
-  
-  if(fileInput.is_open()) {
-    for(unsigned int curLine = 0; getline(fileInput, line); curLine++) {
-      size_t pos = line.find(query_line);
-      
-      if (pos != string::npos) {
-          pos = line.find("logLikelihood:");
-          if (pos != string::npos && pos + 16 < line.length()){ // pos + 15 is the position that the lh-score starts
-            string score_string = line.substr(pos+15);
-            ml_score = std::stod(score_string);
-            dPred->set_best_ML(ml_score);
-          }
-      }
-    }
-
-    fileInput.close();
-  }
-  else
-    cout << "WARNING! Unable to open the log file to search for the best ML score." << endl;
-  
-
-}
-
 void load_parted_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullptr)
 {
   init_part_info(instance);
@@ -1233,10 +1200,8 @@ void load_parted_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullp
         cout << "WARNING! The pythia score could not be retrieved from the checkpoint file with suffix '.adaptiveCkp'" << endl;
         cout << "RAxML-NG will make an attempt to retrieve the pythia score from RAxML-NG's logfile.'\n";
       
-        if(sysutil_file_exists(instance.opts.log_file())){
+        if(sysutil_file_exists(instance.opts.log_file()))
           difficulty = load_pythia_score_from_log_file(instance.opts.log_file());
-          load_best_ML_from_logfile(instance.opts.log_file(), dPred);
-        }
 
         else
         {
@@ -1297,7 +1262,7 @@ void load_parted_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullp
 
     if (opts.constraint_tree_file.empty() || !opts.use_old_constraint)
     {
-      opts.start_trees[StartingTree::random] = dPred->numStartTrees(difficulty, 4  , 0.5, 0.25);
+      opts.start_trees[StartingTree::random] = dPred->numStartTrees(difficulty, 3.5  , 0.5, 0.25);
       opts.start_trees[StartingTree::parsimony] = dPred->numStartTrees(difficulty, 7.0, 0.5, 0.25);
     }
     else
@@ -2877,18 +2842,19 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm, DifficultyP
     else
     {
       if(opts.command == Command::adaptive){
-        optimizer.optimize_topology_adaptive(*treeinfo, cm, dPred->getDifficulty());
+        double difficulty = dPred->getDifficulty();
+        unsigned int n_taxa = treeinfo->pll_treeinfo().tip_count;
+        
+        if((difficulty>0.4 && difficulty < 0.6) && n_taxa > 700)
+          optimizer.optimize_topology(*treeinfo, cm);
+        else 
+          optimizer.optimize_topology_adaptive(*treeinfo, cm, difficulty);
+        
         LOG_PROGR << endl;
         LOG_WORKER_TS(log_level) << "ML tree search #" << start_tree_num <<
                             ", logLikelihood: " << FMT_LH(checkp.loglh()) << endl;
         LOG_PROGR << endl;
 
-        /* if (ParallelContext::group_master_thread())
-        {
-          ParallelContext::UniqueLock lock;
-          instance.ML_trees.emplace_back(treeinfo->tree());
-        } */
-      
       } else{
         optimizer.optimize_topology(*treeinfo, cm);
         LOG_PROGR << endl;
@@ -2908,7 +2874,7 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm, DifficultyP
       treeinfo->persite_loglh(part_site_lh);
     }
 
-    cm.save_ml_tree(opts.command == Command::adaptive ? dPred : nullptr);
+    cm.save_ml_tree();
     cm.reset_search_state();
 
     // coarse: collect ML trees from MPI workers

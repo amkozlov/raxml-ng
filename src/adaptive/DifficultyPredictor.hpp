@@ -17,11 +17,10 @@ using namespace std;
 struct AdaptiveCheckpoint
 {
     double pythiaScore;
-    double bestML;
 
-    AdaptiveCheckpoint() : pythiaScore(0.0), bestML(-INFINITY) {}
-    AdaptiveCheckpoint(double pScore, double mlScore) : 
-            pythiaScore(pScore), bestML(mlScore) {}
+    AdaptiveCheckpoint() : pythiaScore(0.0) {}
+    AdaptiveCheckpoint(double pScore) : 
+            pythiaScore(pScore) {}
 };
 
 class DifficultyPredictor{
@@ -36,7 +35,6 @@ class DifficultyPredictor{
         const corax_state_t *states_map;
         const PartitionedMSA* partitioned_msa_ptr;
         string outfile;
-        double best_ML;
         
         // Parsimony trees treelist
         TreeList pars_tree_list;
@@ -73,9 +71,6 @@ class DifficultyPredictor{
 
         void set_checkpoint_true() { ckpt = true; }
         bool checkpoint_mode() {return ckpt;}
-
-        double get_best_ML () { return best_ML; }
-        void set_best_ML(double _best_ML);
     
 };
 

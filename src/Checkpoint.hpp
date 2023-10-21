@@ -110,7 +110,7 @@ public:
 
   void update_and_write(const TreeInfo& treeinfo);
 
-  void save_ml_tree(DifficultyPredictor* dPred = nullptr);
+  void save_ml_tree();
   void save_bs_tree();
 
   bool read() { return read(_ckp_fname); }
@@ -125,17 +125,13 @@ public:
   void gather_ml_trees();
   void gather_bs_trees();
 
-  double best_loglh() {return _best_loglh; }
-  void   set_best_lh_from_chkp(double lh) { if(lh > _best_loglh) _best_loglh = lh; }
-
 private:
   bool _active;
   std::string _ckp_fname;
   CheckpointFile _checkp_file;
   IDSet _updated_models;
   SearchState _empty_search_state;
-  double _best_loglh;
-
+  
   void gather_model_params();
   std::string backup_fname() const { return _ckp_fname + ".bk"; }
 };
