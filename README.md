@@ -135,7 +135,7 @@ When using the **adaptive** RAxML-NG version, please cite [this paper](https://a
 Anastasis Togkousidis, Oleksiy M Kozlov, Julia Haag, Dimitri Höhler, Alexandros Stamatakis (2023)
 **Adaptive RAxML-NG: Accelerating Phylogenetic Inference under Maximum Likelihood using Dataset Difficulty.**
 *Molecular Biology and Evolution, 40 (10)*
-doi:[10.1093/molbev/msad227][https://doi.org/10.1093/molbev/msad227]
+doi:[10.1093/molbev/msad227](https://doi.org/10.1093/molbev/msad227)
 
 ## The team
 
