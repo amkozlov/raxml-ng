@@ -115,9 +115,8 @@ If still in doubt, please feel free to post to the [RAxML google group](https://
     ./raxml-ng --adaptive --msa testDNA.fa --model GTR+G
 
   
-  WARNING! The **adaptive** version has been thoroughly tested only on sequential mode.
-  Parallel execution is not guaranteed to work.
-  Parallelization and Checkpointing are currently under development.
+  WARNING! The heuristic for the **adaptive** version is still under development.
+  Parallelization and already implemented. The tool will soon be released.
 
 ## License and citation
 
@@ -129,6 +128,14 @@ Alexey M. Kozlov, Diego Darriba, Tom&aacute;&scaron; Flouri, Benoit Morel, and A
 **RAxML-NG: A fast, scalable, and user-friendly tool for maximum likelihood phylogenetic inference.** 
 *Bioinformatics, 35 (21), 4453-4455* 
 doi:[10.1093/bioinformatics/btz305](https://doi.org/10.1093/bioinformatics/btz305)
+
+
+When using the **adaptive** RAxML-NG version, please cite [this paper](https://academic.oup.com/mbe/article/40/10/msad227/7296053):
+
+Anastasis Togkousidis, Oleksiy M Kozlov, Julia Haag, Dimitri Höhler, Alexandros Stamatakis (2023)
+**Adaptive RAxML-NG: Accelerating Phylogenetic Inference under Maximum Likelihood using Dataset Difficulty.**
+*Molecular Biology and Evolution, 40 (10)*
+doi:[10.1093/molbev/msad227][https://doi.org/10.1093/molbev/msad227]
 
 ## The team
 
