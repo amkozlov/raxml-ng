@@ -116,7 +116,7 @@ If still in doubt, please feel free to post to the [RAxML google group](https://
 
   
   WARNING! The heuristic for the **adaptive** version is still under development.
-  Parallelization and already implemented. The tool will soon be released.
+  Parallelization and checkpointing are already implemented. The tool will be released soon.
 
 ## License and citation
 
