@@ -31,10 +31,8 @@ private:
   double _nni_tolerance;
 
   // functions for adaptive mode
-  double convergence_rate(CheckpointManager& cm, double test_loglh);
-  bool first_search_done(CheckpointManager& cm);
-  bool converged(CheckpointManager& cm, double test_loglh, double epsilon);
-  int adaptive_slow_spr_radius(double difficulty);
+  int spr_radius_limit_adaptive(double difficulty);
+  int spr_radius_step_adaptive(int spr_radius_max, bool slow_spr);
 };
 
 #endif /* RAXML_OPTIMIZER_H_ */

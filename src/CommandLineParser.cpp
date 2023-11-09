@@ -307,8 +307,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.spr_cutoff = 1.0;
 
   /* default: nni parameters */
-  opts.nni_tolerance = 0.1;
-  opts.nni_epsilon = 0.1;
+  opts.nni_tolerance = 10;
+  opts.nni_epsilon = 10;
 
   /* bootstrapping / bootstopping */
   opts.bs_metrics.push_back(BranchSupportMetric::fbp);

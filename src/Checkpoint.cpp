@@ -82,7 +82,6 @@ CheckpointManager::CheckpointManager(const Options& opts) :
     _active(opts.nofiles_mode ? false : true), _ckp_fname(opts.checkp_file())
 {
   _checkp_file.opts = opts;
-  _best_loglh = -INFINITY;
 }
 
 const Checkpoint& CheckpointManager::checkpoint(size_t ckp_id) const
@@ -189,7 +188,7 @@ void CheckpointManager::reset_search_state()
   ParallelContext::thread_barrier();
 };
 
-void CheckpointManager::save_ml_tree(DifficultyPredictor* dPred)
+void CheckpointManager::save_ml_tree()
 {
   if (ParallelContext::group_master())
   {
@@ -202,14 +201,8 @@ void CheckpointManager::save_ml_tree(DifficultyPredictor* dPred)
 //           ParallelContext::group_id(), index, ckp.loglh());
 
     auto& ml_trees = _checkp_file.ml_trees;
-    if (ml_trees.empty() || ckp.loglh() > ml_trees.best_score()){
+    if (ml_trees.empty() || ckp.loglh() > ml_trees.best_score())
       _checkp_file.best_models = ckp.models;
-      _best_loglh = ckp.loglh();
-
-      if(dPred) 
-        dPred->set_best_ML(_best_loglh);
-      
-    }
 
     ml_trees.insert(ckp.tree_index, ScoredTopology(ckp.loglh(), ckp.tree.topology()));
 

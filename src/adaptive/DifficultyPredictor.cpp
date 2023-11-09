@@ -6,7 +6,6 @@ DifficultyPredictor::DifficultyPredictor(const string& _outfile, bool _nofiles_m
   rf_dist_calc.reset(new RFDistCalculator());
   outfile = _outfile;
   ckpt = false;
-  best_ML = -INFINITY;
   nofiles_mode = _nofiles_mode;
 }
 
@@ -176,7 +175,7 @@ void DifficultyPredictor::store_difficulty_in_chkpt_file(double score, const str
 
   if(nofiles_mode) return;
 
-  AdaptiveCheckpoint chpt(score, best_ML);
+  AdaptiveCheckpoint chpt(score);
   ofstream out(out_file, ios::binary);
 
   if(!out) {
@@ -186,7 +185,6 @@ void DifficultyPredictor::store_difficulty_in_chkpt_file(double score, const str
   else
   {
     out.write( reinterpret_cast<char*>( &chpt.pythiaScore), sizeof(double));
-    out.write( reinterpret_cast<char*>( &chpt.bestML), sizeof(double));
     out.close();
   }
 }
@@ -200,9 +198,7 @@ double DifficultyPredictor::load_adaptive_chkpt(const string& bin_file){
   ifstream file (bin_file, ios::in | ios::binary);
   if (file.is_open())
   {
-      file.read((char*)&chpt.pythiaScore, sizeof(double));
-      file.read((char*)&chpt.bestML, sizeof(double));
-  
+    file.read((char*)&chpt.pythiaScore, sizeof(double));
   } else {
 
     LOG_DEBUG << "Unable to open the binary file with suffix '.adaptiveCkp'" << endl;
@@ -213,14 +209,5 @@ double DifficultyPredictor::load_adaptive_chkpt(const string& bin_file){
   if (chpt.pythiaScore >= 0 && chpt.pythiaScore <= 1)
     difficulty = chpt.pythiaScore;
 
-  best_ML = chpt.bestML;
-
   return difficulty;
-}
-
-void DifficultyPredictor::set_best_ML(double _best_ML){
-  if(_best_ML > best_ML){
-    best_ML = _best_ML;
-    store_difficulty_in_chkpt_file(difficulty, outfile);
-  }
 }
