@@ -307,7 +307,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.spr_cutoff = 1.0;
 
   /* default: nni parameters */
-  opts.nni_tolerance = 10;
+  opts.nni_tolerance = 1.0;
   opts.nni_epsilon = 10;
 
   /* bootstrapping / bootstopping */

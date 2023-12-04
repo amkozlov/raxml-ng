@@ -321,43 +321,32 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
     iter = 0;
   }
 
-  // If the dataset is "easy" or "difficult", start with an NNI round
-  if (do_step(CheckpointStep::radiusDetectOrNNI)){
-    cm.update_and_write(treeinfo);
-    if (easy_or_difficult) nni(treeinfo, nni_params, loglh);
-  }
-  
-  // + model parameter optimization
-  if (do_step(CheckpointStep::modOpt2)){  
-    cm.update_and_write(treeinfo);
-    
-    if(easy_or_difficult){
-      LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << interim_modopt_eps << ")" << endl;
-      loglh = optimize_model(treeinfo, fast_modopt_eps);
-    }
-  }
-
   // do SPRs
   const int radius_limit = min(spr_radius_limit_adaptive(difficulty), (int) treeinfo.pll_treeinfo().tip_count - 3);
-  int radius_step = spr_radius_step_adaptive(radius_limit, false);
+  int radius_step = spr_radius_step_adaptive(radius_limit);
   double old_loglh;
-  bool impr = true, condition = true;
+  bool impr = true;
   double impr_perc = 1;
 
-  // setting up fast SPR parameters
-  if(do_step(CheckpointStep::fastSPR)){
+  // If the dataset is "easy" or "difficult", start with an NNI round
+  if (do_step(CheckpointStep::radiusDetectOrNNI)){
+    
+    cm.update_and_write(treeinfo);
     
     if(iter == 0){
+
+      if (easy_or_difficult)  nni(treeinfo, nni_params, loglh);
+      
       spr_params.thorough = 0;
       spr_params.radius_min = 1;
       spr_params.radius_max = radius_step;
       spr_params.ntopol_keep = 0;
       spr_params.subtree_cutoff = 0.;
-
-    }
     
+    }
+
     /* Fast SPR-NNI rounds */
-    while(condition) {
+    while(impr) {
 
       cm.update_and_write(treeinfo);
       ++iter;
@@ -369,22 +358,10 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
       loglh = treeinfo.spr_round(spr_params);
       
       // nni round
-      if (spr_params.radius_max > 2*radius_step) nni(treeinfo, nni_params, loglh);
+      if (spr_params.radius_max > radius_step) nni(treeinfo, nni_params, loglh);
 
       impr_perc = (loglh - old_loglh) / fabs(loglh);
       impr = (loglh - old_loglh > _lh_epsilon);
-      condition = impr && (impr_perc >= 1e-3);
-
-      if((!condition) &&
-        (!easy_or_difficult) && 
-        (spr_params.radius_max == radius_step) &&
-        (radius_step < radius_limit))
-      {
-        spr_params.radius_min += radius_step;
-        spr_params.radius_max += radius_step;
-        condition = true;
-        continue;
-      }
 
       if (impr_perc <= 0.01 && (spr_params.radius_min + radius_step < radius_limit))
       {
@@ -392,6 +369,45 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
         spr_params.radius_max += radius_step;
       }     
     }
+    
+  }
+  
+  // + model parameter optimization
+  if (do_step(CheckpointStep::modOpt2)){  
+
+    cm.update_and_write(treeinfo);
+    LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << fast_modopt_eps << ")" << endl;
+    loglh = optimize_model(treeinfo, fast_modopt_eps);
+
+    /* reset iteration counter for fast SPRs */
+    iter = 0;
+
+    /* initialize search params */
+    spr_params.thorough = 0;
+    spr_params.radius_min = 1;
+    spr_params.radius_max = radius_limit;
+    spr_params.ntopol_keep = 20;
+    spr_params.subtree_cutoff = _spr_cutoff;
+    spr_params.reset_cutoff_info(loglh);
+  }
+
+  // setting up fast SPR parameters
+  if(do_step(CheckpointStep::fastSPR)){  
+     do
+    {
+      cm.update_and_write(treeinfo);
+      ++iter;
+      old_loglh = loglh;
+      LOG_PROGRESS(old_loglh) << (spr_params.thorough ? "SLOW" : "FAST") <<
+          " spr round " << iter << " (radius: " << spr_params.radius_max << ")" << endl;
+      loglh = treeinfo.spr_round(spr_params);
+
+      /* optimize ALL branches */
+      loglh = treeinfo.optimize_branches(_lh_epsilon, 1);
+
+      impr = (loglh - old_loglh > _lh_epsilon);
+    }
+    while (impr);
   }
   
   if (do_step(CheckpointStep::modOpt3)){
@@ -403,7 +419,6 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
     loglh = optimize_model(treeinfo, interim_modopt_eps);
 
     // slow spr setup
-    radius_step = spr_radius_step_adaptive(radius_limit, true);
     iter = 0;
     spr_params.thorough = 1;
     spr_params.radius_min = 1;
@@ -433,27 +448,15 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
       
       impr = (loglh - old_loglh > _lh_epsilon);
       
-      impr_perc = (loglh - old_loglh) / fabs(loglh);
-      
-      if ((!impr) || 
-          (spr_params.radius_min + radius_step < radius_limit && impr_perc <= 1e-3))
+      if(!impr)
       {
+        /* no improvement in thorough mode: set min radius to old max,
+         * and increase max radius by the step */
         spr_params.radius_min = spr_params.radius_max + 1;
         spr_params.radius_max += radius_step;
       }
-
-      /* if (impr)
-      {
-        spr_params.radius_min -= 1;
-        spr_params.radius_max = radius_step;
-      }
-      else
-      {
-        spr_params.radius_min = spr_params.radius_max + 1;
-        spr_params.radius_max += radius_step;
-      } */
     }
-    while (spr_params.radius_min < radius_limit); 
+    while (spr_params.radius_min >= 0 && spr_params.radius_min < radius_limit);
   }
 
   if (do_step(CheckpointStep::modOpt4))
@@ -523,31 +526,16 @@ int Optimizer::spr_radius_limit_adaptive(double difficulty){
   }
 }
 
-int Optimizer::spr_radius_step_adaptive(int spr_radius_max, bool slow_spr){
+int Optimizer::spr_radius_step_adaptive(int spr_radius_max){
 
   int radius_step = 0;
-  if(slow_spr)
-  {
-    if(spr_radius_max <= 7){
-      radius_step = spr_radius_max;
-    } else if (spr_radius_max <= 13){
-      radius_step = (int) ((spr_radius_max / 2) + 1);
-    } else {
-      radius_step = (int) ((spr_radius_max / 3) + 1);
-    }
 
-  } 
-  else 
-  {
-    if(spr_radius_max <= 5){
-      radius_step = spr_radius_max;
-    } else if (spr_radius_max <= 10){
-      radius_step = (int) ((spr_radius_max / 2) + 1);
-    } else if (spr_radius_max <= 15){
-      radius_step = (int) ((spr_radius_max / 3) + 1);
-    } else {
-      radius_step = (int) ((spr_radius_max / 4) + 1);
-    }
+  if(spr_radius_max <= 7){
+    radius_step = spr_radius_max;
+  } else if (spr_radius_max <= 13){
+    radius_step = (int) (spr_radius_max / 2);
+  } else {
+    radius_step = (int) (spr_radius_max / 3);
   }
 
   return radius_step;

@@ -1173,7 +1173,7 @@ double load_pythia_score_from_log_file(const string& oldLogFile){
   return pythia_score;
 }
 
-void load_parted_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullptr)
+void  load_parted_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullptr)
 {
   init_part_info(instance);
   
@@ -1262,8 +1262,12 @@ void load_parted_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullp
 
     if (opts.constraint_tree_file.empty() || !opts.use_old_constraint)
     {
-      opts.start_trees[StartingTree::random] = dPred->numStartTrees(difficulty, 3.5  , 0.5, 0.25);
-      opts.start_trees[StartingTree::parsimony] = dPred->numStartTrees(difficulty, 7.0, 0.5, 0.25);
+      int pars_trees = dPred->numStartTrees(difficulty, 7.0, 0.5, 0.25);
+      
+      opts.start_trees[StartingTree::random] = difficulty >= 0.7 ? 0 :
+                                dPred->numStartTrees(difficulty, 3.5  , 0.5, 0.25);
+      opts.start_trees[StartingTree::parsimony] = difficulty >= 0.7 ? (int) (1.5 * pars_trees) : pars_trees;
+
     }
     else
       opts.start_trees[StartingTree::random] = 2*dPred->numStartTrees(difficulty, 8.0, 0.5, 0.3);
@@ -2842,13 +2846,9 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm, DifficultyP
     else
     {
       if(opts.command == Command::adaptive){
-        double difficulty = dPred->getDifficulty();
-        unsigned int n_taxa = treeinfo->pll_treeinfo().tip_count;
         
-        if((difficulty>0.4 && difficulty < 0.6) && n_taxa > 700)
-          optimizer.optimize_topology(*treeinfo, cm);
-        else 
-          optimizer.optimize_topology_adaptive(*treeinfo, cm, difficulty);
+        double difficulty = dPred->getDifficulty();
+        optimizer.optimize_topology_adaptive(*treeinfo, cm, difficulty);
         
         LOG_PROGR << endl;
         LOG_WORKER_TS(log_level) << "ML tree search #" << start_tree_num <<
