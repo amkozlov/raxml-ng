@@ -27,6 +27,7 @@
 *.exe
 *.out
 *.app
+*.sh
 
 # binaries
 build/
@@ -39,3 +40,13 @@ release/
 .cproject
 .project
 .settings/
+
+# python scripts
+*.py
+
+# some json files
+.vscode/launch.json
+.vscode/tasks.json
+
+# TODO file
+todo.txt

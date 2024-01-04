@@ -69,32 +69,34 @@ bool Tree::binary() const
 
 bool Tree::compatible(const Tree& other) const
 {
-  return pllmod_utree_constraint_check_tree(&pll_utree(), &other.pll_utree()) == PLL_SUCCESS;
+
+  return corax_utree_constraint_check_tree(&pll_utree(), &other.pll_utree()) == CORAX_SUCCESS;
+  //return corax_utree_consistency_check(&pll_utree(), &other.pll_utree()) == CORAX_SUCCESS;
 }
 
-pll_utree_t * Tree::pll_utree_copy() const
+corax_utree_t * Tree::pll_utree_copy() const
 {
-  return _pll_utree ? pll_utree_clone(_pll_utree.get()) : nullptr;
+  return _pll_utree ? corax_utree_clone(_pll_utree.get()) : nullptr;
 }
 
-void Tree::pll_utree(const pll_utree_t& tree)
+void Tree::pll_utree(const corax_utree_t& tree)
 {
   _num_tips = tree.tip_count;
-  _pll_utree.reset(pll_utree_clone(&tree));
+  _pll_utree.reset(corax_utree_clone(&tree));
   _pll_utree_tips.clear();
 }
 
-void Tree::pll_utree(unsigned int tip_count, const pll_unode_t& root)
+void Tree::pll_utree(unsigned int tip_count, const corax_unode_t& root)
 {
   _num_tips = tip_count;
-  _pll_utree.reset(pll_utree_wraptree_multi(pll_utree_graph_clone(&root), _num_tips, 0));
+  _pll_utree.reset(corax_utree_wraptree_multi(corax_utree_graph_clone(&root), _num_tips, 0));
   _pll_utree_tips.clear();
 }
 
 Tree Tree::buildRandom(size_t num_tips, const char * const* tip_labels,
                        unsigned int random_seed)
 {
-  PllUTreeUniquePtr pll_utree(pllmod_utree_create_random(num_tips, tip_labels, random_seed));
+  PllUTreeUniquePtr pll_utree(corax_utree_random_create(num_tips, tip_labels, random_seed));
 
   libpll_check_error("ERROR building random tree");
   assert(pll_utree);
@@ -115,12 +117,12 @@ Tree Tree::buildRandom(const NameList& taxon_names, unsigned int random_seed)
 Tree Tree::buildRandomConstrained(const NameList& taxon_names, unsigned int random_seed,
                                   const Tree& constrained_tree)
 {
-  PllUTreeUniquePtr pll_utree(pllmod_utree_resolve_multi(&constrained_tree.pll_utree(),
+  PllUTreeUniquePtr pll_utree(corax_utree_random_resolve_multi(&constrained_tree.pll_utree(),
                                                          random_seed, nullptr));
 
   if (!pll_utree)
   {
-    assert(pll_errno);
+    assert(corax_errno);
     libpll_check_error("ERROR in building a randomized constrained tree");
   }
 
@@ -173,14 +175,14 @@ Tree Tree::buildParsimonyConstrained(const PartitionedMSA& parted_msa, unsigned 
     tip_labels[i] = taxon_names[i].data();
 
   // create pll_partitions
-  std::vector<pll_partition*> pars_partitions(parted_msa.part_count(), nullptr);
+  std::vector<corax_partition*> pars_partitions(parted_msa.part_count(), nullptr);
   size_t i = 0;
   for (const auto& pinfo: parted_msa.part_list())
   {
     const auto& model = pinfo.model();
     const auto& msa = pinfo.msa();
 
-    auto partition = pll_partition_create(taxon_count,
+    auto partition = corax_partition_create(taxon_count,
                                          0,   /* number of CLVs */
                                          model.num_states(),
                                          msa.length(),
@@ -192,12 +194,12 @@ Tree Tree::buildParsimonyConstrained(const PartitionedMSA& parted_msa, unsigned 
 
     /* set pattern weights */
     if (!msa.weights().empty())
-      pll_set_pattern_weights(partition, msa.weights().data());
+      corax_set_pattern_weights(partition, msa.weights().data());
 
     /* set tip states */
     for (size_t j = 0; j < msa.size(); ++j)
     {
-      pll_set_tip_states(partition, j, model.charmap(), msa.at(j).c_str());
+      corax_set_tip_states(partition, j, model.charmap(), msa.at(j).c_str());
     }
 
     pars_partitions[i++] = partition;
@@ -207,13 +209,12 @@ Tree Tree::buildParsimonyConstrained(const PartitionedMSA& parted_msa, unsigned 
   PllUTreeUniquePtr pll_utree;
   if (constrained_tree.empty())
   {
-    pll_utree.reset(pllmod_utree_create_parsimony_multipart(taxon_count,
+    pll_utree.reset(corax_utree_create_parsimony_multipart(taxon_count,
                                                             (char* const*) tip_labels.data(),
                                                             pars_partitions.size(),
                                                             pars_partitions.data(),
                                                             random_seed,
                                                             pscore));
-
     tree = Tree(pll_utree);
   }
   else
@@ -229,7 +230,7 @@ Tree Tree::buildParsimonyConstrained(const PartitionedMSA& parted_msa, unsigned 
     unsigned int max_rounds = std::max(std::min(int(10000 / constrained_tree.num_tips()), 10), 1);
 //    printf("max_spr_rounds: %u\n", max_rounds);
     intVector clv_index_map(taxon_count * 2);
-    pll_utree.reset(pllmod_utree_resolve_parsimony_multipart(&constrained_tree.pll_utree(),
+    pll_utree.reset(corax_utree_resolve_parsimony_multipart(&constrained_tree.pll_utree(),
                                                              pars_partitions.size(),
                                                              pars_partitions.data(),
                                                              tip_idmap.data(),
@@ -237,10 +238,9 @@ Tree Tree::buildParsimonyConstrained(const PartitionedMSA& parted_msa, unsigned 
                                                              random_seed,
                                                              clv_index_map.data(),
                                                              pscore));
-
     if (!pll_utree)
     {
-      assert(pll_errno);
+      assert(corax_errno);
       libpll_check_error("ERROR in building a constrained parsimony tree");
     }
 
@@ -269,7 +269,7 @@ Tree Tree::buildParsimonyConstrained(const PartitionedMSA& parted_msa, unsigned 
   }
 
   for (auto p: pars_partitions)
-    pll_partition_destroy(p);
+    corax_partition_destroy(p);
 
   libpll_check_error("ERROR building parsimony tree");
   assert(!tree.empty());
@@ -357,7 +357,7 @@ void Tree::insert_tips_random(const NameList& tip_names, unsigned int random_see
   for (size_t i = 0; i < tip_names.size(); ++i)
     tip_labels[i] = tip_names[i].data();
 
-  int retval = pllmod_utree_extend_random(_pll_utree.get(),
+  int retval = corax_utree_random_extend(_pll_utree.get(),
                                           tip_labels.size(),
                                           (const char * const*) tip_labels.data(),
                                           random_seed);
@@ -366,12 +366,12 @@ void Tree::insert_tips_random(const NameList& tip_names, unsigned int random_see
     _num_tips = _pll_utree->tip_count;
   else
   {
-    assert(pll_errno);
+    assert(corax_errno);
     libpll_check_error("ERROR in randomized tree extension");
   }
 }
 
-void Tree::insert_tips_pasimony(const NameList& tip_names, std::vector<pll_partition*>& pars_partitions,
+void Tree::insert_tips_pasimony(const NameList& tip_names, std::vector<corax_partition*>& pars_partitions,
                                 const IDVector& tip_msa_idmap,
                                 unsigned int random_seed, unsigned int * score)
 {
@@ -388,8 +388,8 @@ void Tree::insert_tips_pasimony(const NameList& tip_names, std::vector<pll_parti
     tip_idmap.assign(tip_msa_idmap.cbegin(), tip_msa_idmap.cend());
   }
 
-
-  int retval = pllmod_utree_extend_parsimony_multipart(_pll_utree.get(),
+  
+  int retval = corax_utree_extend_parsimony_multipart(_pll_utree.get(),
                                           tip_labels.size(),
                                           (char * const*) tip_labels.data(),
                                           tip_idmap.data(),
@@ -402,7 +402,7 @@ void Tree::insert_tips_pasimony(const NameList& tip_names, std::vector<pll_parti
     _num_tips = _pll_utree->tip_count;
   else
   {
-    assert(pll_errno);
+    assert(corax_errno);
     libpll_check_error("ERROR in randomized tree extension");
   }
 }
@@ -430,17 +430,17 @@ void Tree::fix_outbound_brlens(double min_brlen, double max_brlen)
 
 void Tree::fix_missing_brlens(double new_brlen)
 {
-  pllmod_utree_set_length_recursive(_pll_utree.get(), new_brlen, 1);
+  corax_utree_set_length_recursive(_pll_utree.get(), new_brlen, 1);
 }
 
 void Tree::reset_brlens(double new_brlen)
 {
-  pllmod_utree_set_length_recursive(_pll_utree.get(), new_brlen, 0);
+  corax_utree_set_length_recursive(_pll_utree.get(), new_brlen, 0);
 }
 
 void Tree::collapse_short_branches(double min_brlen)
 {
-  if (!pllmod_utree_collapse_branches(_pll_utree.get(), min_brlen))
+  if (!corax_utree_collapse_branches(_pll_utree.get(), min_brlen))
     libpll_check_error("Failed to collapse short branches: ", true);
 }
 
@@ -509,9 +509,9 @@ void Tree::topology(const TreeTopology& topol)
   unsigned int pmatrix_index = 0;
   for (const auto& branch: topol)
   {
-    pll_unode_t * left_node = allnodes.at(branch.left_node_id);
-    pll_unode_t * right_node = allnodes.at(branch.right_node_id);
-    pllmod_utree_connect_nodes(left_node, right_node, branch.length);
+    corax_unode_t * left_node = allnodes.at(branch.left_node_id);
+    corax_unode_t * right_node = allnodes.at(branch.right_node_id);
+    corax_utree_connect_nodes(left_node, right_node, branch.length);
 
     // important: make sure all branches have distinct pmatrix indices!
     left_node->pmatrix_index = right_node->pmatrix_index = pmatrix_index;
@@ -594,7 +594,7 @@ void Tree::reroot(const NameList& outgroup_taxa, bool add_root_node)
   }
 
   // re-root tree with the outgroup
-  int res = pllmod_utree_outgroup_root(_pll_utree.get(), tip_ids.data(), tip_ids.size(),
+  int res = corax_utree_outgroup_root(_pll_utree.get(), tip_ids.data(), tip_ids.size(),
                                        add_root_node);
 
   if (!res)

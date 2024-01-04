@@ -32,21 +32,21 @@ void sysutil_fatal(const char * format, ...)
 
 void sysutil_fatal_libpll()
 {
-  sysutil_fatal("ERROR(%d): %s\n", pll_errno, pll_errmsg);
+  sysutil_fatal("ERROR(%d): %s\n", corax_errno, corax_errmsg);
 }
 
 void libpll_check_error(const std::string& errmsg, bool force)
 {
-  if (pll_errno)
-    throw runtime_error(errmsg +  " (LIBPLL-" + to_string(pll_errno) + "): " + string(pll_errmsg));
+  if (corax_errno)
+    throw runtime_error(errmsg +  " (LIBPLL-" + to_string(corax_errno) + "): " + string(corax_errmsg));
   else if (force)
     throw runtime_error("Unknown LIBPLL error.");
 }
 
 void libpll_reset_error()
 {
-  pll_errno = 0;
-  strcpy(pll_errmsg, "");
+  corax_errno = 0;
+  strcpy(corax_errmsg, "");
 }
 
 void * xmemalign(size_t size, size_t alignment)
@@ -339,14 +339,14 @@ unsigned long sysutil_get_cpu_features()
 unsigned int sysutil_simd_autodetect()
 {
 //  unsigned long features = sysutil_get_cpu_features();
-  if (PLL_STAT(avx2_present))
-    return PLL_ATTRIB_ARCH_AVX2;
-  else if (PLL_STAT(avx_present))
-    return PLL_ATTRIB_ARCH_AVX;
-  else if (PLL_STAT(sse3_present))
-    return PLL_ATTRIB_ARCH_SSE;
+  if (CORAX_HAS_CPU_FEATURE(avx2_present))
+    return CORAX_ATTRIB_ARCH_AVX2;
+  else if (CORAX_HAS_CPU_FEATURE(avx_present))
+    return CORAX_ATTRIB_ARCH_AVX;
+  else if (CORAX_HAS_CPU_FEATURE(sse3_present))
+    return CORAX_ATTRIB_ARCH_SSE;
   else
-    return PLL_ATTRIB_ARCH_CPU;
+    return CORAX_ATTRIB_ARCH_CPU;
 }
 
 #if defined(__linux__)

@@ -54,7 +54,7 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Model& m)
   if (m.num_ratecats() > 1)
   {
     stream << m.ratehet_mode();
-    if (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_GAMMA)
+    if (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA)
       stream << m.alpha();
 
     stream << m.ratecat_weights();
@@ -62,8 +62,8 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Model& m)
   }
 
   /* store subst model parameters only if they were estimated */
-  if (m.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::ML ||
-      m.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::ML)
+  if (m.param_mode(CORAX_OPT_PARAM_FREQUENCIES) == ParamValue::ML ||
+      m.param_mode(CORAX_OPT_PARAM_SUBST_RATES) == ParamValue::ML)
   {
     stream << m.num_submodels();
     for (size_t i = 0; i < m.num_submodels(); ++i)
@@ -112,33 +112,33 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, std::tuple<const Model&
     stream << m.param_mode();
   }
 
-  if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER))
+  if (save_modparam(m, fmt, CORAX_OPT_PARAM_BRANCH_LEN_SCALER))
     stream << m.brlen_scaler();
 
-  if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_PINV))
+  if (save_modparam(m, fmt, CORAX_OPT_PARAM_PINV))
       stream << m.pinv();
 
   if (m.num_ratecats() > 1)
   {
-    if (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_GAMMA)
+    if (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA)
     {
-      if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_ALPHA))
+      if (save_modparam(m, fmt, CORAX_OPT_PARAM_ALPHA))
         stream << m.alpha();
     }
     else
     {
-      if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_RATE_WEIGHTS))
+      if (save_modparam(m, fmt, CORAX_OPT_PARAM_RATE_WEIGHTS))
         stream << m.ratecat_weights();
-      if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_FREE_RATES))
+      if (save_modparam(m, fmt, CORAX_OPT_PARAM_FREE_RATES))
         stream << m.ratecat_rates();
     }
   }
 
   for (size_t i = 0; i < m.num_submodels(); ++i)
   {
-    if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_FREQUENCIES))
+    if (save_modparam(m, fmt, CORAX_OPT_PARAM_FREQUENCIES))
       stream << m.submodel(i).base_freqs();
-    if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_SUBST_RATES))
+    if (save_modparam(m, fmt, CORAX_OPT_PARAM_SUBST_RATES))
       stream << m.submodel(i).subst_rates();
   }
 
@@ -162,15 +162,15 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, Model& m)
     auto ratehet_mode = stream.get<unsigned int>();
     assert(ratehet_mode == m.ratehet_mode());
 
-    if (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_GAMMA)
+    if (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA)
       m.alpha(stream.get<double>());
 
     m.ratecat_weights(stream.get<doubleVector>());
     m.ratecat_rates(stream.get<doubleVector>());
   }
 
-  if (m.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::ML ||
-      m.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::ML)
+  if (m.param_mode(CORAX_OPT_PARAM_FREQUENCIES) == ParamValue::ML ||
+      m.param_mode(CORAX_OPT_PARAM_SUBST_RATES) == ParamValue::ML)
   {
     auto num_submodels = stream.get<unsigned int>();
     assert(num_submodels == m.num_submodels());
@@ -203,33 +203,33 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::tuple<Model&, Mode
       m.param_mode(e.first, e.second);
   }
 
-  if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER))
+  if (save_modparam(m, fmt, CORAX_OPT_PARAM_BRANCH_LEN_SCALER))
     m.brlen_scaler(stream.get<double>());
 
-  if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_PINV))
+  if (save_modparam(m, fmt, CORAX_OPT_PARAM_PINV))
     m.pinv(stream.get<double>());
 
   if (m.num_ratecats() > 1)
   {
-    if (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_GAMMA)
+    if (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA)
     {
-      if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_ALPHA))
+      if (save_modparam(m, fmt, CORAX_OPT_PARAM_ALPHA))
         m.alpha(stream.get<double>());
     }
     else
     {
-      if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_RATE_WEIGHTS))
+      if (save_modparam(m, fmt, CORAX_OPT_PARAM_RATE_WEIGHTS))
         m.ratecat_weights(stream.get<doubleVector>());
-      if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_FREE_RATES))
+      if (save_modparam(m, fmt, CORAX_OPT_PARAM_FREE_RATES))
         m.ratecat_rates(stream.get<doubleVector>());
     }
   }
 
   for (size_t i = 0; i < m.num_submodels(); ++i)
   {
-    if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_FREQUENCIES))
+    if (save_modparam(m, fmt, CORAX_OPT_PARAM_FREQUENCIES))
       m.base_freqs(i, stream.get<doubleVector>());
-    if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_SUBST_RATES))
+    if (save_modparam(m, fmt, CORAX_OPT_PARAM_SUBST_RATES))
       m.subst_rates(i, stream.get<doubleVector>());
   }
 

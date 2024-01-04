@@ -66,6 +66,16 @@ cmake -DSTATIC_BUILD=ON -DENABLE_RAXML_SIMD=OFF -DENABLE_PLLMOD_SIMD=OFF ..
 make
 ```
 
+**Adaptive** version (currently under development):
+
+```
+git clone --recursive -b adaptive https://github.com/togkousa/raxml-ng.git
+cd raxml-ng
+mkdir build && cd build
+cmake ..
+make
+```
+
 ## Documentation and Support
 
 Documentation can be found in the [github wiki](https://github.com/amkozlov/raxml-ng/wiki). 
@@ -100,6 +110,14 @@ If still in doubt, please feel free to post to the [RAxML google group](https://
 
      `./raxml-ng --support --tree bestML.tree --bs-trees bootstraps.tree`
 
+  5. To execute the **adaptive** version, the user needs to add the `--adaptive` option:
+
+    ./raxml-ng --adaptive --msa testDNA.fa --model GTR+G
+
+  
+  WARNING! The heuristic for the **adaptive** version is still under development.
+  Parallelization and checkpointing are already implemented. The tool will be released soon.
+
 ## License and citation
 
 The code is currently licensed under the GNU Affero General Public License version 3.
@@ -110,6 +128,14 @@ Alexey M. Kozlov, Diego Darriba, Tom&aacute;&scaron; Flouri, Benoit Morel, and A
 **RAxML-NG: A fast, scalable, and user-friendly tool for maximum likelihood phylogenetic inference.** 
 *Bioinformatics, 35 (21), 4453-4455* 
 doi:[10.1093/bioinformatics/btz305](https://doi.org/10.1093/bioinformatics/btz305)
+
+
+When using the **adaptive** RAxML-NG version, please cite [this paper](https://academic.oup.com/mbe/article/40/10/msad227/7296053):
+
+Anastasis Togkousidis, Oleksiy M Kozlov, Julia Haag, Dimitri Höhler, Alexandros Stamatakis (2023)
+**Adaptive RAxML-NG: Accelerating Phylogenetic Inference under Maximum Likelihood using Dataset Difficulty.**
+*Molecular Biology and Evolution, 40 (10)*
+doi:[10.1093/molbev/msad227](https://doi.org/10.1093/molbev/msad227)
 
 ## The team
 

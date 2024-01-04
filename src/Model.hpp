@@ -2,15 +2,14 @@
 #define RAXML_MODEL_H_
 
 #include <algorithm>
-
 #include "common.h"
 
-typedef std::unordered_map<pll_state_t,std::string> StateNameMap;
+typedef std::unordered_map<corax_state_t,std::string> StateNameMap;
 
 class SubstitutionModel
 {
 public:
-  SubstitutionModel(const pllmod_subst_model_t& sm) :
+  SubstitutionModel(const corax_subst_model_t& sm) :
     _states(sm.states), _name(sm.name)
   {
     if (sm.freqs)
@@ -112,7 +111,7 @@ public:
   unsigned int num_states() const { return _num_states; };
   std::string name() const { return _name; };
 
-  const pll_state_t* charmap() const;
+  const corax_state_t* charmap() const;
   const NameList& state_names() const;            // non-ambiguous states only, eg A C G T
   const StateNameMap& full_state_namemap() const; // + ambiguous states, eg A C G T M R W S Y K -
 
@@ -175,7 +174,7 @@ private:
   std::string _custom_states;
   std::string _custom_gaps;
   bool _custom_case_sensitive;
-  std::shared_ptr<pll_state_t> _custom_charmap;
+  std::shared_ptr<corax_state_t> _custom_charmap;
   mutable NameList _state_names;
   mutable StateNameMap _full_state_namemap;
 
@@ -199,8 +198,8 @@ private:
   ParamModeMap _param_mode;
 
   void autodetect_data_type(const std::string& model_name);
-  pllmod_mixture_model_t * init_mix_model(const std::string& model_name);
-  void init_model_opts(const std::string& model_opts, const pllmod_mixture_model_t& mix_model);
+  corax_mixture_model_t * init_mix_model(const std::string& model_name);
+  void init_model_opts(const std::string& model_opts, const corax_mixture_model_t& mix_model);
   void init_state_names() const;
   void set_user_srates(doubleVector& srates, bool normalize = true);
   void set_user_freqs(doubleVector& freqs);
@@ -210,8 +209,8 @@ typedef std::unordered_map<size_t, Model> ModelMap;
 typedef std::unordered_map<size_t, Model&> ModelRefMap;
 typedef std::unordered_map<size_t, const Model&> ModelCRefMap;
 
-void assign(Model& model, const pll_partition_t * partition);
-void assign(pll_partition_t * partition, const Model& model);
+void assign(Model& model, const corax_partition_t * partition);
+void assign(corax_partition_t * partition, const Model& model);
 
 LogStream& operator<<(LogStream& stream, const Model& m);
 

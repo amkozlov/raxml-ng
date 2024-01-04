@@ -24,8 +24,12 @@
 
 #include <memory>
 
+#include <corax/corax.h>
+#include "difficulty.h"
+
 #include "version.h"
 #include "common.h"
+
 #include "MSA.hpp"
 #include "Options.hpp"
 #include "CommandLineParser.hpp"
@@ -47,6 +51,7 @@
 #include "topology/RFDistCalculator.hpp"
 #include "topology/ConstraintTree.hpp"
 #include "util/EnergyMonitor.hpp"
+#include "adaptive/DifficultyPredictor.hpp"
 
 #ifdef _RAXML_TERRAPHAST
 #include "terraces/TerraceWrapper.hpp"
@@ -247,17 +252,17 @@ void init_part_info(RaxmlInstance& instance)
   /* make sure that linked branch length mode is set for unpartitioned alignments */
   if (parted_msa.part_count() == 1)
   {
-    opts.brlen_linkage = PLLMOD_COMMON_BRLEN_LINKED;
+    opts.brlen_linkage = CORAX_BRLEN_LINKED;
     if (opts.safety_checks.isset(SafetyCheck::model) &&
-        parted_msa.model(0).param_mode(PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER) != ParamValue::undefined)
+        parted_msa.model(0).param_mode(CORAX_OPT_PARAM_BRANCH_LEN_SCALER) != ParamValue::undefined)
       throw runtime_error("Branch length scalers (+B) are not supported for non-partitioned models!");
   }
 
   /* in the scaled brlen mode, use ML optimization of brlen scalers by default */
-  if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_SCALED)
+  if (opts.brlen_linkage == CORAX_BRLEN_SCALED)
   {
     for (auto& pinfo: parted_msa.part_list())
-      pinfo.model().set_param_mode_default(PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER, ParamValue::ML);
+      pinfo.model().set_param_mode_default(CORAX_OPT_PARAM_BRANCH_LEN_SCALER, ParamValue::ML);
   }
 
   int freerate_count = 0;
@@ -267,12 +272,12 @@ void init_part_info(RaxmlInstance& instance)
     LOG_DEBUG << "|" << pinfo.name() << "|   |" << pinfo.model().to_string() << "|   |" <<
         pinfo.range_string() << "|" << endl;
 
-    if (pinfo.model().ratehet_mode() == PLLMOD_UTIL_MIXTYPE_FREE)
+    if (pinfo.model().ratehet_mode() == CORAX_UTIL_MIXTYPE_FREE)
       freerate_count++;
   }
 
   if (parted_msa.part_count() > 1 && freerate_count > 0 &&
-      opts.brlen_linkage == PLLMOD_COMMON_BRLEN_LINKED)
+      opts.brlen_linkage == CORAX_BRLEN_LINKED)
   {
     throw runtime_error("LG4X and FreeRate models are not supported in linked branch length mode.\n"
         "Please use the '--brlen scaled' option to switch into proportional branch length mode.");
@@ -316,11 +321,11 @@ bool check_msa_global(const MSA& msa)
   }
 
   /* check for duplicate taxon names */
-  unsigned long stats_mask = PLLMOD_MSA_STATS_DUP_TAXA;
+  unsigned long stats_mask = CORAX_MSA_STATS_DUP_TAXA;
 
-  pllmod_msa_stats_t * stats = pllmod_msa_compute_stats(msa.pll_msa(),
+  corax_msa_stats_t * stats = corax_msa_compute_stats(msa.pll_msa(),
                                                         4,
-                                                        pll_map_nt, // map is not used here
+                                                        corax_map_nt, // map is not used here
                                                         NULL,
                                                         stats_mask);
 
@@ -344,7 +349,7 @@ bool check_msa_global(const MSA& msa)
     msa_valid = false;
   }
 
-  pllmod_msa_destroy_stats(stats);
+  corax_msa_destroy_stats(stats);
 
   return msa_valid;
 }
@@ -388,11 +393,11 @@ bool check_msa(RaxmlInstance& instance)
   /* check for duplicate sequences */
   if (opts.safety_checks.isset(SafetyCheck::msa_dups))
   {
-    unsigned long stats_mask = PLLMOD_MSA_STATS_DUP_SEQS;
+    unsigned long stats_mask = CORAX_MSA_STATS_DUP_SEQS;
 
-    pllmod_msa_stats_t * stats = pllmod_msa_compute_stats(pll_msa,
+    corax_msa_stats_t * stats = corax_msa_compute_stats(pll_msa,
                                                           4,
-                                                          pll_map_nt, // map is not used here
+                                                          corax_map_nt, // map is not used here
                                                           NULL,
                                                           stats_mask);
 
@@ -405,7 +410,7 @@ bool check_msa(RaxmlInstance& instance)
                             stats->dup_seqs_pairs[c*2+1]);
     }
 
-    pllmod_msa_destroy_stats(stats);
+    corax_msa_destroy_stats(stats);
   }
 
   size_t total_gap_cols = 0;
@@ -413,7 +418,7 @@ bool check_msa(RaxmlInstance& instance)
   for (auto& pinfo: parted_msa.part_list())
   {
     /* check for invalid MSA characters */
-    pllmod_msa_errors_t * errs = pllmod_msa_check(pinfo.msa().pll_msa(),
+    corax_msa_errors_t * errs = corax_msa_check(pinfo.msa().pll_msa(),
                                                   pinfo.model().charmap());
 
     if (errs)
@@ -431,7 +436,7 @@ bool check_msa(RaxmlInstance& instance)
         part_num++;
         continue;
       }
-      pllmod_msa_destroy_errors(errs);
+      corax_msa_destroy_errors(errs);
     }
     else
       libpll_check_error("MSA check failed");
@@ -440,9 +445,9 @@ bool check_msa(RaxmlInstance& instance)
     /* Check for all-gap columns and sequences */
     if (opts.safety_checks.isset(SafetyCheck::msa_allgaps))
     {
-      unsigned long stats_mask = PLLMOD_MSA_STATS_GAP_SEQS | PLLMOD_MSA_STATS_GAP_COLS;
+      unsigned long stats_mask = CORAX_MSA_STATS_GAP_SEQS | CORAX_MSA_STATS_GAP_COLS;
 
-      pllmod_msa_stats_t * stats = pinfo.compute_stats(stats_mask);
+      corax_msa_stats_t * stats = pinfo.compute_stats(stats_mask);
 
       if (stats->gap_cols_count > 0)
       {
@@ -469,7 +474,7 @@ bool check_msa(RaxmlInstance& instance)
         }
       }
 
-      pllmod_msa_destroy_stats(stats);
+      corax_msa_destroy_stats(stats);
     }
 
     part_num++;
@@ -544,11 +549,11 @@ size_t total_free_params(const RaxmlInstance& instance)
   auto num_branches = tree.num_branches();
   auto brlen_linkage = instance.opts.brlen_linkage;
 
-  if (brlen_linkage == PLLMOD_COMMON_BRLEN_LINKED)
+  if (brlen_linkage == CORAX_BRLEN_LINKED)
     free_params += num_branches;
-  else if (brlen_linkage == PLLMOD_COMMON_BRLEN_SCALED)
+  else if (brlen_linkage == CORAX_BRLEN_SCALED)
     free_params += num_branches + num_parts - 1;
-  else if (brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED)
+  else if (brlen_linkage == CORAX_BRLEN_UNLINKED)
     free_params += num_branches * num_parts;
 
   return free_params;
@@ -568,7 +573,7 @@ void check_models(const RaxmlInstance& instance)
     if (opts.safety_checks.isset(SafetyCheck::model_lg4_freqs))
     {
       if ((model.name() == "LG4X" || model.name() == "LG4M") &&
-          model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) != ParamValue::model)
+          model.param_mode(CORAX_OPT_PARAM_FREQUENCIES) != ParamValue::model)
       {
         throw runtime_error("Partition \"" + pinfo.name() +
                             "\": You specified LG4M or LG4X model with shared stationary based frequencies (" +
@@ -581,12 +586,12 @@ void check_models(const RaxmlInstance& instance)
     // check for zero state frequencies
     if (opts.safety_checks.isset(SafetyCheck::model_zero_freqs))
     {
-      if (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::empirical)
+      if (model.param_mode(CORAX_OPT_PARAM_FREQUENCIES) == ParamValue::empirical)
       {
         const auto& freqs = stats.emp_base_freqs;
         for (unsigned int i = 0; i < freqs.size(); ++i)
         {
-          if (freqs[i] < PLL_EIGEN_MINFREQ)
+          if (freqs[i] < CORAX_EIGEN_MINFREQ)
           {
             if (!zero_freqs)
             {
@@ -610,7 +615,7 @@ void check_models(const RaxmlInstance& instance)
     // check for user-defined state frequencies which do not sum up to one
     if (opts.safety_checks.isset(SafetyCheck::model_invalid_freqs))
     {
-      if (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::user)
+      if (model.param_mode(CORAX_OPT_PARAM_FREQUENCIES) == ParamValue::user)
       {
         const auto& freqs = model.base_freqs(0);
         double sum = 0.;
@@ -632,8 +637,8 @@ void check_models(const RaxmlInstance& instance)
     }
 
     if (model.num_submodels() > 1 &&
-        (model.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::ML ||
-         model.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::ML))
+        (model.param_mode(CORAX_OPT_PARAM_FREQUENCIES) == ParamValue::ML ||
+         model.param_mode(CORAX_OPT_PARAM_SUBST_RATES) == ParamValue::ML))
     {
       throw runtime_error("Invalid model " + model.to_string(false) + " in partition " + pinfo.name() + ":\n"
                           "Mixture models with ML estimates of rates/frequencies are not supported yet!");
@@ -677,7 +682,7 @@ void check_models(const RaxmlInstance& instance)
       if (free_params >= sample_size)
       {
         if (model_free_params >= sample_size ||
-            instance.opts.brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED)
+            instance.opts.brlen_linkage == CORAX_BRLEN_UNLINKED)
         {
           throw runtime_error(errmsg);
         }
@@ -804,6 +809,7 @@ void check_options_early(Options& opts)
   opts.use_rba_partload &= (opts.num_ranks > 1 && !opts.coarse());                // only useful for fine-grain MPI runs
   opts.use_rba_partload &= (!opts.start_trees.count(StartingTree::parsimony));    // does not work with parsimony
   opts.use_rba_partload &= (opts.command == Command::search ||                    // currently doesn't work with bootstrap
+                            opts.command == Command::adaptive ||
                             opts.command == Command::evaluate ||
                             opts.command == Command::ancestral);
 
@@ -1044,7 +1050,7 @@ void load_msa_weights(MSA& msa, const Options& opts)
   }
 }
 
-void load_msa(RaxmlInstance& instance)
+void load_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullptr)
 {
   const auto& opts = instance.opts;
   auto& parted_msa = *instance.parted_msa;
@@ -1053,7 +1059,11 @@ void load_msa(RaxmlInstance& instance)
 
   /* load MSA */
   auto msa = msa_load_from_file(opts.msa_file, opts.msa_format);
-
+  
+  if(dPred) // adaptive mode
+    dPred->compute_msa_features(msa.pll_msa_nonconst(), 
+              instance.parted_msa->models().at(0).data_type() == DataType::dna ? true : false);
+  
   if (!msa.size())
     throw runtime_error("Alignment file is empty!");
 
@@ -1088,9 +1098,10 @@ void load_msa(RaxmlInstance& instance)
     throw runtime_error("Alignment check failed (see details above)!");
 
   if (opts.use_pattern_compression)
-  {
+  { 
     LOG_VERB_TS << "Compressing alignment patterns... " << endl;
     bool store_backmap = opts.command == Command::sitelh;
+    
     parted_msa.compress_patterns(store_backmap);
 
     // temp workaround: since MSA pattern compression calls rand(), it will change all random
@@ -1134,17 +1145,136 @@ void load_msa(RaxmlInstance& instance)
   }
 }
 
-void load_parted_msa(RaxmlInstance& instance)
+double load_pythia_score_from_log_file(const string& oldLogFile){
+  
+  LOG_DEBUG << "Trying to load pythia score from log file " << endl;
+
+  ifstream fileInput;
+  string line;
+  string query_line = "Predicted difficulty:"; // search in log files
+  double pythia_score = -1;
+
+  // open file to search
+  fileInput.open(oldLogFile.c_str());
+  
+  if(fileInput.is_open()) {
+    for(unsigned int curLine = 0; getline(fileInput, line); curLine++) {
+      size_t pos = line.find(query_line);
+      if (pos != string::npos) {
+          string score_string = line.substr(pos+22); // position of pythia score
+          pythia_score = std::stod(score_string);
+      }
+    }
+    fileInput.close();
+  }
+  else
+    cout << "WARNING! Unable to open the log file to search for the pythia score." << endl;
+    
+  return pythia_score;
+}
+
+void  load_parted_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullptr)
 {
   init_part_info(instance);
-
+  
   assert(instance.parted_msa);
+  
+  // for the adaptive version
+  double difficulty = -1;
 
   if (instance.opts.msa_format != FileFormat::binary)
-    load_msa(instance);
+    load_msa(instance, dPred);
+  else 
+  { 
+    if (dPred){
 
+      LOG_DEBUG << "WARNING: You cannot invoke Adaptive RAxML-NG with input MSA a binary file, "
+                << "unless the invocation corresponds to checkpoint mode. " 
+                << "The input should be either a PHYLIP or FASTA file " << endl;
+
+      if(sysutil_file_exists(instance.opts.adaptive_chkpt_file()))
+        difficulty = dPred->load_adaptive_chkpt(instance.opts.adaptive_chkpt_file());
+      
+      if(difficulty == -1){ // This is naive, I might change that implemenation later
+        
+        cout << "WARNING! The pythia score could not be retrieved from the checkpoint file with suffix '.adaptiveCkp'" << endl;
+        cout << "RAxML-NG will make an attempt to retrieve the pythia score from RAxML-NG's logfile.'\n";
+      
+        if(sysutil_file_exists(instance.opts.log_file()))
+          difficulty = load_pythia_score_from_log_file(instance.opts.log_file());
+
+        else
+        {
+          throw runtime_error("The file with suffix '.adaptiveCkp' seems to be missing from the checkpoint files. "
+                              "Unfortunately, you will have to rerun RAxML-NG in --redo mode");
+          
+        }
+      }
+
+      if(difficulty == -1)
+      {
+        throw runtime_error("Adaptive RAxML-NG failed to rettrieve the difficulty score "
+                            "either from the logfile or from the file with suffix '.adaptiveCkp'. "
+                            "Unfortunately, you will have to rerun RAxML-NG in --redo mode");
+      }
+    
+    }
+  }
+  
   // use MSA sequences IDs as "normalized" tip IDs in all trees
   instance.tip_id_map = instance.parted_msa->taxon_id_map();
+  
+  // computes the number of searches for adaptive raxml
+  if(dPred){
+    
+    auto & opts = instance.opts;
+    if (!opts.start_trees.empty())
+    { 
+      LOG_INFO << "WARNING: "
+                  "You specified the number of initial trees in the adaptive search. \nSince the pupropse of the adaptive search "
+                  "is to determine the number of searches based on difficuly prediction, your input will be ignored\n" << endl;
+    }
+
+    LOG_INFO_TS << "Adaptive mode: Predicting difficulty of the MSA ..." << endl;
+
+    PartitionedMSA *_pmsa = instance.parted_msa_parsimony ?
+                                  instance.parted_msa_parsimony.get() : instance.parted_msa.get();
+
+    if (instance.opts.msa_format != FileFormat::binary)
+    {                             
+      dPred->set_partitioned_msa_ptr(_pmsa);
+      // TODO: check if there is any reason not to use tip-inner
+      unsigned int attrs = opts.simd_arch;
+      attrs |= CORAX_ATTRIB_PATTERN_TIP;
+      difficulty = dPred->predict_difficulty(attrs, 
+                                            instance.opts.diff_pred_pars_trees,
+                                            instance.opts.nofiles_mode? false : true);
+    } 
+  
+    LOG_INFO_TS << "Predicted difficulty: " << difficulty << "\n" << endl;
+
+    if (difficulty > 0.7){ // Warning printout statement for difficult dataset 
+      
+      LOG_INFO << "WARNING! This dataset is considered hard-to-analyze in the sense that the phylogenetic signal is insufficient." << endl
+            << "Adaptive RAxML-NG will execute a fast heuristic to quickly infer only a few out of the many equally likely topologies." << endl
+            << "However, the results should not be considered as representatives for the true tree" << endl << endl ;
+    }
+
+    if (opts.constraint_tree_file.empty() || !opts.use_old_constraint)
+    {
+      int pars_trees = dPred->numStartTrees(difficulty, 7.0, 0.5, 0.25);
+      
+      opts.start_trees[StartingTree::random] = difficulty >= 0.7 ? 0 :
+                                dPred->numStartTrees(difficulty, 3.5  , 0.5, 0.25);
+      opts.start_trees[StartingTree::parsimony] = difficulty >= 0.7 ? (int) (1.5 * pars_trees) : pars_trees;
+
+    }
+    else
+      opts.start_trees[StartingTree::random] = 2*dPred->numStartTrees(difficulty, 8.0, 0.5, 0.3);
+
+    for (const auto& it: opts.start_trees)
+      opts.num_searches += it.second;
+  }
 }
 
 void prepare_tree(const RaxmlInstance& instance, Tree& tree)
@@ -1214,7 +1344,7 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type)
       unsigned int attrs = opts.simd_arch;
 
       // TODO: check if there is any reason not to use tip-inner
-      attrs |= PLL_ATTRIB_PATTERN_TIP;
+      attrs |= CORAX_ATTRIB_PATTERN_TIP;
 
       const PartitionedMSA& pars_msa = instance.parted_msa_parsimony ?
                                     *instance.parted_msa_parsimony.get() : *instance.parted_msa;
@@ -1634,6 +1764,7 @@ void balance_load(RaxmlInstance& instance)
 
   instance.proc_part_assign =
       instance.load_balancer->get_all_assignments(part_sizes, ParallelContext::threads_per_group());
+    /* only master process writes the log file */
 
   LOG_INFO_TS << "Data distribution: " << PartitionAssignmentStats(instance.proc_part_assign) << endl;
   LOG_VERB << endl << instance.proc_part_assign;
@@ -1810,7 +1941,7 @@ void reroot_tree_with_outgroup(const Options& opts, Tree& tree, bool add_root_no
     }
     catch (std::runtime_error& e)
     {
-      if (pll_errno == PLLMOD_TREE_ERROR_POLYPHYL_OUTGROUP)
+      if (corax_errno == CORAX_TREE_ERROR_POLYPHYL_OUTGROUP)
         LOG_WARN << "WARNING: " << e.what() << endl << endl;
       else
         throw e;
@@ -2111,7 +2242,7 @@ void check_terrace(const RaxmlInstance& instance, const Tree& tree)
 #ifdef _RAXML_TERRAPHAST
   const auto& parted_msa = *instance.parted_msa;
 
-  if (parted_msa.part_count() > 1 && instance.opts.brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED)
+  if (parted_msa.part_count() > 1 && instance.opts.brlen_linkage == CORAX_BRLEN_UNLINKED)
   {
     try
     {
@@ -2213,7 +2344,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
 
   if (opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate || opts.command == Command::sitelh ||
-      opts.command == Command::ancestral)
+      opts.command == Command::ancestral || opts.command == Command::adaptive)
   {
     auto model_log_lvl = parted_msa.part_count() > 1 ? LogLevel::verbose : LogLevel::info;
     const auto& ml_models = instance.ml_tree.models;
@@ -2233,7 +2364,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
   }
 
   if (opts.command == Command::search || opts.command == Command::all ||
-      opts.command == Command::evaluate || opts.command == Command::sitelh)
+      opts.command == Command::evaluate || opts.command == Command::sitelh || opts.command == Command::adaptive)
   {
     auto best_loglh = instance.ml_tree.loglh;
 
@@ -2281,7 +2412,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
       LOG_INFO << "Best ML tree saved to: " << sysutil_realpath(opts.best_tree_file()) << endl;
     }
 
-    if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED && !opts.partition_trees_file().empty())
+    if (opts.brlen_linkage == CORAX_BRLEN_UNLINKED && !opts.partition_trees_file().empty())
     {
       NewickStream nw_result(opts.partition_trees_file());
 
@@ -2346,7 +2477,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
   }
 
   if (opts.command == Command::search || opts.command == Command::all ||
-      opts.command == Command::evaluate || opts.command == Command::sitelh)
+      opts.command == Command::evaluate || opts.command == Command::sitelh || opts.command == Command::adaptive)
   {
     if (!opts.best_model_file().empty())
     {
@@ -2577,7 +2708,7 @@ void finalize_energy(RaxmlInstance& instance, const CheckpointFile& checkp)
   else
     instance.used_wh = 0;
 
-  ParallelContext::mpi_reduce(&instance.used_wh, 1, PLLMOD_COMMON_REDUCE_SUM);
+  ParallelContext::mpi_reduce(&instance.used_wh, 1, CORAX_REDUCE_SUM);
 }
 
 void init_parallel_buffers(const RaxmlInstance& instance)
@@ -2613,7 +2744,7 @@ void init_parallel_buffers(const RaxmlInstance& instance)
   ParallelContext::resize_buffers(reduce_buffer_size, worker_buf_size);
 }
 
-void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
+void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm, DifficultyPredictor* dPred = nullptr)
 {
   auto& worker = instance.get_worker();
   Checkpoint& checkp = cm.checkpoint();
@@ -2650,6 +2781,14 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
         " distinct starting trees" << endl;
   }
 
+  /* if(opts.command == Command::adaptive && dPred->checkpoint_mode()) {
+    if (ParallelContext::group_master_thread())
+    {
+      ParallelContext::UniqueLock lock;
+      cm.set_best_lh_from_chkp(dPred->get_best_ML());
+    }
+  } */
+
   (instance.start_trees.size() > 1 ? LOG_RESULT : LOG_INFO) << endl;
 
   unsigned int batch_id = (instance.done_ml_trees.size() / opts.bootstop_interval) + 1;
@@ -2681,7 +2820,7 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
     Optimizer optimizer(opts);
     if (opts.command == Command::evaluate || opts.command == Command::sitelh ||
         opts.command == Command::ancestral)
-    {
+    { 
       // check if we have anything to optimize
       if (opts.optimize_brlen || opts.optimize_model)
       {
@@ -2706,11 +2845,23 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
     }
     else
     {
-      optimizer.optimize_topology(*treeinfo, cm);
-      LOG_PROGR << endl;
-      LOG_WORKER_TS(log_level) << "ML tree search #" << start_tree_num <<
-                           ", logLikelihood: " << FMT_LH(checkp.loglh()) << endl;
-      LOG_PROGR << endl;
+      if(opts.command == Command::adaptive){
+        
+        double difficulty = dPred->getDifficulty();
+        optimizer.optimize_topology_adaptive(*treeinfo, cm, difficulty);
+        
+        LOG_PROGR << endl;
+        LOG_WORKER_TS(log_level) << "ML tree search #" << start_tree_num <<
+                            ", logLikelihood: " << FMT_LH(checkp.loglh()) << endl;
+        LOG_PROGR << endl;
+
+      } else{
+        optimizer.optimize_topology(*treeinfo, cm);
+        LOG_PROGR << endl;
+        LOG_WORKER_TS(log_level) << "ML tree search #" << start_tree_num <<
+                            ", logLikelihood: " << FMT_LH(checkp.loglh()) << endl;
+        LOG_PROGR << endl;
+      }
     }
 
     if (!instance.persite_loglh.empty())
@@ -2873,24 +3024,25 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
 }
 
 
-void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
+void thread_main(RaxmlInstance& instance, CheckpointManager& cm, DifficultyPredictor* dPred = nullptr)
 {
   /* wait until master thread prepares all global data */
 //  printf("WORKER: %u, LOCAL_THREAD: %u\n", ParallelContext::group_id(), ParallelContext::local_proc_id());
   ParallelContext::global_barrier();
 
   auto const& opts = instance.opts;
-
   check_oversubscribe(instance);
 
   if ((opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate || opts.command == Command::sitelh ||
-      opts.command == Command::ancestral) &&
+      opts.command == Command::ancestral || opts.command == Command::adaptive) &&
       !instance.start_trees.empty())
   {
-    thread_infer_ml(instance, cm);
+    thread_infer_ml(instance, cm, dPred);
     ParallelContext::global_barrier();
   }
+
+  ParallelContext::global_barrier();
 
   if ((opts.command == Command::bootstrap || opts.command == Command::all))
   {
@@ -2904,6 +3056,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 {
   auto const& opts = instance.opts;
+  shared_ptr<DifficultyPredictor> dPred;
 
   /* init load balancer */
   switch(opts.load_balance_method)
@@ -2934,7 +3087,31 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
     instance.opts.msa_format = FileFormat::binary;
   }
 
-  load_parted_msa(instance);
+  // Difficulty Predictor for adaptive RAxML-NG
+  // The Difficulty Predictor is one object shared by all threads (in any parallelization scheme)
+  if(opts.command == Command::adaptive)
+    dPred = make_shared<DifficultyPredictor>(instance.opts.adaptive_chkpt_file(), opts.nofiles_mode);
+
+  /* If resuming from a checkpoint on adaptive mode*/
+  // Still single thread execution
+  if(opts.command == Command::adaptive &&
+      sysutil_file_exists(opts.checkp_file()) &&
+      !opts.redo_mode)
+  {
+    dPred->set_checkpoint_true();
+  }
+  
+  // load MSA  
+  try{
+    load_parted_msa(instance, 
+                    opts.command == Command::adaptive? dPred.get() : nullptr );
+  
+  } catch(const runtime_error& error){
+    
+    throw error;
+
+  }
+
   assert(instance.parted_msa);
   auto& parted_msa = *instance.parted_msa;
 
@@ -2945,9 +3122,10 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   check_options(instance);
 
   ParallelContext::init_pthreads(opts, std::bind(thread_main,
-                                                 std::ref(instance),
-                                                 std::ref(cm)));
-
+                                                std::ref(instance),
+                                                std::ref(cm),
+                                                opts.command == Command::adaptive ? dPred.get() : nullptr ));
+  
   /* init workers */
   assert(opts.num_workers > 0);
   for (size_t i = 0; i < ParallelContext::num_local_groups(); ++i)
@@ -2968,7 +3146,7 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   load_checkpoint(instance, cm);
 
   /* load/create starting tree if not already loaded from checkpoint */
-  if (instance.start_trees.size() < opts.num_searches)
+  if(instance.start_trees.size() < opts.num_searches)
   {
     if (ParallelContext::master_rank() || opts.start_tree_file().empty() ||
         (!opts.constraint_tree_file.empty() && opts.use_old_constraint))
@@ -3032,8 +3210,12 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   if (ParallelContext::master_rank())
     instance.opts.remove_result_files();
-
-  thread_main(instance, cm);
+  
+  // Main routines
+  thread_main(instance, 
+              cm, 
+              opts.command == Command::adaptive? dPred.get() : nullptr);
+  
 
   if (ParallelContext::master_rank())
   {
@@ -3052,6 +3234,7 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
     if (!instance.ml_tree.models.empty())
     {
+      // both in standard and adaptive mode, the code enters this if clause
       const auto& ml_models = instance.ml_tree.models;
       assert(ml_models.size() == parted_msa.part_count());
       for (size_t p = 0; p < parted_msa.part_count(); ++p)
@@ -3070,7 +3253,7 @@ int clean_exit(int retval)
 int internal_main(int argc, char** argv, void* comm)
 {
   int retval = EXIT_SUCCESS;
-
+  
   RaxmlInstance instance;
   auto& opts = instance.opts;
 
@@ -3115,6 +3298,7 @@ int internal_main(int argc, char** argv, void* comm)
     case Command::consense:
     case Command::sitelh:
     case Command::ancestral:
+    case Command::adaptive:
       if (!opts.redo_mode && opts.result_files_exist())
       {
         LOG_ERROR << endl << "ERROR: Result files for the run with prefix `" <<
@@ -3197,6 +3381,7 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::all:
       case Command::sitelh:
       case Command::ancestral:
+      case Command::adaptive:
       {
         master_main(instance, cm);
         break;
@@ -3301,11 +3486,11 @@ int internal_main(int argc, char** argv, void* comm)
     }
   }
   catch(exception& e)
-  {
+  { 
     LOG_ERROR << endl << "ERROR: " << e.what() << endl << endl;
     retval = EXIT_FAILURE;
   }
-
+  
   return clean_exit(retval);
 }
 

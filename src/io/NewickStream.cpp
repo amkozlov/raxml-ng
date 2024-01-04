@@ -2,12 +2,12 @@
 
 using namespace std;
 
-char * newick_name_cb(const pll_unode_t * node)
+char * newick_name_cb(const corax_unode_t * node)
 {
   return node->label ? strdup(node->label) : strdup("");
 }
 
-char * newick_print_cb(const pll_unode_t * node)
+char * newick_print_cb(const corax_unode_t * node)
 {
   // that's ugly, but cannot find a better solution so far...
   const unsigned int precision = logger().precision(LogElement::brlen);
@@ -22,14 +22,14 @@ char * newick_print_cb(const pll_unode_t * node)
 
 std::string to_newick_string_rooted(const Tree& tree, double root_brlen)
 {
-  char * newick_str = pll_utree_export_newick_rooted(&tree.pll_utree_root(),
+  char * newick_str = corax_utree_export_newick_rooted(&tree.pll_utree_root(),
                                                      root_brlen);
   std::string result = newick_str;
   free(newick_str);
   return result;
 }
 
-void to_newick_file(const pll_utree_t& tree, const std::string& fname)
+void to_newick_file(const corax_utree_t& tree, const std::string& fname)
 {
   if (ParallelContext::master())
   {
@@ -38,10 +38,10 @@ void to_newick_file(const pll_utree_t& tree, const std::string& fname)
   }
 }
 
-NewickStream& operator<<(NewickStream& stream, const pll_unode_t& root)
+NewickStream& operator<<(NewickStream& stream, const corax_unode_t& root)
 {
   auto print_cb = stream.brlens() ? newick_print_cb : newick_name_cb;
-  char * newick_str = pll_utree_export_newick(&root, print_cb);
+  char * newick_str = corax_utree_export_newick(&root, print_cb);
   if (newick_str)
   {
     stream << newick_str << std::endl;
@@ -49,13 +49,13 @@ NewickStream& operator<<(NewickStream& stream, const pll_unode_t& root)
   }
   else
   {
-    assert(pll_errno);
+    assert(corax_errno);
     libpll_check_error("Failed to generate Newick");
   }
   return stream;
 }
 
-NewickStream& operator<<(NewickStream& stream, const pll_utree_t& tree)
+NewickStream& operator<<(NewickStream& stream, const corax_utree_t& tree)
 {
   stream << *tree.vroot;
   return stream;
@@ -80,7 +80,7 @@ NewickStream& operator>>(NewickStream& stream, Tree& tree)
   {
     newick_str += ";";
 
-    pll_utree_t * utree = pll_utree_parse_newick_string_unroot(newick_str.c_str());
+    corax_utree_t * utree = corax_utree_parse_newick_string_unroot(newick_str.c_str());
 
     libpll_check_error("ERROR reading tree file");
 
@@ -92,7 +92,7 @@ NewickStream& operator>>(NewickStream& stream, Tree& tree)
 //    tree = Tree(*utree);
     tree.pll_utree(*utree);
 
-    pll_utree_destroy(utree, nullptr);
+    corax_utree_destroy(utree, nullptr);
   }
 
   return stream;

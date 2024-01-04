@@ -486,7 +486,7 @@ void assign_models(Checkpoint& ckp, const TreeInfo& treeinfo)
 
 void assign_models(TreeInfo& treeinfo, const Checkpoint& ckp)
 {
-  const pllmod_treeinfo_t& pll_treeinfo = treeinfo.pll_treeinfo();
+  const corax_treeinfo_t& pll_treeinfo = treeinfo.pll_treeinfo();
   for (auto& m: ckp.models)
   {
     if (!pll_treeinfo.partitions[m.first])

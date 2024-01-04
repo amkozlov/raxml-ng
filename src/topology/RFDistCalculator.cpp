@@ -2,11 +2,16 @@
 
 using namespace std;
 
+RFDistCalculator::RFDistCalculator() : _num_trees(0), _num_tips(0), _avg_rf(0.0), _avg_rrf(0.0), _num_uniq_trees(0) {}
+
 RFDistCalculator::RFDistCalculator (const TreeList& trees, bool lowmem) :
     _num_trees(0), _num_tips(0), _avg_rf(0.0), _avg_rrf(0.0), _num_uniq_trees(0)
-{
-  if (trees.size() > 1)
-  {
+{ 
+  tree_list = &trees;
+  recalculate_rf(lowmem);
+  /* if (trees.size() > 1)
+  { 
+    tree_list = &trees;
     _num_trees = trees.size();
     _num_tips = trees.at(0).num_tips();
     if (lowmem)
@@ -17,11 +22,48 @@ RFDistCalculator::RFDistCalculator (const TreeList& trees, bool lowmem) :
   else
     throw runtime_error("Need at least 2 trees to compute RF distances! "
                         "Given: " + to_string(trees.size()));
+  
+  // create the mapping of trees into topologies
+  map_trees_into_topologies(); */
 }
 
 RFDistCalculator::~RFDistCalculator ()
 {
 }
+
+void RFDistCalculator::recalculate_rf(bool lowmem){
+  
+  _rfdist_mat.clear();
+  _split_occurence.clear();
+  
+  if (tree_list->size() > 1)
+  { 
+    _num_trees = tree_list->size();
+    _num_tips = tree_list->at(0).num_tips();
+    if (lowmem)
+      calc_rfdist_lowmem(*tree_list);
+    else
+      calc_rfdist(*tree_list);
+    
+    // create the mapping of trees into topologies
+    map_trees_into_topologies();
+    
+  } else
+    throw runtime_error("Need at least 2 trees to compute RF distances! "
+                        "Given: " + to_string(tree_list->size()));
+  
+}
+
+unsigned int RFDistCalculator::get_frequency_of_topology(unsigned int topology_index){
+  
+  assert(_num_uniq_trees > 0); // we need to have at least one unique topology
+  
+  if(topology_index <= _num_uniq_trees - 1){
+    return unique_topology_frequences.at(topology_index);
+  } else
+    throw runtime_error("The topology_index should be an unsigned int "
+                          "between on the interval [0, num_uniq_trees()-1] \n");
+} 
 
 void RFDistCalculator::add_tree_splits(size_t tree_idx, const Tree& tree,
                                        bitv_hashtable_t * splits_hash)
@@ -30,13 +72,13 @@ void RFDistCalculator::add_tree_splits(size_t tree_idx, const Tree& tree,
   assert(tree.num_tips() == _num_tips);
   assert(tree_idx < _num_trees);
 
-  pll_split_t * splits = pllmod_utree_split_create(&tree.pll_utree_root(),
+  corax_split_t * splits = corax_utree_split_create(&tree.pll_utree_root(),
                                                  tree.num_tips(),
                                                  nullptr);
 
   for (size_t i = 0; i < tree.num_splits(); ++i)
   {
-    bitv_hash_entry_t * e = pllmod_utree_split_hashtable_insert_single(splits_hash,
+    bitv_hash_entry_t * e = corax_utree_split_hashtable_insert_single(splits_hash,
                                                                        splits[i],
                                                                        1.0);
     if (!e)
@@ -51,16 +93,16 @@ void RFDistCalculator::add_tree_splits(size_t tree_idx, const Tree& tree,
     _split_occurence[e->bip_number][tree_idx] = true;
   }
 
-  pllmod_utree_split_destroy(splits);
+  corax_utree_split_destroy(splits);
 }
 
 void RFDistCalculator::calc_rfdist(const TreeList& trees)
 {
-  bitv_hashtable_t * splits_hash = pllmod_utree_split_hashtable_create(_num_tips, 0);
+  bitv_hashtable_t * splits_hash = corax_utree_split_hashtable_create(_num_tips, 0);
 
   if (!splits_hash)
   {
-    assert(pll_errno);
+    assert(corax_errno);
     libpll_check_error("Cannot create split hashtable");
   }
 
@@ -104,7 +146,7 @@ void RFDistCalculator::calc_rfdist(const TreeList& trees)
     }
   }
 
-  pllmod_utree_split_hashtable_destroy(splits_hash);
+  corax_utree_split_hashtable_destroy(splits_hash);
 
   /* compute averages */
   _avg_rf = std::accumulate(_rfdist_mat.begin(), _rfdist_mat.end(), 0);
@@ -133,11 +175,11 @@ void RFDistCalculator::calc_rfdist_lowmem(const TreeList& trees)
   assert(trees.size() > 0);
 
   /* extract splits from all trees */
-  std::vector<pll_split_t *> splits(_num_trees);
+  std::vector<corax_split_t *> splits(_num_trees);
   for (size_t i = 0; i < _num_trees; ++i)
   {
     const auto& tree = trees.at(i);
-    splits[i] = pllmod_utree_split_create(&tree.pll_utree_root(),
+    splits[i] = corax_utree_split_create(&tree.pll_utree_root(),
                                           tree.num_tips(),
                                           nullptr);
   }
@@ -152,7 +194,7 @@ void RFDistCalculator::calc_rfdist_lowmem(const TreeList& trees)
     bool uniq = true;
     for (size_t j = i+1; j < _num_trees; ++j)
     {
-      auto rf = pllmod_utree_split_rf_distance(splits[i], splits[j], _num_tips);
+      auto rf = corax_utree_split_rf_distance(splits[i], splits[j], _num_tips);
       _avg_rf += rf;
 
       // TODO: maxrf will be different for multifurcating trees
@@ -168,7 +210,7 @@ void RFDistCalculator::calc_rfdist_lowmem(const TreeList& trees)
   }
 
   for (auto s: splits)
-    pllmod_utree_split_destroy(s);
+    corax_utree_split_destroy(s);
 
   _avg_rf /= num_pairs;
   _avg_rrf /= num_pairs;
@@ -215,6 +257,89 @@ double RFDistCalculator::rrf(size_t i, size_t j) const
  return rf(i, j) / maxrf();
 }
 
+void RFDistCalculator::map_trees_into_topologies(){
+  
+  // number of trees in treelist
+  size_t num_trees = tree_list->size();
+  tree_to_topology.clear();
+  unique_topology_frequences.clear();
+  
+  // clear - resize and initialize mapping
+  tree_topology_mapping.clear();
+  tree_topology_mapping.resize(num_trees);
+  for (size_t i=0; i < num_trees; i++) tree_topology_mapping[i] = -2; // initialize: set all elements to -2
+
+  // based on the pre-calculated rf distances, create the unordered mapping
+  unsigned int topology_counter = 0;
+  for (size_t i=0; i < num_trees; i++){
+    
+    tree_topology_mapping[i] = (tree_topology_mapping[i] == -2) ? -1 : tree_topology_mapping[i];
+    unsigned int freq = 1;
+
+    if(tree_topology_mapping[i] == -1){
+      
+      for(size_t j = i+1; j < num_trees; j++){
+        
+        if(tree_topology_mapping[j] == -2){
+          
+          auto tmp_rf = rf(i, j);
+          if(tmp_rf == 0){
+            freq += 1;
+            tree_topology_mapping[j] = i; 
+          }
+
+        }
+      }
+
+      // setting up the frequencies and topologies table
+      tree_to_topology.insert({(unsigned int)i, topology_counter});
+      unique_topology_frequences.push_back(freq);
+      topology_counter++;
+    }
+  }
+
+  assert(topology_counter == num_uniq_trees() && 
+          tree_to_topology.size() == num_uniq_trees() &&
+          unique_topology_frequences.size() == num_uniq_trees());
+  
+}
+
+unsigned int RFDistCalculator::get_topology_with_highest_freq(){
+
+  unsigned int max_freq_i = -1;
+  unsigned int max_freq = 0;
+
+  for(size_t i = 0; i<_num_uniq_trees; i++){
+    unsigned int cur_freq = get_frequency_of_topology((unsigned int) i );
+    if(cur_freq > max_freq){
+      max_freq_i = i;
+      max_freq = cur_freq;
+    }
+  }
+
+  for(size_t i = 0; i<_num_uniq_trees; i++){
+    if(i != max_freq_i){
+      unsigned int cur_freq = get_frequency_of_topology((unsigned int) i );
+      assert(cur_freq <= max_freq);
+      if (cur_freq == max_freq)
+        cout << "WARNING: Topologies " << max_freq_i << " and " << i <<
+             " have equal frequency = " << cur_freq << ".\nHowever, only index " << max_freq_i << " is returned\n" << endl;
+      
+    }
+  }
+
+  return max_freq_i;
+
+}
+
+unsigned int RFDistCalculator::map_tree_into_topology(size_t i){
+
+  if(tree_topology_mapping[i] == -1){
+    return tree_to_topology.at( (unsigned int) i);
+  } else
+    return map_tree_into_topology(tree_topology_mapping[i]);
+}
+
 std::fstream& operator<<(std::fstream& stream, const RFDistCalculator& rfcalc)
 {
   auto num_trees = rfcalc.num_trees();
@@ -233,4 +358,3 @@ std::fstream& operator<<(std::fstream& stream, const RFDistCalculator& rfcalc)
   }
   return stream;
 }
-

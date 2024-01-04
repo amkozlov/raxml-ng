@@ -1,11 +1,12 @@
-file(GLOB RAXML_SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp 
+file(GLOB RAXML_SOURCES ${PROJECT_SOURCE_DIR}/src/common.h
+                        ${PROJECT_SOURCE_DIR}/src/*.cpp 
                         ${PROJECT_SOURCE_DIR}/src/util/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/io/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/bootstrap/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/autotune/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/loadbalance/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/topology/*.cpp
-                        )
+                        ${PROJECT_SOURCE_DIR}/src/adaptive/*.cpp)
 
 if(USE_TERRAPHAST)
   file (GLOB TERRACE_SOURCES ${PROJECT_SOURCE_DIR}/src/terraces/*.cpp)
@@ -38,35 +39,26 @@ else()
   add_executable(raxml_module ${RAXML_SOURCES})
 endif()
 
-
-if (USE_LIBPLL_CMAKE)
-  target_include_directories(raxml_module PRIVATE ${PLLMOD_EXPORTED_INCLUDE_PATH})
-  set(LIBPLL_LIBS  ${PLLMODULES_LIBRARIES} ${PLL_LIBRARIES})
-else()
-  set(LIBPLL_LIBS ${RAXML_LOCALDEPS_DIR}/lib/libpll_algorithm.a
-                  ${RAXML_LOCALDEPS_DIR}/lib/libpll_binary.a
-                  ${RAXML_LOCALDEPS_DIR}/lib/libpll_optimize.a
-                  ${RAXML_LOCALDEPS_DIR}/lib/libpll_msa.a
-                  ${RAXML_LOCALDEPS_DIR}/lib/libpll_tree.a
-                  ${RAXML_LOCALDEPS_DIR}/lib/libpll_util.a
-                  ${RAXML_LOCALDEPS_DIR}/lib/libpll.a
-                  )
+if (USE_CORAXLIB_CMAKE)
+  target_include_directories(raxml_module PUBLIC ${PROJECT_SOURCE_DIR}/libs/coraxlib/src ${PROJECT_SOURCE_DIR}/libs/coraxlib/lib/difficulty_prediction/src)
+  #target_link_libraries(raxml_module PUBLIC corax)
+  target_link_directories(raxml_module PUBLIC ${PROJECT_SOURCE_DIR}/libs/coraxlib/bin)
+  set(LIBPLL_LIBS coraxlib_difficulty_prediction_lib corax)
 endif()
-
 
 set(RAXML_LIBS ${LIBPLL_LIBS} m)
 
 if(USE_TERRAPHAST)
   set(RAXML_LIBS ${RAXML_LOCALDEPS_DIR}/lib/libterraces.a ${RAXML_LIBS})
-  add_dependencies(raxml_module terraces)
+  target_link_libraries(raxml_module PUBLIC ${RAXML_LIBS})
 endif()
 
 # export to the parent dir to use in GTest makefile
 set(RAXML_LIBS ${RAXML_LIBS} PARENT_SCOPE)
 
-#message(STATUS "Libs: ${RAXML_LIBS}")
+message(STATUS "Libs: ${RAXML_LIBS}")
 
-target_link_libraries(raxml_module ${RAXML_LIBS})
+target_link_libraries(raxml_module PUBLIC ${RAXML_LIBS})
 
 if (BUILD_AS_LIBRARY AND NOT APPLE)
   target_link_libraries(raxml_module gcc_s gcc)

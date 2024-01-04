@@ -7,12 +7,13 @@ using namespace std;
 Options::Options() : opt_version(RAXML_OPT_VERSION), cmdline(""), command(Command::none),
 use_tip_inner(true), use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false),
 use_repeats(true), use_rba_partload(true), use_energy_monitor(true), use_old_constraint(false),
+use_spr_fastclv(false),
 optimize_model(true), optimize_brlen(true), force_mode(false), safety_checks(SafetyCheck::all),
 redo_mode(false), nofiles_mode(false), write_interim_results(true), write_bs_msa(false),
 log_level(LogLevel::progress), msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
-random_seed(0), start_trees(), lh_epsilon(DEF_LH_EPSILON), spr_radius(-1),
-spr_cutoff(1.0),
-brlen_linkage(PLLMOD_COMMON_BRLEN_SCALED), brlen_opt_method(PLLMOD_OPT_BLO_NEWTON_FAST),
+random_seed(0), start_trees(), lh_epsilon(DEF_LH_EPSILON), lh_epsilon_brlen_triplet(DEF_LH_EPSILON_BRLEN_TRIPLET),
+spr_radius(-1), spr_cutoff(1.0),
+brlen_linkage(CORAX_BRLEN_SCALED), brlen_opt_method(CORAX_OPT_BLO_NEWTON_FAST),
 brlen_min(RAXML_BRLEN_MIN), brlen_max(RAXML_BRLEN_MAX),
 num_searches(1), terrace_maxsize(100),
 num_bootstraps(1000), bootstop_criterion(BootstopCriterion::none), bootstop_cutoff(0.03),
@@ -20,7 +21,7 @@ bootstop_interval(RAXML_BOOTSTOP_INTERVAL), bootstop_permutations(RAXML_BOOTSTOP
 tbe_naive(false), consense_cutoff(ConsenseCutoff::MR), tree_file(""), constraint_tree_file(""),
 msa_file(""), model_file(""), weights_file(""), outfile_prefix(""),
 num_threads(1), num_threads_max(1), num_ranks(1), num_workers(1), num_workers_max(UINT_MAX),
-simd_arch(PLL_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(LoadBalancing::benoit)
+simd_arch(CORAX_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(LoadBalancing::benoit)
 {}
 
 string Options::output_fname(const string& suffix) const
@@ -63,6 +64,7 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.tmp_best_tree, "lastTree.TMP");
   set_default_outfile(outfile_names.tmp_ml_trees, "mlTrees.TMP");
   set_default_outfile(outfile_names.tmp_bs_trees, "bootstraps.TMP");
+  set_default_outfile(outfile_names.adaptiveCkp, "adaptiveCkp");
 }
 
 std::string Options::checkp_file() const
@@ -112,6 +114,9 @@ bool Options::result_files_exist() const
     case Command::search:
       return sysutil_file_exists(best_tree_file()) || sysutil_file_exists(best_tree_collapsed_file()) ||
              sysutil_file_exists(best_model_file()) ||sysutil_file_exists(partition_trees_file());
+    case Command::adaptive:
+      return sysutil_file_exists(best_tree_file()) || sysutil_file_exists(best_tree_collapsed_file()) ||
+             sysutil_file_exists(best_model_file()) ||sysutil_file_exists(partition_trees_file());
     case Command::bootstrap:
       return sysutil_file_exists(bootstrap_trees_file());
     case Command::all:
@@ -143,7 +148,7 @@ bool Options::result_files_exist() const
 
 void Options::remove_result_files() const
 {
-  if (command == Command::search || command == Command::all ||
+  if (command == Command::search || command == Command::adaptive || command == Command::all ||
       command == Command::evaluate)
   {
     sysutil_file_remove(best_tree_file());
@@ -204,19 +209,19 @@ string Options::simd_arch_name() const
 {
   switch(simd_arch)
   {
-    case PLL_ATTRIB_ARCH_CPU:
+    case CORAX_ATTRIB_ARCH_CPU:
       return "NONE";
       break;
-    case PLL_ATTRIB_ARCH_SSE:
+    case CORAX_ATTRIB_ARCH_SSE:
       return "SSE3";
       break;
-    case PLL_ATTRIB_ARCH_AVX:
+    case CORAX_ATTRIB_ARCH_AVX:
       return "AVX";
       break;
-    case PLL_ATTRIB_ARCH_AVX2:
+    case CORAX_ATTRIB_ARCH_AVX2:
       return "AVX2";
       break;
-    case PLL_ATTRIB_ARCH_AVX512:
+    case CORAX_ATTRIB_ARCH_AVX512:
       return "AVX512";
       break;
     default:
@@ -296,6 +301,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       break;
     case Command::sitelh:
       stream << "Per-site likelihood computation";
+      break;
+    case Command::adaptive:
+      stream << "Adaptive ML tree search";
       break;
     default:
       break;
@@ -404,7 +412,7 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   stream << "  random seed: " << opts.random_seed << endl;
 
   if (opts.command == Command::bootstrap || opts.command == Command::all ||
-      opts.command == Command::search || opts.command == Command::evaluate ||
+      opts.command == Command::search || opts.command == Command::evaluate || opts.command == Command::adaptive ||
       opts.command == Command::parse || opts.command == Command::ancestral)
   {
     stream << "  tip-inner: " << (opts.use_tip_inner ? "ON" : "OFF") << endl;
@@ -412,7 +420,13 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     stream << "  per-rate scalers: " << (opts.use_rate_scalers ? "ON" : "OFF") << endl;
     stream << "  site repeats: " << (opts.use_repeats ? "ON" : "OFF") << endl;
 
-    if (opts.command == Command::search)
+    stream << "  logLH epsilon: " ;
+    stream << "general: " << opts.lh_epsilon << ", ";
+    stream << "brlen-triplet: " << opts.lh_epsilon_brlen_triplet;
+    stream << endl;
+    
+    if (opts.command == Command::search || opts.command == Command::adaptive || 
+        opts.command == Command::all || opts.command == Command::bootstrap)
     {
       if (opts.spr_radius > 0)
         stream << "  fast spr radius: " << opts.spr_radius << endl;
@@ -423,12 +437,14 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
         stream << "  spr subtree cutoff: " << opts.spr_cutoff << endl;
       else
         stream << "  spr subtree cutoff: OFF" << endl;
+
+      stream << "  fast CLV updates: " << (opts.use_spr_fastclv ? "ON" : "OFF") << endl;
     }
 
     stream << "  branch lengths: ";
-    if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_SCALED)
+    if (opts.brlen_linkage == CORAX_BRLEN_SCALED)
       stream << "proportional";
-    else if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED)
+    else if (opts.brlen_linkage == CORAX_BRLEN_UNLINKED)
       stream << "unlinked";
     else
       stream << "linked";
@@ -440,19 +456,19 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       stream << "ML estimate, algorithm: ";
       switch(opts.brlen_opt_method)
       {
-        case PLLMOD_OPT_BLO_NEWTON_FAST:
+        case CORAX_OPT_BLO_NEWTON_FAST:
           stream << "NR-FAST";
           break;
-        case PLLMOD_OPT_BLO_NEWTON_SAFE:
+        case CORAX_OPT_BLO_NEWTON_SAFE:
           stream << "NR-SAFE";
           break;
-        case PLLMOD_OPT_BLO_NEWTON_GLOBAL:
+        case CORAX_OPT_BLO_NEWTON_GLOBAL:
           stream << "NR-GLOBAL";
           break;
-        case PLLMOD_OPT_BLO_NEWTON_OLDFAST:
+        case CORAX_OPT_BLO_NEWTON_OLDFAST:
           stream << "legacy NR-FAST";
           break;
-        case PLLMOD_OPT_BLO_NEWTON_OLDSAFE:
+        case CORAX_OPT_BLO_NEWTON_OLDSAFE:
           stream << "legacy NR-SAFE";
           break;
       }

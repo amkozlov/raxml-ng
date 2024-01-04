@@ -1,5 +1,4 @@
 #include "file_io.hpp"
-
 using namespace std;
 
 AncestralProbStream& operator<<(AncestralProbStream& stream, const AncestralStates& ancestral)

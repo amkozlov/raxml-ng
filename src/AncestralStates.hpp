@@ -34,8 +34,8 @@ struct AncestralStates
 
 typedef std::shared_ptr<AncestralStates> AncestralStatesSharedPtr;
 
-void assign_tree(AncestralStates& ancestral, const pllmod_ancestral_t& pll_ancestral);
-void assign_probs(AncestralStates& ancestral, const pllmod_ancestral_t& pll_ancestral,
+void assign_tree(AncestralStates& ancestral, const corax_ancestral_t& pll_ancestral);
+void assign_probs(AncestralStates& ancestral, const corax_ancestral_t& pll_ancestral,
                   const PartitionAssignment& part_assign);
 
 #endif /* RAXML_ANCESTRALSTATES_HPP_ */

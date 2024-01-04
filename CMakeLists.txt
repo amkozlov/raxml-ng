@@ -4,7 +4,7 @@ set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES  ON)
 
 set(RAXML_BINARY_NAME "" CACHE STRING "Custom RAxML-NG binary name")
-set(USE_LIBPLL_CMAKE ON CACHE BOOL "Use CMake to build libpll and pll-modules")
+set(USE_CORAXLIB_CMAKE ON CACHE BOOL "Use CMake to build Coraxlib")
 set(BUILD_AS_LIBRARY OFF CACHE BOOL "Build RAxML-NG as shared library (instead of stand-alone executable)")
 set(PLLMOD_DEBUG OFF CACHE BOOL "Debug pll-modules (tons of console output!)")
 
@@ -20,7 +20,7 @@ set (ENABLE_PLLMOD_SIMD OFF CACHE BOOL "Enable SIMD instructions in pll-modules 
 # build a static binary
 set(STATIC_BUILD OFF CACHE BOOL "Build static binary")
 
-set(USE_TERRAPHAST ON CACHE BOOL "Use phylogentic terraces library (terraphast) ")
+set(USE_TERRAPHAST OFF CACHE BOOL "Use phylogentic terraces library (terraphast) ")
 set(USE_GMP OFF CACHE BOOL "Use GNU Multiple precision (GMP) library ")
 
 set(ENABLE_PTHREADS ${USE_PTHREADS})
@@ -118,7 +118,7 @@ endif()
 
 if(BUILD_AS_LIBRARY)
   # building shared library only works with CMake!
-  set(USE_LIBPLL_CMAKE ON)
+  set(USE_CORAXLIB_CMAKE ON)
 
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_RAXML_BUILD_AS_LIB -fPIC")
 endif()
@@ -131,9 +131,12 @@ message(STATUS "Using flags: ${CMAKE_CXX_FLAGS}")
 
 # build dependencies
 set(RAXML_LOCALDEPS_DIR ${PROJECT_BINARY_DIR}/localdeps)
+set(CORAX_BUILD_DIFFICULTY_PREDICTION ON CACHE BOOL "Build difficulty prediction module")
 add_subdirectory(${PROJECT_SOURCE_DIR}/libs)
+# set(CORAX_BUILD_DIFFICULTY_PREDICTION ON)
 
-include_directories(${RAXML_LOCALDEPS_DIR}/include ${TERRACES_INCLUDE_DIR})
+
+include_directories(${RAXML_LOCALDEPS_DIR}/include ${TERRACES_INCLUDE_DIR} ${PROJECT_SOURCE_DIR}/libs/coraxlib/src)
 
 if(ENABLE_MPI)
   find_package(MPI)

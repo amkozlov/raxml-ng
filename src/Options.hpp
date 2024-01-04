@@ -33,6 +33,7 @@ struct OutputFileNames
   std::string tmp_best_tree;
   std::string tmp_ml_trees;
   std::string tmp_bs_trees;
+  std::string adaptiveCkp;
 };
 
 class Options
@@ -59,6 +60,7 @@ public:
   bool use_rba_partload;
   bool use_energy_monitor;
   bool use_old_constraint;
+  bool use_spr_fastclv;
 
   bool optimize_model;
   bool optimize_brlen;
@@ -77,12 +79,17 @@ public:
   long random_seed;
   StartingTreeMap start_trees;
   double lh_epsilon;
+  double lh_epsilon_brlen_triplet;
   int spr_radius;
   double spr_cutoff;
   int brlen_linkage;
   int brlen_opt_method;
   double brlen_min;
   double brlen_max;
+  int diff_pred_pars_trees;
+
+  double nni_tolerance;
+  double nni_epsilon;
 
   unsigned int num_searches;
   unsigned long long terrace_maxsize;
@@ -133,6 +140,7 @@ public:
   const std::string& best_tree_file() const { return outfile_names.best_tree; }
   const std::string& best_tree_collapsed_file() const { return outfile_names.best_tree_collapsed; }
   const std::string& best_model_file() const { return outfile_names.best_model; }
+  const std::string& adaptive_chkpt_file() const { return outfile_names.adaptiveCkp; }
   const std::string& partition_trees_file() const { return outfile_names.partition_trees; }
   const std::string& ml_trees_file() const { return outfile_names.ml_trees; }
   const std::string& bootstrap_trees_file() const { return outfile_names.bootstrap_trees; }

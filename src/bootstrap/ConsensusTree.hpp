@@ -11,7 +11,7 @@ public:
   ~ConsensusTree ();
 
 protected:
-  virtual void add_tree(const pll_unode_t& root);
+  virtual void add_tree(const corax_unode_t& root);
   virtual bool compute_support();
 
 private:

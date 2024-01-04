@@ -4,6 +4,7 @@
 #include "common.h"
 #include "TreeInfo.hpp"
 #include "io/binary_io.hpp"
+#include "adaptive/DifficultyPredictor.hpp"
 
 constexpr int RAXML_CKP_VERSION = 5;
 constexpr int RAXML_CKP_MIN_SUPPORTED_VERSION = 5;
@@ -20,7 +21,7 @@ enum class CheckpointStep
   start,
   brlenOpt,
   modOpt1,
-  radiusDetect,
+  radiusDetectOrNNI,
   modOpt2,
   fastSPR,
   modOpt3,
@@ -37,7 +38,9 @@ struct SearchState
   double loglh;
 
   int iteration;
+  nni_round_params nni_params;
   spr_round_params spr_params;
+  
   int fast_spr_radius;
 };
 
@@ -128,7 +131,7 @@ private:
   CheckpointFile _checkp_file;
   IDSet _updated_models;
   SearchState _empty_search_state;
-
+  
   void gather_model_params();
   std::string backup_fname() const { return _ckp_fname + ".bk"; }
 };

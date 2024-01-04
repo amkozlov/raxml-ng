@@ -25,9 +25,9 @@ ConsensusTree::~ConsensusTree ()
 {
 }
 
-void ConsensusTree::add_tree(const pll_unode_t& root)
+void ConsensusTree::add_tree(const corax_unode_t& root)
 {
-  pll_unode_t ** node_split_map = nullptr;
+  corax_unode_t ** node_split_map = nullptr;
   doubleVector support;
   int update_only = 0;
 
@@ -44,7 +44,7 @@ bool ConsensusTree::compute_support()
   normalize_support_in_hashtable();
 
   /* build final split system */
-  pll_split_system_t * split_system = pllmod_utree_split_consensus(_pll_splits_hash,
+  corax_split_system_t * split_system = corax_utree_split_consensus(_pll_splits_hash,
                                                                    _num_tips,
                                                                    _cutoff);
 
@@ -56,7 +56,7 @@ bool ConsensusTree::compute_support()
   LOG_DEBUG_TS << "Building consensus tree topology..." << endl;
 
   /* build tree from splits */
-  pll_consensus_utree_t * cons_tree = pllmod_utree_from_splits(split_system,
+  corax_consensus_utree_t * cons_tree = corax_utree_from_splits(split_system,
                                                                _num_tips,
                                                                (char * const *) tip_labels_cstr().data());
 
@@ -79,12 +79,12 @@ bool ConsensusTree::compute_support()
       auto node = _pll_utree->nodes[_pll_utree->tip_count + i];
       assert(node->data);
       _node_split_map[i] = node;
-      _support[i] = ((pll_consensus_data_t *) node->data)->support;
+      _support[i] = ((corax_consensus_data_t *) node->data)->support;
     }
   }
 
-  pllmod_utree_split_system_destroy(split_system);
-  pllmod_utree_consensus_destroy(cons_tree);
+  corax_utree_split_system_destroy(split_system);
+  corax_utree_consensus_destroy(cons_tree);
 
   return true;
 }

@@ -9,7 +9,7 @@ using namespace std;
 FastaStream& operator>>(FastaStream& stream, MSA& msa)
 {
   /* open the file */
-  auto file = pll_fasta_open(stream.fname().c_str(), pll_map_generic);
+  auto file = corax_fasta_open(stream.fname().c_str(), corax_map_generic);
   if (!file)
     libpll_check_error("Unable to parse FASTA file");
 
@@ -23,7 +23,7 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
   int sites = 0;
 
   /* read the rest */
-  while (pll_fasta_getnext(file, &header, &header_length, &sequence, &sequence_length, &sequence_number))
+  while (corax_fasta_getnext(file, &header, &header_length, &sequence, &sequence_length, &sequence_number))
   {
     if (!sites)
     {
@@ -60,10 +60,10 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
     free(header);
   }
 
-  if (pll_errno != PLL_ERROR_FILE_EOF)
+  if (corax_errno != CORAX_ERROR_FILE_EOF)
     libpll_check_error("Error parsing FASTA file: " +  stream.fname() + "\n");
 
-  pll_fasta_close(file);
+  corax_fasta_close(file);
 
   libpll_reset_error();
 
@@ -72,13 +72,13 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
 
 PhylipStream& operator>>(PhylipStream& stream, MSA& msa)
 {
-  pll_msa_t * pll_msa = pll_phylip_load(stream.fname().c_str(),
-                                        stream.interleaved() ? PLL_TRUE : PLL_FALSE);
+  corax_msa_t * pll_msa = corax_phylip_load(stream.fname().c_str(),
+                                        stream.interleaved() ? CORAX_TRUE : CORAX_FALSE);
 
   if (pll_msa)
   {
     msa = MSA(pll_msa);
-    pll_msa_destroy(pll_msa);
+    corax_msa_destroy(pll_msa);
   }
   else
     libpll_check_error("Unable to parse PHYLIP file: " +  stream.fname() + "\n");
@@ -88,10 +88,10 @@ PhylipStream& operator>>(PhylipStream& stream, MSA& msa)
 
 PhylipStream& operator<<(PhylipStream& stream, const MSA& msa)
 {
-  auto retval = pllmod_msa_save_phylip(msa.pll_msa(), stream.fname().c_str());
+  auto retval = corax_phylip_save(stream.fname().c_str(), msa.pll_msa());
 
   if (!retval)
-    throw runtime_error{pll_errmsg};
+    throw runtime_error{corax_errmsg};
 
   return stream;
 }

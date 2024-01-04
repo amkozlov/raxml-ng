@@ -18,6 +18,8 @@ include_directories (${GTEST_INCLUDE_DIRS})
 
 add_executable        (raxml_test_module ${RAXML_TEST_SOURCES})
 
+target_include_directories(raxml_test_module PRIVATE ${PROJECT_SOURCE_DIR}/libs/coraxlib/src ${PROJECT_SOURCE_DIR}/libs/coraxlib/lib/difficulty_prediction/src)
+target_link_directories(raxml_test_module PRIVATE ${PROJECT_SOURCE_DIR}/libs/coraxlib/bin)
 target_link_libraries (raxml_test_module ${RAXML_LIBS})
 
 if(GMP_FOUND)
