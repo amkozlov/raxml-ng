@@ -32,7 +32,7 @@ private:
 
   // functions for adaptive mode
   int spr_radius_limit_adaptive(double difficulty);
-  int spr_radius_step_adaptive(int spr_radius_max, bool slow_spr);
+  int spr_radius_step_adaptive(int spr_radius_max);
 };
 
 #endif /* RAXML_OPTIMIZER_H_ */
