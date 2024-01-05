@@ -1,4 +1,5 @@
 #include "CommandLineParser.hpp"
+#include "version.h"
 
 #include <getopt.h>
 
@@ -197,27 +198,15 @@ void CommandLineParser::compute_num_searches(Options &opts)
       opts.command == Command::evaluate || opts.command == Command::start ||
       opts.command == Command::ancestral || opts.command == Command::sitelh)
   {
-    if (opts.start_trees.empty())
+    assert(!opts.start_trees.empty());
+
+    auto def_tree_count = 10;
+    for (auto& it: opts.start_trees)
     {
-      /* parsimony starting trees are not supported with old-style topological constraint! */
-      if (opts.constraint_tree_file.empty() || !opts.use_old_constraint)
-      {
-        opts.start_trees[StartingTree::random] = 10;
-        opts.start_trees[StartingTree::parsimony] = 10;
-      }
+      if (it.first == StartingTree::user)
+        it.second = 1;
       else
-        opts.start_trees[StartingTree::random] = 20;
-    }
-    else
-    {
-      auto def_tree_count = 10;
-      for (auto& it: opts.start_trees)
-      {
-        if (it.first == StartingTree::user)
-          it.second = 1;
-        else
-          it.second = it.second > 0 ? it.second : def_tree_count;
-      }
+        it.second = it.second > 0 ? it.second : def_tree_count;
     }
 
     for (const auto& it: opts.start_trees)
@@ -291,7 +280,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* use new split-based constraint checking method -> slightly slower, but more reliable */
   opts.use_old_constraint = false;
   
-  /* disable incremental CLV updates across pruned subtrees in SPR rounds */
+  /* enable incremental CLV updates across pruned subtrees in SPR rounds */
   opts.use_spr_fastclv = true;
 
   /* optimize model and branch lengths */
@@ -363,7 +352,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   opts.tbe_naive = false;
 
+  int compat_ver = RAXML_INTVER;
   bool log_level_set = false;
+  string optarg_tree = "";
 
   int option_index = 0;
   int c;
@@ -415,7 +406,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
 
       case 5: /* starting tree */
-        parse_start_trees(opts, optarg);
+        if (optarg_tree.empty())
+          optarg_tree = strdup(optarg);
         break;
 
       case 6: /* set prefix for output files */
@@ -556,6 +548,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         else if (strcasecmp(optarg, "fasta") == 0)
         {
           opts.msa_format = FileFormat::fasta;
+        }
+        else if (strcasecmp(optarg, "fasta_longlabels") == 0)
+        {
+          opts.msa_format = FileFormat::fasta_longlabels;
         }
         else if (strcasecmp(optarg, "phylip") == 0)
         {
@@ -832,9 +828,20 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_spr_fastclv = true;
             else if (eopt == "fastclv-off")
               opts.use_spr_fastclv = false;
+            else if (eopt == "bs-start-pars")
+              opts.use_bs_pars = true;
+            else if (eopt == "bs-start-rand")
+              opts.use_bs_pars = false;
+            else if (eopt == "pars-par")
+              opts.use_par_pars = true;
+            else if (eopt == "pars-seq")
+              opts.use_par_pars = false;
             else if (eopt == "compat-v11")
             {
+              compat_ver = 110;
               opts.use_spr_fastclv = false;
+              opts.use_bs_pars = false;
+              opts.use_par_pars = false;
               opts.lh_epsilon = DEF_LH_EPSILON_V11;
               opts.lh_epsilon_brlen_triplet = DEF_LH_EPSILON_V11;
             }
@@ -866,21 +873,14 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         }
         break;
 
-      case 48: /* search from a single starting tree */
+      case 48: /* search1: search from a single starting tree */
         opts.command = Command::search;
-        if (opts.start_trees.empty())
-          opts.start_trees[StartingTree::random] = 1;
-        else
-        {
-          if (opts.start_trees.count(StartingTree::random))
-            opts.start_trees[StartingTree::random] = 1;
-          if (opts.start_trees.count(StartingTree::parsimony))
-            opts.start_trees[StartingTree::parsimony] = 1;
-        }
+        optarg_tree = "default1";
         num_commands++;
         break;
       case 49: /* generate bootstrap replicate MSAs */
         opts.command = Command::bsmsa;
+        opts.use_par_pars = false;
         num_commands++;
         break;
 
@@ -888,7 +888,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.command = Command::rfdist;
         num_commands++;
         if (optarg)
-          parse_start_trees(opts, optarg);
+          optarg_tree = optarg;
         break;
 
       case 51: /* compute and print average RF distance w/o noise */
@@ -898,7 +898,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         log_level_set = true;
         num_commands++;
         if (optarg)
-          parse_start_trees(opts, optarg);
+          optarg_tree = optarg;
         break;
 
       case 52: /* build consensus tree */
@@ -1009,6 +1009,17 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* if more than one independent command, fail */
   if (num_commands > 1)
     throw OptionException("More than one command specified");
+
+  /* process start tree defaults */
+  if (opts.command == Command::search || opts.command == Command::all ||
+      opts.command == Command::start)
+  {
+    if (optarg_tree.empty())
+      optarg_tree = opts.use_old_constraint ? "rand{20}" : RAXML_DEF_START_TREE;
+    else if (optarg_tree == "default1")
+      optarg_tree = compat_ver < 120 ? RAXML_DEF_START_TREE1_V11 : RAXML_DEF_START_TREE1;
+  }
+  parse_start_trees(opts, optarg_tree);
 
   check_options(opts);
 

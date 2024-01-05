@@ -2,7 +2,7 @@
 #define RAXML_TREE_HPP_
 
 #include "common.h"
-#include "PartitionedMSA.hpp"
+#include "ParsimonyMSA.hpp"
 
 // seems to be the only way to have custom deleter for unique_ptr
 // without having to specify it every time during object creation
@@ -91,11 +91,11 @@ public:
   static Tree buildRandom(const NameList& taxon_names, unsigned int random_seed);
   static Tree buildRandomConstrained(const NameList& taxon_names, unsigned int random_seed,
                                      const Tree& constrained_tree);
-  static Tree buildParsimony(const PartitionedMSA& parted_msa, unsigned int random_seed,
-                             unsigned int attributes, unsigned int * score = nullptr);
-  static Tree buildParsimonyConstrained(const PartitionedMSA& parted_msa, unsigned int random_seed,
-                             unsigned int attributes, unsigned int * score,
-                             const Tree& constrained_tree, const IDVector& tip_msa_idmap);
+  static Tree buildParsimony(const ParsimonyMSA& pars_msa, unsigned int random_seed,
+                             unsigned int * score = nullptr);
+  static Tree buildParsimonyConstrained(const ParsimonyMSA& parted_msa, unsigned int random_seed,
+                             unsigned int * score, const Tree& constrained_tree,
+                             const IDVector& tip_msa_idmap);
   static Tree loadFromFile(const std::string& file_name);
 
   std::vector<const char*> tip_labels_cstr() const;

@@ -16,25 +16,32 @@ Documentation: [github wiki](https://github.com/amkozlov/raxml-ng/wiki)
 ## Installation instructions
 
 * For most desktop Unix/Linux and macOS systems, the easiest way to install RAxML-NG is by using the pre-compiled binary:  
-[**Download 64-bit Linux binary**](https://github.com/amkozlov/raxml-ng/releases/download/1.1.0/raxml-ng_v1.1.0_linux_x86_64.zip)  
-[**Download 64-bit OSX/macOS binary**](https://github.com/amkozlov/raxml-ng/releases/download/1.1.0/raxml-ng_v1.1.0_macos_x86_64.zip)   
-[**NEW (experimental!): Apple M1 binary**](https://github.com/amkozlov/raxml-ng/releases/download/1.1.0/raxml-ng_v1.1.0_macos_M1_experimental.zip)
+[**Download 64-bit Linux binary**](https://github.com/amkozlov/raxml-ng/releases/download/1.2.1/raxml-ng_v1.2.1_linux_x86_64.zip)  
+[**Download 64-bit OSX/macOS binary**](https://github.com/amkozlov/raxml-ng/releases/download/1.2.1/raxml-ng_v1.2.1_macos_x86_64.zip)   
+[**Download Apple M1 binary**](https://github.com/amkozlov/raxml-ng/releases/download/1.2.1/raxml-ng_v1.2.1_macos_M1.zip)
 
 * For clusters/supercomputers (i.e., if you want to use MPI), please use the following installation package which contains pre-built *libpll*. You will need `GCC 6.4+` and `CMake 3.0.2+` in order to compile RAxML-NG for your system.  
-[**Download RAxML-NG-MPI for Linux**](https://github.com/amkozlov/raxml-ng/releases/download/1.1.0/raxml-ng_v1.1.0_linux_x86_64_MPI.zip)
+[**Download RAxML-NG-MPI for Linux**](https://github.com/amkozlov/raxml-ng/releases/download/1.2.1/raxml-ng_v1.2.1_linux_x86_64_MPI.zip)
 
-* On Windows, you can use [linux binary](https://github.com/amkozlov/raxml-ng/releases/download/1.1.0/raxml-ng_v1.1.0_linux_x86_64.zip) via [Windows Subsystem for Linux](https://ubuntu.com/wsl), but performance might be lower than with native Linux execution. 
+* On Windows, you can use [linux binary](https://github.com/amkozlov/raxml-ng/releases/download/1.2.1/raxml-ng_v1.2.1_linux_x86_64.zip) via [Windows Subsystem for Linux](https://ubuntu.com/wsl), but performance might be lower than with native Linux execution. 
 
 * If neither of the above options worked for you, please clone this repository and build RAxML-NG from scratch.
 
-1. **Install the dependecies.** On Ubuntu (and other Debian-based systems), you can simply run:
+**1. Install the dependecies.** On Ubuntu (and other Debian-based systems), you can simply run:
 ```
 sudo apt-get install flex bison libgmp3-dev
 ```
 For other systems, please make sure you have following packages/libraries installed:  
-[`GNU Bison`](http://www.gnu.org/software/bison/) [`Flex`](http://flex.sourceforge.net/) [`GMP`](https://gmplib.org/)
+- [`GNU Bison`](http://www.gnu.org/software/bison/)
+- [`Flex`](http://flex.sourceforge.net/) 
+- [`GMP`](https://gmplib.org/)
 
-2. **Build RAxML-NG.**
+If you do not want to use git submodules (e.g., for packaging), you also need to install:
+- [`pll-modules`](https://github.com/ddarriba/pll-modules/) 
+- [`libpll-2`](https://github.com/xflouris/libpll-2)
+- [`terraphast`](https://github.com/amkozlov/terraphast-one) (optional)
+
+**2. Build RAxML-NG.**
 
 PTHREADS version:
 
@@ -87,11 +94,11 @@ If still in doubt, please feel free to post to the [RAxML google group](https://
 
 ## Usage examples
 
-  1. Perform single tree inference on DNA alignment 
-     (random starting tree, general time-reversible model, ML estimate of substitution rates and
+  1. Perform single quick&dirty tree inference on DNA alignment 
+     (one parsimony starting tree, general time-reversible model, ML estimate of substitution rates and
       nucleotide frequencies, discrete GAMMA model of rate heterogeneity with 4 categories):
 
-     `./raxml-ng --msa testDNA.fa --model GTR+G`
+     `./raxml-ng --search1 --msa testDNA.fa --model GTR+G`
 
   2. Perform an all-in-one analysis (ML tree search + non-parametric bootstrap) 
      (10 randomized parsimony starting trees, fixed empirical substitution matrix (LG),
@@ -146,6 +153,8 @@ doi:[10.1093/molbev/msad227](https://doi.org/10.1093/molbev/msad227)
 * Benoit Morel
 * Ben Bettisworth
 * Sarah Lutteropp
+* Julia Haag
+* Anastasis Togkousidis
 
 ## References
 

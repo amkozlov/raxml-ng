@@ -48,7 +48,12 @@ private:
 class FastaStream : public MSAFileStream
 {
 public:
-  FastaStream(const std::string& fname) : MSAFileStream(fname) {}
+  FastaStream(const std::string& fname, bool long_labels = false) :
+    MSAFileStream(fname), _long_labels(long_labels) {}
+
+  bool long_labels() const { return _long_labels; }
+private:
+  bool _long_labels;
 };
 
 class CATGStream : public MSAFileStream

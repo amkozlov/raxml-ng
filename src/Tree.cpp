@@ -152,59 +152,27 @@ Tree Tree::buildRandomConstrained(const NameList& taxon_names, unsigned int rand
   return tree;
 }
 
-Tree Tree::buildParsimony(const PartitionedMSA& parted_msa, unsigned int random_seed,
-                           unsigned int attributes, unsigned int * score)
+Tree Tree::buildParsimony(const ParsimonyMSA& pars_msa, unsigned int random_seed,
+                          unsigned int * score)
 {
-  return buildParsimonyConstrained(parted_msa, random_seed, attributes, score, Tree(), IDVector());
+  return buildParsimonyConstrained(pars_msa, random_seed, score, Tree(), IDVector());
 }
 
-Tree Tree::buildParsimonyConstrained(const PartitionedMSA& parted_msa, unsigned int random_seed,
-                           unsigned int attributes, unsigned int * score,
-                           const Tree& constrained_tree, const IDVector& tip_msa_idmap)
+Tree Tree::buildParsimonyConstrained(const ParsimonyMSA& pars_msa, unsigned int random_seed,
+                           unsigned int * score, const Tree& constrained_tree,
+                           const IDVector& tip_msa_idmap)
 {
   unsigned int lscore;
   unsigned int *pscore = score ? score : &lscore;
 
-  LOG_DEBUG << "Parsimony seed: " << random_seed << endl;
-
   Tree tree;
-  auto taxon_names = parted_msa.taxon_names();
+  auto taxon_names = pars_msa.taxon_names();
   auto taxon_count = taxon_names.size();
   std::vector<const char*> tip_labels(taxon_names.size(), nullptr);
   for (size_t i = 0; i < taxon_names.size(); ++i)
     tip_labels[i] = taxon_names[i].data();
 
-  // create pll_partitions
-  std::vector<corax_partition*> pars_partitions(parted_msa.part_count(), nullptr);
-  size_t i = 0;
-  for (const auto& pinfo: parted_msa.part_list())
-  {
-    const auto& model = pinfo.model();
-    const auto& msa = pinfo.msa();
-
-    auto partition = corax_partition_create(taxon_count,
-                                         0,   /* number of CLVs */
-                                         model.num_states(),
-                                         msa.length(),
-                                         1,
-                                         1, /* pmatrix count */
-                                         1,  /* rate_cats */
-                                         0,  /* scale buffers */
-                                         attributes);
-
-    /* set pattern weights */
-    if (!msa.weights().empty())
-      corax_set_pattern_weights(partition, msa.weights().data());
-
-    /* set tip states */
-    for (size_t j = 0; j < msa.size(); ++j)
-    {
-      corax_set_tip_states(partition, j, model.charmap(), msa.at(j).c_str());
-    }
-
-    pars_partitions[i++] = partition;
-  }
-  assert(i == pars_partitions.size());
+  auto pars_partitions = pars_msa.pll_partitions();
 
   PllUTreeUniquePtr pll_utree;
   if (constrained_tree.empty())
@@ -267,9 +235,6 @@ Tree Tree::buildParsimonyConstrained(const PartitionedMSA& parted_msa, unsigned 
 
 //    pll_utree_show_ascii(tree.pll_utree().vroot, PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH | PLL_UTREE_SHOW_CLV_INDEX);
   }
-
-  for (auto p: pars_partitions)
-    corax_partition_destroy(p);
 
   libpll_check_error("ERROR building parsimony tree");
   assert(!tree.empty());

@@ -7,7 +7,7 @@ using namespace std;
 Options::Options() : opt_version(RAXML_OPT_VERSION), cmdline(""), command(Command::none),
 use_tip_inner(true), use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false),
 use_repeats(true), use_rba_partload(true), use_energy_monitor(true), use_old_constraint(false),
-use_spr_fastclv(false),
+use_spr_fastclv(true), use_bs_pars(true), use_par_pars(true),
 optimize_model(true), optimize_brlen(true), force_mode(false), safety_checks(SafetyCheck::all),
 redo_mode(false), nofiles_mode(false), write_interim_results(true), write_bs_msa(false),
 log_level(LogLevel::progress), msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
@@ -21,7 +21,8 @@ bootstop_interval(RAXML_BOOTSTOP_INTERVAL), bootstop_permutations(RAXML_BOOTSTOP
 tbe_naive(false), consense_cutoff(ConsenseCutoff::MR), tree_file(""), constraint_tree_file(""),
 msa_file(""), model_file(""), weights_file(""), outfile_prefix(""),
 num_threads(1), num_threads_max(1), num_ranks(1), num_workers(1), num_workers_max(UINT_MAX),
-simd_arch(CORAX_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(LoadBalancing::benoit)
+simd_arch(CORAX_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(LoadBalancing::benoit),
+diff_pred_pars_trees(RAXML_CPYTHIA_TREES_NUM), nni_tolerance(1.0), nni_epsilon(10)
 {}
 
 string Options::output_fname(const string& suffix) const
@@ -363,11 +364,12 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       opts.command == Command::bsmsa)
   {
     stream << "  bootstrap replicates: ";
+    stream << (opts.use_bs_pars ? "parsimony (" : "random (");
     if (opts.bootstop_criterion == BootstopCriterion::none)
-      stream << opts.num_bootstraps;
+      stream << opts.num_bootstraps << ")";
     else
     {
-      stream << "max: " << opts.num_bootstraps << " + bootstopping (";
+      stream << "max: " << opts.num_bootstraps << ") + bootstopping (";
       switch(opts.bootstop_criterion)
       {
         case BootstopCriterion::autoFC:

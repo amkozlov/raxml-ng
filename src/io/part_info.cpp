@@ -164,11 +164,15 @@ RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const Partitioned
     auto part_name = parted_msa.part_name(p);
     auto part_len = parted_msa.part_sites(p);
 
-    stream << model_str << ", "
-           << part_name << " = "
-           << (offset+1) << "-" << (offset+part_len)
-           << std::endl;
-    offset += part_len;
+    // NB: skip empty partitions!
+    if (part_len)
+    {
+      stream << model_str << ", "
+             << part_name << " = "
+             << (offset+1) << "-" << (offset+part_len)
+             << std::endl;
+      offset += part_len;
+    }
   }
   assert(offset == parted_msa.total_sites());
 

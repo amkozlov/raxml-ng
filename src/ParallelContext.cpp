@@ -110,15 +110,22 @@ static void pin_thread(size_t core_id, pthread_t thread)
 
 void ParallelContext::init_pthreads(const Options& opts, const std::function<void()>& thread_main)
 {
-  _num_threads = opts.num_threads;
-  _num_groups = std::max(opts.num_workers, 1u);
+  init_pthreads_custom(opts, thread_main, opts.num_threads, opts.num_workers);
+}
+
+void ParallelContext::init_pthreads_custom(const Options& opts, const std::function<void()>& thread_main,
+                                           unsigned int num_threads, unsigned int num_workers)
+{
+  _num_threads = num_threads;
+  _num_groups = std::max(num_workers, 1u);
   _parallel_buf.reserve(PARALLEL_BUF_SIZE);
 
   _local_rank_id = _num_ranks > _num_groups ? _rank_id : 0;
 
   /* init thread groups */
   size_t groups_per_rank = _num_groups > 1 ? _num_groups / _num_ranks : 1;
-  size_t group_size = opts.num_threads / std::max<size_t>(groups_per_rank, 1u);
+  groups_per_rank = std::max<size_t>(groups_per_rank, 1u);
+  size_t group_size = num_threads / groups_per_rank;
   auto start_grp_id = _num_groups > 1 ? _rank_id * groups_per_rank : 0;
   for (size_t i = 0; i < groups_per_rank; ++i)
     _thread_groups.emplace_back(start_grp_id + i, i, group_size, PARALLEL_BUF_SIZE);
@@ -234,7 +241,7 @@ void ParallelContext::resize_buffers(size_t reduce_buf_size, size_t worker_buf_s
     grp.reduction_buf.reserve(reduce_buf_size);
 }
 
-void ParallelContext::finalize(bool force)
+void ParallelContext::finalize_threads(bool force)
 {
 #ifdef _RAXML_PTHREADS
   for (thread& t: _threads)
@@ -244,9 +251,15 @@ void ParallelContext::finalize(bool force)
     else
       t.join();
   }
+  _thread_groups.clear();
   _threads.clear();
+#else
+  RAXML_UNUSED(force);
 #endif
+}
 
+void ParallelContext::finalize_mpi(bool force)
+{
 #ifdef _RAXML_MPI
   if (_owns_comm)
   {
@@ -259,11 +272,15 @@ void ParallelContext::finalize(bool force)
   }
   else
     MPI_Barrier(_comm);
-#endif
-
-#if !defined(_RAXML_PTHREADS) && !defined(_RAXML_MPI)
+#else
   RAXML_UNUSED(force);
 #endif
+}
+
+void ParallelContext::finalize(bool force)
+{
+  finalize_threads(force);
+  finalize_mpi(force);
 }
 
 void ParallelContext::barrier()
