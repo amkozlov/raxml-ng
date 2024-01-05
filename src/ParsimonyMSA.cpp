@@ -100,24 +100,24 @@ void ParsimonyMSA::create_pll_partitions(unsigned int attributes)
     const auto& model = pinfo.model();
     const auto& msa = pinfo.msa();
 
-    auto partition = pll_partition_create(_pars_msa->taxon_count(),
-                                         0,   /* number of CLVs */
-                                         model.num_states(),
-                                         msa.length(),
-                                         1,
-                                         1, /* pmatrix count */
-                                         1,  /* rate_cats */
-                                         0,  /* scale buffers */
-                                         attributes);
+    auto partition = corax_partition_create(_pars_msa->taxon_count(),
+                                             0,   /* number of CLVs */
+                                             model.num_states(),
+                                             msa.length(),
+                                             1,
+                                             1, /* pmatrix count */
+                                             1,  /* rate_cats */
+                                             0,  /* scale buffers */
+                                             attributes);
 
     /* set pattern weights */
     if (!msa.weights().empty())
-      pll_set_pattern_weights(partition, msa.weights().data());
+      corax_set_pattern_weights(partition, msa.weights().data());
 
     /* set tip states */
     for (size_t j = 0; j < msa.size(); ++j)
     {
-      pll_set_tip_states(partition, j, model.charmap(), msa.at(j).c_str());
+      corax_set_tip_states(partition, j, model.charmap(), msa.at(j).c_str());
     }
 
     _pll_partitions.push_back(partition);
@@ -128,7 +128,7 @@ void ParsimonyMSA::create_pll_partitions(unsigned int attributes)
 void ParsimonyMSA::free_pll_partitions()
 {
   for (auto p: _pll_partitions)
-    pll_partition_destroy(p);
+    corax_partition_destroy(p);
   _pll_partitions.clear();
 }
 

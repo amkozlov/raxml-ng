@@ -7,6 +7,12 @@ DifficultyPredictor::DifficultyPredictor(const string& _outfile, bool _nofiles_m
   outfile = _outfile;
   ckpt = false;
   nofiles_mode = _nofiles_mode;
+  difficulty = -1;
+  is_dna = true;
+  states = 0;
+  states_map = nullptr;
+  parsimony_msa_ptr = nullptr;
+  features = nullptr;
 }
 
 DifficultyPredictor::~DifficultyPredictor(){
@@ -16,14 +22,15 @@ DifficultyPredictor::~DifficultyPredictor(){
   
 }
 
-void DifficultyPredictor::set_partitioned_msa_ptr(PartitionedMSA* _pmsa){
+void DifficultyPredictor::set_parsimony_msa_ptr(ParsimonyMSA* _pmsa){
   
-  partitioned_msa_ptr = _pmsa;
+  parsimony_msa_ptr = _pmsa;
+  const PartitionedMSA& part_msa = parsimony_msa_ptr->part_msa();
   
   size_t weights_size = 0;
   int msa_patterns = 0;
 
-  for (const auto& pinfo: partitioned_msa_ptr->part_list()) msa_patterns += pinfo.length();
+  for (const auto& pinfo: part_msa.part_list()) msa_patterns += pinfo.length();
   
   //const double msa_patterns   = (double)partitioned_msa_ptr->full_msa().length();
   features->patterns          = msa_patterns;
@@ -33,7 +40,7 @@ void DifficultyPredictor::set_partitioned_msa_ptr(PartitionedMSA* _pmsa){
   double bollback_multinomial_tmp = 0;
   int number_of_sites = 0;
 
-  for (const auto& pinfo: partitioned_msa_ptr->part_list()){
+  for (const auto& pinfo: part_msa.part_list()){
     
     int cur_num_sites = 0;
     weights_size = pinfo.msa().weights().size();
@@ -56,14 +63,20 @@ void DifficultyPredictor::set_partitioned_msa_ptr(PartitionedMSA* _pmsa){
   features->bollback_multinomial -= number_of_sites*log(number_of_sites);
 }
 
-double DifficultyPredictor::predict_difficulty(unsigned int attrs, int n_trees, bool store_in_file){
+double DifficultyPredictor::predict_difficulty(int n_trees, bool store_in_file){
   
   map<std::string, unsigned int> labelToId;
   unsigned int score;
-  int n_taxa = (int) partitioned_msa_ptr->taxon_count();
+  int n_taxa = (int) parsimony_msa_ptr->part_msa().taxon_count();
   
+  // init seeds
+  intVector seeds(n_trees);
   for (int i = 0; i < n_trees; ++i)
-    pars_tree_list.emplace_back(Tree::buildParsimony(*partitioned_msa_ptr, i, attrs, &score));
+    seeds[i] = rand();
+
+  // TODO parallelization
+  for (int i = 0; i < n_trees; ++i)
+    pars_tree_list.emplace_back(Tree::buildParsimony(*parsimony_msa_ptr, seeds[i], &score));
   
   // re-label trees
   for (int i = 0; i < n_taxa; ++i)

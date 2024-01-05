@@ -1197,6 +1197,16 @@ double load_pythia_score_from_log_file(const string& oldLogFile){
   return pythia_score;
 }
 
+void build_parsimony_msa(RaxmlInstance& instance)
+{
+  unsigned int attrs = instance.opts.simd_arch;
+
+  // TODO: check if there is any reason not to use tip-inner
+  attrs |= CORAX_ATTRIB_PATTERN_TIP;
+
+  instance.parted_msa_parsimony.reset(new ParsimonyMSA(instance.parted_msa, attrs));
+}
+
 void  load_parted_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullptr)
 {
   init_part_info(instance);
@@ -1261,17 +1271,12 @@ void  load_parted_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = null
 
     LOG_INFO_TS << "Adaptive mode: Predicting difficulty of the MSA ..." << endl;
 
-    PartitionedMSA *_pmsa = instance.parted_msa_parsimony ?
-                                  instance.parted_msa_parsimony.get() : instance.parted_msa.get();
+    build_parsimony_msa(instance);
 
     if (instance.opts.msa_format != FileFormat::binary)
     {                             
-      dPred->set_partitioned_msa_ptr(_pmsa);
-      // TODO: check if there is any reason not to use tip-inner
-      unsigned int attrs = opts.simd_arch;
-      attrs |= CORAX_ATTRIB_PATTERN_TIP;
-      difficulty = dPred->predict_difficulty(attrs, 
-                                            instance.opts.diff_pred_pars_trees,
+      dPred->set_parsimony_msa_ptr(instance.parted_msa_parsimony.get());
+      difficulty = dPred->predict_difficulty(instance.opts.diff_pred_pars_trees,
                                             instance.opts.nofiles_mode? false : true);
     } 
   
@@ -1603,16 +1608,6 @@ void load_constraint(RaxmlInstance& instance)
 //    pll_utree_show_ascii(&cons_tree.pll_utree_root(), PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH |
 //                                     PLL_UTREE_SHOW_CLV_INDEX );
   }
-}
-
-void build_parsimony_msa(RaxmlInstance& instance)
-{
-  unsigned int attrs = instance.opts.simd_arch;
-
-  // TODO: check if there is any reason not to use tip-inner
-  attrs |= PLL_ATTRIB_PATTERN_TIP;
-
-  instance.parted_msa_parsimony.reset(new ParsimonyMSA(instance.parted_msa, attrs));
 }
 
 void thread_start_trees(RaxmlInstance& instance, StartingTree st_tree_type,

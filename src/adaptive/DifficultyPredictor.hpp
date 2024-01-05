@@ -1,7 +1,7 @@
 #ifndef RAXML_ADAPTIVE_DIFFICULTYPREDICTOR_HPP_
 #define RAXML_ADAPTIVE_DIFFICULTYPREDICTOR_HPP_
 
-#include "../PartitionedMSA.hpp"
+#include "../ParsimonyMSA.hpp"
 #include "../MSA.hpp"
 #include "../topology/RFDistCalculator.hpp"
 #include "../Tree.hpp"
@@ -33,7 +33,7 @@ class DifficultyPredictor{
         bool ckpt;
         bool nofiles_mode;
         const corax_state_t *states_map;
-        const PartitionedMSA* partitioned_msa_ptr;
+        const ParsimonyMSA* parsimony_msa_ptr;
         string outfile;
         
         // Parsimony trees treelist
@@ -59,11 +59,11 @@ class DifficultyPredictor{
         double getDifficulty(){ return difficulty; }
 
         // difficulty prediction
-        double predict_difficulty(unsigned int attrs, int n_trees, bool store_in_file = true);
+        double predict_difficulty(int n_trees, bool store_in_file = true);
         int numStartTrees(double difficulty, double amp, double mean = 0.5, double s = 0.2);
 
         // setters
-        void set_partitioned_msa_ptr(PartitionedMSA* _pmsa);
+        void set_parsimony_msa_ptr(ParsimonyMSA* _pmsa);
         void compute_msa_features(corax_msa_t* original_msa, bool _is_dna);
 
         void store_difficulty_in_chkpt_file(double score, const string& out_file);
