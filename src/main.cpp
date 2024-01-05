@@ -1204,7 +1204,7 @@ void build_parsimony_msa(RaxmlInstance& instance)
   // TODO: check if there is any reason not to use tip-inner
   attrs |= CORAX_ATTRIB_PATTERN_TIP;
 
-  instance.parted_msa_parsimony.reset(new ParsimonyMSA(instance.parted_msa, attrs));
+  instance.parted_msa_parsimony.reset(new ParsimonyMSA(instance.parted_msa, attrs, instance.opts.use_pattern_compression));
 }
 
 void  load_parted_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullptr)

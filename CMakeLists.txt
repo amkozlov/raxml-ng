@@ -3,7 +3,7 @@ cmake_minimum_required (VERSION 3.0.2 FATAL_ERROR)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES  ON)
 
-set(RAXML_BINARY_NAME "" CACHE STRING "Custom RAxML-NG binary name")
+set(RAXML_BINARY_NAME "raxml-ng-adaptive" CACHE STRING "Custom RAxML-NG binary name")
 set(USE_CORAXLIB_CMAKE ON CACHE BOOL "Use CMake to build Coraxlib")
 set(BUILD_AS_LIBRARY OFF CACHE BOOL "Build RAxML-NG as shared library (instead of stand-alone executable)")
 set(PLLMOD_DEBUG OFF CACHE BOOL "Debug pll-modules (tons of console output!)")

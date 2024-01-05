@@ -1,12 +1,12 @@
 #include "ParsimonyMSA.hpp"
 
-ParsimonyMSA::ParsimonyMSA (std::shared_ptr<PartitionedMSA> parted_msa, unsigned int attributes)
+ParsimonyMSA::ParsimonyMSA (std::shared_ptr<PartitionedMSA> parted_msa, unsigned int attributes, bool compress_patterns)
 {
-  init_pars_msa(parted_msa);
+  init_pars_msa(parted_msa, compress_patterns);
   create_pll_partitions(attributes);
 }
 
-void ParsimonyMSA::init_pars_msa(std::shared_ptr<PartitionedMSA> orig_msa)
+void ParsimonyMSA::init_pars_msa(std::shared_ptr<PartitionedMSA> orig_msa, bool compress_patterns)
 {
   if (orig_msa->part_count() == 1)
   {
@@ -81,13 +81,13 @@ void ParsimonyMSA::init_pars_msa(std::shared_ptr<PartitionedMSA> orig_msa)
   }
 
   /* Currently, parsimony computation can not use pattern compression */
-//  if (instance.opts.use_pattern_compression)
-//  {
-//    for (auto& pinfo: pars_msa->part_list())
-//    {
-//      pinfo.compress_patterns();
-//    }
-//  }
+  if (compress_patterns)
+  {
+    for (auto& pinfo: pars_msa->part_list())
+    {
+      pinfo.compress_patterns();
+    }
+  }
 
 }
 
