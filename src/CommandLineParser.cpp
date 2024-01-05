@@ -255,8 +255,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   opts.cmdline = get_cmdline(argc, argv);
 
-  /* if no command specified, default to --search (or --help if no args were given) */
-  opts.command = (argc > 1) ? Command::search : Command::help;
+  /* if no command specified, default to --adaptive (or --help if no args were given) */
+  opts.command = (argc > 1) ? Command::adaptive : Command::help;
   opts.start_trees.clear();
   opts.random_seed = (long)time(NULL);
 
@@ -351,6 +351,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.nofiles_mode = false;
 
   opts.tbe_naive = false;
+
+  /* parallel parsimony not yet supported in adaptive mode */
+  opts.use_par_pars = false;
 
   int compat_ver = RAXML_INTVER;
   bool log_level_set = false;
@@ -1051,6 +1054,7 @@ void CommandLineParser::print_help()
             "  --help                                     display help information\n"
             "  --version                                  display version information\n"
             "  --evaluate                                 evaluate the likelihood of a tree (with model+brlen optimization)\n"
+            "  --adaptive                                 Adaptive ML tree search\n"
             "  --search                                   ML tree search (default: 10 parsimony + 10 random starting trees)\n"
             "  --bootstrap                                bootstrapping (default: use bootstopping to auto-detect #replicates)\n"
             "  --all                                      all-in-one (ML search + bootstrapping)\n"
