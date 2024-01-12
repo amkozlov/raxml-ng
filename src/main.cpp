@@ -772,6 +772,13 @@ void check_options_early(Options& opts)
   if (!opts.weights_file.empty() && !sysutil_file_exists(opts.weights_file))
     throw runtime_error("Site weights file not found: " + opts.weights_file);
 
+  if (!opts.constraint_tree_file.empty() && opts.command == Command::adaptive)
+  {
+    throw runtime_error("Adaptive search mode does not support topological constraints.\n"
+                        "HINT:  Use --search to run standard tree search instead.");
+  }
+
+
   if (!opts.constraint_tree_file.empty() &&
       ((opts.start_trees.count(StartingTree::parsimony) > 0 ||
        opts.start_trees.count(StartingTree::user) > 0) && opts.use_old_constraint))
@@ -1605,8 +1612,8 @@ void load_constraint(RaxmlInstance& instance)
     /* make sure tip indices are consistent between MSA and pll_tree */
     cons_tree.reset_tip_ids(instance.tip_id_map);
 
-//    pll_utree_show_ascii(&cons_tree.pll_utree_root(), PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH |
-//                                     PLL_UTREE_SHOW_CLV_INDEX );
+//    corax_utree_show_ascii(&cons_tree.pll_utree_root(), CORAX_UTREE_SHOW_LABEL | CORAX_UTREE_SHOW_BRANCH_LENGTH |
+//                                     CORAX_UTREE_SHOW_CLV_INDEX );
   }
 }
 

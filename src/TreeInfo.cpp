@@ -425,7 +425,8 @@ void TreeInfo::set_topology_constraint(const Tree& cons_tree)
 {
   if (!cons_tree.empty())
   {
-    int retval = corax_treeinfo_set_constraint_tree(_pll_treeinfo, &cons_tree.pll_utree());
+    int retval = corax_treeinfo_set_constraint_tree(_pll_treeinfo, &cons_tree.pll_utree(),
+                                                    _use_old_constraint ? 1 : 0);
 
     if (!retval)
       libpll_check_error("ERROR: Cannot set topological constraint");

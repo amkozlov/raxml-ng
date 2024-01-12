@@ -233,7 +233,7 @@ Tree Tree::buildParsimonyConstrained(const ParsimonyMSA& pars_msa, unsigned int 
       tree.insert_tips_pasimony(free_tips, pars_partitions, tip_msa_idmap, random_seed, pscore);
     }
 
-//    pll_utree_show_ascii(tree.pll_utree().vroot, PLL_UTREE_SHOW_LABEL | PLL_UTREE_SHOW_BRANCH_LENGTH | PLL_UTREE_SHOW_CLV_INDEX);
+//    corax_utree_show_ascii(tree.pll_utree().vroot, CORAX_UTREE_SHOW_LABEL | CORAX_UTREE_SHOW_BRANCH_LENGTH | CORAX_UTREE_SHOW_CLV_INDEX);
   }
 
   libpll_check_error("ERROR building parsimony tree");

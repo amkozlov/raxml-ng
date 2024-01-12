@@ -88,10 +88,6 @@ public:
   int brlen_opt_method;
   double brlen_min;
   double brlen_max;
-  int diff_pred_pars_trees;
-
-  double nni_tolerance;
-  double nni_epsilon;
 
   unsigned int num_searches;
   unsigned long long terrace_maxsize;
@@ -128,6 +124,11 @@ public:
   unsigned int simd_arch;               /* vector instruction set */
   bool thread_pinning;                  /* pin threads to cores */
   LoadBalancing load_balance_method;
+
+  /* adaptive */
+  int diff_pred_pars_trees;
+  double nni_tolerance;
+  double nni_epsilon;
 
   bool coarse() const { return num_workers > 1; };
 
