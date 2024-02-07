@@ -343,6 +343,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   int compat_ver = RAXML_INTVER;
   bool log_level_set = false;
+  bool lh_epsilon_set = false;
   string optarg_tree = "";
 
   int option_index = 0;
@@ -489,6 +490,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           throw InvalidOptionValueException("Invalid LH epsilon parameter value: " +
                                             string(optarg) +
                                             ", please provide a positive real number.");
+        lh_epsilon_set = true;
         break;
 
       case 18: /* random seed */
@@ -831,7 +833,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_spr_fastclv = false;
               opts.use_bs_pars = false;
               opts.use_par_pars = false;
-              opts.lh_epsilon = DEF_LH_EPSILON_V11;
+              if (!lh_epsilon_set)
+                opts.lh_epsilon = DEF_LH_EPSILON_V11;
               opts.lh_epsilon_brlen_triplet = DEF_LH_EPSILON_V11;
             }
             else
@@ -950,7 +953,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.write_bs_msa = true;
         break;
 
-      case 58: /* LH epsilon */
+      case 58: /* triplet LH epsilon */
         if(sscanf(optarg, "%lf", &opts.lh_epsilon_brlen_triplet) != 1 || opts.lh_epsilon_brlen_triplet < 0.)
           throw InvalidOptionValueException("Invalid triplet LH epsilon parameter value: " +
                                             string(optarg) +
@@ -969,7 +972,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   if (num_commands > 1)
     throw OptionException("More than one command specified");
 
-  /* process start tree defaults */
+  /* process start tree & LH epsilon defaults */
   if (opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::start)
   {
@@ -977,6 +980,14 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       optarg_tree = opts.use_old_constraint ? "rand{20}" : RAXML_DEF_START_TREE;
     else if (optarg_tree == "default1")
       optarg_tree = compat_ver < 120 ? RAXML_DEF_START_TREE1_V11 : RAXML_DEF_START_TREE1;
+    if (!lh_epsilon_set)
+      opts.lh_epsilon = compat_ver < 120 ? DEF_LH_EPSILON_V11 : DEF_LH_EPSILON;
+  }
+  else
+  {
+    /* Always use old lower LH epsilon (0.1) for commands without tree search (--evaluate etc.)! */
+    if (!lh_epsilon_set)
+      opts.lh_epsilon = DEF_LH_EPSILON_V11;
   }
   parse_start_trees(opts, optarg_tree);
 
