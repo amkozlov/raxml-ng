@@ -196,7 +196,8 @@ void CommandLineParser::compute_num_searches(Options &opts)
 {
   if (opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate || opts.command == Command::start ||
-      opts.command == Command::ancestral || opts.command == Command::sitelh)
+      opts.command == Command::ancestral || opts.command == Command::sitelh ||
+      (opts.command == Command::adaptive && !opts.start_trees.empty()))
   {
     assert(!opts.start_trees.empty());
 

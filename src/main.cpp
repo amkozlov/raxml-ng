@@ -772,13 +772,6 @@ void check_options_early(Options& opts)
   if (!opts.weights_file.empty() && !sysutil_file_exists(opts.weights_file))
     throw runtime_error("Site weights file not found: " + opts.weights_file);
 
-  if (!opts.constraint_tree_file.empty() && opts.command == Command::adaptive)
-  {
-    throw runtime_error("Adaptive search mode does not support topological constraints.\n"
-                        "HINT:  Use --search to run standard tree search instead.");
-  }
-
-
   if (!opts.constraint_tree_file.empty() &&
       ((opts.start_trees.count(StartingTree::parsimony) > 0 ||
        opts.start_trees.count(StartingTree::user) > 0) && opts.use_old_constraint))
@@ -1266,15 +1259,9 @@ void  load_parted_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = null
   instance.tip_id_map = instance.parted_msa->taxon_id_map();
   
   // computes the number of searches for adaptive raxml
-  if(dPred){
-    
+  if(dPred)
+  {
     auto & opts = instance.opts;
-    if (!opts.start_trees.empty())
-    { 
-      LOG_INFO << "WARNING: "
-                  "You specified the number of initial trees in the adaptive search. \nSince the pupropse of the adaptive search "
-                  "is to determine the number of searches based on difficuly prediction, your input will be ignored\n" << endl;
-    }
 
     LOG_INFO_TS << "Adaptive mode: Predicting difficulty of the MSA ..." << endl;
 
@@ -1289,11 +1276,18 @@ void  load_parted_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = null
   
     LOG_INFO_TS << "Predicted difficulty: " << difficulty << "\n" << endl;
 
-    if (difficulty > 0.7){ // Warning printout statement for difficult dataset 
-      
+    if (difficulty > 0.7)
+    { // Warning printout statement for difficult dataset
       LOG_INFO << "WARNING! This dataset is considered hard-to-analyze in the sense that the phylogenetic signal is insufficient." << endl
             << "Adaptive RAxML-NG will execute a fast heuristic to quickly infer only a few out of the many equally likely topologies." << endl
             << "However, the results should not be considered as representatives for the true tree" << endl << endl ;
+    }
+
+    if (!opts.start_trees.empty())
+    {
+      LOG_INFO << "WARNING: You specified the exact number of starting trees on the command line.\n"
+                  "This will override automatic detection of optimal starting tree number based on MSA difficulty.\n" << endl;
+      return;
     }
 
     if (opts.constraint_tree_file.empty() || !opts.use_old_constraint)
@@ -1301,7 +1295,7 @@ void  load_parted_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = null
       int pars_trees = dPred->numStartTrees(difficulty, 7.0, 0.5, 0.25);
       
       opts.start_trees[StartingTree::random] = difficulty >= 0.7 ? 0 :
-                                dPred->numStartTrees(difficulty, 3.5  , 0.5, 0.25);
+                                dPred->numStartTrees(difficulty, 3.5, 0.5, 0.25);
       opts.start_trees[StartingTree::parsimony] = difficulty >= 0.7 ? (int) (1.5 * pars_trees) : pars_trees;
 
     }

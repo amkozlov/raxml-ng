@@ -42,11 +42,11 @@ double Optimizer::optimize_model(TreeInfo& treeinfo, double lh_epsilon)
   return new_loglh;
 }
 
-void Optimizer::nni(TreeInfo& treeinfo, nni_round_params& nni_params, double& loglh){
+void Optimizer::nni(TreeInfo& treeinfo, nni_round_params& nni_params, double& loglh)
+{
   // nni round
   LOG_PROGRESS(loglh) << "NNI round tolerance = " <<  nni_params.tolerance << ", epsilon = " << nni_params.lh_epsilon << endl;
   loglh = treeinfo.nni_round(nni_params);
-  
 }
 
 double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
@@ -329,25 +329,25 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
   double impr_perc = 1;
 
   // If the dataset is "easy" or "difficult", start with an NNI round
-  if (do_step(CheckpointStep::radiusDetectOrNNI)){
-    
+  if (do_step(CheckpointStep::radiusDetectOrNNI))
+  {
     cm.update_and_write(treeinfo);
     
-    if(iter == 0){
-
-      if (easy_or_difficult)  nni(treeinfo, nni_params, loglh);
+    if(iter == 0)
+    {
+      if (easy_or_difficult)
+        nni(treeinfo, nni_params, loglh);
       
       spr_params.thorough = 0;
       spr_params.radius_min = 1;
       spr_params.radius_max = radius_step;
       spr_params.ntopol_keep = 0;
       spr_params.subtree_cutoff = 0.;
-    
     }
 
     /* Fast SPR-NNI rounds */
-    while(impr) {
-
+    while(impr)
+    {
       cm.update_and_write(treeinfo);
       ++iter;
       old_loglh = loglh;
@@ -358,7 +358,8 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
       loglh = treeinfo.spr_round(spr_params);
       
       // nni round
-      if (spr_params.radius_max > radius_step) nni(treeinfo, nni_params, loglh);
+      if (spr_params.radius_max > radius_step)
+        nni(treeinfo, nni_params, loglh);
 
       impr_perc = (loglh - old_loglh) / fabs(loglh);
       impr = (loglh - old_loglh > _lh_epsilon);
@@ -369,12 +370,11 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
         spr_params.radius_max += radius_step;
       }     
     }
-    
   }
   
   // + model parameter optimization
-  if (do_step(CheckpointStep::modOpt2)){  
-
+  if (do_step(CheckpointStep::modOpt2))
+  {
     cm.update_and_write(treeinfo);
     LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << fast_modopt_eps << ")" << endl;
     loglh = optimize_model(treeinfo, fast_modopt_eps);
@@ -392,8 +392,9 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
   }
 
   // setting up fast SPR parameters
-  if(do_step(CheckpointStep::fastSPR)){  
-     do
+  if(do_step(CheckpointStep::fastSPR))
+  {
+    do
     {
       cm.update_and_write(treeinfo);
       ++iter;
@@ -410,7 +411,8 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
     while (impr);
   }
   
-  if (do_step(CheckpointStep::modOpt3)){
+  if (do_step(CheckpointStep::modOpt3))
+  {
     cm.update_and_write(treeinfo);
 
     /* optimize model parameters a bit more thoroughly */
@@ -426,7 +428,6 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
     spr_params.ntopol_keep = 20;
     spr_params.subtree_cutoff = _spr_cutoff;
     spr_params.reset_cutoff_info(loglh);
-
   }
 
   if (do_step(CheckpointStep::slowSPR))
@@ -441,14 +442,15 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
           " spr round " << iter << " (radius: " << spr_params.radius_max << ")" << endl;
       loglh = treeinfo.spr_round(spr_params);
       
-      if(spr_params.radius_min > radius_step) nni(treeinfo, nni_params, loglh);
+      if (spr_params.radius_min > radius_step)
+        nni(treeinfo, nni_params, loglh);
 
       /* optimize ALL branches */
       loglh = treeinfo.optimize_branches(_lh_epsilon, 1);
       
       impr = (loglh - old_loglh > _lh_epsilon);
       
-      if(!impr)
+      if (!impr)
       {
         /* no improvement in thorough mode: set min radius to old max,
          * and increase max radius by the step */
