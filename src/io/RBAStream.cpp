@@ -4,7 +4,7 @@
 using namespace std;
 
 const uint64_t RBA_MAGIC       = *(reinterpret_cast<const uint64_t*>("RBAF\x13\x12\x17\x0A"));
-const uint32_t RBA_VERSION     = 2;
+const uint32_t RBA_VERSION     = 3;
 const uint32_t RBA_MIN_VERSION = 2;
 
 struct RBAHeader
@@ -53,6 +53,9 @@ RBAStream& operator<<(RBAStream& stream, const PartitionedMSA& part_msa)
   header.part_count = part_msa.part_count();
 
   bos << header;
+
+  // msa difficulty (pythia)
+  bos << part_msa.difficulty_score();
 
   // taxon labels
   for (const auto& label: part_msa.taxon_names())
@@ -122,6 +125,15 @@ RBAStream& operator>>(RBAStream& stream, RBAStream::RBAOutput out)
     ensure_equal("taxon count", header.taxon_count, part_msa.taxon_count());
     ensure_equal("partition count", header.part_count, part_msa.part_count());
     ensure_equal("pattern count", header.pattern_count, part_msa.total_patterns());
+  }
+
+  // msa difficulty (pythia)
+  if (header.version >= 3)
+  {
+    double pythia_score;
+    bos >> pythia_score;
+    if (load_meta)
+      part_msa.difficulty_score(pythia_score);
   }
 
   NameList taxon_names(header.taxon_count, "");

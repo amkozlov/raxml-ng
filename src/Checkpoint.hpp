@@ -6,7 +6,7 @@
 #include "io/binary_io.hpp"
 #include "adaptive/DifficultyPredictor.hpp"
 
-constexpr int RAXML_CKP_VERSION = 5;
+constexpr int RAXML_CKP_VERSION = 6;
 constexpr int RAXML_CKP_MIN_SUPPORTED_VERSION = 5;
 
 struct MLTree
@@ -67,11 +67,12 @@ struct Checkpoint
 
 struct CheckpointFile
 {
-  CheckpointFile() : version(RAXML_CKP_VERSION), elapsed_seconds(0.), consumed_wh(0.) {}
+  CheckpointFile() : version(RAXML_CKP_VERSION), elapsed_seconds(0.), consumed_wh(0.), pythia_score(-1.) {}
 
   int version;
   double elapsed_seconds;
   double consumed_wh;
+  double pythia_score;
   Options opts;
 
   std::vector<Checkpoint> checkp_list;
@@ -102,6 +103,9 @@ public:
   //TODO: this is not very elegant, but should do the job for now
   SearchState& search_state();
   void reset_search_state();
+
+  double pythia_score() const { return _checkp_file.pythia_score; }
+  void pythia_score(double score) { _checkp_file.pythia_score = score; }
 
   void init_checkpoints(const Tree& tree, const ModelCRefMap& models);
 

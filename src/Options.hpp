@@ -33,7 +33,6 @@ struct OutputFileNames
   std::string tmp_best_tree;
   std::string tmp_ml_trees;
   std::string tmp_bs_trees;
-  std::string adaptiveCkp;
 };
 
 class Options
@@ -143,7 +142,6 @@ public:
   const std::string& best_tree_file() const { return outfile_names.best_tree; }
   const std::string& best_tree_collapsed_file() const { return outfile_names.best_tree_collapsed; }
   const std::string& best_model_file() const { return outfile_names.best_model; }
-  const std::string& adaptive_chkpt_file() const { return outfile_names.adaptiveCkp; }
   const std::string& partition_trees_file() const { return outfile_names.partition_trees; }
   const std::string& ml_trees_file() const { return outfile_names.ml_trees; }
   const std::string& bootstrap_trees_file() const { return outfile_names.bootstrap_trees; }

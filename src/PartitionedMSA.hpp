@@ -6,7 +6,7 @@
 class PartitionedMSA
 {
 public:
-  PartitionedMSA() {};
+  PartitionedMSA(): _difficulty_score(-1.) {};
   PartitionedMSA(const NameList& taxon_names);
 
   // copy/move constructors and assignments
@@ -49,6 +49,9 @@ public:
   void model(size_t index, Model&& m) { _part_list.at(index).model(std::move(m)); };
   void model(size_t index, const Model& m) { _part_list.at(index).model(m); };
 
+  double difficulty_score() const { return _difficulty_score; }
+  void difficulty_score(double score) { _difficulty_score = score; }
+
   // operations
   void append_part_info(PartitionInfo&& part_info) { _part_list.push_back(std::move(part_info)); };
 
@@ -69,6 +72,7 @@ private:
   NameList _taxon_names;
   NameIdMap _taxon_id_map;
   mutable uintVector _site_part_map;
+  double _difficulty_score;
 
   uintVector get_site_part_assignment() const;
   void set_taxon_names(const NameList& taxon_names);

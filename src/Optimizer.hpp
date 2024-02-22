@@ -16,7 +16,7 @@ public:
   double optimize_model(TreeInfo& treeinfo, double lh_epsilon);
   double optimize_model(TreeInfo& treeinfo) { return optimize_model(treeinfo, _lh_epsilon); };
   double optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm);
-  double optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManager& cm, double difficulty);
+  double optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManager& cm);
   double evaluate(TreeInfo& treeinfo, CheckpointManager& cm);
   void nni(TreeInfo& treeinfo, nni_round_params& nni_params, double& loglh);
 

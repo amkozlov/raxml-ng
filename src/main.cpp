@@ -125,6 +125,8 @@ struct RaxmlInstance
   AncestralStatesSharedPtr ancestral_states;
   vector<vector<doubleVector>> persite_loglh;      // per-tree -> per-partition -> per-site
 
+  shared_ptr<DifficultyPredictor> msa_diff_predictor;
+
   vector<RaxmlWorker> workers;
   RaxmlWorker& get_worker() { return workers.at(ParallelContext::local_group_id()); }
 
@@ -1074,19 +1076,23 @@ void load_msa_weights(MSA& msa, const Options& opts)
   }
 }
 
-void load_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullptr)
+void load_msa(RaxmlInstance& instance)
 {
   const auto& opts = instance.opts;
   auto& parted_msa = *instance.parted_msa;
+  auto diff_pred = instance.msa_diff_predictor;
 
   LOG_INFO_TS << "Reading alignment from file: " << opts.msa_file << endl;
 
   /* load MSA */
   auto msa = msa_load_from_file(opts.msa_file, opts.msa_format);
   
-  if(dPred) // adaptive mode
-    dPred->compute_msa_features(msa.pll_msa_nonconst(), 
-              instance.parted_msa->models().at(0).data_type() == DataType::dna ? true : false);
+  if (diff_pred) // adaptive mode
+  {
+    // TODO check for mixed-type MSAs - exit with error?
+    const auto& m = instance.parted_msa->model(0);
+    diff_pred->compute_msa_features(msa.pll_msa_nonconst(), m.num_states(), m.charmap());
+  }
   
   if (!msa.size())
     throw runtime_error("Alignment file is empty!");
@@ -1150,6 +1156,12 @@ void load_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullptr)
   LOG_INFO << parted_msa;
 
   LOG_INFO << endl;
+}
+
+void write_binary_msa_file(RaxmlInstance& instance)
+{
+  const auto& opts = instance.opts;
+  auto& parted_msa = *instance.parted_msa;
 
   if (ParallelContext::master_rank() &&
       !instance.opts.use_prob_msa && !instance.opts.binary_msa_file().empty())
@@ -1169,34 +1181,6 @@ void load_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullptr)
   }
 }
 
-double load_pythia_score_from_log_file(const string& oldLogFile){
-  
-  LOG_DEBUG << "Trying to load pythia score from log file " << endl;
-
-  ifstream fileInput;
-  string line;
-  string query_line = "Predicted difficulty:"; // search in log files
-  double pythia_score = -1;
-
-  // open file to search
-  fileInput.open(oldLogFile.c_str());
-  
-  if(fileInput.is_open()) {
-    for(unsigned int curLine = 0; getline(fileInput, line); curLine++) {
-      size_t pos = line.find(query_line);
-      if (pos != string::npos) {
-          string score_string = line.substr(pos+22); // position of pythia score
-          pythia_score = std::stod(score_string);
-      }
-    }
-    fileInput.close();
-  }
-  else
-    cout << "WARNING! Unable to open the log file to search for the pythia score." << endl;
-    
-  return pythia_score;
-}
-
 void build_parsimony_msa(RaxmlInstance& instance)
 {
   unsigned int attrs = instance.opts.simd_arch;
@@ -1207,104 +1191,89 @@ void build_parsimony_msa(RaxmlInstance& instance)
   instance.parted_msa_parsimony.reset(new ParsimonyMSA(instance.parted_msa, attrs, instance.opts.use_pattern_compression));
 }
 
-void  load_parted_msa(RaxmlInstance& instance, DifficultyPredictor* dPred = nullptr)
+void predict_msa_difficulty(RaxmlInstance& instance)
+{
+  auto & opts = instance.opts;
+  auto diff_pred = instance.msa_diff_predictor;
+  double difficulty = instance.parted_msa->difficulty_score();
+
+  if (!diff_pred)
+    return;
+
+  if (difficulty < 0.)
+  {
+    LOG_INFO_TS << "Adaptive mode: Predicting difficulty of the MSA ..." << endl;
+
+    build_parsimony_msa(instance);
+
+    if (opts.msa_format != FileFormat::binary)
+    {
+      diff_pred->set_parsimony_msa_ptr(instance.parted_msa_parsimony.get());
+      difficulty = diff_pred->predict_difficulty(opts.diff_pred_pars_trees);
+    }
+    else
+    {
+      // TODO predict difficulty from RBA (feature computation is tricky)
+    }
+
+    assert(difficulty >= 0.);
+
+    instance.parted_msa->difficulty_score(difficulty);
+  }
+
+  LOG_INFO_TS << "Predicted difficulty: " << difficulty << "\n" << endl;
+
+  if (difficulty > 0.7)
+  { // Warning printout statement for difficult dataset
+    LOG_INFO << "WARNING! This dataset is considered hard-to-analyze in the sense that the phylogenetic signal is insufficient." << endl
+          << "Adaptive RAxML-NG will execute a fast heuristic to quickly infer only a few out of the many equally likely topologies." << endl
+          << "However, the results should not be considered as representatives for the true tree" << endl << endl ;
+  }
+}
+
+// computes the number of searches for adaptive raxml
+void autotune_start_trees(RaxmlInstance& instance)
+{
+  auto & opts = instance.opts;
+  auto diff_pred = instance.msa_diff_predictor;
+  double difficulty = instance.parted_msa->difficulty_score();
+
+  if (opts.num_searches > 0 || !diff_pred || difficulty < 0.)
+    return;
+
+  if (opts.constraint_tree_file.empty() || !opts.use_old_constraint)
+  {
+    int pars_trees = diff_pred->num_start_trees(difficulty, 7.0, 0.5, 0.25);
+
+    opts.start_trees[StartingTree::random] = difficulty >= 0.7 ? 0 :
+        diff_pred->num_start_trees(difficulty, 3.5, 0.5, 0.25);
+    opts.start_trees[StartingTree::parsimony] = difficulty >= 0.7 ? (int) (1.5 * pars_trees) : pars_trees;
+
+  }
+  else
+    opts.start_trees[StartingTree::random] = 2*diff_pred->num_start_trees(difficulty, 8.0, 0.5, 0.3);
+
+  for (const auto& it: opts.start_trees)
+    opts.num_searches += it.second;
+}
+
+
+void load_parted_msa(RaxmlInstance& instance)
 {
   init_part_info(instance);
   
   assert(instance.parted_msa);
   
-  // for the adaptive version
-  double difficulty = -1;
-
   if (instance.opts.msa_format != FileFormat::binary)
-    load_msa(instance, dPred);
-  else 
-  { 
-    if (dPred){
+    load_msa(instance);
 
-      LOG_DEBUG << "WARNING: You cannot invoke Adaptive RAxML-NG with input MSA a binary file, "
-                << "unless the invocation corresponds to checkpoint mode. " 
-                << "The input should be either a PHYLIP or FASTA file " << endl;
-
-      if(sysutil_file_exists(instance.opts.adaptive_chkpt_file()))
-        difficulty = dPred->load_adaptive_chkpt(instance.opts.adaptive_chkpt_file());
-      
-      if(difficulty == -1){ // This is naive, I might change that implemenation later
-        
-        cout << "WARNING! The pythia score could not be retrieved from the checkpoint file with suffix '.adaptiveCkp'" << endl;
-        cout << "RAxML-NG will make an attempt to retrieve the pythia score from RAxML-NG's logfile.'\n";
-      
-        if(sysutil_file_exists(instance.opts.log_file()))
-          difficulty = load_pythia_score_from_log_file(instance.opts.log_file());
-
-        else
-        {
-          throw runtime_error("The file with suffix '.adaptiveCkp' seems to be missing from the checkpoint files. "
-                              "Unfortunately, you will have to rerun RAxML-NG in --redo mode");
-          
-        }
-      }
-
-      if(difficulty == -1)
-      {
-        throw runtime_error("Adaptive RAxML-NG failed to rettrieve the difficulty score "
-                            "either from the logfile or from the file with suffix '.adaptiveCkp'. "
-                            "Unfortunately, you will have to rerun RAxML-NG in --redo mode");
-      }
-    
-    }
-  }
+  predict_msa_difficulty(instance);
   
+  if (instance.opts.msa_format != FileFormat::binary)
+    write_binary_msa_file(instance);
+
   // use MSA sequences IDs as "normalized" tip IDs in all trees
   instance.tip_id_map = instance.parted_msa->taxon_id_map();
-  
-  // computes the number of searches for adaptive raxml
-  if(dPred)
-  {
-    auto & opts = instance.opts;
-
-    LOG_INFO_TS << "Adaptive mode: Predicting difficulty of the MSA ..." << endl;
-
-    build_parsimony_msa(instance);
-
-    if (instance.opts.msa_format != FileFormat::binary)
-    {                             
-      dPred->set_parsimony_msa_ptr(instance.parted_msa_parsimony.get());
-      difficulty = dPred->predict_difficulty(instance.opts.diff_pred_pars_trees,
-                                            instance.opts.nofiles_mode? false : true);
-    } 
-  
-    LOG_INFO_TS << "Predicted difficulty: " << difficulty << "\n" << endl;
-
-    if (difficulty > 0.7)
-    { // Warning printout statement for difficult dataset
-      LOG_INFO << "WARNING! This dataset is considered hard-to-analyze in the sense that the phylogenetic signal is insufficient." << endl
-            << "Adaptive RAxML-NG will execute a fast heuristic to quickly infer only a few out of the many equally likely topologies." << endl
-            << "However, the results should not be considered as representatives for the true tree" << endl << endl ;
-    }
-
-    if (!opts.start_trees.empty())
-    {
-      LOG_INFO << "WARNING: You specified the exact number of starting trees on the command line.\n"
-                  "This will override automatic detection of optimal starting tree number based on MSA difficulty.\n" << endl;
-      return;
-    }
-
-    if (opts.constraint_tree_file.empty() || !opts.use_old_constraint)
-    {
-      int pars_trees = dPred->numStartTrees(difficulty, 7.0, 0.5, 0.25);
-      
-      opts.start_trees[StartingTree::random] = difficulty >= 0.7 ? 0 :
-                                dPred->numStartTrees(difficulty, 3.5, 0.5, 0.25);
-      opts.start_trees[StartingTree::parsimony] = difficulty >= 0.7 ? (int) (1.5 * pars_trees) : pars_trees;
-
-    }
-    else
-      opts.start_trees[StartingTree::random] = 2*dPred->numStartTrees(difficulty, 8.0, 0.5, 0.3);
-
-    for (const auto& it: opts.start_trees)
-      opts.num_searches += it.second;
-  }
 }
 
 void prepare_tree(const RaxmlInstance& instance, Tree& tree)
@@ -1418,6 +1387,9 @@ void load_checkpoint(RaxmlInstance& instance, CheckpointManager& cm)
   cm.init_checkpoints(instance.random_tree, instance.parted_msa->models());
 
   auto& ckpfile = cm.checkp_file();
+
+  /* store Pythia MSA difficulty score in the checkpoint */
+  cm.pythia_score(instance.parted_msa->difficulty_score());
 
   if (!instance.opts.redo_mode)
   {
@@ -2725,7 +2697,7 @@ void init_parallel_buffers(const RaxmlInstance& instance)
   ParallelContext::resize_buffers(reduce_buffer_size, worker_buf_size);
 }
 
-void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm, DifficultyPredictor* dPred = nullptr)
+void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
 {
   auto& worker = instance.get_worker();
   Checkpoint& checkp = cm.checkpoint();
@@ -2826,23 +2798,17 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm, DifficultyP
     }
     else
     {
-      if(opts.command == Command::adaptive){
-        
-        double difficulty = dPred->getDifficulty();
-        optimizer.optimize_topology_adaptive(*treeinfo, cm, difficulty);
-        
-        LOG_PROGR << endl;
-        LOG_WORKER_TS(log_level) << "ML tree search #" << start_tree_num <<
-                            ", logLikelihood: " << FMT_LH(checkp.loglh()) << endl;
-        LOG_PROGR << endl;
-
-      } else{
-        optimizer.optimize_topology(*treeinfo, cm);
-        LOG_PROGR << endl;
-        LOG_WORKER_TS(log_level) << "ML tree search #" << start_tree_num <<
-                            ", logLikelihood: " << FMT_LH(checkp.loglh()) << endl;
-        LOG_PROGR << endl;
+      if(opts.command == Command::adaptive)
+      {
+        optimizer.optimize_topology_adaptive(*treeinfo, cm);
       }
+      else
+        optimizer.optimize_topology(*treeinfo, cm);
+
+      LOG_PROGR << endl;
+      LOG_WORKER_TS(log_level) << "ML tree search #" << start_tree_num <<
+                          ", logLikelihood: " << FMT_LH(checkp.loglh()) << endl;
+      LOG_PROGR << endl;
     }
 
     if (!instance.persite_loglh.empty())
@@ -3025,7 +2991,7 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
 }
 
 
-void thread_main(RaxmlInstance& instance, CheckpointManager& cm, DifficultyPredictor* dPred = nullptr)
+void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 {
   /* wait until master thread prepares all global data */
 //  printf("WORKER: %u, LOCAL_THREAD: %u\n", ParallelContext::group_id(), ParallelContext::local_proc_id());
@@ -3039,7 +3005,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm, DifficultyPredi
       opts.command == Command::ancestral || opts.command == Command::adaptive) &&
       !instance.start_trees.empty())
   {
-    thread_infer_ml(instance, cm, dPred);
+    thread_infer_ml(instance, cm);
     ParallelContext::global_barrier();
   }
 
@@ -3057,7 +3023,6 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm, DifficultyPredi
 void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 {
   auto const& opts = instance.opts;
-  shared_ptr<DifficultyPredictor> dPred;
 
   /* init load balancer */
   switch(opts.load_balance_method)
@@ -3091,30 +3056,14 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   // Difficulty Predictor for adaptive RAxML-NG
   // The Difficulty Predictor is one object shared by all threads (in any parallelization scheme)
   if(opts.command == Command::adaptive)
-    dPred = make_shared<DifficultyPredictor>(instance.opts.adaptive_chkpt_file(), opts.nofiles_mode);
+    instance.msa_diff_predictor = make_shared<DifficultyPredictor>();
 
-  /* If resuming from a checkpoint on adaptive mode*/
-  // Still single thread execution
-  if(opts.command == Command::adaptive &&
-      sysutil_file_exists(opts.checkp_file()) &&
-      !opts.redo_mode)
-  {
-    dPred->set_checkpoint_true();
-  }
-  
   // load MSA  
-  try{
-    load_parted_msa(instance, 
-                    opts.command == Command::adaptive? dPred.get() : nullptr );
-  
-  } catch(const runtime_error& error){
-    
-    throw error;
-
-  }
-
+  load_parted_msa(instance);
   assert(instance.parted_msa);
   auto& parted_msa = *instance.parted_msa;
+
+  autotune_start_trees(instance);
 
   load_constraint(instance);
 
@@ -3156,8 +3105,7 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   ParallelContext::init_pthreads(opts, std::bind(thread_main,
                                                 std::ref(instance),
-                                                std::ref(cm),
-                                                opts.command == Command::adaptive ? dPred.get() : nullptr ));
+                                                std::ref(cm)));
   
   /* init workers */
   assert(opts.num_workers > 0);
@@ -3223,10 +3171,7 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
     instance.opts.remove_result_files();
   
   // Main routines
-  thread_main(instance, 
-              cm, 
-              opts.command == Command::adaptive? dPred.get() : nullptr);
-  
+  thread_main(instance, cm);
 
   if (ParallelContext::master_rank())
   {

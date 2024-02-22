@@ -2,7 +2,7 @@
 
 using namespace std;
 
-PartitionedMSA::PartitionedMSA(const NameList& taxon_names)
+PartitionedMSA::PartitionedMSA(const NameList& taxon_names) : PartitionedMSA()
 {
   set_taxon_names(taxon_names);
 }

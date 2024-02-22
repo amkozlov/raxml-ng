@@ -413,6 +413,8 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const CheckpointFile& c
 
   stream << ckpfile.opts;
 
+  stream << ckpfile.pythia_score;
+
   stream << ckpfile.checkp_list;
 
   stream << ckpfile.best_models;
@@ -441,6 +443,9 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, CheckpointFile& ckpfile
 
     stream >> ckpfile.opts;
   }
+
+  if (ckpfile.version > 5)
+    stream >> ckpfile.pythia_score;
 
   {
     // we should take special care in case number of workers has been changed after restart:

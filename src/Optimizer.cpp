@@ -253,7 +253,7 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
   return loglh;
 }
 
-double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManager& cm, double difficulty)
+double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManager& cm)
 {
   // TODO: connect the command line arguments for nni-epsilon and nni-tolerance with nni_params.lh_epsilon and 
   // nni_params.tolerance
@@ -281,6 +281,7 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
   nni_params.tolerance = _nni_tolerance;
   nni_params.lh_epsilon = _nni_epsilon;
 
+  double difficulty = cm.checkp_file().pythia_score;
   bool easy_or_difficult = (difficulty <= 0.3) || (difficulty >= 0.7);
 
   CheckpointStep resume_step = search_state.step;
