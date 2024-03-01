@@ -131,6 +131,12 @@ public:
   double nni_tolerance;
   double nni_epsilon;
 
+  /* Stopping Criteria */
+  bool early_stopping;
+  int  stopping_rule; /* 0: Noise Sampling RELL approach, 1: Noise Sampling RELL approach, 2: KH test, 3: KH multiple testing correction */
+  bool modified_version;
+  bool count_spr_moves;
+
   bool coarse() const { return num_workers > 1; };
 
   std::string simd_arch_name() const;

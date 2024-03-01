@@ -393,9 +393,15 @@ double TreeInfo::spr_round(spr_round_params& params)
                                params.subtree_cutoff > 0. ? &params.cutoff_info : nullptr,
                                params.subtree_cutoff, 
                                params.lh_epsilon_brlen_triplet,
-                               _use_spr_fastclv);
+                               _use_spr_fastclv,
+                               params.total_moves,
+                               params.increasing_moves);
 
   libpll_check_error("ERROR in SPR round");
+
+  if(params.total_moves)
+    LOG_DEBUG << "SPR moves = " << (*params.total_moves) << 
+      ", Increasing moves = " << (*params.increasing_moves) << endl; 
 
   assert(isfinite(loglh) && loglh);
 

@@ -53,6 +53,7 @@
 #include "topology/ConstraintTree.hpp"
 #include "util/EnergyMonitor.hpp"
 #include "adaptive/DifficultyPredictor.hpp"
+#include "adaptive/StoppingCriterion.hpp"
 
 #ifdef _RAXML_TERRAPHAST
 #include "terraces/TerraceWrapper.hpp"
@@ -126,6 +127,7 @@ struct RaxmlInstance
   vector<vector<doubleVector>> persite_loglh;      // per-tree -> per-partition -> per-site
 
   shared_ptr<DifficultyPredictor> msa_diff_predictor;
+  StoppingCriterion * criterion; // pointer fors stopping criteria
 
   vector<RaxmlWorker> workers;
   RaxmlWorker& get_worker() { return workers.at(ParallelContext::local_group_id()); }
@@ -2778,6 +2780,12 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
 
     auto log_level = instance.start_trees.size() > 1 ? LogLevel::result : LogLevel::info;
     Optimizer optimizer(opts);
+    
+    if(instance.criterion){
+      instance.criterion->set_thread_offset(part_assign, ParallelContext::local_proc_id());
+      optimizer.set_stopping_criterion(instance.criterion); 
+    }
+
     if (opts.command == Command::evaluate || opts.command == Command::sitelh ||
         opts.command == Command::ancestral)
     { 
@@ -3170,11 +3178,45 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   init_persite_loglh(instance);
 
+  if(opts.stopping_rule != -1){
+    
+    switch (opts.stopping_rule)
+    {
+      case 0:
+        instance.criterion = 
+          new NoiseSampling(instance.parted_msa, ParallelContext::num_groups(), ParallelContext::num_procs(), true);
+        break;
+      
+      case 1:
+        instance.criterion = 
+          new NoiseSampling(instance.parted_msa, ParallelContext::num_groups(), ParallelContext::num_procs(), false);
+        break;
+
+      case 2:
+        instance.criterion = 
+          new KH(instance.parted_msa, ParallelContext::num_groups(), ParallelContext::num_procs(), false);
+        break;
+      
+      case 3:
+        instance.criterion = 
+          new KH(instance.parted_msa, ParallelContext::num_groups(), ParallelContext::num_procs(), true);
+        break;
+      
+      default:
+        break;
+    }
+  } else {
+    instance.criterion = nullptr;
+  }
+
   if (ParallelContext::master_rank())
     instance.opts.remove_result_files();
   
   // Main routines
   thread_main(instance, cm);
+
+  if(instance.criterion) 
+    delete instance.criterion;
 
   if (ParallelContext::master_rank())
   {

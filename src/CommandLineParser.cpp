@@ -85,6 +85,7 @@ static struct option long_options[] =
   {"diff_pred_trees",    required_argument, 0, 0},   /*  60 */
   {"nni-tolerance",      required_argument, 0, 0 },  /*  61 */
   {"nni-epsilon",        required_argument, 0, 0 },  /*  62 */
+  {"stopping-criterion", required_argument, 0, 0 },  /*  63 */
   { 0, 0, 0, 0 }
 };
 
@@ -302,6 +303,12 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* default: nni parameters */
   opts.nni_tolerance = 1.0;
   opts.nni_epsilon = 10;
+
+  /* Stopping criteria */
+  opts.early_stopping = false; // by default, stopping rules are turned off
+  opts.stopping_rule = -1;
+  opts.modified_version = false;
+  opts.count_spr_moves = false;
 
   /* bootstrapping / bootstopping */
   opts.bs_metrics.push_back(BranchSupportMetric::fbp);
@@ -852,6 +859,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_pythia = true;
             else if (eopt == "pythia-off")
               opts.use_pythia = false;
+            else if (eopt == "modified-on")
+              opts.modified_version = true;
             else if (eopt == "compat-v11")
             {
               compat_ver = 110;
@@ -1032,6 +1041,28 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         {
           throw InvalidOptionValueException("Invalid NNI epsilon  : " + string(optarg) +
                                             ", please provide a positive real number!\n");
+        }
+        break;
+      
+      case 63:
+        /* 0: rell, 1: no-rell, 2: kh*/
+        opts.early_stopping = true;
+        if (strcasecmp(optarg, "ns-rell") == 0) {
+          opts.stopping_rule = 0;
+        } else if (strcasecmp(optarg, "ns-norell") == 0) {
+          opts.stopping_rule = 1;
+        } else if (strcasecmp(optarg, "KH") == 0) {
+          opts.stopping_rule = 2;
+        } else if (strcasecmp(optarg, "KH-mult") == 0) {
+          opts.stopping_rule = 3;
+          opts.count_spr_moves = true;
+        } else {
+          throw InvalidOptionValueException("Invalid stopping criterion: " + string(optarg) +
+                                            ", please provide one of the following options: \n" +
+                                            "- ns-rell : Noise sampling RELL apporach\n" +
+                                            "- ns-norell : Noise sampling no-RELL apporach\n" + 
+                                            "- KH : KH test\n" +
+                                            "- KH-mult : KH test with multiple correction\n");
         }
         break;
               

@@ -20,6 +20,9 @@ struct spr_round_params
   double lh_epsilon_brlen_full;
   double lh_epsilon_brlen_triplet;
 
+  unsigned long int * total_moves;
+  unsigned long int * increasing_moves;
+
   void reset_cutoff_info(double loglh)
   {
     cutoff_info.lh_dec_count = 0;

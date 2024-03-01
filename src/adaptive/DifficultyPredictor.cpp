@@ -41,12 +41,12 @@ void DifficultyPredictor::set_parsimony_msa_ptr(ParsimonyMSA* _pmsa)
   {
     int cur_num_sites = 0;
     weights_size = pinfo.msa().weights().size();
-    assert(pinfo.length() == weights_size);
+    if(weights_size > 0) assert(pinfo.length() == weights_size);
     
-    unsigned int weights[weights_size];
+    unsigned int weights[pinfo.length()];
     for (size_t j=0; j < pinfo.msa().weights().size(); j++)
     {
-      weights[j] = pinfo.msa().weights().at(j);
+      weights[j] = weights_size > 0 ? pinfo.msa().weights().at(j) : 1;
       if( weights[j] != 0 ) cur_num_sites += weights[j];
     }
 
