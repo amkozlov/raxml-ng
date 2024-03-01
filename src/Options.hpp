@@ -62,6 +62,8 @@ public:
   bool use_spr_fastclv;
   bool use_bs_pars;
   bool use_par_pars;
+  bool use_pythia;
+  bool use_adaptive_search;
 
   bool optimize_model;
   bool optimize_brlen;

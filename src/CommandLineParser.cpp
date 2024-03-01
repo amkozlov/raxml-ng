@@ -80,8 +80,8 @@ static struct option long_options[] =
   {"sitelh",             no_argument, 0, 0 },        /*  55 */
   {"site-weights",       required_argument, 0, 0 },  /*  56 */
   {"bs-write-msa",       no_argument, 0, 0 },        /*  57 */
-  {"lh-epsilon-triplet", required_argument, 0, 0 },   /* 58 */
-  {"adaptive",           no_argument, 0, 0 },        /*  59 */
+  {"lh-epsilon-triplet", required_argument, 0, 0 },  /* 58 */
+  {"adaptive",           optional_argument, 0, 0 },  /*  59 */
   {"diff_pred_trees",    required_argument, 0, 0},   /*  60 */
   {"nni-tolerance",      required_argument, 0, 0 },  /*  61 */
   {"nni-epsilon",        required_argument, 0, 0 },  /*  62 */
@@ -103,7 +103,7 @@ void CommandLineParser::check_options(Options &opts)
       opts.command == Command::bootstrap || opts.command == Command::all ||
       opts.command == Command::terrace || opts.command == Command::check ||
       opts.command == Command::parse || opts.command == Command::start ||
-      opts.command == Command::ancestral || opts.command == Command::adaptive)
+      opts.command == Command::ancestral)
   {
     if (opts.msa_file.empty())
       throw OptionException("You must specify a multiple alignment file with --msa switch");
@@ -196,8 +196,7 @@ void CommandLineParser::compute_num_searches(Options &opts)
 {
   if (opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate || opts.command == Command::start ||
-      opts.command == Command::ancestral || opts.command == Command::sitelh ||
-      (opts.command == Command::adaptive && !opts.start_trees.empty()))
+      opts.command == Command::ancestral || opts.command == Command::sitelh)
   {
     assert(!opts.start_trees.empty());
 
@@ -206,7 +205,7 @@ void CommandLineParser::compute_num_searches(Options &opts)
     {
       if (it.first == StartingTree::user)
         it.second = 1;
-      else
+      else if (it.first != StartingTree::adaptive)
         it.second = it.second > 0 ? it.second : def_tree_count;
     }
 
@@ -241,6 +240,10 @@ void CommandLineParser::parse_start_trees(Options &opts, const string& arg)
     {
       st_tree_type = StartingTree::parsimony;
     }
+    else if (st_tree ==  "auto" || st_tree == "adaptive")
+    {
+      st_tree_type = StartingTree::adaptive;
+    }
     else
     {
       opts.tree_file += (opts.tree_file.empty() ? "" : ",") + st_tree;
@@ -257,7 +260,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.cmdline = get_cmdline(argc, argv);
 
   /* if no command specified, default to --adaptive (or --help if no args were given) */
-  opts.command = (argc > 1) ? Command::adaptive : Command::help;
+  opts.command = (argc > 1) ? Command::search : Command::help;
   opts.start_trees.clear();
   opts.random_seed = (long)time(NULL);
 
@@ -455,6 +458,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.use_pattern_compression = false;
           opts.use_tip_inner = false;
           opts.use_repeats = false;
+          opts.use_pythia = false;
+          opts.use_adaptive_search = false;
         }
         else
           opts.use_prob_msa = false;
@@ -842,12 +847,18 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_par_pars = true;
             else if (eopt == "pars-seq")
               opts.use_par_pars = false;
+            else if (eopt == "pythia-on")
+              opts.use_pythia = true;
+            else if (eopt == "pythia-off")
+              opts.use_pythia = false;
             else if (eopt == "compat-v11")
             {
               compat_ver = 110;
               opts.use_spr_fastclv = false;
               opts.use_bs_pars = false;
               opts.use_par_pars = false;
+              opts.use_pythia = false;
+              opts.use_adaptive_search = false;
               if (!lh_epsilon_set)
                 opts.lh_epsilon = DEF_LH_EPSILON_V11;
               opts.lh_epsilon_brlen_triplet = DEF_LH_EPSILON_V11;
@@ -976,8 +987,26 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       
       case 59: /* Adaptive RAxML-ng analysis with difficulty prediction */
-        opts.command = Command::adaptive;
-        num_commands++;
+        if (!optarg || (strcasecmp(optarg, "on") == 0))
+        {
+          opts.use_adaptive_search = true;
+          opts.use_pythia = true;
+        }
+        else if (strcasecmp(optarg, "start") == 0)
+        {
+          opts.use_adaptive_search = false;
+          opts.use_pythia = true;
+          optarg_tree = "adaptive";
+        }
+        else if (strcasecmp(optarg, "off") == 0)
+        {
+          opts.use_adaptive_search = false;
+          opts.use_pythia = false;
+        }
+        else
+        {
+          throw InvalidOptionValueException("Invalid --adaptive  mode: " + string(optarg));
+        }
         break;
       
       case 60: /* Number of parsimony trees in difficulty prediction */
@@ -1022,15 +1051,19 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       opts.command == Command::start)
   {
     if (optarg_tree.empty())
-      optarg_tree = opts.use_old_constraint ? "rand{20}" : RAXML_DEF_START_TREE;
+    {
+      if (opts.use_adaptive_search)
+        optarg_tree = "adaptive";
+      else
+        optarg_tree = opts.use_old_constraint ? "rand{20}" : RAXML_DEF_START_TREE;
+    }
     else if (optarg_tree == "default1")
       optarg_tree = compat_ver < 120 ? RAXML_DEF_START_TREE1_V11 : RAXML_DEF_START_TREE1;
   }
   parse_start_trees(opts, optarg_tree);
 
   /* process LH epsilon defaults */
-  if (opts.command == Command::search || opts.command == Command::all ||
-      opts.command == Command::adaptive)
+  if (opts.command == Command::search || opts.command == Command::all)
   {
     if (!lh_epsilon_set)
       opts.lh_epsilon = compat_ver < 120 ? DEF_LH_EPSILON_V11 : DEF_LH_EPSILON;
@@ -1072,7 +1105,6 @@ void CommandLineParser::print_help()
             "  --help                                     display help information\n"
             "  --version                                  display version information\n"
             "  --evaluate                                 evaluate the likelihood of a tree (with model+brlen optimization)\n"
-            "  --adaptive                                 Adaptive ML tree search\n"
             "  --search                                   ML tree search (default: 10 parsimony + 10 random starting trees)\n"
             "  --bootstrap                                bootstrapping (default: use bootstopping to auto-detect #replicates)\n"
             "  --all                                      all-in-one (ML search + bootstrapping)\n"
@@ -1098,8 +1130,8 @@ void CommandLineParser::print_help()
             "  --rf                                       Alias for: --rfdist --nofiles --log result\n"
             "\n"
             "Input and output options:\n"
-            "  --tree            rand{N} | pars{N} | FILE starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
-            "                                             N = number of trees (default: rand{10},pars{10})\n"
+            "  --tree            rand{N} | pars{N} |      starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
+            "                    FILE | auto              N = number of trees (default: auto-detect based on MSA difficulty)\n"
             "  --msa             FILE                     alignment file\n"
             "  --msa-format      VALUE                    alignment file format: FASTA, PHYLIP, CATG or AUTO-detect (default)\n"
             "  --data-type       VALUE                    data type: DNA, AA, BIN(ary) or AUTO-detect (default)\n"
@@ -1136,9 +1168,10 @@ void CommandLineParser::print_help()
             "  --lh-epsilon   VALUE                       log-likelihood epsilon for optimization/tree search (default: 0.1)\n"
             "\n"
             "Topology search options:\n"
-            "  --spr-radius           VALUE               SPR re-insertion radius for fast iterations (default: AUTO)\n"
-            "  --spr-cutoff           VALUE | off         relative LH cutoff for descending into subtrees (default: 1.0)\n"
-            "  --lh-epsilon-triplet   VALUE               log-likelihood epsilon for branch length triplet optimization (default: 1000)\n"
+            "  --adaptive            [ on | off | start ] Adaptive ML tree search (start = starting trees only)\n"
+            "  --spr-radius          VALUE                SPR re-insertion radius for fast iterations (default: AUTO)\n"
+            "  --spr-cutoff          VALUE | off          relative LH cutoff for descending into subtrees (default: 1.0)\n"
+            "  --lh-epsilon-triplet  VALUE                log-likelihood epsilon for branch length triplet optimization (default: 1000)\n"
             "\n"
             "Bootstrapping options:\n"
             "  --bs-trees     VALUE                       number of bootstraps replicates\n"

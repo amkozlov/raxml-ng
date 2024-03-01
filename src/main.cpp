@@ -835,7 +835,6 @@ void check_options_early(Options& opts)
   opts.use_rba_partload &= (opts.num_ranks > 1 && !opts.coarse());                // only useful for fine-grain MPI runs
   opts.use_rba_partload &= (!opts.start_trees.count(StartingTree::parsimony));    // does not work with parsimony
   opts.use_rba_partload &= (opts.command == Command::search ||                    // currently doesn't work with bootstrap
-                            opts.command == Command::adaptive ||
                             opts.command == Command::evaluate ||
                             opts.command == Command::ancestral);
 
@@ -1105,6 +1104,8 @@ void load_msa(RaxmlInstance& instance)
     instance.opts.use_pattern_compression = false;
     instance.opts.use_tip_inner = false;
     instance.opts.use_repeats = false;
+    instance.opts.use_pythia = false;
+    instance.opts.use_adaptive_search = false;
 
     if (parted_msa.part_count() > 1)
       throw runtime_error("Partitioned probabilistic alignments are not supported yet, sorry...");
@@ -1197,7 +1198,7 @@ void predict_msa_difficulty(RaxmlInstance& instance)
   auto diff_pred = instance.msa_diff_predictor;
   double difficulty = instance.parted_msa->difficulty_score();
 
-  if (!diff_pred)
+  if (!diff_pred || !opts.use_pythia)
     return;
 
   if (difficulty < 0.)
@@ -1237,21 +1238,33 @@ void autotune_start_trees(RaxmlInstance& instance)
   auto & opts = instance.opts;
   auto diff_pred = instance.msa_diff_predictor;
   double difficulty = instance.parted_msa->difficulty_score();
+  bool adaptive = opts.start_trees.count(StartingTree::adaptive);
 
-  if (opts.num_searches > 0 || !diff_pred || difficulty < 0.)
+  if (!adaptive || opts.num_searches > 0)
     return;
 
-  if (opts.constraint_tree_file.empty() || !opts.use_old_constraint)
+  opts.start_trees.erase(StartingTree::adaptive);
+
+  if (!diff_pred || difficulty < 0.)
   {
-    int pars_trees = diff_pred->num_start_trees(difficulty, 7.0, 0.5, 0.25);
-
-    opts.start_trees[StartingTree::random] = difficulty >= 0.7 ? 0 :
-        diff_pred->num_start_trees(difficulty, 3.5, 0.5, 0.25);
-    opts.start_trees[StartingTree::parsimony] = difficulty >= 0.7 ? (int) (1.5 * pars_trees) : pars_trees;
-
+    /* difficulty prediction not avalailable -> fallback to defaults */
+    opts.start_trees[StartingTree::random] = 10;
+    opts.start_trees[StartingTree::parsimony] = 10;
   }
   else
-    opts.start_trees[StartingTree::random] = 2*diff_pred->num_start_trees(difficulty, 8.0, 0.5, 0.3);
+  {
+    if (opts.constraint_tree_file.empty() || !opts.use_old_constraint)
+    {
+      int pars_trees = diff_pred->num_start_trees(difficulty, 7.0, 0.5, 0.25);
+
+      opts.start_trees[StartingTree::random] = difficulty >= 0.7 ? 0 :
+          diff_pred->num_start_trees(difficulty, 3.5, 0.5, 0.25);
+      opts.start_trees[StartingTree::parsimony] = difficulty >= 0.7 ? (int) (1.5 * pars_trees) : pars_trees;
+
+    }
+    else
+      opts.start_trees[StartingTree::random] = 2*diff_pred->num_start_trees(difficulty, 8.0, 0.5, 0.3);
+  }
 
   for (const auto& it: opts.start_trees)
     opts.num_searches += it.second;
@@ -2292,7 +2305,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
 
   if (opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate || opts.command == Command::sitelh ||
-      opts.command == Command::ancestral || opts.command == Command::adaptive)
+      opts.command == Command::ancestral)
   {
     auto model_log_lvl = parted_msa.part_count() > 1 ? LogLevel::verbose : LogLevel::info;
     const auto& ml_models = instance.ml_tree.models;
@@ -2312,7 +2325,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
   }
 
   if (opts.command == Command::search || opts.command == Command::all ||
-      opts.command == Command::evaluate || opts.command == Command::sitelh || opts.command == Command::adaptive)
+      opts.command == Command::evaluate || opts.command == Command::sitelh)
   {
     auto best_loglh = instance.ml_tree.loglh;
 
@@ -2425,7 +2438,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
   }
 
   if (opts.command == Command::search || opts.command == Command::all ||
-      opts.command == Command::evaluate || opts.command == Command::sitelh || opts.command == Command::adaptive)
+      opts.command == Command::evaluate || opts.command == Command::sitelh)
   {
     if (!opts.best_model_file().empty())
     {
@@ -2734,14 +2747,6 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
         " distinct starting trees" << endl;
   }
 
-  /* if(opts.command == Command::adaptive && dPred->checkpoint_mode()) {
-    if (ParallelContext::group_master_thread())
-    {
-      ParallelContext::UniqueLock lock;
-      cm.set_best_lh_from_chkp(dPred->get_best_ML());
-    }
-  } */
-
   (instance.start_trees.size() > 1 ? LOG_RESULT : LOG_INFO) << endl;
 
   unsigned int batch_id = (instance.done_ml_trees.size() / opts.bootstop_interval) + 1;
@@ -2798,10 +2803,8 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
     }
     else
     {
-      if(opts.command == Command::adaptive)
-      {
+      if (opts.use_adaptive_search)
         optimizer.optimize_topology_adaptive(*treeinfo, cm);
-      }
       else
         optimizer.optimize_topology(*treeinfo, cm);
 
@@ -2967,7 +2970,11 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
     treeinfo->set_topology_constraint(instance.constraint_tree);
 
     Optimizer optimizer(opts);
-    optimizer.optimize_topology(*treeinfo, cm);
+
+    if (opts.use_adaptive_search)
+      optimizer.optimize_topology_adaptive(*treeinfo, cm);
+    else
+      optimizer.optimize_topology(*treeinfo, cm);
 
     LOG_PROGR << endl;
     LOG_WORKER_TS(LogLevel::info) << "Bootstrap tree #" << *bs_num <<
@@ -3002,7 +3009,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   if ((opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate || opts.command == Command::sitelh ||
-      opts.command == Command::ancestral || opts.command == Command::adaptive) &&
+      opts.command == Command::ancestral) &&
       !instance.start_trees.empty())
   {
     thread_infer_ml(instance, cm);
@@ -3028,7 +3035,6 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   switch(opts.load_balance_method)
   {
     case LoadBalancing::naive:
-      instance.load_balancer.reset(new SimpleLoadBalancer());
       break;
     case LoadBalancing::kassian:
       instance.load_balancer.reset(new KassianLoadBalancer());
@@ -3052,11 +3058,6 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
     instance.opts.msa_file = opts.binary_msa_file();
     instance.opts.msa_format = FileFormat::binary;
   }
-
-  // Difficulty Predictor for adaptive RAxML-NG
-  // The Difficulty Predictor is one object shared by all threads (in any parallelization scheme)
-  if(opts.command == Command::adaptive)
-    instance.msa_diff_predictor = make_shared<DifficultyPredictor>();
 
   // load MSA  
   load_parted_msa(instance);
@@ -3254,7 +3255,6 @@ int internal_main(int argc, char** argv, void* comm)
     case Command::consense:
     case Command::sitelh:
     case Command::ancestral:
-    case Command::adaptive:
       if (!opts.redo_mode && opts.result_files_exist())
       {
         LOG_ERROR << endl << "ERROR: Result files for the run with prefix `" <<
@@ -3329,6 +3329,11 @@ int internal_main(int argc, char** argv, void* comm)
 
     CheckpointManager cm(opts);
 
+    // Difficulty Predictor for adaptive RAxML-NG
+    // The Difficulty Predictor is one object shared by all threads (in any parallelization scheme)
+    if (opts.use_pythia)
+      instance.msa_diff_predictor = make_shared<DifficultyPredictor>();
+
     switch (opts.command)
     {
       case Command::evaluate:
@@ -3337,7 +3342,6 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::all:
       case Command::sitelh:
       case Command::ancestral:
-      case Command::adaptive:
       {
         master_main(instance, cm);
         break;
@@ -3364,6 +3368,7 @@ int internal_main(int argc, char** argv, void* comm)
 #endif
       case Command::check:
         opts.use_pattern_compression = false;
+        opts.use_pythia = false;
         /* fall through */
       case Command::parse:
       {

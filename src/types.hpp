@@ -16,7 +16,8 @@ enum class StartingTree
 {
   random,
   parsimony,
-  user
+  user,
+  adaptive
 };
 
 enum class Command
@@ -38,8 +39,7 @@ enum class Command
   rfdist,
   consense,
   ancestral,
-  sitelh,
-  adaptive
+  sitelh
 };
 
 enum class FileFormat

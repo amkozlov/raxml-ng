@@ -7,7 +7,7 @@ using namespace std;
 Options::Options() : opt_version(RAXML_OPT_VERSION), cmdline(""), command(Command::none),
 use_tip_inner(true), use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false),
 use_repeats(true), use_rba_partload(true), use_energy_monitor(true), use_old_constraint(false),
-use_spr_fastclv(true), use_bs_pars(true), use_par_pars(true),
+use_spr_fastclv(true), use_bs_pars(true), use_par_pars(true), use_pythia(true), use_adaptive_search(true),
 optimize_model(true), optimize_brlen(true), force_mode(false), safety_checks(SafetyCheck::all),
 redo_mode(false), nofiles_mode(false), write_interim_results(true), write_bs_msa(false),
 log_level(LogLevel::progress), msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
@@ -114,9 +114,6 @@ bool Options::result_files_exist() const
     case Command::search:
       return sysutil_file_exists(best_tree_file()) || sysutil_file_exists(best_tree_collapsed_file()) ||
              sysutil_file_exists(best_model_file()) ||sysutil_file_exists(partition_trees_file());
-    case Command::adaptive:
-      return sysutil_file_exists(best_tree_file()) || sysutil_file_exists(best_tree_collapsed_file()) ||
-             sysutil_file_exists(best_model_file()) ||sysutil_file_exists(partition_trees_file());
     case Command::bootstrap:
       return sysutil_file_exists(bootstrap_trees_file());
     case Command::all:
@@ -148,8 +145,7 @@ bool Options::result_files_exist() const
 
 void Options::remove_result_files() const
 {
-  if (command == Command::search || command == Command::adaptive || command == Command::all ||
-      command == Command::evaluate)
+  if (command == Command::search || command == Command::all || command == Command::evaluate)
   {
     sysutil_file_remove(best_tree_file());
     sysutil_file_remove(best_tree_collapsed_file());
@@ -302,11 +298,15 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     case Command::sitelh:
       stream << "Per-site likelihood computation";
       break;
-    case Command::adaptive:
-      stream << "Adaptive ML tree search";
-      break;
     default:
       break;
+  }
+
+  if (opts.command == Command::search || opts.command == Command::bootstrap ||
+      opts.command == Command::all)
+  {
+    if (opts.use_adaptive_search)
+      stream << " (adaptive)";
   }
 
   if (opts.command == Command::all || opts.command == Command::support)
@@ -354,6 +354,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
         break;
       case StartingTree::user:
         stream << "user";
+        break;
+      case StartingTree::adaptive:
+        stream << "adaptive";
         break;
     }
   }
@@ -413,7 +416,7 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   stream << "  random seed: " << opts.random_seed << endl;
 
   if (opts.command == Command::bootstrap || opts.command == Command::all ||
-      opts.command == Command::search || opts.command == Command::evaluate || opts.command == Command::adaptive ||
+      opts.command == Command::search || opts.command == Command::evaluate ||
       opts.command == Command::parse || opts.command == Command::ancestral)
   {
     stream << "  tip-inner: " << (opts.use_tip_inner ? "ON" : "OFF") << endl;
@@ -426,8 +429,8 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     stream << "brlen-triplet: " << opts.lh_epsilon_brlen_triplet;
     stream << endl;
     
-    if (opts.command == Command::search || opts.command == Command::adaptive || 
-        opts.command == Command::all || opts.command == Command::bootstrap)
+    if (opts.command == Command::search ||  opts.command == Command::all ||
+        opts.command == Command::bootstrap)
     {
       if (opts.spr_radius > 0)
         stream << "  fast spr radius: " << opts.spr_radius << endl;
