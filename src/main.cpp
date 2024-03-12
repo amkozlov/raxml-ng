@@ -2783,8 +2783,9 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
     
     if(instance.criterion){
       instance.criterion->set_thread_offset(part_assign, ParallelContext::local_proc_id());
-      optimizer.set_stopping_criterion(instance.criterion); 
-    }
+    } 
+
+    optimizer.set_stopping_criterion(instance.criterion);
 
     if (opts.command == Command::evaluate || opts.command == Command::sitelh ||
         opts.command == Command::ancestral)
