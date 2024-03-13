@@ -606,7 +606,7 @@ double Optimizer::optimize_topology_modified(TreeInfo& treeinfo, CheckpointManag
     LOG_PROGRESS(loglh) << approach << " apporach. Epsilon = " << _lh_epsilon << endl;
   }
 
-  best_fast_radius = 10; // maybe change that idk
+  best_fast_radius = _spr_radius > 0 ?  _spr_radius : 10; // maybe change that idk
 
   LOG_PROGRESS(loglh) << "SPR radius for FAST iterations: " << best_fast_radius << endl;
 
@@ -688,7 +688,7 @@ double Optimizer::optimize_topology_modified(TreeInfo& treeinfo, CheckpointManag
     /* init slow SPRs */
     spr_params.thorough = 1;
     spr_params.radius_min = 1;
-    spr_params.radius_max = 10;   
+    spr_params.radius_max = best_fast_radius;   
     iter = 0;
   }
   
