@@ -61,15 +61,15 @@ message(STATUS "Libs: ${RAXML_LIBS}")
 target_link_libraries(raxml_module PUBLIC ${RAXML_LIBS})
 
 if (BUILD_AS_LIBRARY AND NOT APPLE)
-  target_link_libraries(raxml_module gcc_s gcc)
+  target_link_libraries(raxml_module PUBLIC gcc_s gcc)
 endif()
 
 if(GMP_FOUND)
-  target_link_libraries(raxml_module ${GMP_LIBRARIES})
+  target_link_libraries(raxml_module PUBLIC ${GMP_LIBRARIES})
 endif()
 
 if(MPI_FOUND)
-  target_link_libraries(raxml_module ${MPI_CXX_LIBRARIES})
+  target_link_libraries(raxml_module PUBLIC ${MPI_CXX_LIBRARIES})
 endif()
 
 if(MPI_COMPILE_FLAGS)
