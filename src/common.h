@@ -45,6 +45,7 @@ unsigned long sysutil_get_memtotal(bool ignore_errors = true);
 
 std::string sysutil_get_cpu_model();
 unsigned int sysutil_get_cpu_cores();
+unsigned int sysutil_task_cpu_cores(bool physical = false);
 unsigned long sysutil_get_cpu_features();
 unsigned int sysutil_simd_autodetect();
 

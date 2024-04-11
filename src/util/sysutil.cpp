@@ -11,6 +11,10 @@
 #include <stdarg.h>
 #include <limits.h>
 
+#if defined(__linux__)
+#include <sched.h>
+#endif
+
 #include <chrono>
 #include <thread>
 
@@ -239,6 +243,11 @@ static bool ht_enabled()
   return (bool) (info[3] & (0x1 << 28));
 }
 
+static int threads_per_core()
+{
+  return ht_enabled() ? 2 : 1;
+}
+
 unsigned int sysutil_get_cpu_cores()
 {
   auto lcores = std::thread::hardware_concurrency();
@@ -248,10 +257,29 @@ unsigned int sysutil_get_cpu_cores()
   }
   catch (const std::runtime_error&)
   {
-    auto threads_per_core = ht_enabled() ? 2 : 1;
-
-    return lcores / threads_per_core;
+    return lcores / threads_per_core();
   }
+}
+
+unsigned int sysutil_task_cpu_cores(bool physical /* = false */)
+{
+  auto ncores = std::thread::hardware_concurrency();
+
+#if defined(__linux__)
+  cpu_set_t mask;
+  if (sched_getaffinity(0, sizeof(cpu_set_t), &mask) != -1)
+    ncores = CPU_COUNT(&mask);
+#endif
+
+  if (physical)
+    ncores /= threads_per_core();
+
+  return ncores;
+}
+
+long sysutil_online_cpu_cores()
+{
+  return sysconf(_SC_NPROCESSORS_ONLN);
 }
 
 unsigned long sysutil_get_cpu_features()
