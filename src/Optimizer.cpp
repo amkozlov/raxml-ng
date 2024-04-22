@@ -662,7 +662,8 @@ double Optimizer::optimize_topology_modified(TreeInfo& treeinfo, CheckpointManag
         if(spr_params.increasing_moves){
           
           double p_value = criterion->get_pvalue(ParallelContext::group_id());
-          LOG_PROGRESS(loglh) << "KH-like multiple-testing p-value = " << p_value << endl;
+          double epsilon_value = criterion->get_epsilon(ParallelContext::group_id()); 
+          LOG_PROGRESS(loglh) << "KH-like multiple-testing p-value = " << p_value  << ", epsilon = " << epsilon_value << endl;
           impr = (p_value <= 0.05);
 
         } else {
@@ -727,7 +728,8 @@ double Optimizer::optimize_topology_modified(TreeInfo& treeinfo, CheckpointManag
         if(spr_params.increasing_moves){
           
           double p_value = criterion->get_pvalue(ParallelContext::group_id());
-          LOG_PROGRESS(loglh) << "KH-like multiple-testing p-value = " << p_value << endl;
+          double epsilon_value = criterion->get_epsilon(ParallelContext::group_id()); 
+          LOG_PROGRESS(loglh) << "KH-like multiple-testing p-value = " << p_value  << ", epsilon = " << epsilon_value << endl;
           impr = (p_value <= 0.05);
 
         } else {

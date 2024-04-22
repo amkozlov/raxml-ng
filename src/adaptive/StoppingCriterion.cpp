@@ -246,12 +246,14 @@ void KH::run_test(){
         //std::cout << "Increasing moves " << increasing_moves[group_id] << std::endl;
         if( increasing_moves[group_id] == 0 || stdev < 1e-9){
             ret_val = 1;
+            epsilon[group_id] = (NL - L) > 10 ? (NL - L) : 10;
             
         } else {
             double x = (NL - L) / (stdev * sqrt(total_sites));
             StandardNormalDistribution ndist;
             ret_val = increasing_moves[group_id]*(1 - ndist.cdf(x));
             ret_val = ret_val < 1 ? ret_val : 1;
+            epsilon[group_id] = ndist.inv_cdf(1 - (0.05 / increasing_moves[group_id])) * sqrt(total_sites) * stdev;
         }
         
         p_value[group_id] = ret_val;
