@@ -35,7 +35,9 @@ build-mpi/
 build-static/
 release/
 
-# Eclipse project files
+# IDE project files
 .cproject
 .project
 .settings/
+.vscode
+.devcontainer
