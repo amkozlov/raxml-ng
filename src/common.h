@@ -43,6 +43,8 @@ unsigned int sysutil_get_cpu_cores();
 unsigned long sysutil_get_cpu_features();
 unsigned int sysutil_simd_autodetect();
 
+unsigned int sysutil_task_cpu_cores(bool physical = false);
+
 double sysutil_get_energy();
 
 const SystemTimer& global_timer();

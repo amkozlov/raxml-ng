@@ -162,6 +162,8 @@ void print_banner()
   LOG_INFO << "System: " << sysutil_get_cpu_model() << ", ";
   LOG_INFO << sysutil_get_cpu_cores() << " cores, ";
   LOG_INFO << sysutil_get_memtotal() / (1024*1024*1024) << " GB RAM";
+  if (sysutil_task_cpu_cores(true) < sysutil_get_cpu_cores())
+    LOG_INFO << " (allocated: " << sysutil_task_cpu_cores(true) << " physical cores)";
   LOG_INFO << endl << endl;
 }
 

@@ -310,10 +310,11 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* max #threads = # available CPU cores */
 #if !defined(_RAXML_PTHREADS)
   opts.num_threads = 1;
-#elif !defined(_RAXML_MPI)
-  opts.num_threads_max = std::max(1u, sysutil_get_cpu_cores());
 #else
-  opts.num_threads_max = std::max(1u, (unsigned int) (sysutil_get_cpu_cores() / ParallelContext::ranks_per_node()));
+  if (ParallelContext::ranks_per_node() == 1)
+    opts.num_threads_max = std::max(1u, sysutil_task_cpu_cores(true));
+  else
+    opts.num_threads_max = std::max(1u, (unsigned int) (sysutil_get_cpu_cores() / ParallelContext::ranks_per_node()));
 #endif
 
 #if defined(_RAXML_MPI)
