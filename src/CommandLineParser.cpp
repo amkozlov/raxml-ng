@@ -1047,9 +1047,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 63:
         /* 0: rell, 1: no-rell, 2: kh*/
         opts.early_stopping = true;
-        if (strcasecmp(optarg, "ns-rell") == 0) {
+        if (strcasecmp(optarg, "sn-rell") == 0) {
           opts.stopping_rule = 0;
-        } else if (strcasecmp(optarg, "ns-norell") == 0) {
+        } else if (strcasecmp(optarg, "sn-normal") == 0) {
           opts.stopping_rule = 1;
         } else if (strcasecmp(optarg, "KH") == 0) {
           opts.stopping_rule = 2;
@@ -1059,8 +1059,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         } else {
           throw InvalidOptionValueException("Invalid stopping criterion: " + string(optarg) +
                                             ", please provide one of the following options: \n" +
-                                            "- ns-rell : Noise sampling RELL apporach\n" +
-                                            "- ns-norell : Noise sampling no-RELL apporach\n" + 
+                                            "- sn-rell : Sampling Noise RELL apporach\n" +
+                                            "- sn-normal : Sampling Noise Normal apporach\n" + 
                                             "- KH : KH test\n" +
                                             "- KH-mult : KH test with multiple correction\n");
         }

@@ -564,15 +564,15 @@ double Optimizer::optimize_topology_modified(TreeInfo& treeinfo, CheckpointManag
     switch (_stopping_criterion)
     {
       case 0:
-        approach = "RELL";
+        approach = "Sampling Noise RELL";
         break;
       
       case 1:
-        approach = "NO-RELL";
+        approach = "Sampling Noise Normal";
         break;
 
       case 2:
-        approach = "KH-like";
+        approach = "KH";
         break;
       
       case 3:
@@ -583,7 +583,7 @@ double Optimizer::optimize_topology_modified(TreeInfo& treeinfo, CheckpointManag
         break;
     }
     
-    LOG_PROGRESS(loglh) << "Noise Sampling Using the " << approach << " apporach." << endl;
+    LOG_PROGRESS(loglh) << "Stopping criterion: " << approach << " apporach." << endl;
   
   } else {
 
