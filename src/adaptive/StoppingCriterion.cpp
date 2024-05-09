@@ -206,31 +206,28 @@ void KH::run_test(){
     int group_id = ParallelContext::group_id();
 
     double ret_val = 0, L = old_loglh[group_id], NL = new_loglh[group_id];
-    double test_L = 0, test_NL = 0;
     unsigned int i, pos = 0;
+    
+    if((NL - L ) < 10) {
+        epsilon[group_id] = 10;
+        return;
+    }
 
     double* logl_diffs = new double[total_sites];
     double mean = 0;
 
     for(int part = 0; part < part_count; ++part){
-        
         unsigned int part_sites = sites[part];
+
         for(i = 0; i<part_sites; ++i){
-            
             //std::cout <<  " Partition " << part <<", Persite lnl[ " << pos << "] " << persite_lnl[group_id][part][i] << endl;
             logl_diffs[pos] = persite_lnl_new[group_id][part][i] - persite_lnl[group_id][part][i];
-            
-            test_L += persite_lnl[group_id][part][i];
-            test_NL += persite_lnl_new[group_id][part][i];
-
             mean += logl_diffs[pos];
             pos++;
         }
     }
 
     //std::cout << "NL " << NL << " and test NL " << test_NL << endl;
-    assert(fabs(L - test_L) < 1e-3);
-    assert(fabs(NL - test_NL) < 1e-3);
     //std::cout << "Success! Group id " << group_id <<  endl;
 
     mean = mean / total_sites;
@@ -244,12 +241,13 @@ void KH::run_test(){
     // multiple testing correction
     if(count_spr_moves){
         //std::cout << "Increasing moves " << increasing_moves[group_id] << std::endl;
-        if( increasing_moves[group_id] == 0 || stdev < 1e-9){
+        if( increasing_moves[group_id] == 0){
             ret_val = 1;
-            epsilon[group_id] = (NL - L) > 10 ? (NL - L) : 10;
+            epsilon[group_id] = (NL - L);
             
         } else {
             double x = (NL - L) / (stdev * sqrt(total_sites));
+            //cout << "X = " << x << endl;
             StandardNormalDistribution ndist;
             ret_val = increasing_moves[group_id]*(1 - ndist.cdf(x));
             ret_val = ret_val < 1 ? ret_val : 1;
@@ -259,6 +257,9 @@ void KH::run_test(){
         p_value[group_id] = ret_val;
 
     } else {
+        
+        //double x = (NL - L) / (stdev * sqrt(total_sites));
+        //cout << "X = " << x << endl;
         
         //cout << "HEY OP! stdev " << stdev << endl;
         ret_val = 1.645 * sqrt(total_sites) * stdev;

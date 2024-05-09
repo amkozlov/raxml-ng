@@ -1202,7 +1202,10 @@ void predict_msa_difficulty(RaxmlInstance& instance)
   auto diff_pred = instance.msa_diff_predictor;
   double difficulty = instance.parted_msa->difficulty_score();
 
-  if (!diff_pred || !opts.use_pythia)
+  if((!diff_pred) || !opts.use_pythia || instance.opts.stopping_rule >= 0 || instance.opts.modified_version)
+    return;
+
+  if (!diff_pred)
     return;
 
   if (difficulty < 0.)
