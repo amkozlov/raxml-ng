@@ -335,8 +335,11 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
   }
 
   // do SPRs
-  const int radius_limit = min(spr_radius_limit_adaptive(difficulty), (int) treeinfo.pll_treeinfo().tip_count - 3);
-  int radius_step = spr_radius_step_adaptive(radius_limit);
+  const int radius_limit = difficulty != -1 ? 
+                      min(spr_radius_limit_adaptive(difficulty), (int) treeinfo.pll_treeinfo().tip_count - 3) :
+                      min(20, (int) treeinfo.pll_treeinfo().tip_count - 3 );
+  
+  int radius_step = difficulty != -1 ? spr_radius_step_adaptive(radius_limit) : 5;
   double old_loglh;
   bool impr = true;
   double impr_perc = 1;
