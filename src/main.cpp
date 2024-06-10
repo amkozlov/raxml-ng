@@ -2785,7 +2785,8 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
     Optimizer optimizer(opts);
     
     if(instance.criterion){
-      instance.criterion->set_thread_offset(part_assign, ParallelContext::local_proc_id());
+      instance.criterion->initialize_persite_lnl_vectors(treeinfo.get());
+      instance.criterion->set_thread_offset(treeinfo.get(), part_assign, ParallelContext::local_proc_id());
     } 
 
     optimizer.set_stopping_criterion(instance.criterion);
@@ -3188,22 +3189,22 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
     {
       case 0:
         instance.criterion = 
-          new NoiseSampling(instance.parted_msa, ParallelContext::num_groups(), ParallelContext::num_procs(), true);
+          new NoiseSampling(instance.parted_msa, ParallelContext::num_groups(), ParallelContext::num_threads(), true, instance.opts.random_seed);
         break;
       
       case 1:
         instance.criterion = 
-          new NoiseSampling(instance.parted_msa, ParallelContext::num_groups(), ParallelContext::num_procs(), false);
+          new NoiseSampling(instance.parted_msa, ParallelContext::num_groups(), ParallelContext::num_threads(), false, instance.opts.random_seed);
         break;
 
       case 2:
         instance.criterion = 
-          new KH(instance.parted_msa, ParallelContext::num_groups(), ParallelContext::num_procs(), false);
+          new KH(instance.parted_msa, ParallelContext::num_groups(), ParallelContext::num_threads(), false, instance.opts.random_seed);
         break;
       
       case 3:
         instance.criterion = 
-          new KH(instance.parted_msa, ParallelContext::num_groups(), ParallelContext::num_procs(), true);
+          new KH(instance.parted_msa, ParallelContext::num_groups(), ParallelContext::num_threads(), true, instance.opts.random_seed);
         break;
       
       default:

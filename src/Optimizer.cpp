@@ -491,10 +491,6 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
 }
 
 double Optimizer::optimize_topology_modified(TreeInfo& treeinfo, CheckpointManager& cm){
-
-  // delete
-  //int delete_file_counter = 1;
-  //std::string delete_file = "../persite_lnl_";
   
   assert(_modified_version || criterion != nullptr);
 
@@ -504,7 +500,7 @@ double Optimizer::optimize_topology_modified(TreeInfo& treeinfo, CheckpointManag
   SearchState local_search_state = cm.search_state();
   auto& search_state = ParallelContext::group_master_thread() ? cm.search_state() : local_search_state;
   ParallelContext::barrier();
-
+ 
   /* set references such that we can work directly with checkpoint values */
   double &loglh = search_state.loglh;
   int& iter = search_state.iteration;
@@ -522,12 +518,11 @@ double Optimizer::optimize_topology_modified(TreeInfo& treeinfo, CheckpointManag
   vector<double *> persite_lnl, persite_lnl_new;
   
   if(criterion){
-
-    persite_lnl = criterion->get_persite_lnl(ParallelContext::local_group_id(), ParallelContext::local_thread_id()); 
+    persite_lnl = criterion->get_persite_lnl(ParallelContext::group_id(), ParallelContext::local_thread_id()); 
     if (use_kh_like) 
-      persite_lnl_new = criterion->get_persite_lnl_new(ParallelContext::local_group_id(),  ParallelContext::local_thread_id()); 
-  
+      persite_lnl_new = criterion->get_persite_lnl_new(ParallelContext::group_id(),  ParallelContext::local_thread_id()); 
   }
+
   CheckpointStep resume_step = search_state.step;
 
   /* Compute initial LH of the starting tree */
@@ -593,8 +588,6 @@ double Optimizer::optimize_topology_modified(TreeInfo& treeinfo, CheckpointManag
     LOG_PROGRESS(loglh) << "Modified version called" << endl;  
   }
 
-  
-  
   // fix that later
   if(_stopping_criterion == 0 || _stopping_criterion == 1){
     

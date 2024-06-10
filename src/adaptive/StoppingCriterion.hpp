@@ -18,13 +18,20 @@ class StoppingCriterion {
         int n_threads;
         
         bool kh_test_case;
+        bool vectors_initialized;
+        bool vectors_uncompressed_initialized;
+        vector<bool> sites_uncompressed_initialized;
 
         vector<intVector> thread_offset;
-
-        void initialize_persite_lnl_vectors();
+        
         void initialize_thread_offset();
         void clear_persite_lnl_vector();
+
+        void initialize_persite_vector(vector<vector<double *>> &vec);
+        void initialize_uncompressed(TreeInfo * treeinfo);
+        void set_thread_offset_uncompressed(TreeInfo * treeinfo, int local_thread_id);
         
+        void store_uncompressed(bool plnl_old);
         int get_offset(int thread_id, int part_id) {return thread_offset[thread_id][part_id]; }
         std::vector<double *> get_vec(int group_id, int local_thread_id, bool plnl);
 
@@ -32,11 +39,19 @@ class StoppingCriterion {
         int part_count;
         unsigned int total_sites;
         unsigned int* sites;
+
+        unsigned int total_patterns;
+        unsigned int * patterns;
+        vector<vector<unsigned int *>> pattern_weights;
         
         vector<vector<double *>> persite_lnl;
         vector<vector<double *>> persite_lnl_new;
 
+        vector<vector<double *>> persite_lnl_uncompressed;
+        vector<vector<double *>> persite_lnl_uncompressed_new;
+
         bool count_spr_moves;
+        bool pattern_compression;
         unsigned long *increasing_moves;
 
         double *old_loglh;
@@ -44,6 +59,10 @@ class StoppingCriterion {
 
         double *epsilon;
         double *p_value;
+
+        int seed;
+        
+        std::pair<int, int> find_by_site_index(unsigned int site_index);
         
     public:
         
@@ -51,7 +70,8 @@ class StoppingCriterion {
                         int _n_groups, 
                         int _n_threads, 
                         bool _kh_test, 
-                        bool _count_spr_moves = false);
+                        bool _count_spr_moves = false,
+                        int _seed = 0);
         
         virtual ~StoppingCriterion();
         
@@ -60,7 +80,8 @@ class StoppingCriterion {
         void compute_loglh(TreeInfo& treeinfo, vector<double*>& plnl, bool plnl_old = true);
 
         // setter
-        void set_thread_offset(const PartitionAssignment& part_assignment, int local_thread_id);
+        void initialize_persite_lnl_vectors(TreeInfo * treeinfo);
+        void set_thread_offset(TreeInfo* treeinfo, const PartitionAssignment& part_assignment, int local_thread_id);
 
         // getters
         std::vector<double *> get_persite_lnl(int group_id, int local_thread_id) { return get_vec(group_id, local_thread_id, true); }
@@ -71,7 +92,7 @@ class StoppingCriterion {
         
         bool multi_test_correction() {return count_spr_moves; }
         bool kh_test() { return kh_test_case; }
-
+        
         void set_increasing_moves(unsigned long _moves);
 };
 
@@ -84,7 +105,8 @@ class NoiseSampling : public StoppingCriterion {
         NoiseSampling(shared_ptr<PartitionedMSA> parted_msa, 
                 int _n_groups, 
                 int _n_threads,
-                bool _rell = false) : StoppingCriterion(parted_msa, _n_groups, _n_threads, false, false) { rell = _rell; };
+                bool _rell = false,
+                int _seed = 0) : StoppingCriterion(parted_msa, _n_groups, _n_threads, false, false, _seed) { rell = _rell; };
 
         void run_test() override;
 };
@@ -95,7 +117,8 @@ class KH : public StoppingCriterion {
         KH(shared_ptr<PartitionedMSA> parted_msa, 
             int _n_groups, 
             int _n_threads, 
-            bool _count_spr_moves = false) : StoppingCriterion(parted_msa, _n_groups, _n_threads, true, _count_spr_moves) {}
+            bool _count_spr_moves = false,
+            int _seed = 0) : StoppingCriterion(parted_msa, _n_groups, _n_threads, true, _count_spr_moves, _seed) {}
 
         void run_test() override;
 
