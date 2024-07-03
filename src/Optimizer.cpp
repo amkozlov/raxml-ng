@@ -585,7 +585,7 @@ double Optimizer::optimize_topology_modified(TreeInfo& treeinfo, CheckpointManag
   
   } else {
 
-    LOG_PROGRESS(loglh) << "Modified version called" << endl;  
+    LOG_PROGRESS(loglh) << "Simplified version (sRAxML-NG) called" << endl;  
   }
 
   // fix that later

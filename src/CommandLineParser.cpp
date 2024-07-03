@@ -855,12 +855,12 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_par_pars = true;
             else if (eopt == "pars-seq")
               opts.use_par_pars = false;
+            else if (eopt == "simplified-on")
+              opts.modified_version = true;
             else if (eopt == "pythia-on")
               opts.use_pythia = true;
             else if (eopt == "pythia-off")
               opts.use_pythia = false;
-            else if (eopt == "modified-on")
-              opts.modified_version = true;
             else if (eopt == "compat-v11")
             {
               compat_ver = 110;
