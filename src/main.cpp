@@ -2929,21 +2929,21 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
   auto start_tree_type = instance.opts.use_bs_pars ? StartingTree::parsimony : StartingTree::random;
   while (!instance.bs_converged && bs_num != worker.bs_trees.cend())
   {
-    if (instance.opts.use_par_pars)
+    if (ParallelContext::group_master_thread())
     {
-      if (ParallelContext::group_master_thread())
+      if (instance.opts.use_par_pars)
       {
         auto bs_seed = instance.bs_seeds.at(*bs_num - 1);
         worker.cur_bs_start_tree = generate_tree(instance, start_tree_type, bs_seed);
         worker.cur_bs_rep = bg.generate(*instance.parted_msa, bs_seed);
       }
-      ParallelContext::thread_barrier();
+      else
+      {
+        worker.cur_bs_start_tree = instance.bs_start_trees.at(*bs_num - 1);
+        worker.cur_bs_rep = instance.bs_reps.at(*bs_num - 1);
+      }
     }
-    else
-    {
-      worker.cur_bs_start_tree = instance.bs_start_trees.at(*bs_num - 1);
-      worker.cur_bs_rep = instance.bs_reps.at(*bs_num - 1);
-    }
+    ParallelContext::thread_barrier();
 
     // rebalance sites
     if (ParallelContext::group_master_thread())
