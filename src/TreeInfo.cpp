@@ -636,7 +636,17 @@ corax_partition_t* create_pll_partition(const Options& opts, const PartitionInfo
                                              { return w > 0; }
                                            );
 
-  unsigned int attrs = opts.simd_arch;
+  unsigned int attrs = 0;
+
+  if (opts.simd_arch > CORAX_ATTRIB_ARCH_SSE &&
+      model.num_states() * model.num_ratecats() < 4)
+  {
+    /* AVX needs at least 4 CLV elements per site -> fall back to SSE */
+    attrs = CORAX_ATTRIB_ARCH_SSE;
+  }
+  else
+    attrs = opts.simd_arch;
+
 
   if (opts.use_rate_scalers && model.num_ratecats() > 1)
   {
