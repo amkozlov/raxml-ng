@@ -252,7 +252,7 @@ void init_part_info(RaxmlInstance& instance)
   else if (!opts.model_file.empty())
   {
     // create and init single pseudo-partition
-    parted_msa.emplace_part_info("noname", opts.data_type, opts.model_file);
+    parted_msa.init_single_model(opts.data_type, opts.model_file);
   }
   else
     throw runtime_error("Please specify an evolutionary model with --model switch");

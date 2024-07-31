@@ -3,10 +3,12 @@
 
 #include "PartitionInfo.hpp"
 
+class AutoPartitioner;
+
 class PartitionedMSA
 {
 public:
-  PartitionedMSA(): _difficulty_score(-1.) {};
+  PartitionedMSA();
   PartitionedMSA(const NameList& taxon_names);
 
   // copy/move constructors and assignments
@@ -53,6 +55,7 @@ public:
   void difficulty_score(double score) { _difficulty_score = score; }
 
   // operations
+  void init_single_model(DataType data_type, const std::string &model_string);
   void append_part_info(PartitionInfo&& part_info) { _part_list.push_back(std::move(part_info)); };
 
   template <class... Args>
@@ -68,6 +71,7 @@ public:
 
 private:
   std::vector<PartitionInfo> _part_list;
+  std::shared_ptr<AutoPartitioner> _auto_part;
   MSA _full_msa;
   NameList _taxon_names;
   NameIdMap _taxon_id_map;
@@ -76,6 +80,17 @@ private:
 
   uintVector get_site_part_assignment() const;
   void set_taxon_names(const NameList& taxon_names);
+};
+
+class AutoPartitioner
+{
+public:
+  void init_from_string(PartitionedMSA& part_msa, DataType data_type, const std::string &model_string);
+  void update_partition_ranges(PartitionedMSA& part_msa);
+
+private:
+  doubleVector get_column_entropies(const PartitionedMSA& part_msa);
+  std::string resolve_auto_range(const doubleVector& col_entropies, size_t part_num, double binw);
 };
 
 std::ostream& operator<<(std::ostream& stream, const PartitionedMSA& part_msa);

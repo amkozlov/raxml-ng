@@ -1166,7 +1166,7 @@ void CommandLineParser::print_help()
             "  --opt-model    on | off                    ML optimization of all model parameters (default: ON)\n"
             "  --opt-branches on | off                    ML optimization of all branch lengths (default: ON)\n"
             "  --prob-msa     on | off                    use probabilistic alignment (works with CATG and VCF)\n"
-            "  --lh-epsilon   VALUE                       log-likelihood epsilon for optimization/tree search (default: 0.1)\n"
+            "  --lh-epsilon   VALUE                       log-likelihood epsilon for optimization/tree search (default: 10)\n"
             "\n"
             "Topology search options:\n"
             "  --adaptive            [ on | off | start ] Adaptive ML tree search (start = starting trees only)\n"

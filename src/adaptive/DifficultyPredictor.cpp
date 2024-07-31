@@ -153,6 +153,9 @@ void DifficultyPredictor::compute_msa_features(corax_msa_t* original_msa, size_t
       CORAX_MSA_STATS_GAP_PROP | CORAX_MSA_STATS_INV_PROP
           | CORAX_MSA_STATS_ENTROPY);
 
+  libpll_check_error("ERROR computing MSA stats");
+  assert(msa_stats);
+
   _features->proportion_gaps      = msa_stats->gap_prop;
   _features->proportion_invariant = msa_stats->inv_prop;
   _features->entropy              = msa_stats->entropy;

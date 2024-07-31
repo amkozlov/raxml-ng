@@ -2,6 +2,9 @@
 
 using namespace std;
 
+PartitionedMSA::PartitionedMSA(): _auto_part (new AutoPartitioner()), _difficulty_score(-1.)
+{}
+
 PartitionedMSA::PartitionedMSA(const NameList& taxon_names) : PartitionedMSA()
 {
   set_taxon_names(taxon_names);
@@ -14,6 +17,11 @@ PartitionedMSA& PartitionedMSA::operator=(PartitionedMSA&& other)
   _taxon_names = std::move(other._taxon_names);
   _taxon_id_map = std::move(other._taxon_id_map);
    return *this;
+}
+
+void PartitionedMSA::init_single_model(DataType data_type, const std::string &model_string)
+{
+  _auto_part->init_from_string(*this, data_type, model_string);
 }
 
 ModelCRefMap PartitionedMSA::models() const
@@ -37,7 +45,6 @@ void PartitionedMSA::set_taxon_names(const NameList& taxon_names)
 uintVector PartitionedMSA::get_site_part_assignment() const
 {
   const size_t full_len = _full_msa.length();
-
   uintVector spa(full_len);
 
   size_t p = 0;
@@ -141,6 +148,8 @@ void PartitionedMSA::split_msa()
 
   if (part_count() == 0)
     return;
+
+  _auto_part->update_partition_ranges(*this);
 
   if (part_count() == 1)
   {
@@ -291,3 +300,108 @@ std::ostream& operator<<(std::ostream& stream, const PartitionedMSA& part_msa)
 }
 
 
+
+void AutoPartitioner::init_from_string(PartitionedMSA& part_msa, DataType data_type, const std::string &model_string)
+{
+  size_t pos = model_string.find_first_of("/");
+  const string model_def = pos == string::npos ? model_string : model_string.substr(0, pos);
+  const string part_def = pos == string::npos ? "" : model_string.substr(pos+1);
+
+  if (!part_def.empty())
+  {
+    /* automatic partitioning */
+    istringstream ss(part_def);
+    if (toupper(ss.get()) != 'P')
+      throw runtime_error(string("Invalid auto-partition specification: ") + part_def);
+
+    size_t num_part = 4;
+    if (isdigit(ss.peek()))
+    {
+      ss >> num_part;
+    }
+
+    std::string ap_name = "ap";
+    for (size_t i = 0; i < num_part; ++i)
+    {
+      part_msa.emplace_part_info(ap_name + std::to_string(i+1), data_type, model_def, "auto");
+    }
+  }
+  else
+    part_msa.emplace_part_info("noname", data_type, model_def);
+}
+
+void AutoPartitioner::update_partition_ranges(PartitionedMSA& part_msa)
+{
+  auto column_entropies = get_column_entropies(part_msa);
+//  double binw = log2(mod.num_states())  / 4.;
+  double maxe = column_entropies.empty() ? 0. :
+                                          *std::max_element(column_entropies.cbegin(), column_entropies.cend());
+  double binw = maxe  / part_msa.part_count();
+
+  size_t p = 0;
+  for (auto& pinfo: part_msa.part_list())
+  {
+    if (pinfo.range_string() == "auto")
+    {
+      auto new_range = resolve_auto_range(column_entropies, p, binw);
+//      printf("p%lu : %s\n", p, new_range.c_str());
+      pinfo.range_string(new_range);
+    }
+    p++;
+  }
+
+  if (part_msa.part_count() > 1)
+  {
+    for (std::vector<PartitionInfo>::iterator it = part_msa.part_list().begin(); it != part_msa.part_list().end();)
+    {
+        if (it->range_string() == "")
+            it = part_msa.part_list().erase(it);
+        else
+            ++it;
+    }
+  }
+}
+
+std::string AutoPartitioner::resolve_auto_range(const doubleVector& col_entropies, size_t part_num, double binw)
+{
+  ostringstream range;
+
+  size_t sites_assigned = 0;
+  part_num++;
+  double ub = binw * part_num;
+  double lb = part_num > 1 ? binw * (part_num-1) : -1;
+  for (size_t i = 0; i < col_entropies.size(); ++i)
+  {
+    if (col_entropies[i] > ub || col_entropies[i] <= lb)
+      continue;
+    range << (sites_assigned ? "," : "") << (i+1);
+    sites_assigned++;
+  }
+
+  return range.str();
+}
+
+doubleVector AutoPartitioner::get_column_entropies(const PartitionedMSA& part_msa)
+{
+  auto full_len = part_msa.full_msa().length();
+  doubleVector column_entropies(full_len);
+
+  // TODO support multiple partitions / data types
+  const auto& mod = part_msa.model(0);
+  double * e = corax_msa_column_entropies(part_msa.full_msa().pll_msa(),
+                                          mod.num_states(), mod.charmap());
+
+  libpll_check_error("ERROR computing column entropies");
+  assert(e);
+
+//  printf("Site entropy: ");
+//  for (size_t i = 0; i < full_len; ++i)
+//    printf("%.3f ", e[i]);
+//  printf("\n\n");
+
+  column_entropies.assign(e, e + full_len);
+
+  free(e);
+
+  return column_entropies;
+}
