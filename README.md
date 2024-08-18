@@ -119,12 +119,16 @@ If still in doubt, please feel free to post to the [RAxML google group](https://
 
   5. To execute the **adaptive** version, the user needs to add the `--adaptive` option:
 
-    ./raxml-ng --adaptive --msa testDNA.fa --model GTR+G
+     `./raxml-ng --adaptive --msa testDNA.fa --model GTR+G`
 
-  
-  WARNING! The heuristic for the **adaptive** version is still under development.
-  Parallelization and checkpointing are already implemented. The tool will be released soon.
+  6. Stopping criteria can be activated using the `----stopping-criterion {sn-normal|sn-rell|KH|KH-mult}` option. In case users want to execute only the Simplified version (sRAxML-NG), they can use the `--extra simplified-on` option: 
+   ```
+   # stopping criterion (for example the KH-test with Multiple testing correciton)
+   ./raxml-ng --msa testDNA.fa --model GTR+G --stopping-criterion KH-mult 
 
+   # Executing only the Simplified version (without any stopping rule):
+   ./raxml-ng --msa testDNA.fa --model GTR+G --extra simplified-on
+   ```
 ## License and citation
 
 The code is currently licensed under the GNU Affero General Public License version 3.
