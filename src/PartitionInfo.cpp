@@ -8,6 +8,19 @@ PartitionInfo::~PartitionInfo ()
 {
 }
 
+PartitionInfo& PartitionInfo::operator=(PartitionInfo&& other) noexcept{
+  
+  if(this != &other){
+    _name = std::move(other._name);
+    _range_string = std::move(other._range_string);
+    _model = std::move(other._model);
+    _msa = std::move(other._msa);
+    _stats = std::move(other._stats);
+  }
+
+  return *this;
+}
+
 size_t PartitionInfo::length() const
 {
   const auto& st = stats();

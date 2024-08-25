@@ -353,11 +353,14 @@ void AutoPartitioner::update_partition_ranges(PartitionedMSA& part_msa)
   if (part_msa.part_count() > 1)
   {
     for (std::vector<PartitionInfo>::iterator it = part_msa.part_list().begin(); it != part_msa.part_list().end();)
-    {
-        if (it->range_string() == "")
-            it = part_msa.part_list().erase(it);
+    {   
+      
+        if (it->range_string() == ""){
+          it = part_msa.part_list().erase(it);
+        }
         else
-            ++it;
+          ++it;
+      
     }
   }
 }

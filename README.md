@@ -121,7 +121,7 @@ If still in doubt, please feel free to post to the [RAxML google group](https://
 
      `./raxml-ng --adaptive --msa testDNA.fa --model GTR+G`
 
-  6. **Stopping criteria** can be activated using the `----stopping-criterion {sn-normal|sn-rell|KH|KH-mult}` option. In case users want to execute only the Simplified version (sRAxML-NG), they can use the `--extra simplified-on` option: 
+  6. **Stopping criteria** can be activated using the `--stopping-criterion {sn-normal|sn-rell|KH|KH-mult}` option. In case users want to execute only the Simplified version (sRAxML-NG), they can use the `--extra simplified-on` option: 
    ```
    # stopping criterion (for example the KH-test with Multiple testing correciton)
    ./raxml-ng --msa testDNA.fa --model GTR+G --stopping-criterion KH-mult 
