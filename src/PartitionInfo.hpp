@@ -72,6 +72,8 @@ public:
     other._stats = PartitionStats();
   }
 
+  PartitionInfo& operator=(PartitionInfo&& other) = default;
+
   // getters
   const std::string& name() const { return _name; };
   const Model& model() const { return _model; };
