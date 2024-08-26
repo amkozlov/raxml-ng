@@ -59,8 +59,7 @@ class DifficultyPredictor
         int num_start_trees(double difficulty, double amp, double mean = 0.5, double s = 0.2);
 
         // setters
-        void set_parsimony_msa_ptr(ParsimonyMSA* _pmsa);
-        void compute_msa_features(corax_msa_t* original_msa, size_t states, const corax_state_t *states_map);
+        void compute_msa_features(ParsimonyMSA* _pmsa);
 
         void write_adaptive_chkpt();
         double load_adaptive_chkpt();

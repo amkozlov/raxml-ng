@@ -19,46 +19,50 @@ DifficultyPredictor::~DifficultyPredictor()
   _pars_tree_list.clear();
 }
 
-void DifficultyPredictor::set_parsimony_msa_ptr(ParsimonyMSA* _pmsa)
+void DifficultyPredictor::compute_msa_features(ParsimonyMSA* _pmsa)
 {
   _parsimony_msa_ptr = _pmsa;
   const PartitionedMSA& part_msa = _parsimony_msa_ptr->part_msa();
   
-  size_t weights_size = 0;
-  int msa_patterns = 0;
+  _features                    = (corax_msa_features *) calloc(1, sizeof(corax_msa_features));
+  _features->taxa              = part_msa.taxon_count();
+  _features->sites             = part_msa.total_sites();
+  _features->sites_per_taxa    = _features->sites / _features->taxa;
+  _features->patterns          = part_msa.total_patterns();
+  _features->patterns_per_taxa = (double) _features->patterns / _features->taxa;
 
-  for (const auto& pinfo: part_msa.part_list()) msa_patterns += pinfo.length();
-  
-  //const double msa_patterns   = (double)partitioned_msa_ptr->full_msa().length();
-  _features->patterns          = msa_patterns;
-  _features->patterns_per_taxa = (double) msa_patterns / _features->taxa;
-
+  _features->proportion_gaps      = 0.;
+  _features->proportion_invariant = 0.;
+  _features->entropy              = 0.;
   _features->bollback_multinomial = 0;
+
   double bollback_multinomial_tmp = 0;
   int number_of_sites = 0;
 
-  for (const auto& pinfo: part_msa.part_list())
+  for (const PartitionInfo& pinfo: part_msa.part_list())
   {
-    int cur_num_sites = 0;
-    weights_size = pinfo.msa().weights().size();
-    assert(pinfo.length() == weights_size);
-    
-    unsigned int weights[weights_size];
-    for (size_t j=0; j < pinfo.msa().weights().size(); j++)
-    {
-      weights[j] = pinfo.msa().weights().at(j);
-      if( weights[j] != 0 ) cur_num_sites += weights[j];
-    }
+    auto& msa_stats = pinfo.stats();
+    size_t cur_num_sites = msa_stats.site_count;
+    double part_prop = cur_num_sites / _features->sites;
 
-    bollback_multinomial_tmp =
-      corax_msa_bollback_multinomial(pinfo.msa().pll_msa_nonconst(), weights, _states_map);
+    assert(pinfo.length() == pinfo.msa().weights().size());
+
+    _features->proportion_gaps      += part_prop * msa_stats.gap_prop;
+    _features->proportion_invariant += part_prop * msa_stats.inv_prop;
+    _features->entropy              += part_prop * msa_stats.mean_column_entropy;
+
+    bollback_multinomial_tmp = corax_msa_bollback_multinomial(pinfo.msa().pll_msa_nonconst(),
+                                                              // TODO fix const qualifier
+                                                              (unsigned int *) pinfo.msa().weights().data(),
+                                                              pinfo.model().charmap());
     
     bollback_multinomial_tmp += cur_num_sites * log(cur_num_sites);
     _features->bollback_multinomial += bollback_multinomial_tmp;
     number_of_sites += cur_num_sites;
   }
+  assert(number_of_sites == _features->sites);
 
-  _features->bollback_multinomial -= number_of_sites*log(number_of_sites);
+  _features->bollback_multinomial -= number_of_sites * log(number_of_sites);
 }
 
 double DifficultyPredictor::predict_difficulty(int n_trees)
@@ -128,39 +132,6 @@ double DifficultyPredictor::normal_pdf(double x, double m, double s)
   double a = (x - m) / s;
 
   return inv_sqrt_2pi / s * std::exp(-0.5f * a * a);
-}
-
-void DifficultyPredictor::compute_msa_features(corax_msa_t* original_msa, size_t states,
-                                               const corax_state_t *states_map)
-{
-  _features = (corax_msa_features *) calloc(1, sizeof(corax_msa_features));
-
-  const double msa_taxa    = (double) original_msa->count;
-  const double msa_sites   = (double) original_msa->length;
-  _features->taxa           = msa_taxa;
-  _features->sites          = msa_sites;
-  _features->sites_per_taxa = msa_sites / msa_taxa;
-
-  // new version 
-  _states = states;
-  _states_map = states_map;
-  
-  corax_msa_stats_t *msa_stats = corax_msa_compute_stats(
-      original_msa,
-      _states,
-      _states_map,
-      NULL,
-      CORAX_MSA_STATS_GAP_PROP | CORAX_MSA_STATS_INV_PROP
-          | CORAX_MSA_STATS_ENTROPY);
-
-  libpll_check_error("ERROR computing MSA stats");
-  assert(msa_stats);
-
-  _features->proportion_gaps      = msa_stats->gap_prop;
-  _features->proportion_invariant = msa_stats->inv_prop;
-  _features->entropy              = msa_stats->entropy;
-
-  corax_msa_destroy_stats(msa_stats);
 }
 
 void DifficultyPredictor::print_features(double avg_rff, double prop_unique)

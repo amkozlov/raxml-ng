@@ -27,6 +27,20 @@ size_t PartitionInfo::mark_partition_sites(unsigned int part_num, std::vector<un
   size_t sites_assigned = 0;
   const char * range = _range_string.c_str();
 
+//  if (_range_string == "auto")
+//  {
+//    auto& col_entropies = stats().column_entropies;
+//    printf("%lu %lu\n\n", site_part.size(), col_entropies.size());
+//    for (i = 0; i < site_part.size(); ++i)
+//    {
+//      if (col_entropies[i] > 0.5 * part_num)
+//        continue;
+//      site_part[i] = part_num;
+//      sites_assigned++;
+//    }
+//    return sites_assigned;
+//  }
+
   do
   {
     while(*range == ',')
@@ -110,6 +124,8 @@ const PartitionStats& PartitionInfo::stats() const
     stats_mask |= CORAX_MSA_STATS_INV_PROP;
     stats_mask |= CORAX_MSA_STATS_GAP_SEQS;
 
+    stats_mask |= CORAX_MSA_STATS_ENTROPY;
+
     if (_model.param_mode(CORAX_OPT_PARAM_SUBST_RATES) == ParamValue::empirical)
       stats_mask |= CORAX_MSA_STATS_SUBST_RATES;
 
@@ -129,6 +145,16 @@ const PartitionStats& PartitionInfo::stats() const
       _stats.emp_subst_rates.assign(pll_stats->subst_rates,
                                     pll_stats->subst_rates + CORAX_SUBST_RATE_COUNT(states));
     }
+
+    _stats.mean_column_entropy = pll_stats->entropy;
+//    if (pll_stats->column_entropies)
+//    {
+//      _stats.column_entropies.assign(pll_stats->column_entropies, pll_stats->column_entropies + _stats.site_count);
+////      printf("Site entropy: ");
+////      for (size_t i = 0; i < _stats.site_count; ++i)
+////        printf("%.3f ", pll_stats->column_entropies[i]);
+////      printf("\n\n");
+//    }
 
     corax_msa_destroy_stats(pll_stats);
   }

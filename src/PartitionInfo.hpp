@@ -17,12 +17,15 @@ struct PartitionStats
   doubleVector emp_base_freqs;
   doubleVector emp_subst_rates;
 
+  double mean_column_entropy;
+//  doubleVector column_entropies;
+
   bool empty() const { return site_count == 0; }
   size_t gap_seq_count() const { return gap_seqs.size(); }
   size_t inv_count() const { return (size_t) site_count * inv_prop; }
 
   PartitionStats() : site_count(0), pattern_count(0), inv_prop(0.), gap_prop(0.), gap_seqs(),
-      emp_base_freqs(), emp_subst_rates() {}
+      emp_base_freqs(), emp_subst_rates(), mean_column_entropy(0.) /*, column_entropies()*/ {}
 
   friend void swap(PartitionStats& first, PartitionStats& second)
   {
@@ -33,12 +36,15 @@ struct PartitionStats
     std::swap(first.gap_seqs, second.gap_seqs);
     std::swap(first.emp_base_freqs, second.emp_base_freqs);
     std::swap(first.emp_subst_rates, second.emp_subst_rates);
+    std::swap(first.mean_column_entropy, second.mean_column_entropy);
+//    std::swap(first.column_entropies, second.column_entropies);
   }
 
   PartitionStats(const PartitionStats& other) : site_count(other.site_count),
       pattern_count(other.pattern_count),
       inv_prop(other.inv_prop), gap_prop(other.gap_prop), gap_seqs(other.gap_seqs),
-      emp_base_freqs(other.emp_base_freqs), emp_subst_rates(other.emp_subst_rates) {}
+      emp_base_freqs(other.emp_base_freqs), emp_subst_rates(other.emp_subst_rates),
+      mean_column_entropy(other.mean_column_entropy) /*, column_entropies(other.emp_subst_rates)*/{}
 
   PartitionStats& operator=(PartitionStats other)
   {

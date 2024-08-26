@@ -390,6 +390,7 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const PartitionStats& p
   stream << ps.gap_prop;
   stream << ps.emp_base_freqs;
   stream << ps.emp_subst_rates;
+  stream << ps.mean_column_entropy;
 
   return stream;
 }
@@ -402,6 +403,7 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, PartitionStats& ps)
   stream >> ps.gap_prop;
   stream >> ps.emp_base_freqs;
   stream >> ps.emp_subst_rates;
+  stream >> ps.mean_column_entropy;
 
   return stream;
 }

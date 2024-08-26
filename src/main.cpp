@@ -1081,19 +1081,11 @@ void load_msa(RaxmlInstance& instance)
 {
   const auto& opts = instance.opts;
   auto& parted_msa = *instance.parted_msa;
-  auto diff_pred = instance.msa_diff_predictor;
 
   LOG_INFO_TS << "Reading alignment from file: " << opts.msa_file << endl;
 
   /* load MSA */
   auto msa = msa_load_from_file(opts.msa_file, opts.msa_format);
-  
-  if (diff_pred) // adaptive mode
-  {
-    // TODO check for mixed-type MSAs - exit with error?
-    const auto& m = instance.parted_msa->model(0);
-    diff_pred->compute_msa_features(msa.pll_msa_nonconst(), m.num_states(), m.charmap());
-  }
   
   if (!msa.size())
     throw runtime_error("Alignment file is empty!");
@@ -1200,37 +1192,30 @@ void predict_msa_difficulty(RaxmlInstance& instance)
   auto diff_pred = instance.msa_diff_predictor;
   double difficulty = instance.parted_msa->difficulty_score();
 
-  if (!diff_pred || !opts.use_pythia)
-    return;
-
-  if (difficulty < 0.)
+  if (difficulty < 0. && diff_pred && opts.use_pythia)
   {
     LOG_INFO_TS << "Adaptive mode: Predicting difficulty of the MSA ..." << endl;
 
     build_parsimony_msa(instance);
 
-    if (opts.msa_format != FileFormat::binary)
-    {
-      diff_pred->set_parsimony_msa_ptr(instance.parted_msa_parsimony.get());
-      difficulty = diff_pred->predict_difficulty(opts.diff_pred_pars_trees);
-    }
-    else
-    {
-      // TODO predict difficulty from RBA (feature computation is tricky)
-    }
+    diff_pred->compute_msa_features(instance.parted_msa_parsimony.get());
+    difficulty = diff_pred->predict_difficulty(opts.diff_pred_pars_trees);
 
     assert(difficulty >= 0.);
 
     instance.parted_msa->difficulty_score(difficulty);
   }
 
-  LOG_INFO_TS << "Predicted difficulty: " << difficulty << "\n" << endl;
+  if (difficulty >= 0.)
+  {
+    LOG_INFO_TS << "Predicted difficulty: " << difficulty << "\n" << endl;
 
-  if (difficulty > 0.7)
-  { // Warning printout statement for difficult dataset
-    LOG_INFO << "WARNING! This dataset is considered hard-to-analyze in the sense that the phylogenetic signal is insufficient." << endl
-          << "Adaptive RAxML-NG will execute a fast heuristic to quickly infer only a few out of the many equally likely topologies." << endl
-          << "However, the results should not be considered as representatives for the true tree" << endl << endl ;
+    if (difficulty > 0.7)
+    { // Warning printout statement for difficult dataset
+      LOG_INFO << "WARNING! This dataset is considered hard-to-analyze in the sense that the phylogenetic signal is insufficient." << endl
+            << "Adaptive RAxML-NG will execute a fast heuristic to quickly infer only a few out of the many equally likely topologies." << endl
+            << "However, the results should not be considered as representatives for the true tree" << endl << endl ;
+    }
   }
 }
 
