@@ -357,9 +357,6 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   opts.tbe_naive = false;
 
-  /* parallel parsimony not yet supported in adaptive mode */
-  opts.use_par_pars = false;
-
   int compat_ver = RAXML_INTVER;
   bool log_level_set = false;
   bool lh_epsilon_set = false;

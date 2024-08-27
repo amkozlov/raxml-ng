@@ -2,13 +2,10 @@
 #include <memory>
 #include <random>
 
-DifficultyPredictor::DifficultyPredictor(const string& outfile)
+DifficultyPredictor::DifficultyPredictor()
 {
   _rf_dist_calc.reset(new RFDistCalculator());
-  _outfile = outfile;
   _difficulty = -1;
-  _states = 0;
-  _states_map = nullptr;
   _parsimony_msa_ptr = nullptr;
   _features = nullptr;
 }
@@ -51,9 +48,8 @@ void DifficultyPredictor::compute_msa_features(ParsimonyMSA* _pmsa)
     _features->proportion_invariant += part_prop * msa_stats.inv_prop;
     _features->entropy              += part_prop * msa_stats.mean_column_entropy;
 
-    bollback_multinomial_tmp = corax_msa_bollback_multinomial(pinfo.msa().pll_msa_nonconst(),
-                                                              // TODO fix const qualifier
-                                                              (unsigned int *) pinfo.msa().weights().data(),
+    bollback_multinomial_tmp = corax_msa_bollback_multinomial(pinfo.msa().pll_msa(),
+                                                              pinfo.msa().weights().data(),
                                                               pinfo.model().charmap());
     
     bollback_multinomial_tmp += cur_num_sites * log(cur_num_sites);
@@ -76,7 +72,6 @@ double DifficultyPredictor::predict_difficulty(int n_trees)
   for (int i = 0; i < n_trees; ++i)
     seeds[i] = rand();
 
-  // TODO parallelization
   for (int i = 0; i < n_trees; ++i)
     _pars_tree_list.emplace_back(Tree::buildParsimony(*_parsimony_msa_ptr, seeds[i], &score));
   
@@ -95,25 +90,28 @@ double DifficultyPredictor::predict_difficulty(int n_trees)
     }
   }
 
+  labelToId.clear();
+
+  return predict_difficulty(_pars_tree_list);
+}
+
+double DifficultyPredictor::predict_difficulty(const TreeList& pars_trees)
+{
   // calculate rf distances - predict difficulty
-  _rf_dist_calc->set_tree_list(_pars_tree_list);
+  _rf_dist_calc->set_tree_list(pars_trees);
   _rf_dist_calc->recalculate_rf();
 
-  double num_unique = (double) _rf_dist_calc->num_uniq_trees() / n_trees;
+  double prop_unique = (double) _rf_dist_calc->num_uniq_trees() / _rf_dist_calc->num_trees();
   // printFeatures(rf_dist_calc->avg_rrf(), num_unique);
 
-  double out_pred = corax_msa_predict_difficulty(_features, _rf_dist_calc->avg_rrf(), num_unique);
+  double out_pred = corax_msa_predict_difficulty(_features, _rf_dist_calc->avg_rrf(), prop_unique);
   out_pred = round(out_pred * 100.0) / 100.0;
 
   _difficulty = out_pred;
 
-  labelToId.clear();
-
-  // storing in binary file if configured
-  write_adaptive_chkpt();
-
   return out_pred;
 }
+
 
 int DifficultyPredictor::num_start_trees(double diff, double amp, double mean, double s)
 {
@@ -150,50 +148,6 @@ void DifficultyPredictor::print_features(double avg_rff, double prop_unique)
   cout << "Proportion of unique topologies: " << prop_unique << endl;
   cout << "======================================================" << endl;
 
-}
-
-void DifficultyPredictor::write_adaptive_chkpt()
-{
-  if (_outfile.empty()) return;
-
-  AdaptiveCheckpoint chpt(_difficulty);
-  ofstream out(_outfile, ios::binary);
-
-  if (!out)
-  {
-    cout << "WARNING!! Error in storing Pythia's score in binary file with suffix '.adaptiveCkp'. " << endl;
-    cout << "There might occur errors when rerunning RAxML-NG from a checkpoint. " << endl;
-  } 
-  else
-  {
-    out.write( reinterpret_cast<char*>( &chpt.pythiaScore), sizeof(double));
-    out.close();
-  }
-}
-
-
-double DifficultyPredictor::load_adaptive_chkpt()
-{
-  AdaptiveCheckpoint chpt;
-  _difficulty = -1;
-
-  if (!_outfile.empty())
-  {
-    ifstream file (_outfile, ios::in | ios::binary);
-    if (file.is_open())
-    {
-      file.read((char*)&chpt.pythiaScore, sizeof(double));
-    } else
-    {
-      LOG_DEBUG << "Unable to open the binary file with suffix '.adaptiveCkp'" << endl;
-      return -1;
-    }
-
-    if (chpt.pythiaScore >= 0 && chpt.pythiaScore <= 1)
-      _difficulty = chpt.pythiaScore;
-  }
-
-  return _difficulty;
 }
 
 double DifficultyPredictor::load_pythia_score_from_log_file(const string& old_log_file)

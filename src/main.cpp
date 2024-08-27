@@ -84,6 +84,10 @@ struct RaxmlInstance
 
   intVector bs_seeds;
 
+  /* shared list of parsimony trees used for difficulty prediction, starting trees etc. */
+  TreeList pars_trees;
+  unsigned int num_threads_parsimony;
+
   /* IDs of the trees that have been already inferred (eg after resuming from a checkpoint) */
   IDSet done_ml_trees;
   IDSet done_bs_trees;
@@ -1176,46 +1180,17 @@ void write_binary_msa_file(RaxmlInstance& instance)
   }
 }
 
-void build_parsimony_msa(RaxmlInstance& instance)
+void build_parsimony_msa(RaxmlInstance& instance, bool force = false)
 {
   unsigned int attrs = instance.opts.simd_arch;
 
   // TODO: check if there is any reason not to use tip-inner
   attrs |= CORAX_ATTRIB_PATTERN_TIP;
 
-  instance.parted_msa_parsimony.reset(new ParsimonyMSA(instance.parted_msa, attrs, instance.opts.use_pattern_compression));
-}
-
-void predict_msa_difficulty(RaxmlInstance& instance)
-{
-  auto & opts = instance.opts;
-  auto diff_pred = instance.msa_diff_predictor;
-  double difficulty = instance.parted_msa->difficulty_score();
-
-  if (difficulty < 0. && diff_pred && opts.use_pythia)
+  if (!instance.parted_msa_parsimony || force)
   {
-    LOG_INFO_TS << "Adaptive mode: Predicting difficulty of the MSA ..." << endl;
-
-    build_parsimony_msa(instance);
-
-    diff_pred->compute_msa_features(instance.parted_msa_parsimony.get());
-    difficulty = diff_pred->predict_difficulty(opts.diff_pred_pars_trees);
-
-    assert(difficulty >= 0.);
-
-    instance.parted_msa->difficulty_score(difficulty);
-  }
-
-  if (difficulty >= 0.)
-  {
-    LOG_INFO_TS << "Predicted difficulty: " << difficulty << "\n" << endl;
-
-    if (difficulty > 0.7)
-    { // Warning printout statement for difficult dataset
-      LOG_INFO << "WARNING! This dataset is considered hard-to-analyze in the sense that the phylogenetic signal is insufficient." << endl
-            << "Adaptive RAxML-NG will execute a fast heuristic to quickly infer only a few out of the many equally likely topologies." << endl
-            << "However, the results should not be considered as representatives for the true tree" << endl << endl ;
-    }
+    instance.parted_msa_parsimony.reset(new ParsimonyMSA(instance.parted_msa, attrs,
+                                                         instance.opts.use_pattern_compression));
   }
 }
 
@@ -1257,24 +1232,6 @@ void autotune_start_trees(RaxmlInstance& instance)
     opts.num_searches += it.second;
 }
 
-
-void load_parted_msa(RaxmlInstance& instance)
-{
-  init_part_info(instance);
-  
-  assert(instance.parted_msa);
-  
-  if (instance.opts.msa_format != FileFormat::binary)
-    load_msa(instance);
-
-  predict_msa_difficulty(instance);
-  
-  if (instance.opts.msa_format != FileFormat::binary)
-    write_binary_msa_file(instance);
-
-  // use MSA sequences IDs as "normalized" tip IDs in all trees
-  instance.tip_id_map = instance.parted_msa->taxon_id_map();
-}
 
 void prepare_tree(const RaxmlInstance& instance, Tree& tree)
 {
@@ -1583,17 +1540,54 @@ void load_constraint(RaxmlInstance& instance)
   }
 }
 
-void thread_start_trees(RaxmlInstance& instance, StartingTree st_tree_type,
+void thread_start_trees(RaxmlInstance& instance, TreeList& tree_list, StartingTree st_tree_type,
                         const intVector& seeds, size_t offset)
 {
   for (size_t i = 0; i < seeds.size(); ++i)
   {
     if (i % ParallelContext::num_threads() == ParallelContext::thread_id())
-      instance.start_trees[offset + i] = generate_tree(instance, st_tree_type, seeds[i]);
+      tree_list[offset + i] = generate_tree(instance, st_tree_type, seeds[i]);
   }
 }
 
-void build_start_trees(RaxmlInstance& instance, unsigned int num_threads = 1)
+void build_trees_parallel(RaxmlInstance& instance, TreeList& tree_list, StartingTree tree_type,
+                          size_t tree_count, unsigned int num_threads)
+{
+  auto& opts = instance.opts;
+  auto old_size = tree_list.size();
+  tree_list.resize(old_size + tree_count);
+
+  // init seeds
+  intVector seeds(tree_count);
+  for (size_t i = 0; i < tree_count; ++i)
+    seeds[i] = rand();
+
+  auto thread_fn = std::bind(thread_start_trees,
+                             std::ref(instance),
+                             std::ref(tree_list),
+                             tree_type,
+                             std::cref(seeds),
+                             old_size);
+
+  if (!num_threads)
+    num_threads = instance.num_threads_parsimony;
+  assert(num_threads > 0);
+
+  if (num_threads > 1 && tree_type == StartingTree::parsimony)
+  {
+    auto mem_per_thread = instance.parted_msa_parsimony->memsize_estimate();
+    LOG_VERB << "Estimated memory per parsimony thread: " <<  mem_per_thread/1024/1024 << " MB" << endl;
+    unsigned int num_threads_max = 0.7 * sysutil_get_memtotal() / mem_per_thread;
+    num_threads = std::min(num_threads, num_threads_max);
+  }
+  LOG_INFO << "Parallel parsimony: " << tree_count <<  " trees with " << num_threads << " threads" << endl;
+  ParallelContext::init_pthreads_custom(opts, thread_fn, num_threads, num_threads);
+  thread_fn();
+  ParallelContext::finalize_threads();
+}
+
+
+void build_start_trees(RaxmlInstance& instance, unsigned int num_threads = 0)
 {
   auto& opts = instance.opts;
   const auto& parted_msa = *instance.parted_msa;
@@ -1606,11 +1600,6 @@ void build_start_trees(RaxmlInstance& instance, unsigned int num_threads = 1)
   {
     auto st_tree_type = st_tree.first;
     auto& st_tree_count = st_tree.second;
-
-    // init seeds
-    intVector seeds(st_tree_count);
-    for (size_t i = 0; i < st_tree_count; ++i)
-      seeds[i] = rand();
 
     switch (st_tree_type)
     {
@@ -1633,29 +1622,33 @@ void build_start_trees(RaxmlInstance& instance, unsigned int num_threads = 1)
         assert(0);
     }
 
-    if (num_threads != 1 && st_tree_type == StartingTree::parsimony)
+    if (st_tree_type == StartingTree::parsimony && opts.use_par_pars)
     {
-      auto old_size = instance.start_trees.size();
-      instance.start_trees.resize(old_size + st_tree_count);
+      size_t trees_to_generate = st_tree_count;
 
-      auto thread_fn = std::bind(thread_start_trees,
-                                 std::ref(instance),
-                                 st_tree_type,
-                                 std::cref(seeds),
-                                 old_size);
+      if (instance.constraint_tree.empty() && !instance.pars_trees.empty())
+      {
+        /* Try to reuse existing pars trees from pythia -> does not work with constraint */
+        for (size_t i = 0; (i < instance.pars_trees.size()) && trees_to_generate; i++)
+        {
+          instance.start_trees.emplace_back(instance.start_trees.at(i));
+          trees_to_generate--;
+        }
 
-      assert(num_threads > 0);
-      auto mem_per_thread = instance.parted_msa_parsimony->memsize_estimate();
-      LOG_VERB << "Estimated memory per parsimony thread: " <<  mem_per_thread/1024/1024 << " MB" << endl;
-      unsigned int num_threads_max = 0.7 * sysutil_get_memtotal() / mem_per_thread;
-      num_threads = std::min(num_threads, num_threads_max);
-      LOG_INFO << "Parallel parsimony with " << num_threads << " threads" << endl;
-      ParallelContext::init_pthreads_custom(opts, thread_fn, num_threads, num_threads);
-      thread_fn();
-      ParallelContext::finalize_threads();
+        LOG_DEBUG_TS << "Reusing " << (st_tree_count - trees_to_generate)  << " parsimony trees; "
+                     << "left to generate: " << trees_to_generate << endl;
+      }
+
+      if (trees_to_generate)
+        build_trees_parallel(instance, instance.start_trees, st_tree_type, trees_to_generate, num_threads);
     }
     else
     {
+      // init seeds
+      intVector seeds(st_tree_count);
+      for (size_t i = 0; i < st_tree_count; ++i)
+        seeds[i] = rand();
+
       for (size_t i = 0; i < st_tree_count; ++i)
       {
         auto tree = generate_tree(instance, st_tree_type, seeds[i]);
@@ -1673,11 +1666,7 @@ void build_start_trees(RaxmlInstance& instance, unsigned int num_threads = 1)
         instance.start_trees.emplace_back(tree);
       }
     }
-
   }
-
-  // free memory used for parsimony MSA
-  instance.parted_msa_parsimony.release();
 
   if (::ParallelContext::master_rank())
   {
@@ -1685,6 +1674,58 @@ void build_start_trees(RaxmlInstance& instance, unsigned int num_threads = 1)
     for (auto const& tree: instance.start_trees)
       nw_start << tree;
   }
+}
+
+void predict_msa_difficulty(RaxmlInstance& instance)
+{
+  auto & opts = instance.opts;
+  auto diff_pred = instance.msa_diff_predictor;
+  double difficulty = instance.parted_msa->difficulty_score();
+
+  if (difficulty < 0. && diff_pred && opts.use_pythia)
+  {
+    LOG_INFO_TS << "Adaptive mode: Predicting difficulty of the MSA ..." << endl;
+
+    build_parsimony_msa(instance);
+    build_trees_parallel(instance, instance.pars_trees, StartingTree::parsimony,
+                         opts.diff_pred_pars_trees, instance.num_threads_parsimony);
+
+    diff_pred->compute_msa_features(instance.parted_msa_parsimony.get());
+    difficulty = diff_pred->predict_difficulty(instance.pars_trees);
+
+    assert(difficulty >= 0.);
+
+    instance.parted_msa->difficulty_score(difficulty);
+  }
+
+  if (difficulty >= 0.)
+  {
+    LOG_INFO_TS << "Predicted difficulty: " << difficulty << "\n" << endl;
+
+    if (difficulty > 0.7)
+    { // Warning printout statement for difficult dataset
+      LOG_INFO << "WARNING! This dataset is considered hard-to-analyze in the sense that the phylogenetic signal is insufficient." << endl
+            << "Adaptive RAxML-NG will execute a fast heuristic to quickly infer only a few out of the many equally likely topologies." << endl
+            << "However, the results should not be considered as representatives for the true tree" << endl << endl ;
+    }
+  }
+}
+void load_parted_msa(RaxmlInstance& instance)
+{
+  init_part_info(instance);
+
+  assert(instance.parted_msa);
+
+  if (instance.opts.msa_format != FileFormat::binary)
+    load_msa(instance);
+
+  // use MSA sequences IDs as "normalized" tip IDs in all trees
+  instance.tip_id_map = instance.parted_msa->taxon_id_map();
+
+  predict_msa_difficulty(instance);
+
+  if (instance.opts.msa_format != FileFormat::binary)
+    write_binary_msa_file(instance);
 }
 
 void balance_load(RaxmlInstance& instance)
@@ -3079,8 +3120,7 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
         (!opts.constraint_tree_file.empty() && opts.use_old_constraint))
     {
       /* only master MPI rank generates starting trees (doesn't work with old constrained search) */
-      auto pars_threads = opts.use_par_pars ? opts.num_threads : 1;
-      build_start_trees(instance, pars_threads);
+      build_start_trees(instance);
       ParallelContext::global_mpi_barrier();
     }
     else
@@ -3316,6 +3356,9 @@ int internal_main(int argc, char** argv, void* comm)
 
     CheckpointManager cm(opts);
 
+    /* by default, use all available threads for parsimony tree inference */
+    instance.num_threads_parsimony = opts.num_threads ? opts.num_threads : opts.num_threads_max;
+
     // Difficulty Predictor for adaptive RAxML-NG
     // The Difficulty Predictor is one object shared by all threads (in any parallelization scheme)
     if (opts.use_pythia)
@@ -3386,10 +3429,9 @@ int internal_main(int argc, char** argv, void* comm)
       }
       case Command::start:
       {
-        auto num_threads = opts.num_threads ? opts.num_threads : opts.num_threads_max;
         load_parted_msa(instance);
         load_constraint(instance);
-        build_start_trees(instance, num_threads);
+        build_start_trees(instance);
         if (!opts.start_tree_file().empty())
         {
           LOG_INFO << "\nAll starting trees saved to: " <<
