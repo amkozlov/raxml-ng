@@ -39,7 +39,8 @@ enum class Command
   rfdist,
   consense,
   ancestral,
-  sitelh
+  sitelh,
+  pythia
 };
 
 enum class FileFormat

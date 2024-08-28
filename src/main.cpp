@@ -1580,7 +1580,7 @@ void build_trees_parallel(RaxmlInstance& instance, TreeList& tree_list, Starting
     unsigned int num_threads_max = 0.7 * sysutil_get_memtotal() / mem_per_thread;
     num_threads = std::min(num_threads, num_threads_max);
   }
-  LOG_INFO << "Parallel parsimony: " << tree_count <<  " trees with " << num_threads << " threads" << endl;
+  LOG_INFO_TS << "Parallel parsimony: " << tree_count <<  " trees with " << num_threads << " threads" << endl;
   ParallelContext::init_pthreads_custom(opts, thread_fn, num_threads, num_threads);
   thread_fn();
   ParallelContext::finalize_threads();
@@ -2630,6 +2630,11 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
     }
   }
 
+  if (opts.command == Command::pythia)
+  {
+    LOG_RESULT << *instance.msa_diff_predictor << endl;
+  }
+
   if (!opts.log_file().empty())
       LOG_INFO << "\nExecution log saved to: " << sysutil_realpath(opts.log_file()) << endl;
 
@@ -3425,6 +3430,11 @@ int internal_main(int argc, char** argv, void* comm)
         if (ParallelContext::num_nodes() > 1)
           LOG_WARN  << "WARNING: Running --parse on multiple nodes is wasting resources!" << endl << endl;
 
+        break;
+      }
+      case Command::pythia:
+      {
+        load_parted_msa(instance);
         break;
       }
       case Command::start:

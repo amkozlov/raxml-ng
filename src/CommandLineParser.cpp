@@ -85,6 +85,9 @@ static struct option long_options[] =
   {"diff_pred_trees",    required_argument, 0, 0},   /*  60 */
   {"nni-tolerance",      required_argument, 0, 0 },  /*  61 */
   {"nni-epsilon",        required_argument, 0, 0 },  /*  62 */
+
+  {"pythia",             optional_argument, 0, 0 },  /*  63 */
+  {"pt",                 optional_argument, 0, 0 },  /*  64 */
   { 0, 0, 0, 0 }
 };
 
@@ -1031,6 +1034,19 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
                                             ", please provide a positive real number!\n");
         }
         break;
+
+      case 63: /* pythia: msa difficulty prediction */
+        opts.command = Command::pythia;
+        num_commands++;
+        break;
+
+      case 64: /* pythia quiet */
+        opts.command = Command::pythia;
+        num_commands++;
+        opts.nofiles_mode = true;
+        opts.log_level = LogLevel::result;
+        log_level_set = true;
+        break;
               
       default:
         throw  OptionException("Internal error in option parsing");
@@ -1121,11 +1137,13 @@ void CommandLineParser::print_help()
             "                                             eg: --consense MR75 --tree bsrep.nw\n"
             "  --ancestral                                ancestral state reconstruction at all inner nodes\n"
             "  --sitelh                                   print per-site log-likelihood values\n"
+            "  --pythia                                   compute and print Pythia MSA difficulty score\n"
             "\n"
             "Command shortcuts (mutually exclusive):\n"
             "  --search1                                  Alias for: --search --tree rand{1}\n"
             "  --loglh                                    Alias for: --evaluate --opt-model off --opt-branches off --nofiles --log result\n"
             "  --rf                                       Alias for: --rfdist --nofiles --log result\n"
+            "  --pt                                       Alias for: --pythia --nofiles --log result\n"
             "\n"
             "Input and output options:\n"
             "  --tree            rand{N} | pars{N} |      starting tree: rand(om), pars(imony) or user-specified (newick file)\n"

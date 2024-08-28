@@ -2,12 +2,10 @@
 #include <memory>
 #include <random>
 
-DifficultyPredictor::DifficultyPredictor()
+DifficultyPredictor::DifficultyPredictor() : _difficulty(-1), _parsimony_msa_ptr(nullptr),
+_features(nullptr), _prop_uniq(-1), _avg_rrf(-1)
 {
   _rf_dist_calc.reset(new RFDistCalculator());
-  _difficulty = -1;
-  _parsimony_msa_ptr = nullptr;
-  _features = nullptr;
 }
 
 DifficultyPredictor::~DifficultyPredictor()
@@ -101,10 +99,10 @@ double DifficultyPredictor::predict_difficulty(const TreeList& pars_trees)
   _rf_dist_calc->set_tree_list(pars_trees);
   _rf_dist_calc->recalculate_rf();
 
-  double prop_unique = (double) _rf_dist_calc->num_uniq_trees() / _rf_dist_calc->num_trees();
-  // printFeatures(rf_dist_calc->avg_rrf(), num_unique);
+  _prop_uniq = (double) _rf_dist_calc->num_uniq_trees() / _rf_dist_calc->num_trees();
+  _avg_rrf = _rf_dist_calc->avg_rrf();
 
-  double out_pred = corax_msa_predict_difficulty(_features, _rf_dist_calc->avg_rrf(), prop_unique);
+  double out_pred = corax_msa_predict_difficulty(_features, _rf_dist_calc->avg_rrf(), _prop_uniq);
   out_pred = round(out_pred * 100.0) / 100.0;
 
   _difficulty = out_pred;
@@ -132,7 +130,7 @@ double DifficultyPredictor::normal_pdf(double x, double m, double s)
   return inv_sqrt_2pi / s * std::exp(-0.5f * a * a);
 }
 
-void DifficultyPredictor::print_features(double avg_rff, double prop_unique)
+void DifficultyPredictor::print_features()
 {
   cout << "\n======================================================" << endl;
   cout << "Num taxa: " << _features->taxa << endl;
@@ -144,8 +142,8 @@ void DifficultyPredictor::print_features(double avg_rff, double prop_unique)
   cout << "Proportion invariant: " << _features->proportion_invariant << endl;
   cout << "Entropy: " << _features->entropy << endl;
   cout << "Bollback: " << _features->bollback_multinomial << endl;
-  cout << "Avg rf dist: " << avg_rff << endl;
-  cout << "Proportion of unique topologies: " << prop_unique << endl;
+  cout << "Avg rf dist: " << _avg_rrf << endl;
+  cout << "Proportion of unique topologies: " << _prop_uniq << endl;
   cout << "======================================================" << endl;
 
 }
@@ -179,5 +177,30 @@ double DifficultyPredictor::load_pythia_score_from_log_file(const string& old_lo
     cout << "WARNING! Unable to open the log file to search for the pythia score." << endl;
 
   return pythia_score;
+}
+
+LogStream& operator<<(LogStream& stream, const DifficultyPredictor& dp)
+{
+  auto feat = dp.features();
+
+  if (feat)
+  {
+    stream << "Pythia features: " << endl;
+    stream << "  Num taxa: " << feat->taxa << endl;
+    stream << "  Num sites: " << feat->sites << endl;
+    stream << "  Patterns: " << feat->patterns << endl;
+    stream << "  Patterns/taxa: " << FMT_PREC2(feat->patterns_per_taxa) << endl;
+    stream << "  Sites/taxa: " << FMT_PREC2(feat->sites_per_taxa) << endl;
+    stream << "  Gaps proportion: " << FMT_PREC2(feat->proportion_gaps) << endl;
+    stream << "  Invariant proportion: " << FMT_PREC2(feat->proportion_invariant) << endl;
+    stream << "  Entropy: " << FMT_LH(feat->entropy) << endl;
+    stream << "  Bollback: " << FMT_LH(feat->bollback_multinomial) << endl;
+    stream << "  Avg rf dist: " << FMT_LH(dp.avg_rrf()) << endl;
+    stream << "  Proportion of unique topologies: " << FMT_PREC2(dp.prop_uniq()) << endl;
+    stream << endl;
+  }
+  stream << "Pythia difficulty score: " << FMT_PREC2(dp.difficulty()) << endl;
+
+  return stream;
 }
 

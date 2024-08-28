@@ -28,10 +28,13 @@ class DifficultyPredictor
 
         // features
         corax_msa_features* _features;
+        double _prop_uniq;
+        double _avg_rrf;
+
 
         // more functions
         double normal_pdf(double x, double m, double s);
-        void print_features(double avg_rff, double prop_unique);
+        void print_features();
 
     public:
 
@@ -40,7 +43,10 @@ class DifficultyPredictor
         ~DifficultyPredictor();
         
         // getter
-        double difficulty() { return _difficulty; }
+        double difficulty() const { return _difficulty; }
+        const corax_msa_features* features() const { return _features; }
+        double prop_uniq() const { return _prop_uniq; }
+        double avg_rrf() const { return _avg_rrf; }
 
         // difficulty prediction
         double predict_difficulty(int n_trees);
@@ -52,6 +58,8 @@ class DifficultyPredictor
 
         double load_pythia_score_from_log_file(const string& old_log_file);
 };
+
+LogStream& operator<<(LogStream& stream, const DifficultyPredictor& dp);
 
 
 #endif /* RAXML_ADAPTIVE_DIFFICULTYPREDICTOR_HPP_ */
