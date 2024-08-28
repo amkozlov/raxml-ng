@@ -1631,7 +1631,7 @@ void build_start_trees(RaxmlInstance& instance, unsigned int num_threads = 0)
         /* Try to reuse existing pars trees from pythia -> does not work with constraint */
         for (size_t i = 0; (i < instance.pars_trees.size()) && trees_to_generate; i++)
         {
-          instance.start_trees.emplace_back(instance.start_trees.at(i));
+          instance.start_trees.emplace_back(instance.pars_trees.at(i));
           trees_to_generate--;
         }
 
