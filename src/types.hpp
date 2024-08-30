@@ -101,7 +101,8 @@ enum class LoadBalancing
 enum class BranchSupportMetric
 {
   fbp = 0,
-  tbe
+  tbe,
+  rbs
 };
 
 enum class InformationCriterion

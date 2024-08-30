@@ -52,6 +52,7 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.bootstrap_trees, "bootstraps");
   set_default_outfile(outfile_names.support_tree, "support");
   set_default_outfile(outfile_names.fbp_support_tree, "supportFBP");
+  set_default_outfile(outfile_names.rbs_support_tree, "supportRBS");
   set_default_outfile(outfile_names.tbe_support_tree, "supportTBE");
   set_default_outfile(outfile_names.terrace, "terrace");
   set_default_outfile(outfile_names.binary_msa, "rba");
@@ -84,6 +85,8 @@ const std::string& Options::support_tree_file(BranchSupportMetric bsm) const
   {
     if (bsm == BranchSupportMetric::fbp)
       return outfile_names.fbp_support_tree;
+    else if (bsm == BranchSupportMetric::rbs)
+      return outfile_names.rbs_support_tree;
     else if (bsm == BranchSupportMetric::tbe)
       return outfile_names.tbe_support_tree;
     else
@@ -309,7 +312,8 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       stream << " (adaptive)";
   }
 
-  if (opts.command == Command::all || opts.command == Command::support)
+  if (opts.command == Command::bootstrap || opts.command == Command::all ||
+      opts.command == Command::support)
   {
     stream << " (";
     for (auto it = opts.bs_metrics.cbegin(); it != opts.bs_metrics.cend(); ++it)
@@ -321,6 +325,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       {
         case BranchSupportMetric::fbp:
           stream << "Felsenstein Bootstrap";
+          break;
+        case BranchSupportMetric::rbs:
+          stream << "Rapid Bootstrap";
           break;
         case BranchSupportMetric::tbe:
           stream << "Transfer Bootstrap";

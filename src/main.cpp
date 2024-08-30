@@ -1954,7 +1954,7 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree,
       shared_ptr<SupportTree> sup_tree;
       bool support_in_pct = false;
 
-      if (metric == BranchSupportMetric::fbp)
+      if (metric == BranchSupportMetric::fbp || metric == BranchSupportMetric::rbs)
       {
         sup_tree = make_shared<BootstrapTree>(ref_tree);
         support_in_pct = true;
@@ -2440,6 +2440,8 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
         std::string metric_name = "";
         if (it.first == BranchSupportMetric::fbp)
           metric_name = "Felsenstein bootstrap (FBP)";
+        else if (it.first == BranchSupportMetric::rbs)
+          metric_name = "Rapid bootstrap (RBS)";
         else if (it.first == BranchSupportMetric::tbe)
           metric_name = "Transfer bootstrap (TBE)";
 
@@ -2836,10 +2838,7 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
     }
     else
     {
-      if (opts.use_adaptive_search)
-        optimizer.optimize_topology_adaptive(*treeinfo, cm);
-      else
-        optimizer.optimize_topology(*treeinfo, cm);
+      optimizer.optimize_topology(*treeinfo, cm);
 
       LOG_PROGR << endl;
       LOG_WORKER_TS(log_level) << "ML tree search #" << start_tree_num <<
@@ -2881,6 +2880,10 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
   auto const& master_msa = *instance.parted_msa;
   auto& worker = instance.get_worker();
   Checkpoint& checkp = cm.checkpoint();
+
+  bool rapidbs = (opts.bs_metrics[0] == BranchSupportMetric::rbs);
+  unsigned int processed_trees = 0;
+  unsigned int rbs_batch_size = 10;
 
   unique_ptr<TreeInfo> treeinfo;
 
@@ -2954,6 +2957,8 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
 
   auto ckp_tree_index = instance.run_phase == RaxmlRunPhase::bootstrap ? checkp.tree_index : 0;
 
+  Optimizer optimizer(opts, rapidbs);
+
   ParallelContext::global_thread_barrier();
 
   BootstrapGenerator bg;
@@ -2996,16 +3001,24 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
     {
       if (ParallelContext::group_master_thread())
         checkp.tree_index = *bs_num;
-      treeinfo.reset(new TreeInfo(opts, worker.cur_bs_start_tree, master_msa, instance.tip_msa_idmap,
-                                  bs_part_assign, worker.cur_bs_rep .site_weights));
+      if (rapidbs && (processed_trees % rbs_batch_size != 0))
+      {
+        /* rapid bootstrap: reuse topology+model params from previous replicate */
+        treeinfo.reset(new TreeInfo(opts, checkp.tree, master_msa, instance.tip_msa_idmap,
+                                    bs_part_assign, worker.cur_bs_rep .site_weights));
+        assign_models(*treeinfo, checkp);
+      }
+      else
+      {
+        treeinfo.reset(new TreeInfo(opts, worker.cur_bs_start_tree, master_msa, instance.tip_msa_idmap,
+                                    bs_part_assign, worker.cur_bs_rep .site_weights));
+      }
     }
 
     treeinfo->set_topology_constraint(instance.constraint_tree);
 
-    Optimizer optimizer(opts);
-
-    if (opts.use_adaptive_search)
-      optimizer.optimize_topology_adaptive(*treeinfo, cm);
+    if (rapidbs)
+      optimizer.optimize_topology_rbs(*treeinfo, cm);
     else
       optimizer.optimize_topology(*treeinfo, cm);
 
@@ -3018,6 +3031,7 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
     cm.reset_search_state();
 
     bs_num++;
+    processed_trees++;
 
     if (bs_num == worker.bs_trees.cend() || *bs_num > bs_batch_end)
       gather_bs_trees(bs_batch_start, bs_batch_end);

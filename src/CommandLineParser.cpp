@@ -880,6 +880,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
             {
               opts.bs_metrics.push_back(BranchSupportMetric::fbp);
             }
+            else if (strncasecmp(m.c_str(), "rbs", 3) == 0)
+            {
+              opts.bs_metrics.push_back(BranchSupportMetric::rbs);
+            }
             else if (strncasecmp(m.c_str(), "tbe", 3) == 0)
             {
               opts.bs_metrics.push_back(BranchSupportMetric::tbe);
@@ -1077,7 +1081,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   parse_start_trees(opts, optarg_tree);
 
   /* process LH epsilon defaults */
-  if (opts.command == Command::search || opts.command == Command::all)
+  if (opts.command == Command::search || opts.command == Command::bootstrap ||
+      opts.command == Command::all)
   {
     if (!lh_epsilon_set)
       opts.lh_epsilon = compat_ver < 120 ? DEF_LH_EPSILON_V11 : DEF_LH_EPSILON;
@@ -1194,7 +1199,8 @@ void CommandLineParser::print_help()
             "  --bs-trees     autoMRE{N}                  use MRE-based bootstrap convergence criterion, up to N replicates (default: 1000)\n"
             "  --bs-trees     FILE                        Newick file containing set of bootstrap replicate trees (with --support)\n"
             "  --bs-cutoff    VALUE                       cutoff threshold for the MRE-based bootstopping criteria (default: 0.03)\n"
-            "  --bs-metric    fbp | tbe                   branch support metric: fbp = Felsenstein bootstrap (default), tbe = transfer distance\n"
+            "  --bs-metric    fbp | rbs | tbe             branch support metric: fbp = Felsenstein bootstrap (default), rbs = Rapid bootstrap\n"
+            "                                             tbe = Transfer bootstrap estimate\n"
             "  --bs-write-msa on | off                    write all bootstrap alignments (default: OFF)\n";
 
   cout << "\n"

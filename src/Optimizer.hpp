@@ -9,22 +9,29 @@
 class Optimizer
 {
 public:
-  Optimizer (const Options& opts);
+  Optimizer (const Options& opts, bool rapid_bs = false);
   virtual
   ~Optimizer ();
 
   double optimize_model(TreeInfo& treeinfo, double lh_epsilon);
   double optimize_model(TreeInfo& treeinfo) { return optimize_model(treeinfo, _lh_epsilon); };
+
   double optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm);
+  double optimize_topology_standard(TreeInfo& treeinfo, CheckpointManager& cm);
   double optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManager& cm);
+  double optimize_topology_rbs(TreeInfo& treeinfo, CheckpointManager& cm);
+
   double evaluate(TreeInfo& treeinfo, CheckpointManager& cm);
   void nni(TreeInfo& treeinfo, nni_round_params& nni_params, double& loglh);
 
 private:
+  bool _use_adaptive_search;
   double _lh_epsilon;
   double _lh_epsilon_brlen_triplet;
   int _spr_radius;
   double _spr_cutoff;
+  int _spr_ntopol_keep;
+  corax_random_state * _rstate;
 
   // nni params
   double _nni_epsilon;
