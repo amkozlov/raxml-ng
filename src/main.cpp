@@ -837,6 +837,11 @@ void check_options_early(Options& opts)
       throw runtime_error("Custom site weights are not supported in per-site likelihood computation mode!");
   }
 
+  /* disable pythia if command cannot use difficulty score */
+  opts.use_pythia &= (opts.command == Command::parse || opts.command == Command::search ||
+                      opts.command == Command::bootstrap || opts.command == Command::all ||
+                      opts.command == Command::pythia);
+
   /* autodetect if we can use partial RBA loading */
   opts.use_rba_partload &= (opts.num_ranks > 1 && !opts.coarse());                // only useful for fine-grain MPI runs
   opts.use_rba_partload &= (!opts.start_trees.count(StartingTree::parsimony));    // does not work with parsimony
