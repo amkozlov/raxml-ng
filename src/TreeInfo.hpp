@@ -78,9 +78,6 @@ public:
   void compute_ancestral(const AncestralStatesSharedPtr& ancestral,
                          const PartitionAssignment& part_assign);
 
-  // int savePartition(const char* filename, int partIndex);
-
-  // corax_partition_t* loadPartition(const char* filename);
 
 private:
   corax_treeinfo_t * _pll_treeinfo;
@@ -91,6 +88,7 @@ private:
   bool _check_lh_impr;
   bool _use_old_constraint;
   bool _use_spr_fastclv;
+  double _lh_epsilon;
   doubleVector _partition_contributions;
 
   void init(const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,

@@ -43,10 +43,8 @@ private:
   StoppingCriterion *criterion;
 
   // functions for adaptive mode
-  int spr_radius_limit_adaptive(double difficulty);
-  int spr_radius_step_adaptive(int spr_radius_max);
-
-  bool call_modified_version() {return (_modified_version || (_stopping_criterion >= 0)); }
+  int fast_spr_radius_adaptive(double difficulty);
+  bool call_modified_version() {return _modified_version; }
 };
 
 #endif /* RAXML_OPTIMIZER_H_ */

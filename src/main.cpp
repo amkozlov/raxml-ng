@@ -1202,7 +1202,7 @@ void predict_msa_difficulty(RaxmlInstance& instance)
   auto diff_pred = instance.msa_diff_predictor;
   double difficulty = instance.parted_msa->difficulty_score();
 
-  if((!diff_pred) || !opts.use_pythia || instance.opts.stopping_rule >= 0 || instance.opts.modified_version)
+  if((!diff_pred) || !opts.use_pythia || instance.opts.modified_version)
     return;
 
   if (!diff_pred)
@@ -1264,9 +1264,9 @@ void autotune_start_trees(RaxmlInstance& instance)
     {
       int pars_trees = diff_pred->num_start_trees(difficulty, 7.0, 0.5, 0.25);
 
-      opts.start_trees[StartingTree::random] = difficulty >= 0.7 ? 0 :
+      opts.start_trees[StartingTree::random] = difficulty >= 0.8 ? 0 :
           diff_pred->num_start_trees(difficulty, 3.5, 0.5, 0.25);
-      opts.start_trees[StartingTree::parsimony] = difficulty >= 0.7 ? (int) (1.5 * pars_trees) : pars_trees;
+      opts.start_trees[StartingTree::parsimony] = difficulty >= 0.8 ? (int) (1.5 * pars_trees) : pars_trees;
 
     }
     else

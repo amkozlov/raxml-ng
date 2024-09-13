@@ -31,6 +31,7 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
   _check_lh_impr = opts.safety_checks.isset(SafetyCheck::model_lh_impr);
   _use_old_constraint = opts.use_old_constraint;
   _use_spr_fastclv = opts.use_spr_fastclv;
+  _lh_epsilon = opts.lh_epsilon;
 
   _partition_contributions.resize(parted_msa.part_count());
   double total_weight = 0;

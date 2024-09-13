@@ -302,13 +302,12 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   /* default: nni parameters */
   opts.nni_tolerance = 1.0;
-  opts.nni_epsilon = 10;
+  opts.nni_epsilon = DEF_LH_EPSILON;
 
   /* Stopping criteria */
-  opts.early_stopping = false; // by default, stopping rules are turned off
-  opts.stopping_rule = -1;
+  opts.stopping_rule = 3; // by default, we use the KH-multiple testing as a stopping rule
   opts.modified_version = false;
-  opts.count_spr_moves = false;
+  opts.count_spr_moves = true;
 
   /* bootstrapping / bootstopping */
   opts.bs_metrics.push_back(BranchSupportMetric::fbp);
@@ -468,6 +467,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.use_repeats = false;
           opts.use_pythia = false;
           opts.use_adaptive_search = false;
+          opts.stopping_rule = -1;
+          opts.modified_version = false;
+          opts.count_spr_moves = true;
         }
         else
           opts.use_prob_msa = false;
@@ -855,9 +857,11 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_par_pars = true;
             else if (eopt == "pars-seq")
               opts.use_par_pars = false;
-            else if (eopt == "simplified-on")
+            else if (eopt == "simplified-on"){
               opts.modified_version = true;
-            else if (eopt == "pythia-on")
+              opts.stopping_rule = -1;
+              opts.count_spr_moves = false;
+            } else if (eopt == "pythia-on")
               opts.use_pythia = true;
             else if (eopt == "pythia-off")
               opts.use_pythia = false;
@@ -869,6 +873,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_par_pars = false;
               opts.use_pythia = false;
               opts.use_adaptive_search = false;
+              opts.stopping_rule = -1;
+              opts.modified_version = false;
+              opts.count_spr_moves = false;
               if (!lh_epsilon_set)
                 opts.lh_epsilon = DEF_LH_EPSILON_V11;
               opts.lh_epsilon_brlen_triplet = DEF_LH_EPSILON_V11;
@@ -1046,7 +1053,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       
       case 63:
         /* 0: rell, 1: no-rell, 2: kh*/
-        opts.early_stopping = true;
+        /* If the user specifies a stopping criterion, the algorithm uses a different heuristic */
+        opts.modified_version = true;
+        opts.count_spr_moves = false;
         if (strcasecmp(optarg, "sn-rell") == 0) {
           opts.stopping_rule = 0;
         } else if (strcasecmp(optarg, "sn-normal") == 0) {

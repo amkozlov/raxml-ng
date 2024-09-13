@@ -21,7 +21,7 @@ enum class CheckpointStep
   start,
   brlenOpt,
   modOpt1,
-  radiusDetectOrNNI,
+  radiusDetect,
   modOpt2,
   fastSPR,
   modOpt3,
@@ -46,7 +46,7 @@ struct SearchState
 
 struct Checkpoint
 {
-  Checkpoint() : search_state(), tree_index(0), tree(), models(), last_loglh(0.) {}
+  Checkpoint() : search_state(), tree_index(0), tree(), models(), last_loglh(0.), lh_epsilon(0.){}
 
   Checkpoint(const Checkpoint&) = default;
   Checkpoint& operator=(const Checkpoint&) = default;
@@ -59,6 +59,7 @@ struct Checkpoint
   Tree tree;
   ModelMap models;
   double last_loglh;
+  double lh_epsilon;
 
   double loglh() const { return search_state.loglh; }
 
@@ -106,6 +107,8 @@ public:
 
   double pythia_score() const { return _checkp_file.pythia_score; }
   void pythia_score(double score) { _checkp_file.pythia_score = score; }
+  void set_epsilon(double _epsilon) { checkpoint().lh_epsilon = _epsilon; }
+  double get_epsilon() const { return checkpoint().lh_epsilon; }
 
   void init_checkpoints(const Tree& tree, const ModelCRefMap& models);
 
