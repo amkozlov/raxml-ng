@@ -95,7 +95,7 @@ public:
   unsigned long long terrace_maxsize;
 
   unsigned int num_bootstraps;
-  std::vector<BranchSupportMetric> bs_metrics;
+  std::set<BranchSupportMetric> bs_metrics;
   BootstopCriterion bootstop_criterion;
   double bootstop_cutoff;
   unsigned int bootstop_interval;

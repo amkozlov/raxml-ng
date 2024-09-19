@@ -307,7 +307,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.nni_epsilon = 10;
 
   /* bootstrapping / bootstopping */
-  opts.bs_metrics.push_back(BranchSupportMetric::fbp);
+  opts.bs_metrics.insert(BranchSupportMetric::fbp);
   opts.bootstop_criterion = BootstopCriterion::autoMRE;
   opts.bootstop_cutoff = RAXML_BOOTSTOP_CUTOFF;
   opts.bootstop_interval = RAXML_BOOTSTOP_INTERVAL;
@@ -878,19 +878,23 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           {
             if (strncasecmp(m.c_str(), "fbp", 3) == 0)
             {
-              opts.bs_metrics.push_back(BranchSupportMetric::fbp);
+              opts.bs_metrics.insert(BranchSupportMetric::fbp);
             }
             else if (strncasecmp(m.c_str(), "rbs", 3) == 0)
             {
-              opts.bs_metrics.push_back(BranchSupportMetric::rbs);
+              opts.bs_metrics.insert(BranchSupportMetric::rbs);
             }
             else if (strncasecmp(m.c_str(), "tbe", 3) == 0)
             {
-              opts.bs_metrics.push_back(BranchSupportMetric::tbe);
+              opts.bs_metrics.insert(BranchSupportMetric::tbe);
             }
             else
             {
               throw InvalidOptionValueException("Unknown branch support metric: " + string(optarg));
+            }
+            if (opts.bs_metrics.count(BranchSupportMetric::fbp) && opts.bs_metrics.count(BranchSupportMetric::rbs))
+            {
+              throw OptionException("Invalid branch support metric: FBP and RBS can not be used together!");
             }
           }
         }

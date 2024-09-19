@@ -2886,7 +2886,7 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
   auto& worker = instance.get_worker();
   Checkpoint& checkp = cm.checkpoint();
 
-  bool rapidbs = (opts.bs_metrics[0] == BranchSupportMetric::rbs);
+  bool rapidbs = opts.bs_metrics.count(BranchSupportMetric::rbs);
   unsigned int processed_trees = 0;
   unsigned int rbs_batch_size = 10;
 
