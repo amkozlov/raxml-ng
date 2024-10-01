@@ -88,6 +88,11 @@ static struct option long_options[] =
 
   {"pythia",             optional_argument, 0, 0 },  /*  63 */
   {"pt",                 optional_argument, 0, 0 },  /*  64 */
+
+  {"sh",                 optional_argument, 0, 0 },  /*  65 */
+  {"sh-reps",            required_argument, 0, 0 },  /*  66 */
+  {"sh-epsilon",         required_argument, 0, 0 },  /*  67 */
+
   { 0, 0, 0, 0 }
 };
 
@@ -305,6 +310,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* default: nni parameters */
   opts.nni_tolerance = 1.0;
   opts.nni_epsilon = 10;
+
+  /* default: SH parameters */
+  opts.num_sh_reps = 1000;
+  opts.sh_epsilon = 0.1;
 
   /* bootstrapping / bootstopping */
   opts.bs_metrics.insert(BranchSupportMetric::fbp);
@@ -888,6 +897,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
             {
               opts.bs_metrics.insert(BranchSupportMetric::tbe);
             }
+            else if (strncasecmp(m.c_str(), "sh", 3) == 0 || strncasecmp(m.c_str(), "alrt", 3) == 0)
+            {
+              opts.bs_metrics.insert(BranchSupportMetric::sh_alrt);
+            }
             else
             {
               throw InvalidOptionValueException("Unknown branch support metric: " + string(optarg));
@@ -1055,6 +1068,31 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.log_level = LogLevel::result;
         log_level_set = true;
         break;
+
+      case 65: /* sh: compute SH-like ALRT branch supports for a given tree */
+        opts.command = Command::all;
+        opts.bs_metrics.clear();
+        opts.bs_metrics.insert(BranchSupportMetric::sh_alrt);
+        num_commands++;
+        /* fall through */
+      case 66: /* number of SH replicates */
+        if (optarg)
+        {
+          if (sscanf(optarg, "%u", &opts.num_sh_reps) != 1 || opts.num_sh_reps == 0)
+          {
+            throw InvalidOptionValueException("Invalid number of SH replicates: " + string(optarg) +
+                ", please provide a positive integer number!");
+          }
+        }
+        break;
+      case 67: /* SH epsilon */
+        if(sscanf(optarg, "%lf", &opts.sh_epsilon) != 1 || opts.sh_epsilon <= 0.)
+        {
+          throw InvalidOptionValueException("Invalid SH epsilon  : " + string(optarg) +
+                                            ", please provide a positive real number!\n");
+        }
+        break;
+
               
       default:
         throw  OptionException("Internal error in option parsing");
@@ -1101,7 +1139,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   check_options(opts);
 
   if ((opts.command == Command::bootstrap || opts.command == Command::all) &&
-      opts.num_bootstraps == 0)
+      opts.num_bootstraps == 0 &&
+      opts.bs_metrics.size() > opts.bs_metrics.count(BranchSupportMetric::sh_alrt))
   {
     opts.num_bootstraps = (opts.bootstop_criterion == BootstopCriterion::none) ? 100 : 1000;
   }
@@ -1149,10 +1188,11 @@ void CommandLineParser::print_help()
             "  --pythia                                   compute and print Pythia MSA difficulty score\n"
             "\n"
             "Command shortcuts (mutually exclusive):\n"
-            "  --search1                                  Alias for: --search --tree rand{1}\n"
+            "  --search1                                  Alias for: --search --tree pars{1}\n"
             "  --loglh                                    Alias for: --evaluate --opt-model off --opt-branches off --nofiles --log result\n"
             "  --rf                                       Alias for: --rfdist --nofiles --log result\n"
             "  --pt                                       Alias for: --pythia --nofiles --log result\n"
+            "  --sh [ REPS ]                              Alias for: --all --bs-metic sh [ --sh-reps REPS ]\n"
             "\n"
             "Input and output options:\n"
             "  --tree            rand{N} | pars{N} |      starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
@@ -1203,9 +1243,13 @@ void CommandLineParser::print_help()
             "  --bs-trees     autoMRE{N}                  use MRE-based bootstrap convergence criterion, up to N replicates (default: 1000)\n"
             "  --bs-trees     FILE                        Newick file containing set of bootstrap replicate trees (with --support)\n"
             "  --bs-cutoff    VALUE                       cutoff threshold for the MRE-based bootstopping criteria (default: 0.03)\n"
-            "  --bs-metric    fbp | rbs | tbe             branch support metric: fbp = Felsenstein bootstrap (default), rbs = Rapid bootstrap\n"
-            "                                             tbe = Transfer bootstrap estimate\n"
-            "  --bs-write-msa on | off                    write all bootstrap alignments (default: OFF)\n";
+            "  --bs-metric    fbp | rbs | tbe | sh        branch support metric: fbp = Felsenstein bootstrap (default), rbs = Rapid bootstrap\n"
+            "                                             tbe = Transfer bootstrap estimate, sh = SH-like aLRT\n"
+            "  --bs-write-msa on | off                    write all bootstrap alignments (default: OFF)\n"
+            "\n"
+            "SH-like test options:\n"
+            "  --sh-reps      VALUE                       number of bootstrap replicates for SH-aLRT test (default: 1000)\n"
+            "  --sh-epsilon   VALUE                       log-likelihood epsilon for SH-aLRT test (default: 0.1)\n";
 
   cout << "\n"
             "EXAMPLES:\n"

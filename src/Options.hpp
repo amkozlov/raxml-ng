@@ -22,6 +22,7 @@ struct OutputFileNames
   std::string tbe_support_tree;
   std::string fbp_support_tree;
   std::string rbs_support_tree;
+  std::string sh_support_tree;
   std::string terrace;
   std::string binary_msa;
   std::string bootstrap_msa;
@@ -131,6 +132,10 @@ public:
   int diff_pred_pars_trees;
   double nni_tolerance;
   double nni_epsilon;
+
+  /* SH-like test */
+  unsigned int num_sh_reps;
+  double sh_epsilon;
 
   bool coarse() const { return num_workers > 1; };
 

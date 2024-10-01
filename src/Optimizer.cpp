@@ -574,6 +574,61 @@ double Optimizer::optimize_topology_rbs(TreeInfo& treeinfo, CheckpointManager& c
   return loglh;
 }
 
+double Optimizer::optimize_topology_nni(TreeInfo& treeinfo, CheckpointManager& cm)
+{
+  const double modopt_eps = _lh_epsilon;
+
+  SearchState local_search_state = cm.search_state();
+  auto& search_state = ParallelContext::group_master_thread() ? cm.search_state() : local_search_state;
+  ParallelContext::barrier();
+
+  /* set references such that we can work directly with checkpoint values */
+  double &loglh = search_state.loglh;
+
+  CheckpointStep resume_step = search_state.step;
+
+  nni_round_params& nni_params = search_state.nni_params;
+  nni_params.tolerance = _nni_tolerance;
+  nni_params.lh_epsilon = _nni_epsilon;
+  nni_params.max_rounds = 10;
+
+  /* Compute initial LH of the starting tree */
+  loglh = treeinfo.loglh();
+
+  auto do_step = [&search_state,resume_step](CheckpointStep step) -> bool
+      {
+        if (step >= resume_step)
+        {
+          search_state.step = step;
+          return true;
+        }
+        else
+          return false;;
+      };
+
+  /* Initial fast model optimization */
+  if (do_step(CheckpointStep::modOpt1))
+  {
+    cm.update_and_write(treeinfo);
+    LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << modopt_eps << ")" << endl;
+    loglh = optimize_model(treeinfo, modopt_eps);
+  }
+
+  // do NNIs
+  if (do_step(CheckpointStep::radiusDetectOrNNI))
+  {
+    nni(treeinfo, nni_params, loglh);
+
+    /* optimize ALL branches */
+    loglh = treeinfo.optimize_branches(_lh_epsilon, 1);
+  }
+
+  if (do_step(CheckpointStep::finish))
+    cm.update_and_write(treeinfo);
+
+  return loglh;
+}
+
 
 double Optimizer::evaluate(TreeInfo& treeinfo, CheckpointManager& cm)
 {

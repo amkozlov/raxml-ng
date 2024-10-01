@@ -22,7 +22,8 @@ tbe_naive(false), consense_cutoff(ConsenseCutoff::MR), tree_file(""), constraint
 msa_file(""), model_file(""), weights_file(""), outfile_prefix(""),
 num_threads(1), num_threads_max(1), num_ranks(1), num_workers(1), num_workers_max(UINT_MAX),
 simd_arch(CORAX_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(LoadBalancing::benoit),
-diff_pred_pars_trees(RAXML_CPYTHIA_TREES_NUM), nni_tolerance(1.0), nni_epsilon(10)
+diff_pred_pars_trees(RAXML_CPYTHIA_TREES_NUM), nni_tolerance(1.0), nni_epsilon(10),
+num_sh_reps(1000), sh_epsilon(0.1)
 {}
 
 string Options::output_fname(const string& suffix) const
@@ -54,6 +55,7 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.fbp_support_tree, "supportFBP");
   set_default_outfile(outfile_names.rbs_support_tree, "supportRBS");
   set_default_outfile(outfile_names.tbe_support_tree, "supportTBE");
+  set_default_outfile(outfile_names.sh_support_tree, "supportSH");
   set_default_outfile(outfile_names.terrace, "terrace");
   set_default_outfile(outfile_names.binary_msa, "rba");
   set_default_outfile(outfile_names.bootstrap_msa, "bootstrapMSA");
@@ -89,6 +91,8 @@ const std::string& Options::support_tree_file(BranchSupportMetric bsm) const
       return outfile_names.rbs_support_tree;
     else if (bsm == BranchSupportMetric::tbe)
       return outfile_names.tbe_support_tree;
+    else if (bsm == BranchSupportMetric::sh_alrt)
+      return outfile_names.sh_support_tree;
     else
       return outfile_names.support_tree;
   }
@@ -332,6 +336,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
         case BranchSupportMetric::tbe:
           stream << "Transfer Bootstrap";
           break;
+        case BranchSupportMetric::sh_alrt:
+          stream << "SH-aLRT";
+          break;
       }
     }
     stream << ")";
@@ -369,8 +376,8 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   }
   stream << endl;
 
-  if (opts.command == Command::bootstrap || opts.command == Command::all ||
-      opts.command == Command::bsmsa)
+  if ((opts.command == Command::bootstrap || opts.command == Command::all ||
+      opts.command == Command::bsmsa) && opts.num_bootstraps > 0)
   {
     stream << "  bootstrap replicates: ";
     stream << (opts.use_bs_pars ? "parsimony (" : "random (");

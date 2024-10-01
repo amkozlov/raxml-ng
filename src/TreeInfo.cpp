@@ -451,6 +451,34 @@ void TreeInfo::compute_ancestral(const AncestralStatesSharedPtr& ancestral,
   corax_treeinfo_destroy_ancestral(pll_ancestral);
 }
 
+void TreeInfo::sh_support(const sh_support_params& params, doubleVector& support_values)
+{
+  double *supports = nullptr;
+
+  /* only the master thread will store the support values */
+  if (ParallelContext::master_thread())
+  {
+    support_values.resize(_pll_treeinfo->tree->edge_count);
+    supports = support_values.data();
+  }
+
+  int retval = corax_algo_sh_support(_pll_treeinfo,
+                                     params.tolerance,
+                                     supports,
+                                     params.num_bootstraps,
+                                     (const unsigned int**) params.bsrep_site_weights.data(),
+                                     params.sh_epsilon,
+                                     _brlen_opt_method,
+                                     _brlen_min,
+                                     _brlen_max,
+                                     RAXML_BRLEN_SMOOTHINGS,
+                                     params.lh_epsilon);
+
+  if (!retval)
+    libpll_check_error("ERROR: Cannot compute SH-aLRT support values!");
+}
+
+
 void assign(PartitionedMSA& parted_msa, const TreeInfo& treeinfo)
 {
   const corax_treeinfo_t& pll_treeinfo = treeinfo.pll_treeinfo();
@@ -483,6 +511,18 @@ void assign(Model& model, const TreeInfo& treeinfo, size_t partition_id)
   model.alpha(pll_treeinfo.alphas[partition_id]);
   if (pll_treeinfo.brlen_scalers)
     model.brlen_scaler(pll_treeinfo.brlen_scalers[partition_id]);
+}
+
+void assign_models(TreeInfo& treeinfo, const ModelMap& models)
+{
+  const corax_treeinfo_t& pll_treeinfo = treeinfo.pll_treeinfo();
+  for (auto& m: models)
+  {
+    if (!pll_treeinfo.partitions[m.first])
+      continue;
+
+    treeinfo.model(m.first, m.second);
+  }
 }
 
 void build_clv(ProbVector::const_iterator probs, size_t sites, const WeightVector& weights, size_t seq_offset,

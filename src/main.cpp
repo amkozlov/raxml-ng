@@ -46,6 +46,7 @@
 #include "bootstrap/BootstrapGenerator.hpp"
 #include "bootstrap/BootstopCheck.hpp"
 #include "bootstrap/TransferBootstrapTree.hpp"
+#include "bootstrap/ShSupportTree.hpp"
 #include "bootstrap/ConsensusTree.hpp"
 #include "autotune/ResourceEstimator.hpp"
 #include "ICScoreCalculator.hpp"
@@ -128,13 +129,15 @@ struct RaxmlInstance
   unique_ptr<RFDistCalculator> dist_calculator;
   AncestralStatesSharedPtr ancestral_states;
   vector<vector<doubleVector>> persite_loglh;      // per-tree -> per-partition -> per-site
+  doubleVector sh_support_values;
 
   shared_ptr<DifficultyPredictor> msa_diff_predictor;
 
   vector<RaxmlWorker> workers;
   RaxmlWorker& get_worker() { return workers.at(ParallelContext::local_group_id()); }
 
-  RaxmlInstance() : bs_converged(false), run_phase(RaxmlRunPhase::start), used_wh(0) {}
+  RaxmlInstance() : num_threads_parsimony(0), bs_converged(false),
+      run_phase(RaxmlRunPhase::start), used_wh(0) {}
 };
 
 struct RaxmlWorker
@@ -1860,39 +1863,51 @@ void generate_bootstraps(RaxmlInstance& instance, const CheckpointFile& checkp)
   {
     assert(instance.parted_msa);
 
+    bool is_sh = instance.opts.bs_metrics.count(BranchSupportMetric::sh_alrt);
+    bool is_bs = (instance.opts.bs_metrics.count(BranchSupportMetric::fbp) ||
+                  instance.opts.bs_metrics.count(BranchSupportMetric::rbs) ||
+                  instance.opts.bs_metrics.count(BranchSupportMetric::tbe));
+
+    unsigned int num_bstrees = is_bs ? instance.opts.num_bootstraps : 0;
+    unsigned int num_bsreps = is_sh ? std::max(instance.opts.num_sh_reps, num_bstrees) : num_bstrees;
+
     // init seeds
     auto& seeds = instance.bs_seeds;
-    seeds.resize(instance.opts.num_bootstraps);
+    seeds.resize(num_bsreps);
     for (size_t i = 0; i < seeds.size(); ++i)
       seeds[i] = rand();
 
     build_parsimony_msa(instance);
 
-    /* in parallel parsimony mode, starting trees & replicate MSAs will be generated later "just-in-time" */
-    if (instance.opts.use_par_pars)
-      return;
-
-    /* generate starting trees for bootstrap searches */
-    auto start_tree_type = instance.opts.use_bs_pars ? StartingTree::parsimony : StartingTree::random;
-    for (size_t b = 0; b < instance.opts.num_bootstraps; ++b)
+    /* in parallel parsimony mode, starting trees will be generated later "just-in-time" */
+    if (!instance.opts.use_par_pars)
     {
-      auto tree = generate_tree(instance, start_tree_type, seeds[b]);
+      /* generate starting trees for bootstrap searches */
+      auto start_tree_type = instance.opts.use_bs_pars ? StartingTree::parsimony : StartingTree::random;
+      for (size_t b = 0; b < num_bstrees; ++b)
+      {
+        auto tree = generate_tree(instance, start_tree_type, seeds[b]);
 
-//      if (b < checkp.bs_trees.size())
-//        continue;
+  //      if (b < checkp.bs_trees.size())
+  //        continue;
 
-      instance.bs_start_trees.emplace_back(move(tree));
+        instance.bs_start_trees.emplace_back(move(tree));
+      }
     }
 
-    /* generate replicate alignments */
-    BootstrapGenerator bg;
-    for (size_t b = 0; b < instance.opts.num_bootstraps; ++b)
+    /* in parallel parsimony mode, replicate MSAs will be generated later "just-in-time" */
+    if (!instance.opts.use_par_pars || is_sh)
     {
-//      /* check if this BS was already computed in the previous run and saved in checkpoint */
-//      if (b < checkp.bs_trees.size())
-//        continue;
+      /* generate replicate alignments */
+      BootstrapGenerator bg;
+      for (size_t b = 0; b < num_bsreps; ++b)
+      {
+  //      /* check if this BS was already computed in the previous run and saved in checkpoint */
+  //      if (b < checkp.bs_trees.size())
+  //        continue;
 
-      instance.bs_reps.emplace_back(bg.generate(*instance.parted_msa, seeds[b]));
+        instance.bs_reps.emplace_back(bg.generate(*instance.parted_msa, seeds[b]));
+      }
     }
   }
   RAXML_UNUSED(checkp); // might need it again for re-using previously computed replicates
@@ -1969,16 +1984,28 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree,
         sup_tree = make_shared<TransferBootstrapTree>(ref_tree, instance.opts.tbe_naive);
         support_in_pct = false;
       }
+      else if (metric == BranchSupportMetric::sh_alrt)
+      {
+        sup_tree = make_shared<ShSupportTree>(ref_tree, instance.sh_support_values);
+        support_in_pct = true;
+      }
       else
         assert(0);
 
-      Tree tree = ref_tree;
-      for (auto& bs: bs_trees)
+      assert(sup_tree);
+
+      if (metric != BranchSupportMetric::sh_alrt)
       {
-        tree.topology(bs);
-        sup_tree->add_replicate_tree(tree);
+        Tree tree = ref_tree;
+        for (auto& bs: bs_trees)
+        {
+          tree.topology(bs);
+          sup_tree->add_replicate_tree(tree);
+        }
       }
       sup_tree->draw_support(support_in_pct);
+
+//      corax_utree_show_ascii(&sup_tree->pll_utree_root(), CORAX_UTREE_SHOW_LABEL);
 
       instance.support_trees[metric] = sup_tree;
   }
@@ -2449,6 +2476,8 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
           metric_name = "Rapid bootstrap (RBS)";
         else if (it.first == BranchSupportMetric::tbe)
           metric_name = "Transfer bootstrap (TBE)";
+        else if (it.first == BranchSupportMetric::sh_alrt)
+          metric_name = "SH-like aLRT (SH)";
 
         LOG_INFO << "Best ML tree with " << metric_name << " support values saved to: " <<
             sysutil_realpath(sup_file) << endl;
@@ -2490,7 +2519,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
   {
     // TODO now only master process writes the output, this will have to change with
     // coarse-grained parallelization scheme (parallel start trees/bootstraps)
-    if (!opts.bootstrap_trees_file().empty())
+    if (!opts.bootstrap_trees_file().empty() && !checkp.bs_trees.empty())
     {
   //    NewickStream nw(opts.bootstrap_trees_file(), std::ios::out | std::ios::app);
       NewickStream nw(opts.bootstrap_trees_file(), std::ios::out);
@@ -2879,6 +2908,55 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
   }
 }
 
+void thread_infer_sh(RaxmlInstance& instance, CheckpointManager& cm)
+{
+  auto const& opts = instance.opts;
+  auto const& master_msa = *instance.parted_msa;
+
+  unique_ptr<TreeInfo> treeinfo;
+
+  Optimizer optimizer(opts);
+
+  ParallelContext::global_thread_barrier();
+
+  const auto& part_assign = instance.proc_part_assign.at(ParallelContext::local_proc_id());
+  MLTree best = cm.checkp_file().best_tree();
+
+  treeinfo.reset(new TreeInfo(opts, best.tree, master_msa, instance.tip_msa_idmap,
+                              part_assign));
+  assign_models(*treeinfo, best.models);
+
+  treeinfo->set_topology_constraint(instance.constraint_tree);
+
+  LOG_INFO_TS << "Final NNI optimization" << endl << endl;
+
+  optimizer.optimize_topology_nni(*treeinfo, cm);
+
+  LOG_INFO_TS << endl << "Computing SH-aLRT supports with " << opts.num_sh_reps
+              << " replicates" << endl;
+
+  auto bsnum = instance.bs_reps.size();
+  auto partnum = master_msa.part_count();
+  sh_support_params sh_params(bsnum, partnum);
+  sh_params.sh_epsilon = opts.sh_epsilon;
+  sh_params.tolerance = opts.nni_tolerance;
+  sh_params.lh_epsilon = opts.nni_epsilon;
+  for (size_t i = 0; i < bsnum; ++i)
+  {
+    for (const auto& pa: part_assign)
+    {
+      auto wgt = instance.bs_reps[i].site_weights[pa.part_id].data();
+      sh_params.bsrep_site_weights[i * partnum + pa.part_id] =  wgt + pa.start;
+    }
+  }
+
+  assert(sh_params.num_bootstraps > 0);
+
+  treeinfo->sh_support(sh_params, instance.sh_support_values);
+
+  ParallelContext::global_thread_barrier();
+}
+
 void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
 {
   auto const& opts = instance.opts;
@@ -3072,8 +3150,18 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   if ((opts.command == Command::bootstrap || opts.command == Command::all))
   {
-    thread_infer_bootstrap(instance, cm);
-    ParallelContext::global_barrier();
+    if (opts.bs_metrics.count(BranchSupportMetric::fbp) || opts.bs_metrics.count(BranchSupportMetric::rbs) ||
+        opts.bs_metrics.count(BranchSupportMetric::tbe))
+    {
+      thread_infer_bootstrap(instance, cm);
+      ParallelContext::global_barrier();
+    }
+
+    if (opts.bs_metrics.count(BranchSupportMetric::sh_alrt))
+    {
+      thread_infer_sh(instance, cm);
+      ParallelContext::global_barrier();
+    }
   }
 
   (instance.start_trees.size() > 1 ? LOG_RESULT : LOG_INFO) << endl;
