@@ -26,7 +26,7 @@ public:
   void nni(TreeInfo& treeinfo, nni_round_params& nni_params, double& loglh);
 
 private:
-  bool _use_adaptive_search;
+  TopologyOptMethod _topology_opt_method;
   double _lh_epsilon;
   double _lh_epsilon_brlen_triplet;
   int _spr_radius;

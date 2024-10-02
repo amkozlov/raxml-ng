@@ -4,7 +4,7 @@
 using namespace std;
 
 Optimizer::Optimizer (const Options &opts, bool rapid_bs /* = false */) :
-    _use_adaptive_search(opts.use_adaptive_search),
+    _topology_opt_method(opts.topology_opt_method),
     _lh_epsilon(opts.lh_epsilon), _lh_epsilon_brlen_triplet(opts.lh_epsilon_brlen_triplet), 
     _spr_radius(opts.spr_radius), _spr_cutoff(opts.spr_cutoff), _rstate(nullptr),
     _nni_epsilon(opts.nni_epsilon), _nni_tolerance(opts.nni_tolerance)
@@ -58,10 +58,29 @@ void Optimizer::nni(TreeInfo& treeinfo, nni_round_params& nni_params, double& lo
 
 double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
 {
-  if (_use_adaptive_search)
-    return optimize_topology_adaptive(treeinfo, cm);
-  else
-    return optimize_topology_standard(treeinfo, cm);
+  switch(_topology_opt_method)
+  {
+    case TopologyOptMethod::classic:
+      return optimize_topology_standard(treeinfo, cm);
+      break;
+    case TopologyOptMethod::adaptive:
+      if (cm.checkp_file().pythia_score >= 0.)
+        return optimize_topology_adaptive(treeinfo, cm);
+      else
+        return optimize_topology_standard(treeinfo, cm);
+      break;
+    case TopologyOptMethod::rapidBS:
+      return optimize_topology_rbs(treeinfo, cm);
+      break;
+    case TopologyOptMethod::nniRound:
+      return optimize_topology_nni(treeinfo, cm);
+      break;
+    case TopologyOptMethod::none:
+      return evaluate(treeinfo, cm);
+      break;
+    default:
+      assert(0);
+  }
 }
 
 double Optimizer::optimize_topology_standard(TreeInfo& treeinfo, CheckpointManager& cm)

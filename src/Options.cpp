@@ -7,8 +7,9 @@ using namespace std;
 Options::Options() : opt_version(RAXML_OPT_VERSION), cmdline(""), command(Command::none),
 use_tip_inner(true), use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false),
 use_repeats(true), use_rba_partload(true), use_energy_monitor(true), use_old_constraint(false),
-use_spr_fastclv(true), use_bs_pars(true), use_par_pars(true), use_pythia(true), use_adaptive_search(true),
-optimize_model(true), optimize_brlen(true), force_mode(false), safety_checks(SafetyCheck::all),
+use_spr_fastclv(true), use_bs_pars(true), use_par_pars(true), use_pythia(true),
+optimize_model(true), optimize_brlen(true), topology_opt_method(TopologyOptMethod::adaptive),
+force_mode(false), safety_checks(SafetyCheck::all),
 redo_mode(false), nofiles_mode(false), write_interim_results(true), write_bs_msa(false),
 log_level(LogLevel::progress), msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
 random_seed(0), start_trees(), lh_epsilon(DEF_LH_EPSILON), lh_epsilon_brlen_triplet(DEF_LH_EPSILON_BRLEN_TRIPLET),
@@ -312,8 +313,26 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   if (opts.command == Command::search || opts.command == Command::bootstrap ||
       opts.command == Command::all)
   {
-    if (opts.use_adaptive_search)
-      stream << " (adaptive)";
+    stream << " (";
+    switch (opts.topology_opt_method)
+    {
+      case TopologyOptMethod::classic:
+        stream << "classic";
+        break;
+      case TopologyOptMethod::adaptive:
+        stream << "adaptive";
+        break;
+      case TopologyOptMethod::rapidBS:
+         stream << "rapid bootstrap";
+         break;
+      case TopologyOptMethod::nniRound:
+        stream << "NNI round";
+        break;
+      case TopologyOptMethod::none:
+        stream << "OFF";
+        break;
+    }
+    stream << ")";
   }
 
   if (opts.command == Command::bootstrap || opts.command == Command::all ||

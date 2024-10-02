@@ -113,6 +113,16 @@ enum class InformationCriterion
   bic
 };
 
+enum class TopologyOptMethod
+{
+  none = 0,
+  classic,
+  adaptive,
+  rapidBS,
+  nniRound
+};
+
+
 namespace ConsenseCutoff
 {
   enum ConsenseCutoff : unsigned int

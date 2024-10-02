@@ -845,6 +845,12 @@ void check_options_early(Options& opts)
                       opts.command == Command::bootstrap || opts.command == Command::all ||
                       opts.command == Command::pythia);
 
+  if (opts.use_pythia && !opts.use_pattern_compression)
+  {
+    throw runtime_error("Pythia and adaptive tree search require pattern compression!\n"
+                        "HINT:  Add '--adaptive off' to disable Pythia.\n");
+  }
+
   /* autodetect if we can use partial RBA loading */
   opts.use_rba_partload &= (opts.num_ranks > 1 && !opts.coarse());                // only useful for fine-grain MPI runs
   opts.use_rba_partload &= (!opts.start_trees.count(StartingTree::parsimony));    // does not work with parsimony
@@ -1111,7 +1117,6 @@ void load_msa(RaxmlInstance& instance)
     instance.opts.use_tip_inner = false;
     instance.opts.use_repeats = false;
     instance.opts.use_pythia = false;
-    instance.opts.use_adaptive_search = false;
 
     if (parted_msa.part_count() > 1)
       throw runtime_error("Partitioned probabilistic alignments are not supported yet, sorry...");
@@ -2926,13 +2931,20 @@ void thread_infer_sh(RaxmlInstance& instance, CheckpointManager& cm)
                               part_assign));
   assign_models(*treeinfo, best.models);
 
-  treeinfo->set_topology_constraint(instance.constraint_tree);
+  /* for sh-alrt, we have to make sure that topology is NNI-optimal */
+  if (opts.topology_opt_method != TopologyOptMethod::nniRound)
+  {
+    treeinfo->set_topology_constraint(instance.constraint_tree);
 
-  LOG_INFO_TS << "Final NNI optimization" << endl << endl;
+    LOG_INFO_TS << "Final NNI optimization" << endl << endl;
 
-  optimizer.optimize_topology_nni(*treeinfo, cm);
+    optimizer.optimize_topology_nni(*treeinfo, cm);
+  }
+  else
+    treeinfo->loglh();;
 
-  LOG_INFO_TS << endl << "Computing SH-aLRT supports with " << opts.num_sh_reps
+  LOG_INFO << endl;
+  LOG_INFO_TS << "Computing SH-aLRT supports with " << opts.num_sh_reps
               << " replicates" << endl;
 
   auto bsnum = instance.bs_reps.size();
@@ -2953,6 +2965,24 @@ void thread_infer_sh(RaxmlInstance& instance, CheckpointManager& cm)
   assert(sh_params.num_bootstraps > 0);
 
   treeinfo->sh_support(sh_params, instance.sh_support_values);
+
+  if (ParallelContext::master())
+  {
+    assert(!instance.sh_support_values.empty());
+    double avg_sh = 0.;
+    size_t num_sh = 0;
+    for (double sh: instance.sh_support_values)
+    {
+      if (!isinf(sh))
+      {
+        avg_sh += sh;
+        num_sh++;
+      }
+    }
+    avg_sh /= num_sh;
+
+    LOG_INFO_TS << "Done! Average SH-aLRT support: " << FMT_PREC2(avg_sh) << endl;
+  }
 
   ParallelContext::global_thread_barrier();
 }

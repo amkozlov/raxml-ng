@@ -5,7 +5,7 @@
 #include "PartitionedMSA.hpp"
 #include "util/SafetyCheck.hpp"
 
-constexpr int RAXML_OPT_VERSION = 2;
+constexpr int RAXML_OPT_VERSION = 3;
 
 struct OutputFileNames
 {
@@ -65,10 +65,10 @@ public:
   bool use_bs_pars;
   bool use_par_pars;
   bool use_pythia;
-  bool use_adaptive_search;
 
   bool optimize_model;
   bool optimize_brlen;
+  TopologyOptMethod topology_opt_method;
 
   bool force_mode;
   SafetyCheck safety_checks;

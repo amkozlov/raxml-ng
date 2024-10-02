@@ -92,6 +92,7 @@ static struct option long_options[] =
   {"sh",                 optional_argument, 0, 0 },  /*  65 */
   {"sh-reps",            required_argument, 0, 0 },  /*  66 */
   {"sh-epsilon",         required_argument, 0, 0 },  /*  67 */
+  {"opt-topology",       required_argument, 0, 0 },  /*  68 */
 
   { 0, 0, 0, 0 }
 };
@@ -334,6 +335,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* Difficulty preditction num trees */
   opts.diff_pred_pars_trees = RAXML_CPYTHIA_TREES_NUM;
 
+  bool use_adaptive_search = true;
+  opts.topology_opt_method = TopologyOptMethod::adaptive;
+
   /* max #threads = # available CPU cores */
 #if !defined(_RAXML_PTHREADS)
   opts.num_threads = 1;
@@ -469,7 +473,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.use_tip_inner = false;
           opts.use_repeats = false;
           opts.use_pythia = false;
-          opts.use_adaptive_search = false;
+          use_adaptive_search = false;
         }
         else
           opts.use_prob_msa = false;
@@ -868,7 +872,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_bs_pars = false;
               opts.use_par_pars = false;
               opts.use_pythia = false;
-              opts.use_adaptive_search = false;
+              opts.topology_opt_method = TopologyOptMethod::classic;
               if (!lh_epsilon_set)
                 opts.lh_epsilon = DEF_LH_EPSILON_V11;
               opts.lh_epsilon_brlen_triplet = DEF_LH_EPSILON_V11;
@@ -1011,18 +1015,18 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 59: /* Adaptive RAxML-ng analysis with difficulty prediction */
         if (!optarg || (strcasecmp(optarg, "on") == 0))
         {
-          opts.use_adaptive_search = true;
+          use_adaptive_search = true;
           opts.use_pythia = true;
         }
         else if (strcasecmp(optarg, "start") == 0)
         {
-          opts.use_adaptive_search = false;
+          use_adaptive_search = false;
           opts.use_pythia = true;
           optarg_tree = "adaptive";
         }
         else if (strcasecmp(optarg, "off") == 0)
         {
-          opts.use_adaptive_search = false;
+          use_adaptive_search = false;
           opts.use_pythia = false;
         }
         else
@@ -1073,6 +1077,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.command = Command::all;
         opts.bs_metrics.clear();
         opts.bs_metrics.insert(BranchSupportMetric::sh_alrt);
+        opts.topology_opt_method = TopologyOptMethod::nniRound;
+        opts.use_pythia = false;
         num_commands++;
         /* fall through */
       case 66: /* number of SH replicates */
@@ -1092,7 +1098,20 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
                                             ", please provide a positive real number!\n");
         }
         break;
-
+      case 68: /* topology optimization method */
+        if (strcasecmp(optarg, "off") == 0 || strcasecmp(optarg, "none") == 0)
+          opts.topology_opt_method = TopologyOptMethod::none;
+        else if (strcasecmp(optarg, "classic") == 0 || strcasecmp(optarg, "v1") == 0)
+          opts.topology_opt_method = TopologyOptMethod::classic;
+        else if (strcasecmp(optarg, "adaptive") == 0)
+          opts.topology_opt_method = TopologyOptMethod::adaptive;
+        else if (strcasecmp(optarg, "rapidbs") == 0 || strcasecmp(optarg, "rbs") == 0)
+          opts.topology_opt_method = TopologyOptMethod::rapidBS;
+        else if (strcasecmp(optarg, "nni-round") == 0 || strcasecmp(optarg, "nni") == 0)
+          opts.topology_opt_method = TopologyOptMethod::nniRound;
+        else
+          throw InvalidOptionValueException("Unknown topology optimization method: " + string(optarg));
+        break;
               
       default:
         throw  OptionException("Internal error in option parsing");
@@ -1106,13 +1125,16 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   if (num_commands > 1)
     throw OptionException("More than one command specified");
 
+  if (!use_adaptive_search && opts.topology_opt_method == TopologyOptMethod::adaptive)
+    opts.topology_opt_method = TopologyOptMethod::classic;
+
   /* process start tree defaults */
   if (opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::start)
   {
     if (optarg_tree.empty())
     {
-      if (opts.use_adaptive_search)
+      if (use_adaptive_search)
         optarg_tree = "adaptive";
       else
         optarg_tree = opts.use_old_constraint ? "rand{20}" : RAXML_DEF_START_TREE;
@@ -1192,7 +1214,7 @@ void CommandLineParser::print_help()
             "  --loglh                                    Alias for: --evaluate --opt-model off --opt-branches off --nofiles --log result\n"
             "  --rf                                       Alias for: --rfdist --nofiles --log result\n"
             "  --pt                                       Alias for: --pythia --nofiles --log result\n"
-            "  --sh [ REPS ]                              Alias for: --all --bs-metic sh [ --sh-reps REPS ]\n"
+            "  --sh [ REPS ]                              Alias for: --all --opt-topology nni --bs-metic sh [ --sh-reps REPS ]\n"
             "\n"
             "Input and output options:\n"
             "  --tree            rand{N} | pars{N} |      starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
@@ -1233,6 +1255,8 @@ void CommandLineParser::print_help()
             "  --lh-epsilon   VALUE                       log-likelihood epsilon for optimization/tree search (default: 10)\n"
             "\n"
             "Topology search options:\n"
+            "  --opt-topology        classic | adaptive   Topology optimization method (default: adaptive)\n"
+            "                        nni | rbs ] off      \n"
             "  --adaptive            [ on | off | start ] Adaptive ML tree search (start = starting trees only)\n"
             "  --spr-radius          VALUE                SPR re-insertion radius for fast iterations (default: AUTO)\n"
             "  --spr-cutoff          VALUE | off          relative LH cutoff for descending into subtrees (default: 1.0)\n"
