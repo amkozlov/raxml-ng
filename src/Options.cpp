@@ -306,6 +306,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     case Command::sitelh:
       stream << "Per-site likelihood computation";
       break;
+    case Command::pythia:
+      stream << "Phylogenetic difficulty prediction";
+      break;
     default:
       break;
   }

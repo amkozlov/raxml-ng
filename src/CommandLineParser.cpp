@@ -1256,7 +1256,7 @@ void CommandLineParser::print_help()
             "\n"
             "Topology search options:\n"
             "  --opt-topology        classic | adaptive   Topology optimization method (default: adaptive)\n"
-            "                        nni | rbs ] off      \n"
+            "                        nni | rbs | off      \n"
             "  --adaptive            [ on | off | start ] Adaptive ML tree search (start = starting trees only)\n"
             "  --spr-radius          VALUE                SPR re-insertion radius for fast iterations (default: AUTO)\n"
             "  --spr-cutoff          VALUE | off          relative LH cutoff for descending into subtrees (default: 1.0)\n"
