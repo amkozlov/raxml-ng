@@ -826,8 +826,6 @@ void check_options_early(Options& opts)
       throw runtime_error("Pattern compression is not supported in ancestral state reconstruction mode!");
     if (opts.use_repeats)
       throw runtime_error("Site repeats are not supported in ancestral state reconstruction mode!");
-    if (opts.use_rate_scalers)
-      throw runtime_error("Per-rate scalers are not supported in ancestral state reconstruction mode!");
     if (opts.num_ranks > 1)
       throw runtime_error("MPI parallelization is not supported in ancestral state reconstruction mode!");
   }
@@ -922,7 +920,7 @@ void check_options(RaxmlInstance& instance)
   if (opts.safety_checks.isset(SafetyCheck::model_rate_scalers))
   {
     if (instance.parted_msa->taxon_count() > RAXML_RATESCALERS_TAXA &&
-        !instance.opts.use_rate_scalers && opts.command != Command::ancestral)
+        !instance.opts.use_rate_scalers)
     {
       LOG_INFO << "\nNOTE: Per-rate scalers were automatically enabled to prevent numerical issues "
           "on taxa-rich alignments." << endl;
