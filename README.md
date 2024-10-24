@@ -16,29 +16,26 @@ Documentation: [github wiki](https://github.com/amkozlov/raxml-ng/wiki)
 ## Installation instructions
 
 * For most desktop Unix/Linux and macOS systems, the easiest way to install RAxML-NG is by using the pre-compiled binary:  
-[**Download 64-bit Linux binary**](https://github.com/amkozlov/raxml-ng/releases/download/1.2.1/raxml-ng_v1.2.1_linux_x86_64.zip)  
-[**Download 64-bit OSX/macOS binary**](https://github.com/amkozlov/raxml-ng/releases/download/1.2.1/raxml-ng_v1.2.1_macos_x86_64.zip)   
-[**Download Apple M1 binary**](https://github.com/amkozlov/raxml-ng/releases/download/1.2.1/raxml-ng_v1.2.1_macos_M1.zip)
+[**Download 64-bit Linux binary**](https://github.com/amkozlov/raxml-ng/releases/download/1.2.2/raxml-ng_v1.2.2_linux_x86_64.zip)  
+[**Download 64-bit OSX/macOS binary**](https://github.com/amkozlov/raxml-ng/releases/download/1.2.2/raxml-ng_v1.2.2_macos_x86_64.zip)   
+[**Download Apple M1 binary**](https://github.com/amkozlov/raxml-ng/releases/download/1.2.2/raxml-ng_v1.2.2_macos_M1.zip)
 
 * For clusters/supercomputers (i.e., if you want to use MPI), please use the following installation package which contains pre-built *libpll*. You will need `GCC 6.4+` and `CMake 3.0.2+` in order to compile RAxML-NG for your system.  
-[**Download RAxML-NG-MPI for Linux**](https://github.com/amkozlov/raxml-ng/releases/download/1.2.1/raxml-ng_v1.2.1_linux_x86_64_MPI.zip)
+[**Download RAxML-NG-MPI for Linux**](https://github.com/amkozlov/raxml-ng/releases/download/1.2.2/raxml-ng_v1.2.2_linux_x86_64_MPI.zip)
 
-* On Windows, you can use [linux binary](https://github.com/amkozlov/raxml-ng/releases/download/1.2.1/raxml-ng_v1.2.1_linux_x86_64.zip) via [Windows Subsystem for Linux](https://ubuntu.com/wsl), but performance might be lower than with native Linux execution. 
+* On Windows, you can use [linux binary](https://github.com/amkozlov/raxml-ng/releases/download/1.2.2/raxml-ng_v1.2.2_linux_x86_64.zip) via [Windows Subsystem for Linux](https://ubuntu.com/wsl), but performance might be lower than with native Linux execution. 
 
 * If neither of the above options worked for you, please clone this repository and build RAxML-NG from scratch.
 
-**1. Install the dependecies.** On Ubuntu (and other Debian-based systems), you can simply run:
+**1. Install the dependecies (optional).** On Ubuntu and other Debian-based systems, you can simply run:
 ```
-sudo apt-get install flex bison libgmp3-dev
+sudo apt-get install libgmp3-dev
 ```
 For other systems, please make sure you have following packages/libraries installed:  
-- [`GNU Bison`](http://www.gnu.org/software/bison/)
-- [`Flex`](http://flex.sourceforge.net/) 
 - [`GMP`](https://gmplib.org/)
 
 If you do not want to use git submodules (e.g., for packaging), you also need to install:
-- [`pll-modules`](https://github.com/ddarriba/pll-modules/) 
-- [`libpll-2`](https://github.com/xflouris/libpll-2)
+- [`coraxlib`](https://codeberg.org/Exelixis-Lab/coraxlib) 
 - [`terraphast`](https://github.com/amkozlov/terraphast-one) (optional)
 
 **2. Build RAxML-NG.**
@@ -73,11 +70,11 @@ cmake -DSTATIC_BUILD=ON -DENABLE_RAXML_SIMD=OFF -DENABLE_PLLMOD_SIMD=OFF ..
 make
 ```
 
-**Adaptive** version (currently under development):
+Latest **unstable** development version (`dev` branch):
 
 ```
-git clone --recursive -b adaptive https://github.com/togkousa/raxml-ng.git
-cd raxml-ng
+git clone --recursive -b dev https://github.com/amkozlov/raxml-ng raxml-ng-dev
+cd raxml-ng-dev
 mkdir build && cd build
 cmake ..
 make
@@ -117,13 +114,9 @@ If still in doubt, please feel free to post to the [RAxML google group](https://
 
      `./raxml-ng --support --tree bestML.tree --bs-trees bootstraps.tree`
 
-  5. To execute the **adaptive** version, the user needs to add the `--adaptive` option:
+  5. To run in `v1.1.0` compatibility mode (disable adaptive search, aggressive logLH thresholds etc.), use:
 
-    ./raxml-ng --adaptive --msa testDNA.fa --model GTR+G
-
-  
-  WARNING! The heuristic for the **adaptive** version is still under development.
-  Parallelization and checkpointing are already implemented. The tool will be released soon.
+    ./raxml-ng --msa testDNA.fa --model GTR+G --extra compat-v11
 
 ## License and citation
 
@@ -136,8 +129,7 @@ Alexey M. Kozlov, Diego Darriba, Tom&aacute;&scaron; Flouri, Benoit Morel, and A
 *Bioinformatics, 35 (21), 4453-4455* 
 doi:[10.1093/bioinformatics/btz305](https://doi.org/10.1093/bioinformatics/btz305)
 
-
-When using the **adaptive** RAxML-NG version, please cite [this paper](https://academic.oup.com/mbe/article/40/10/msad227/7296053):
+When using the **adaptive** tree search, please cite [this paper](https://academic.oup.com/mbe/article/40/10/msad227/7296053):
 
 Anastasis Togkousidis, Oleksiy M Kozlov, Julia Haag, Dimitri Höhler, Alexandros Stamatakis (2023)
 **Adaptive RAxML-NG: Accelerating Phylogenetic Inference under Maximum Likelihood using Dataset Difficulty.**
@@ -146,7 +138,7 @@ doi:[10.1093/molbev/msad227](https://doi.org/10.1093/molbev/msad227)
 
 ## The team
 
-* Alexey Kozlov
+* Oleksiy Kozlov
 * Alexandros Stamatakis
 * Diego Darriba
 * Tom&aacute;&scaron; Flouri
