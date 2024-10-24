@@ -81,7 +81,7 @@ TEST(CommandLineParserTest, search_wrong)
   parse_options(cmd, parser, options, true);
 }
 
-TEST(CommandLineParserTest, search_minimal)
+TEST(CommandLineParserTest, search_default)
 {
   // buildup
   CommandLineParser parser;
@@ -93,11 +93,31 @@ TEST(CommandLineParserTest, search_minimal)
   EXPECT_EQ(Command::search, options.command);
   EXPECT_EQ("data.fa", options.msa_file);
   EXPECT_EQ("GTR", options.model_file);
-  EXPECT_EQ(2, options.start_trees.size());
-  EXPECT_EQ(10, options.start_trees.at(StartingTree::random));
-  EXPECT_EQ(10, options.start_trees.at(StartingTree::parsimony));
-  EXPECT_EQ(20, options.num_searches);
+  EXPECT_EQ(1, options.start_trees.size());
+  EXPECT_EQ(0, options.start_trees.at(StartingTree::adaptive));
+  EXPECT_EQ(0, options.num_searches);
+  EXPECT_EQ(TopologyOptMethod::adaptive, options.topology_opt_method);
+  EXPECT_TRUE(options.use_pythia);
+  EXPECT_TRUE(options.use_repeats);
 }
+
+TEST(CommandLineParserTest, search_search1)
+{
+  // buildup
+  CommandLineParser parser;
+  Options options;
+
+  // minimal valid command line
+  string cmd = "raxml-ng --search1 --msa data.fa --model GTR";
+  parse_options(cmd, parser, options, false);
+  EXPECT_EQ(Command::search, options.command);
+  EXPECT_EQ("data.fa", options.msa_file);
+  EXPECT_EQ("GTR", options.model_file);
+  EXPECT_EQ(1, options.start_trees.size());
+  EXPECT_EQ(1, options.start_trees.at(StartingTree::parsimony));
+  EXPECT_EQ(1, options.num_searches);
+}
+
 
 TEST(CommandLineParserTest, search_complex1)
 {
@@ -148,10 +168,9 @@ TEST(CommandLineParserTest, all_default)
   string cmd = "raxml-ng --all --msa data.fa --model part.txt ";
   parse_options(cmd, parser, options, false);
   EXPECT_EQ(Command::all, options.command);
-  EXPECT_EQ(2, options.start_trees.size());
-  EXPECT_EQ(10, options.start_trees.at(StartingTree::random));
-  EXPECT_EQ(10, options.start_trees.at(StartingTree::parsimony));
-  EXPECT_EQ(20, options.num_searches);
+  EXPECT_EQ(1, options.start_trees.size());
+  EXPECT_EQ(0, options.start_trees.at(StartingTree::adaptive));
+  EXPECT_EQ(0, options.num_searches);
   EXPECT_EQ(1000, options.num_bootstraps);
   EXPECT_EQ(BootstopCriterion::autoMRE, options.bootstop_criterion);
   EXPECT_EQ(CORAX_BRLEN_SCALED, options.brlen_linkage);
