@@ -1471,6 +1471,9 @@ void load_constraint(RaxmlInstance& instance)
         (cons_tree.num_tips() == parted_msa.taxon_count() ? "" : "non-") <<
         "comprehensive constraint tree with " << cons_tree.num_tips() << " taxa" << endl << endl;
 
+    if (cons_tree.num_tips() < 4)
+      throw runtime_error("Constraint tree must have at least 4 taxa!");
+
     // check if taxa names are consistent between constraint tree and MSA
     {
       NameList missing_taxa;
