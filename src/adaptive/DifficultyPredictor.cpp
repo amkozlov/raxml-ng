@@ -25,10 +25,12 @@ void DifficultyPredictor::compute_msa_features(ParsimonyMSA* _pmsa)
   _features->sites_per_taxa    = _features->sites / _features->taxa;
   _features->patterns          = part_msa.total_patterns();
   _features->patterns_per_taxa = (double) _features->patterns / _features->taxa;
+  _features->patterns_per_site = (double) _features->patterns / _features->sites;
 
   _features->proportion_gaps      = 0.;
   _features->proportion_invariant = 0.;
   _features->entropy              = 0.;
+  _features->pattern_entropy      = 0.;
   _features->bollback_multinomial = 0;
 
   double bollback_multinomial_tmp = 0;
@@ -45,6 +47,10 @@ void DifficultyPredictor::compute_msa_features(ParsimonyMSA* _pmsa)
     _features->proportion_gaps      += part_prop * msa_stats.gap_prop;
     _features->proportion_invariant += part_prop * msa_stats.inv_prop;
     _features->entropy              += part_prop * msa_stats.mean_column_entropy;
+
+    _features->pattern_entropy += corax_msa_pattern_entropy(pinfo.msa().pll_msa(),
+                                                            pinfo.msa().weights().data(),
+                                                            pinfo.model().charmap());
 
     bollback_multinomial_tmp = corax_msa_bollback_multinomial(pinfo.msa().pll_msa(),
                                                               pinfo.msa().weights().data(),
@@ -136,11 +142,13 @@ void DifficultyPredictor::print_features()
   cout << "Num taxa: " << _features->taxa << endl;
   cout << "Num sites: " << _features->sites << endl;
   cout << "Patterns: " << _features->patterns << endl;
+  cout << "Patterns/site: " << _features->patterns_per_site << endl;
   cout << "Patterns/taxa: " << _features->patterns_per_taxa << endl;
   cout << "Sites/taxa: " << _features->sites_per_taxa << endl;
   cout << "Gaps proportion: " << _features->proportion_gaps << endl;
   cout << "Proportion invariant: " << _features->proportion_invariant << endl;
   cout << "Entropy: " << _features->entropy << endl;
+  cout << "Pattern entropy: " << _features->pattern_entropy << endl;
   cout << "Bollback: " << _features->bollback_multinomial << endl;
   cout << "Avg rf dist: " << _avg_rrf << endl;
   cout << "Proportion of unique topologies: " << _prop_uniq << endl;
@@ -189,14 +197,16 @@ LogStream& operator<<(LogStream& stream, const DifficultyPredictor& dp)
     stream << "  Num taxa: " << feat->taxa << endl;
     stream << "  Num sites: " << feat->sites << endl;
     stream << "  Patterns: " << feat->patterns << endl;
+    stream << "  Patterns/site: " << FMT_PREC2(feat->patterns_per_site) << endl;
     stream << "  Patterns/taxa: " << FMT_PREC2(feat->patterns_per_taxa) << endl;
     stream << "  Sites/taxa: " << FMT_PREC2(feat->sites_per_taxa) << endl;
     stream << "  Gaps proportion: " << FMT_PREC2(feat->proportion_gaps) << endl;
     stream << "  Invariant proportion: " << FMT_PREC2(feat->proportion_invariant) << endl;
     stream << "  Entropy: " << FMT_LH(feat->entropy) << endl;
+    stream << "  Pattern entropy: " << FMT_LH(feat->pattern_entropy) << endl;
     stream << "  Bollback: " << FMT_LH(feat->bollback_multinomial) << endl;
-    stream << "  Avg rf dist: " << FMT_LH(dp.avg_rrf()) << endl;
-    stream << "  Proportion of unique topologies: " << FMT_PREC2(dp.prop_uniq()) << endl;
+    stream << "  Avg RF distance (parsimony): " << FMT_LH(dp.avg_rrf()) << endl;
+    stream << "  Proportion of unique topologies (parsimony): " << FMT_PREC2(dp.prop_uniq()) << endl;
     stream << endl;
   }
   stream << "Pythia difficulty score: " << FMT_PREC2(dp.difficulty()) << endl;
