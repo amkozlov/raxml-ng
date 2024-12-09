@@ -390,6 +390,7 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const PartitionStats& p
   stream << ps.gap_prop;
   stream << ps.emp_base_freqs;
   stream << ps.emp_subst_rates;
+  stream << ps.mean_column_entropy;
 
   return stream;
 }
@@ -402,6 +403,7 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, PartitionStats& ps)
   stream >> ps.gap_prop;
   stream >> ps.emp_base_freqs;
   stream >> ps.emp_subst_rates;
+  stream >> ps.mean_column_entropy;
 
   return stream;
 }
@@ -450,6 +452,11 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Options& o)
 
   stream << o.write_bs_msa << o.use_old_constraint;
 
+  stream << o.use_spr_fastclv << o.use_bs_pars << o.use_par_pars << o.use_pythia;
+  stream << o.topology_opt_method << o.lh_epsilon_brlen_triplet;
+  stream << o.diff_pred_pars_trees << o.nni_tolerance << o.nni_epsilon;
+  stream << o.num_sh_reps << o.sh_epsilon;
+
   return stream;
 }
 
@@ -496,6 +503,14 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, Options& o)
 
   if (o.opt_version >= 2)
     stream >> o.write_bs_msa >> o.use_old_constraint;
+
+  if (o.opt_version >= 3)
+  {
+    stream >> o.use_spr_fastclv >> o.use_bs_pars >> o.use_par_pars >> o.use_pythia;
+    stream >> o.topology_opt_method >> o.lh_epsilon_brlen_triplet;
+    stream >> o.diff_pred_pars_trees >> o.nni_tolerance >> o.nni_epsilon;
+    stream >> o.num_sh_reps >> o.sh_epsilon;
+  }
 
   return stream;
 }

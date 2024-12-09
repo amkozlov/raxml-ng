@@ -21,9 +21,11 @@ char * support_fmt_prop(double support)
 }
 
 
-SupportTree::SupportTree(const Tree& tree) : Tree(tree), _num_bs_trees(0)
+SupportTree::SupportTree(const Tree& tree) : Tree(tree), _num_bs_trees(0),
+    _ref_splits_only(true), _ref_splits(nullptr), _pll_splits_hash(nullptr)
 {
-  _pll_splits_hash = nullptr;
+  if (num_splits() > 0)
+    set_reference_tree();
 }
 
 SupportTree::~SupportTree ()
@@ -54,10 +56,26 @@ void SupportTree::add_splits_to_hashtable(const PllSplitSharedPtr& splits,
                                                          update_only);
 }
 
-
-void SupportTree::add_tree(const Tree& tree)
+void SupportTree::set_reference_tree()
 {
-  add_tree(tree.pll_utree_root());
+  assert(num_splits() > 0);
+
+  _node_split_map.resize(num_splits());
+   doubleVector support(num_splits(), 0.);
+
+  /* extract reference tree splits and add them into hashtable */
+  _ref_splits = extract_splits_from_tree(pll_utree_root(), _node_split_map.data());
+
+  add_splits_to_hashtable(_ref_splits, support, false);
+}
+
+void SupportTree::get_replicate_supports(const corax_unode_t& root,
+                                         PllSplitSharedPtr& splits, doubleVector& support)
+{
+  /* by default, do not modify support vector -> every split gets support +1 */
+  RAXML_UNUSED(root);
+  RAXML_UNUSED(splits);
+  RAXML_UNUSED(support);
 }
 
 void SupportTree::add_replicate_tree(const Tree& tree)
@@ -68,7 +86,13 @@ void SupportTree::add_replicate_tree(const Tree& tree)
   _num_bs_trees++;
 
   /* extract replicate tree splits and add them into hashtable */
-  add_tree(tree);
+  const corax_unode_t& root = tree.pll_utree_root();
+  auto splits = extract_splits_from_tree(root, nullptr);
+
+  doubleVector support;
+  get_replicate_supports(root, splits, support);
+
+  add_splits_to_hashtable(splits, support, _ref_splits_only);
 //  LOG_DEBUG_TS << "Added replicate trees: " << _num_bs_trees << endl;
 }
 
@@ -102,7 +126,8 @@ void SupportTree::collect_support()
 
 bool SupportTree::compute_support()
 {
-  normalize_support_in_hashtable();
+  if (_num_bs_trees > 0)
+    normalize_support_in_hashtable();
 
   collect_support();
 

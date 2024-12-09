@@ -434,8 +434,8 @@ void KH::run_test(){
     double ret_val = 0, L = old_loglh[group_id], NL = new_loglh[group_id];
     unsigned int i, pos = 0;
     
-    if((NL - L ) < 10) {
-        epsilon[group_id] = 10;
+    if((NL - L ) < lh_epsilon) {
+        epsilon[group_id] = lh_epsilon;
         return;
     }
 
@@ -489,7 +489,7 @@ void KH::run_test(){
         
         //cout << "HEY OP! stdev " << stdev << endl;
         ret_val = 1.645 * sqrt(total_sites) * stdev;
-        ret_val = ret_val > 10 ? ret_val : 10;
+        ret_val = ret_val > lh_epsilon ? ret_val : lh_epsilon;
         epsilon[group_id] = ret_val;
     }
 

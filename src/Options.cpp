@@ -7,8 +7,9 @@ using namespace std;
 Options::Options() : opt_version(RAXML_OPT_VERSION), cmdline(""), command(Command::none),
 use_tip_inner(true), use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false),
 use_repeats(true), use_rba_partload(true), use_energy_monitor(true), use_old_constraint(false),
-use_spr_fastclv(true), use_bs_pars(true), use_par_pars(true), use_pythia(true), use_adaptive_search(true),
-optimize_model(true), optimize_brlen(true), force_mode(false), safety_checks(SafetyCheck::all),
+use_spr_fastclv(true), use_bs_pars(true), use_par_pars(true), use_pythia(true),
+optimize_model(true), optimize_brlen(true), topology_opt_method(TopologyOptMethod::adaptive),
+force_mode(false), safety_checks(SafetyCheck::all),
 redo_mode(false), nofiles_mode(false), write_interim_results(true), write_bs_msa(false),
 log_level(LogLevel::progress), msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
 random_seed(0), start_trees(), lh_epsilon(DEF_LH_EPSILON), lh_epsilon_brlen_triplet(DEF_LH_EPSILON_BRLEN_TRIPLET),
@@ -22,7 +23,8 @@ tbe_naive(false), consense_cutoff(ConsenseCutoff::MR), tree_file(""), constraint
 msa_file(""), model_file(""), weights_file(""), outfile_prefix(""),
 num_threads(1), num_threads_max(1), num_ranks(1), num_workers(1), num_workers_max(UINT_MAX),
 simd_arch(CORAX_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(LoadBalancing::benoit),
-diff_pred_pars_trees(RAXML_CPYTHIA_TREES_NUM), nni_tolerance(1.0), nni_epsilon(10)
+diff_pred_pars_trees(RAXML_CPYTHIA_TREES_NUM), nni_tolerance(1.0), nni_epsilon(10),
+num_sh_reps(1000), sh_epsilon(0.1)
 {}
 
 string Options::output_fname(const string& suffix) const
@@ -52,7 +54,9 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.bootstrap_trees, "bootstraps");
   set_default_outfile(outfile_names.support_tree, "support");
   set_default_outfile(outfile_names.fbp_support_tree, "supportFBP");
+  set_default_outfile(outfile_names.rbs_support_tree, "supportRBS");
   set_default_outfile(outfile_names.tbe_support_tree, "supportTBE");
+  set_default_outfile(outfile_names.sh_support_tree, "supportSH");
   set_default_outfile(outfile_names.terrace, "terrace");
   set_default_outfile(outfile_names.binary_msa, "rba");
   set_default_outfile(outfile_names.bootstrap_msa, "bootstrapMSA");
@@ -84,8 +88,12 @@ const std::string& Options::support_tree_file(BranchSupportMetric bsm) const
   {
     if (bsm == BranchSupportMetric::fbp)
       return outfile_names.fbp_support_tree;
+    else if (bsm == BranchSupportMetric::rbs)
+      return outfile_names.rbs_support_tree;
     else if (bsm == BranchSupportMetric::tbe)
       return outfile_names.tbe_support_tree;
+    else if (bsm == BranchSupportMetric::sh_alrt)
+      return outfile_names.sh_support_tree;
     else
       return outfile_names.support_tree;
   }
@@ -298,6 +306,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     case Command::sitelh:
       stream << "Per-site likelihood computation";
       break;
+    case Command::pythia:
+      stream << "Phylogenetic difficulty prediction";
+      break;
     default:
       break;
   }
@@ -305,11 +316,33 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   if (opts.command == Command::search || opts.command == Command::bootstrap ||
       opts.command == Command::all)
   {
-    if (opts.use_adaptive_search)
-      stream << " (adaptive)";
+    stream << " (";
+    switch (opts.topology_opt_method)
+    {
+      case TopologyOptMethod::classic:
+        stream << "classic";
+        break;
+      case TopologyOptMethod::adaptive:
+        stream << "adaptive";
+        break;
+      case TopologyOptMethod::rapidBS:
+         stream << "rapid bootstrap";
+         break;
+      case TopologyOptMethod::nniRound:
+        stream << "NNI round";
+        break;
+      case TopologyOptMethod::simplified:
+        stream << "simplified";
+        break;
+      case TopologyOptMethod::none:
+        stream << "OFF";
+        break;
+    }
+    stream << ")";
   }
 
-  if (opts.command == Command::all || opts.command == Command::support)
+  if (opts.command == Command::bootstrap || opts.command == Command::all ||
+      opts.command == Command::support)
   {
     stream << " (";
     for (auto it = opts.bs_metrics.cbegin(); it != opts.bs_metrics.cend(); ++it)
@@ -322,8 +355,14 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
         case BranchSupportMetric::fbp:
           stream << "Felsenstein Bootstrap";
           break;
+        case BranchSupportMetric::rbs:
+          stream << "Rapid Bootstrap";
+          break;
         case BranchSupportMetric::tbe:
           stream << "Transfer Bootstrap";
+          break;
+        case BranchSupportMetric::sh_alrt:
+          stream << "SH-aLRT";
           break;
       }
     }
@@ -362,8 +401,8 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   }
   stream << endl;
 
-  if (opts.command == Command::bootstrap || opts.command == Command::all ||
-      opts.command == Command::bsmsa)
+  if ((opts.command == Command::bootstrap || opts.command == Command::all ||
+      opts.command == Command::bsmsa) && opts.num_bootstraps > 0)
   {
     stream << "  bootstrap replicates: ";
     stream << (opts.use_bs_pars ? "parsimony (" : "random (");

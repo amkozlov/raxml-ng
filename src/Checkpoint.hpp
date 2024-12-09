@@ -21,7 +21,7 @@ enum class CheckpointStep
   start,
   brlenOpt,
   modOpt1,
-  radiusDetect,
+  radiusDetectOrNNI,
   modOpt2,
   fastSPR,
   modOpt3,
@@ -32,7 +32,7 @@ enum class CheckpointStep
 
 struct SearchState
 {
-  SearchState() : step(CheckpointStep::start), loglh(0.), iteration(0), fast_spr_radius(0) {}
+  SearchState() : step(CheckpointStep::start), loglh(0.), iteration(0), fast_spr_radius(0), slow_spr_radius(0) {}
 
   CheckpointStep step;
   double loglh;
@@ -42,6 +42,7 @@ struct SearchState
   spr_round_params spr_params;
   
   int fast_spr_radius;
+  int slow_spr_radius;
 };
 
 struct Checkpoint

@@ -35,8 +35,21 @@ struct nni_round_params
 {
   double tolerance;
   double lh_epsilon;
-  
+  double max_rounds;
 };
+
+struct sh_support_params
+{
+  unsigned int num_bootstraps;
+  double tolerance;
+  double lh_epsilon;
+  double sh_epsilon;
+  std::vector<unsigned int*> bsrep_site_weights;
+
+  sh_support_params(size_t bsnum, size_t partnum) : num_bootstraps(bsnum),
+      bsrep_site_weights(bsnum * partnum) {}
+};
+
 
 class TreeInfo
 {
@@ -78,6 +91,11 @@ public:
   void compute_ancestral(const AncestralStatesSharedPtr& ancestral,
                          const PartitionAssignment& part_assign);
 
+  void sh_support(const sh_support_params& params, doubleVector& support_values);
+
+  // int savePartition(const char* filename, int partIndex);
+
+  // corax_partition_t* loadPartition(const char* filename);
 
 private:
   corax_treeinfo_t * _pll_treeinfo;
@@ -100,6 +118,7 @@ private:
 
 void assign(PartitionedMSA& parted_msa, const TreeInfo& treeinfo);
 void assign(Model& model, const TreeInfo& treeinfo, size_t partition_id);
+void assign_models(TreeInfo& treeinfo, const ModelMap& models);
 
 
 corax_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& pinfo,

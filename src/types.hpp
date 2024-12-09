@@ -39,7 +39,8 @@ enum class Command
   rfdist,
   consense,
   ancestral,
-  sitelh
+  sitelh,
+  pythia
 };
 
 enum class FileFormat
@@ -100,7 +101,9 @@ enum class LoadBalancing
 enum class BranchSupportMetric
 {
   fbp = 0,
-  tbe
+  tbe,
+  rbs,
+  sh_alrt
 };
 
 enum class InformationCriterion
@@ -108,6 +111,25 @@ enum class InformationCriterion
   aic = 0,
   aicc,
   bic
+};
+
+enum class TopologyOptMethod
+{
+  none = 0,
+  classic,
+  adaptive,
+  rapidBS,
+  nniRound,
+  simplified
+};
+
+enum class StoppingRule
+{
+  none = 0,
+  sn_rell,
+  sn_normal,
+  kh,
+  kh_mult
 };
 
 namespace ConsenseCutoff

@@ -2,15 +2,10 @@
 #include <memory>
 #include <random>
 
-DifficultyPredictor::DifficultyPredictor(const string& outfile)
+DifficultyPredictor::DifficultyPredictor() : _difficulty(-1), _parsimony_msa_ptr(nullptr),
+_features(nullptr), _prop_uniq(-1), _avg_rrf(-1)
 {
   _rf_dist_calc.reset(new RFDistCalculator());
-  _outfile = outfile;
-  _difficulty = -1;
-  _states = 0;
-  _states_map = nullptr;
-  _parsimony_msa_ptr = nullptr;
-  _features = nullptr;
 }
 
 DifficultyPredictor::~DifficultyPredictor()
@@ -19,46 +14,55 @@ DifficultyPredictor::~DifficultyPredictor()
   _pars_tree_list.clear();
 }
 
-void DifficultyPredictor::set_parsimony_msa_ptr(ParsimonyMSA* _pmsa)
+void DifficultyPredictor::compute_msa_features(ParsimonyMSA* _pmsa)
 {
   _parsimony_msa_ptr = _pmsa;
   const PartitionedMSA& part_msa = _parsimony_msa_ptr->part_msa();
   
-  size_t weights_size = 0;
-  int msa_patterns = 0;
+  _features                    = (corax_msa_features *) calloc(1, sizeof(corax_msa_features));
+  _features->taxa              = part_msa.taxon_count();
+  _features->sites             = part_msa.total_sites();
+  _features->sites_per_taxa    = _features->sites / _features->taxa;
+  _features->patterns          = part_msa.total_patterns();
+  _features->patterns_per_taxa = (double) _features->patterns / _features->taxa;
+  _features->patterns_per_site = (double) _features->patterns / _features->sites;
 
-  for (const auto& pinfo: part_msa.part_list()) msa_patterns += pinfo.length();
-  
-  //const double msa_patterns   = (double)partitioned_msa_ptr->full_msa().length();
-  _features->patterns          = msa_patterns;
-  _features->patterns_per_taxa = (double) msa_patterns / _features->taxa;
-
+  _features->proportion_gaps      = 0.;
+  _features->proportion_invariant = 0.;
+  _features->entropy              = 0.;
+  _features->pattern_entropy      = 0.;
   _features->bollback_multinomial = 0;
+
   double bollback_multinomial_tmp = 0;
   int number_of_sites = 0;
 
-  for (const auto& pinfo: part_msa.part_list())
+  for (const PartitionInfo& pinfo: part_msa.part_list())
   {
-    int cur_num_sites = 0;
-    weights_size = pinfo.msa().weights().size();
-    if(weights_size > 0) assert(pinfo.length() == weights_size);
-    
-    unsigned int weights[pinfo.length()];
-    for (size_t j=0; j < pinfo.msa().weights().size(); j++)
-    {
-      weights[j] = weights_size > 0 ? pinfo.msa().weights().at(j) : 1;
-      if( weights[j] != 0 ) cur_num_sites += weights[j];
-    }
+    auto& msa_stats = pinfo.stats();
+    size_t cur_num_sites = msa_stats.site_count;
+    double part_prop = cur_num_sites / _features->sites;
 
-    bollback_multinomial_tmp =
-      corax_msa_bollback_multinomial(pinfo.msa().pll_msa_nonconst(), weights, _states_map);
+    assert(pinfo.length() == pinfo.msa().weights().size());
+
+    _features->proportion_gaps      += part_prop * msa_stats.gap_prop;
+    _features->proportion_invariant += part_prop * msa_stats.inv_prop;
+    _features->entropy              += part_prop * msa_stats.mean_column_entropy;
+
+    _features->pattern_entropy += corax_msa_pattern_entropy(pinfo.msa().pll_msa(),
+                                                            pinfo.msa().weights().data(),
+                                                            pinfo.model().charmap());
+
+    bollback_multinomial_tmp = corax_msa_bollback_multinomial(pinfo.msa().pll_msa(),
+                                                              pinfo.msa().weights().data(),
+                                                              pinfo.model().charmap());
     
     bollback_multinomial_tmp += cur_num_sites * log(cur_num_sites);
     _features->bollback_multinomial += bollback_multinomial_tmp;
     number_of_sites += cur_num_sites;
   }
+  assert(number_of_sites == _features->sites);
 
-  _features->bollback_multinomial -= number_of_sites*log(number_of_sites);
+  _features->bollback_multinomial -= number_of_sites * log(number_of_sites);
 }
 
 double DifficultyPredictor::predict_difficulty(int n_trees)
@@ -72,7 +76,6 @@ double DifficultyPredictor::predict_difficulty(int n_trees)
   for (int i = 0; i < n_trees; ++i)
     seeds[i] = rand();
 
-  // TODO parallelization
   for (int i = 0; i < n_trees; ++i)
     _pars_tree_list.emplace_back(Tree::buildParsimony(*_parsimony_msa_ptr, seeds[i], &score));
   
@@ -91,25 +94,28 @@ double DifficultyPredictor::predict_difficulty(int n_trees)
     }
   }
 
+  labelToId.clear();
+
+  return predict_difficulty(_pars_tree_list);
+}
+
+double DifficultyPredictor::predict_difficulty(const TreeList& pars_trees)
+{
   // calculate rf distances - predict difficulty
-  _rf_dist_calc->set_tree_list(_pars_tree_list);
+  _rf_dist_calc->set_tree_list(pars_trees);
   _rf_dist_calc->recalculate_rf();
 
-  double num_unique = (double) _rf_dist_calc->num_uniq_trees() / n_trees;
-  // printFeatures(rf_dist_calc->avg_rrf(), num_unique);
+  _prop_uniq = (double) _rf_dist_calc->num_uniq_trees() / _rf_dist_calc->num_trees();
+  _avg_rrf = _rf_dist_calc->avg_rrf();
 
-  double out_pred = corax_msa_predict_difficulty(_features, _rf_dist_calc->avg_rrf(), num_unique);
+  double out_pred = corax_msa_predict_difficulty(_features, _rf_dist_calc->avg_rrf(), _prop_uniq);
   out_pred = round(out_pred * 100.0) / 100.0;
 
   _difficulty = out_pred;
 
-  labelToId.clear();
-
-  // storing in binary file if configured
-  write_adaptive_chkpt();
-
   return out_pred;
 }
+
 
 int DifficultyPredictor::num_start_trees(double diff, double amp, double mean, double s)
 {
@@ -130,99 +136,24 @@ double DifficultyPredictor::normal_pdf(double x, double m, double s)
   return inv_sqrt_2pi / s * std::exp(-0.5f * a * a);
 }
 
-void DifficultyPredictor::compute_msa_features(corax_msa_t* original_msa, size_t states,
-                                               const corax_state_t *states_map)
-{
-  _features = (corax_msa_features *) calloc(1, sizeof(corax_msa_features));
-
-  const double msa_taxa    = (double) original_msa->count;
-  const double msa_sites   = (double) original_msa->length;
-  _features->taxa           = msa_taxa;
-  _features->sites          = msa_sites;
-  _features->sites_per_taxa = msa_sites / msa_taxa;
-
-  // new version 
-  _states = states;
-  _states_map = states_map;
-  
-  corax_msa_stats_t *msa_stats = corax_msa_compute_stats(
-      original_msa,
-      _states,
-      _states_map,
-      NULL,
-      CORAX_MSA_STATS_GAP_PROP | CORAX_MSA_STATS_INV_PROP
-          | CORAX_MSA_STATS_ENTROPY);
-
-  libpll_check_error("ERROR computing MSA stats");
-  assert(msa_stats);
-
-  _features->proportion_gaps      = msa_stats->gap_prop;
-  _features->proportion_invariant = msa_stats->inv_prop;
-  _features->entropy              = msa_stats->entropy;
-
-  corax_msa_destroy_stats(msa_stats);
-}
-
-void DifficultyPredictor::print_features(double avg_rff, double prop_unique)
+void DifficultyPredictor::print_features()
 {
   cout << "\n======================================================" << endl;
   cout << "Num taxa: " << _features->taxa << endl;
   cout << "Num sites: " << _features->sites << endl;
   cout << "Patterns: " << _features->patterns << endl;
+  cout << "Patterns/site: " << _features->patterns_per_site << endl;
   cout << "Patterns/taxa: " << _features->patterns_per_taxa << endl;
   cout << "Sites/taxa: " << _features->sites_per_taxa << endl;
   cout << "Gaps proportion: " << _features->proportion_gaps << endl;
   cout << "Proportion invariant: " << _features->proportion_invariant << endl;
   cout << "Entropy: " << _features->entropy << endl;
+  cout << "Pattern entropy: " << _features->pattern_entropy << endl;
   cout << "Bollback: " << _features->bollback_multinomial << endl;
-  cout << "Avg rf dist: " << avg_rff << endl;
-  cout << "Proportion of unique topologies: " << prop_unique << endl;
+  cout << "Avg rf dist: " << _avg_rrf << endl;
+  cout << "Proportion of unique topologies: " << _prop_uniq << endl;
   cout << "======================================================" << endl;
 
-}
-
-void DifficultyPredictor::write_adaptive_chkpt()
-{
-  if (_outfile.empty()) return;
-
-  AdaptiveCheckpoint chpt(_difficulty);
-  ofstream out(_outfile, ios::binary);
-
-  if (!out)
-  {
-    cout << "WARNING!! Error in storing Pythia's score in binary file with suffix '.adaptiveCkp'. " << endl;
-    cout << "There might occur errors when rerunning RAxML-NG from a checkpoint. " << endl;
-  } 
-  else
-  {
-    out.write( reinterpret_cast<char*>( &chpt.pythiaScore), sizeof(double));
-    out.close();
-  }
-}
-
-
-double DifficultyPredictor::load_adaptive_chkpt()
-{
-  AdaptiveCheckpoint chpt;
-  _difficulty = -1;
-
-  if (!_outfile.empty())
-  {
-    ifstream file (_outfile, ios::in | ios::binary);
-    if (file.is_open())
-    {
-      file.read((char*)&chpt.pythiaScore, sizeof(double));
-    } else
-    {
-      LOG_DEBUG << "Unable to open the binary file with suffix '.adaptiveCkp'" << endl;
-      return -1;
-    }
-
-    if (chpt.pythiaScore >= 0 && chpt.pythiaScore <= 1)
-      _difficulty = chpt.pythiaScore;
-  }
-
-  return _difficulty;
 }
 
 double DifficultyPredictor::load_pythia_score_from_log_file(const string& old_log_file)
@@ -254,5 +185,32 @@ double DifficultyPredictor::load_pythia_score_from_log_file(const string& old_lo
     cout << "WARNING! Unable to open the log file to search for the pythia score." << endl;
 
   return pythia_score;
+}
+
+LogStream& operator<<(LogStream& stream, const DifficultyPredictor& dp)
+{
+  auto feat = dp.features();
+
+  if (feat)
+  {
+    stream << "Pythia features: " << endl;
+    stream << "  Num taxa: " << feat->taxa << endl;
+    stream << "  Num sites: " << feat->sites << endl;
+    stream << "  Patterns: " << feat->patterns << endl;
+    stream << "  Patterns/site: " << FMT_PREC2(feat->patterns_per_site) << endl;
+    stream << "  Patterns/taxa: " << FMT_PREC2(feat->patterns_per_taxa) << endl;
+    stream << "  Sites/taxa: " << FMT_PREC2(feat->sites_per_taxa) << endl;
+    stream << "  Gaps proportion: " << FMT_PREC2(feat->proportion_gaps) << endl;
+    stream << "  Invariant proportion: " << FMT_PREC2(feat->proportion_invariant) << endl;
+    stream << "  Entropy: " << FMT_LH(feat->entropy) << endl;
+    stream << "  Pattern entropy: " << FMT_LH(feat->pattern_entropy) << endl;
+    stream << "  Bollback: " << FMT_LH(feat->bollback_multinomial) << endl;
+    stream << "  Avg RF distance (parsimony): " << FMT_LH(dp.avg_rrf()) << endl;
+    stream << "  Proportion of unique topologies (parsimony): " << FMT_PREC2(dp.prop_uniq()) << endl;
+    stream << endl;
+  }
+  stream << "Pythia difficulty score: " << FMT_PREC2(dp.difficulty()) << endl;
+
+  return stream;
 }
 

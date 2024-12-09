@@ -4,17 +4,30 @@
 
 using namespace std;
 
-Optimizer::Optimizer (const Options &opts) :
+Optimizer::Optimizer (const Options &opts, bool rapid_bs /* = false */) :
+    _topology_opt_method(opts.topology_opt_method),
     _lh_epsilon(opts.lh_epsilon), _lh_epsilon_brlen_triplet(opts.lh_epsilon_brlen_triplet), 
-    _spr_radius(opts.spr_radius), _spr_cutoff(opts.spr_cutoff), 
+    _spr_radius(opts.spr_radius), _spr_cutoff(opts.spr_cutoff), _rstate(nullptr),
     _nni_epsilon(opts.nni_epsilon), _nni_tolerance(opts.nni_tolerance), 
-    _stopping_criterion(opts.stopping_rule), _modified_version(opts.modified_version)
+    _stopping_rule(opts.stopping_rule)
 {
+  _spr_ntopol_keep = rapid_bs ? 5 : 20;
+  if (rapid_bs)
+  {
+    _spr_cutoff = 0.5;
+    _rstate = corax_random_create(opts.random_seed + ParallelContext::group_id());
+  }
 }
 
 Optimizer::~Optimizer ()
 {
-  // TODO Auto-generated destructor stub
+  corax_random_destroy(_rstate);
+}
+
+void Optimizer::disable_stopping_rule(){
+
+  _stopping_rule = StoppingRule::none; 
+  _criterion = nullptr;
 }
 
 double Optimizer::optimize_model(TreeInfo& treeinfo, double lh_epsilon)
@@ -54,8 +67,36 @@ void Optimizer::nni(TreeInfo& treeinfo, nni_round_params& nni_params, double& lo
 
 double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
 {
-  if(call_modified_version()) return optimize_topology_modified(treeinfo, cm);
+  switch(_topology_opt_method)
+  {
+    case TopologyOptMethod::classic:
+      return optimize_topology_standard(treeinfo, cm);
+      break;
+    case TopologyOptMethod::adaptive:
+      if (cm.checkp_file().pythia_score >= 0.)
+        return optimize_topology_adaptive(treeinfo, cm);
+      else
+        return optimize_topology_standard(treeinfo, cm);
+      break;
+    case TopologyOptMethod::rapidBS:
+      return optimize_topology_rbs(treeinfo, cm);
+      break;
+    case TopologyOptMethod::nniRound:
+      return optimize_topology_nni(treeinfo, cm);
+      break;
+    case TopologyOptMethod::simplified:
+      return optimize_topology_adaptive(treeinfo, cm);
+      break;
+    case TopologyOptMethod::none:
+      return evaluate(treeinfo, cm);
+      break;
+    default:
+      assert(0);
+  }
+}
 
+double Optimizer::optimize_topology_standard(TreeInfo& treeinfo, CheckpointManager& cm)
+{
   const double fast_modopt_eps = 10.;
   const double interim_modopt_eps = 3.;
   const double final_modopt_eps = 0.1;
@@ -72,8 +113,6 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
 
   spr_params.lh_epsilon_brlen_full = _lh_epsilon;
   spr_params.lh_epsilon_brlen_triplet = _lh_epsilon_brlen_triplet;
-  spr_params.total_moves = nullptr;
-  spr_params.increasing_moves = nullptr;
 
   CheckpointStep resume_step = search_state.step;
 
@@ -121,7 +160,7 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
   {
     /* auto detect best radius for fast SPRs */
 
-    if (do_step(CheckpointStep::radiusDetect))
+    if (do_step(CheckpointStep::radiusDetectOrNNI))
     {
       if (iter == 0)
       {
@@ -176,7 +215,7 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
     spr_params.thorough = 0;
     spr_params.radius_min = 1;
     spr_params.radius_max = best_fast_radius;
-    spr_params.ntopol_keep = 20;
+    spr_params.ntopol_keep = _spr_ntopol_keep;
     spr_params.subtree_cutoff = _spr_cutoff;
     spr_params.reset_cutoff_info(loglh);
   }
@@ -260,19 +299,12 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
   return loglh;
 }
 
-double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManager& cm)
-{
-  // TODO: connect the command line arguments for nni-epsilon and nni-tolerance with nni_params.lh_epsilon and 
-  // nni_params.tolerance
+double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManager& cm){
   
-  if(call_modified_version()) return optimize_topology_modified(treeinfo, cm);
-
   const double fast_modopt_eps = 10.;
   const double interim_modopt_eps = 3.;
   const double final_modopt_eps = 0.1;
-  
-  assert(criterion && criterion->multi_test_correction() && criterion->kh_test());
-  
+
   SearchState local_search_state = cm.search_state();
   auto& search_state = ParallelContext::group_master_thread() ? cm.search_state() : local_search_state;
   ParallelContext::barrier();
@@ -280,21 +312,21 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
   /* set references such that we can work directly with checkpoint values */
   double &loglh = search_state.loglh;
   int& iter = search_state.iteration;
-  int& best_fast_radius = search_state.fast_spr_radius;
+  int& fast_spr_radius = search_state.fast_spr_radius;
+  int& slow_spr_radius = search_state.slow_spr_radius;
 
   // spr round - basics
   spr_round_params& spr_params = search_state.spr_params;
   spr_params.lh_epsilon_brlen_full = _lh_epsilon;
   spr_params.lh_epsilon_brlen_triplet = _lh_epsilon_brlen_triplet;
   
+  double br_len_epsilon = _lh_epsilon;
+  spr_params.lh_epsilon_brlen_full = _lh_epsilon;
+  spr_params.lh_epsilon_brlen_triplet = _lh_epsilon_brlen_triplet;
+
   unsigned long int total_moves = 0, increasing_moves = 0;
-  spr_params.total_moves = &total_moves;
-  spr_params.increasing_moves = &increasing_moves;
-  
-  vector<double *> persite_lnl = 
-    criterion->get_persite_lnl(ParallelContext::group_id(), ParallelContext::local_thread_id());
-  vector<double *> persite_lnl_new = 
-    criterion->get_persite_lnl_new(ParallelContext::group_id(),  ParallelContext::local_thread_id());
+  spr_params.total_moves = (_stopping_rule == StoppingRule::kh_mult) ? &total_moves : nullptr;
+  spr_params.increasing_moves = (_stopping_rule == StoppingRule::kh_mult) ? &increasing_moves : nullptr;
   
   // nni round - basics
   nni_round_params& nni_params = search_state.nni_params;
@@ -302,201 +334,13 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
   nni_params.lh_epsilon = _nni_epsilon;
 
   double difficulty = cm.checkp_file().pythia_score;
-
-  CheckpointStep resume_step = search_state.step;
-
-  /* Compute initial LH of the starting tree */
-  loglh = treeinfo.loglh();
-
-  auto do_step = [&search_state,resume_step](CheckpointStep step) -> bool
-      {
-        if (step >= resume_step)
-        {
-          search_state.step = step;
-          return true;
-        }
-        else
-          return false;;
-      };
-
-  /* Compute initial LH of the starting tree */
-  loglh = treeinfo.loglh();
-
-  // Determine FAST and SLOW SPR maximum radius
-  best_fast_radius = difficulty != -1 ? 
-              min(fast_spr_radius_adaptive(difficulty), (int) treeinfo.pll_treeinfo().tip_count - 3) :
-              min(10, (int) treeinfo.pll_treeinfo().tip_count - 3 );
-  
-  // in case the user has specified their own values
-  if(_spr_radius > 0){
-    best_fast_radius = _spr_radius;
-    LOG_PROGRESS(loglh) << "User specified SPR radius for FAST/SLOW iterations: " << best_fast_radius << endl;
-  }
-
-  /* Initial branch-length model optimization */
-  if (do_step(CheckpointStep::brlenOpt))
-  {
-    cm.update_and_write(treeinfo);
-    LOG_PROGRESS(loglh) << "Initial branch length optimization" << endl;
-    loglh = treeinfo.optimize_branches(fast_modopt_eps, 1);
-  }
-
-  /* Initial fast model optimization */
-  if (do_step(CheckpointStep::modOpt1))
-  {
-    cm.update_and_write(treeinfo);
-    LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << fast_modopt_eps << ")" << endl;
-    loglh = optimize_model(treeinfo, fast_modopt_eps);
-
-    /* start spr rounds from the beginning */
-    iter = 0;
-    spr_params.thorough = 0;
-    spr_params.radius_min = 1;
-    spr_params.radius_max = best_fast_radius;
-    spr_params.ntopol_keep = 20;
-    spr_params.subtree_cutoff = _spr_cutoff;
-    spr_params.reset_cutoff_info(loglh);
-  }
-
-  double old_loglh;
-  bool impr = true;
-  double epsilon;
-
-  if (do_step(CheckpointStep::fastSPR))
-  {
-    do
-    {
-      epsilon = _lh_epsilon;
-
-      cm.update_and_write(treeinfo);
-      ++iter;
-
-      /* Computing the per-site loglh vector before the SPR round */
-      criterion->compute_loglh(treeinfo, persite_lnl, true);
-
-      old_loglh = loglh;
-      LOG_PROGRESS(old_loglh) << (spr_params.thorough ? "SLOW" : "FAST") <<
-          " spr round " << iter << " (radius: " << spr_params.radius_max << ")" << endl;
-      
-      loglh = treeinfo.spr_round(spr_params);
-
-      /* Computing the per-site loglh vector after the SPR round */
-      criterion->compute_loglh(treeinfo,persite_lnl_new, false);
-      criterion->set_increasing_moves((*spr_params.increasing_moves));
-
-      /* KH test with multiple testing correction */
-      if(ParallelContext::group_master_thread())
-        criterion->run_test();
-        
-      ParallelContext::barrier();
-
-      double p_value = criterion->get_pvalue(ParallelContext::group_id());
-      epsilon = criterion->get_epsilon(ParallelContext::group_id()); 
-      LOG_DEBUG << "KH-like multiple-testing epsilon = " << epsilon << endl;
-      impr = ((loglh - old_loglh > epsilon) && (p_value < 1)); 
-    
-    } while (impr);
-  }
-  
-  if (do_step(CheckpointStep::modOpt3))
-  {
-    cm.update_and_write(treeinfo);
-    LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << interim_modopt_eps << ")" << endl;
-    loglh = optimize_model(treeinfo, interim_modopt_eps);
-
-    /* init slow SPRs */
-    spr_params.thorough = 1;
-    iter = 0;
-  }
-  
-  if (do_step(CheckpointStep::slowSPR))
-  {
-    if(iter == 0)
-      nni(treeinfo, nni_params, loglh);
-
-    do
-    {
-      epsilon = _lh_epsilon ;
-
-      cm.update_and_write(treeinfo);
-      ++iter;
-      old_loglh = loglh;
-
-      /* Computing the per-site loglh vector before the SPR round */
-      criterion->compute_loglh(treeinfo, persite_lnl, true);
-
-      LOG_PROGRESS(old_loglh) << (spr_params.thorough ? "SLOW" : "FAST") <<
-          " spr round " << iter << " (radius: " << spr_params.radius_max << ")" << endl;
-
-      loglh = treeinfo.spr_round(spr_params);
-      
-      /* Computing the per-site loglh vector after the SPR round */
-      criterion->compute_loglh(treeinfo, persite_lnl_new, false);
-
-      /* KH test with multiple testing correction */
-      if(criterion->multi_test_correction()) 
-        criterion->set_increasing_moves((*spr_params.increasing_moves));
-
-      if(ParallelContext::group_master_thread())
-        criterion->run_test();
-        
-      ParallelContext::barrier();
-
-      double p_value = criterion->get_pvalue(ParallelContext::group_id());
-      epsilon = criterion->get_epsilon(ParallelContext::group_id()); 
-      LOG_DEBUG << "KH-like multiple-testing epsilon = " << epsilon << endl;
-      impr = ((loglh - old_loglh > epsilon) && (p_value < 1));
-
-    } while (impr);
-  }
-
-  if (do_step(CheckpointStep::modOpt4))
-  {
-    cm.update_and_write(treeinfo);
-    LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << final_modopt_eps << ")" << endl;
-    loglh = optimize_model(treeinfo, final_modopt_eps);
-  }
-
-  if (do_step(CheckpointStep::finish))
-    cm.update_and_write(treeinfo);
-
-  return loglh;
-}
-
-double Optimizer::optimize_topology_modified(TreeInfo& treeinfo, CheckpointManager& cm){
-  
-  assert(_modified_version || criterion != nullptr);
-
-  const double interim_modopt_eps = 3.;
-  const double final_modopt_eps = 0.1;
-
-  SearchState local_search_state = cm.search_state();
-  auto& search_state = ParallelContext::group_master_thread() ? cm.search_state() : local_search_state;
-  ParallelContext::barrier();
- 
-  /* set references such that we can work directly with checkpoint values */
-  double &loglh = search_state.loglh;
-  int& iter = search_state.iteration;
-  spr_round_params& spr_params = search_state.spr_params;
-  int& best_fast_radius = search_state.fast_spr_radius;
-  best_fast_radius = 10;
-  
-  double br_len_epsilon = _lh_epsilon;
-  spr_params.lh_epsilon_brlen_full = _lh_epsilon;
-  spr_params.lh_epsilon_brlen_triplet = _lh_epsilon_brlen_triplet;
-
-  unsigned long int total_moves = 0, increasing_moves = 0;
-  spr_params.total_moves = (criterion && criterion->multi_test_correction()) ? &total_moves : nullptr;
-  spr_params.increasing_moves = (criterion && criterion->multi_test_correction()) ? &increasing_moves : nullptr;
-  
-  bool use_kh_like = (criterion) ? criterion->kh_test() : false;
-
+  bool use_kh_test = (_stopping_rule == StoppingRule::kh || _stopping_rule == StoppingRule::kh_mult);
   vector<double *> persite_lnl, persite_lnl_new;
-  
-  if(criterion){
-    persite_lnl = criterion->get_persite_lnl(ParallelContext::group_id(), ParallelContext::local_thread_id()); 
-    if (use_kh_like) 
-      persite_lnl_new = criterion->get_persite_lnl_new(ParallelContext::group_id(),  ParallelContext::local_thread_id()); 
+
+  if(_criterion){
+    persite_lnl = _criterion->get_persite_lnl(ParallelContext::group_id(), ParallelContext::local_thread_id()); 
+    if (use_kh_test) 
+      persite_lnl_new = _criterion->get_persite_lnl_new(ParallelContext::group_id(),  ParallelContext::local_thread_id()); 
   }
 
   CheckpointStep resume_step = search_state.step;
@@ -517,22 +361,27 @@ double Optimizer::optimize_topology_modified(TreeInfo& treeinfo, CheckpointManag
 
   /* Print statement about which stopping criterion is used */
   string approach;
-  if(criterion){
-    switch (_stopping_criterion)
+  string heuristic = (_topology_opt_method == TopologyOptMethod:: adaptive) ?
+                      "Adaptive RAxML-NG" :
+                      "simplified RAxML-NG (sRAxML-NG)";
+
+  if(_stopping_rule != StoppingRule::none){
+    
+    switch (_stopping_rule)
     {
-      case 0:
+      case StoppingRule::sn_rell:
         approach = "Sampling Noise RELL";
         break;
       
-      case 1:
+      case StoppingRule::sn_normal:
         approach = "Sampling Noise Normal";
         break;
 
-      case 2:
+      case StoppingRule::kh:
         approach = "KH";
         break;
       
-      case 3:
+      case StoppingRule::kh_mult:
         approach = "KH - multiple testing correction";
         break;
       
@@ -540,55 +389,63 @@ double Optimizer::optimize_topology_modified(TreeInfo& treeinfo, CheckpointManag
         break;
     }
     
-    LOG_PROGRESS(loglh) << "sRAxML-NG: Stopping criterion: " << approach << " apporach." << endl;
+    LOG_PROGRESS(loglh) << heuristic << ": Stopping criterion: " << approach << " apporach." << endl;
 
-    if(resume_step > CheckpointStep::modOpt1){
-      {
-        _lh_epsilon = cm.get_epsilon();
-        LOG_PROGRESS(loglh) << approach << " apporach. Epsilon = " << _lh_epsilon << endl;
-      }
-    }
+    /* This is for the SN-based apporaches, since in the KH-based methods the epsilon is recalculated */
+    if(resume_step > CheckpointStep::modOpt1) _lh_epsilon = cm.get_epsilon();
     
   } else {
 
-    LOG_PROGRESS(loglh) << "Simplified version (sRAxML-NG) called" << endl;  
+    LOG_PROGRESS(loglh) << heuristic << ": Stopping criteria off, epsilon = "<< _lh_epsilon << endl;  
   }
 
   if (do_step(CheckpointStep::brlenOpt))
   {
     cm.update_and_write(treeinfo);
     LOG_PROGRESS(loglh) << "Initial branch length optimization" << endl;
-    loglh = treeinfo.optimize_branches(interim_modopt_eps, 1);
+    loglh = treeinfo.optimize_branches(fast_modopt_eps, 1);
   }
 
   /* Initial fast model optimization */
   if (do_step(CheckpointStep::modOpt1))
   {
     cm.update_and_write(treeinfo);
-    LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << interim_modopt_eps << ")" << endl;
-    loglh = optimize_model(treeinfo, interim_modopt_eps);
+    LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << fast_modopt_eps << ")" << endl;
+    loglh = optimize_model(treeinfo, fast_modopt_eps);
+
+    /* Set FAST SPR radius */
+    fast_spr_radius = difficulty >= 0. ? 
+        2 * adaptive_radius(difficulty) : 10;
+    
+    // in case the user has specified their own values
+    if(_spr_radius > 0){
+      fast_spr_radius =_spr_radius;
+      LOG_PROGRESS(loglh) << "User specified SPR radius for FAST/SLOW iterations: " << _spr_radius << endl;
+    }
+
+    fast_spr_radius = min(fast_spr_radius, (int) treeinfo.pll_treeinfo().tip_count - 3);
 
     /* start spr rounds from the beginning */
     iter = 0;
     spr_params.thorough = 0;
     spr_params.radius_min = 1;
-    spr_params.radius_max = best_fast_radius;
-    spr_params.ntopol_keep = 20;
+    spr_params.radius_max = fast_spr_radius;
+    spr_params.ntopol_keep = _spr_ntopol_keep;
     spr_params.subtree_cutoff = _spr_cutoff;
     spr_params.reset_cutoff_info(loglh);
 
     /* If the selected stopping criterion is either SN-Normal or SN-RELL,
       we have to compute the _lh_epsilon here */
-    if(_stopping_criterion == 0 || _stopping_criterion == 1){
+    if(_stopping_rule == StoppingRule::sn_rell || _stopping_rule == StoppingRule::sn_normal){
 
-      criterion->compute_loglh(treeinfo, persite_lnl, true);
+      _criterion->compute_loglh(treeinfo, persite_lnl, true);
       
       if(ParallelContext::group_master_thread()) 
-        criterion->run_test();
+        _criterion->run_test();
         
       ParallelContext::barrier();
 
-      _lh_epsilon = criterion->get_epsilon(ParallelContext::group_id());
+      _lh_epsilon = _criterion->get_epsilon(ParallelContext::group_id());
       LOG_PROGRESS(loglh) << approach << " apporach. Epsilon = " << _lh_epsilon << endl;
 
       if(ParallelContext::group_master_thread())
@@ -601,21 +458,16 @@ double Optimizer::optimize_topology_modified(TreeInfo& treeinfo, CheckpointManag
   double old_loglh, epsilon;
   bool impr = true;
   
-  if(_spr_radius > 0){
-    best_fast_radius = _spr_radius; // maybe change that idk
-    spr_params.radius_max = best_fast_radius;
-    LOG_PROGRESS(loglh) << "SPR radius for FAST/SLOW iterations: " << best_fast_radius << endl;
-  }
   if (do_step(CheckpointStep::fastSPR))
   {
     do
     { 
-      epsilon =_lh_epsilon ;
+      epsilon = _lh_epsilon ;
       
       cm.update_and_write(treeinfo);
       ++iter;
 
-      if(use_kh_like) criterion->compute_loglh(treeinfo, persite_lnl, true);
+      if(use_kh_test) _criterion->compute_loglh(treeinfo, persite_lnl, true);
 
       old_loglh = loglh;
       LOG_PROGRESS(old_loglh) << (spr_params.thorough ? "SLOW" : "FAST") <<
@@ -626,29 +478,29 @@ double Optimizer::optimize_topology_modified(TreeInfo& treeinfo, CheckpointManag
       /* optimize ALL branches */
       loglh = treeinfo.optimize_branches(br_len_epsilon, 1);
 
-      if(use_kh_like){
+      if(use_kh_test){
         
-        criterion->compute_loglh(treeinfo,persite_lnl_new, false);
+        _criterion->compute_loglh(treeinfo,persite_lnl_new, false);
         
-        if(criterion->multi_test_correction()) 
-          criterion->set_increasing_moves((*spr_params.increasing_moves));
+        if(_criterion->multi_test_correction()) 
+          _criterion->set_increasing_moves((*spr_params.increasing_moves));
 
         if(ParallelContext::group_master_thread())
-          criterion->run_test();
+          _criterion->run_test();
           
         ParallelContext::barrier();
 
         if(spr_params.increasing_moves){
           
-          double p_value = criterion->get_pvalue(ParallelContext::group_id());
-          epsilon = criterion->get_epsilon(ParallelContext::group_id()); 
-          LOG_PROGRESS(loglh) << "KH-like multiple-testing epsilon = " << epsilon << endl;
+          double p_value = _criterion->get_pvalue(ParallelContext::group_id());
+          epsilon = _criterion->get_epsilon(ParallelContext::group_id()); 
+          LOG_PROGRESS(loglh) << "KH multiple-testing epsilon = " << epsilon << endl;
           impr = ((loglh - old_loglh > epsilon) && (p_value < 1));
           
         } else {
 
-          epsilon = criterion->get_epsilon(ParallelContext::group_id());
-          LOG_PROGRESS(loglh) << "KH-like criterion epsilon = " << epsilon << endl;
+          epsilon = _criterion->get_epsilon(ParallelContext::group_id());
+          LOG_PROGRESS(loglh) << "KH criterion epsilon = " << epsilon << endl;
           impr = (loglh - old_loglh > epsilon);
         }
       } else {
@@ -665,15 +517,28 @@ double Optimizer::optimize_topology_modified(TreeInfo& treeinfo, CheckpointManag
     LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << interim_modopt_eps << ")" << endl;
     loglh = optimize_model(treeinfo, interim_modopt_eps);
 
+    /* Set SLOW SPR radius */
+    slow_spr_radius = difficulty >= 0. ? 
+        adaptive_radius(difficulty) : 10;
+    
+    // in case the user has specified their own values
+    if(_spr_radius > 0)
+      slow_spr_radius =_spr_radius;
+
+    slow_spr_radius = min(slow_spr_radius, (int) treeinfo.pll_treeinfo().tip_count - 3);
+
     /* init slow SPRs */
     spr_params.thorough = 1;
-    spr_params.radius_min = 1;
-    spr_params.radius_max = best_fast_radius;   
+    spr_params.radius_max = slow_spr_radius;
+    spr_params.reset_cutoff_info(loglh); 
     iter = 0;
   }
   
   if (do_step(CheckpointStep::slowSPR))
   {
+    if(iter == 0 && _topology_opt_method == TopologyOptMethod::adaptive)
+      nni(treeinfo, nni_params, loglh);
+
     do
     {
       epsilon = _lh_epsilon ;
@@ -682,7 +547,7 @@ double Optimizer::optimize_topology_modified(TreeInfo& treeinfo, CheckpointManag
       ++iter;
       old_loglh = loglh;
 
-      if(use_kh_like) criterion->compute_loglh(treeinfo, persite_lnl, true);
+      if(use_kh_test) _criterion->compute_loglh(treeinfo, persite_lnl, true);
 
       LOG_PROGRESS(old_loglh) << (spr_params.thorough ? "SLOW" : "FAST") <<
           " spr round " << iter << " (radius: " << spr_params.radius_max << ")" << endl;
@@ -690,29 +555,29 @@ double Optimizer::optimize_topology_modified(TreeInfo& treeinfo, CheckpointManag
       loglh = treeinfo.spr_round(spr_params);
       loglh = treeinfo.optimize_branches(br_len_epsilon, 1);
 
-      if(use_kh_like){
+      if(use_kh_test){
         
-        criterion->compute_loglh(treeinfo, persite_lnl_new, false);
+        _criterion->compute_loglh(treeinfo, persite_lnl_new, false);
 
-        if(criterion->multi_test_correction()) 
-          criterion->set_increasing_moves((*spr_params.increasing_moves));
+        if(_criterion->multi_test_correction()) 
+          _criterion->set_increasing_moves((*spr_params.increasing_moves));
 
         if(ParallelContext::group_master_thread())
-          criterion->run_test();
+          _criterion->run_test();
           
         ParallelContext::barrier();
 
         if(spr_params.increasing_moves){
           
-          double p_value = criterion->get_pvalue(ParallelContext::group_id());
-          epsilon = criterion->get_epsilon(ParallelContext::group_id()); 
-          LOG_PROGRESS(loglh) << "KH-like multiple-testing epsilon = " << epsilon << endl;
+          double p_value = _criterion->get_pvalue(ParallelContext::group_id());
+          epsilon = _criterion->get_epsilon(ParallelContext::group_id()); 
+          LOG_PROGRESS(loglh) << "KH multiple-testing epsilon = " << epsilon << endl;
           impr = ((loglh - old_loglh > epsilon) && (p_value < 1));
 
         } else {
 
-          epsilon = criterion->get_epsilon(ParallelContext::group_id());
-          LOG_PROGRESS(loglh) << "KH-like criterion epsilon = " << epsilon << endl;
+          epsilon = _criterion->get_epsilon(ParallelContext::group_id());
+          LOG_PROGRESS(loglh) << "KH criterion epsilon = " << epsilon << endl;
           impr = (loglh - old_loglh > epsilon);
         }
       } else {
@@ -734,6 +599,147 @@ double Optimizer::optimize_topology_modified(TreeInfo& treeinfo, CheckpointManag
   if (do_step(CheckpointStep::finish))
     cm.update_and_write(treeinfo);
   
+  return loglh;
+}
+
+double Optimizer::optimize_topology_rbs(TreeInfo& treeinfo, CheckpointManager& cm)
+{
+  const double fast_modopt_eps = 10.;
+  const int max_spr_rounds = 2;
+
+  SearchState local_search_state = cm.search_state();
+  auto& search_state = ParallelContext::group_master_thread() ? cm.search_state() : local_search_state;
+  ParallelContext::barrier();
+
+  /* set references such that we can work directly with checkpoint values */
+  double &loglh = search_state.loglh;
+  int& iter = search_state.iteration;
+  spr_round_params& spr_params = search_state.spr_params;
+
+  spr_params.lh_epsilon_brlen_full = _lh_epsilon;
+  spr_params.lh_epsilon_brlen_triplet = _lh_epsilon_brlen_triplet;
+
+  CheckpointStep resume_step = search_state.step;
+
+  /* Compute initial LH of the starting tree */
+  loglh = treeinfo.loglh();
+
+  auto do_step = [&search_state,resume_step](CheckpointStep step) -> bool
+      {
+        if (step >= resume_step)
+        {
+          search_state.step = step;
+          return true;
+        }
+        else
+          return false;;
+      };
+
+  if (do_step(CheckpointStep::brlenOpt))
+  {
+    cm.update_and_write(treeinfo);
+    LOG_PROGRESS(loglh) << "Initial branch length optimization" << endl;
+    loglh = treeinfo.optimize_branches(fast_modopt_eps, 1);
+  }
+
+  /* Initial fast model optimization */
+  if (do_step(CheckpointStep::modOpt1))
+  {
+    cm.update_and_write(treeinfo);
+    LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << fast_modopt_eps << ")" << endl;
+    loglh = optimize_model(treeinfo, fast_modopt_eps);
+
+    /* start spr rounds from the beginning */
+    iter = 0;
+    spr_params.thorough = 1;
+    spr_params.radius_min = 1;
+    spr_params.radius_max = 5 + corax_random_getint(_rstate, 11);
+    spr_params.ntopol_keep = _spr_ntopol_keep;
+    spr_params.subtree_cutoff = _spr_cutoff;
+    spr_params.reset_cutoff_info(loglh);
+  }
+
+  // do SPRs
+  double old_loglh;
+  bool impr = true;
+
+  if (do_step(CheckpointStep::slowSPR))
+  {
+    do
+    {
+      cm.update_and_write(treeinfo);
+      ++iter;
+      old_loglh = loglh;
+      LOG_PROGRESS(old_loglh) << (spr_params.thorough ? "SLOW" : "FAST") <<
+          " spr round " << iter << " (radius: " << spr_params.radius_max << ")" << endl;
+      loglh = treeinfo.spr_round(spr_params);
+
+      /* optimize ALL branches */
+      loglh = treeinfo.optimize_branches(_lh_epsilon, 1);
+
+      impr = (loglh - old_loglh > _lh_epsilon);
+    }
+    while (impr && iter < max_spr_rounds);
+  }
+
+  if (do_step(CheckpointStep::finish))
+    cm.update_and_write(treeinfo);
+
+  return loglh;
+}
+
+double Optimizer::optimize_topology_nni(TreeInfo& treeinfo, CheckpointManager& cm)
+{
+  const double modopt_eps = _lh_epsilon;
+
+  SearchState local_search_state = cm.search_state();
+  auto& search_state = ParallelContext::group_master_thread() ? cm.search_state() : local_search_state;
+  ParallelContext::barrier();
+
+  /* set references such that we can work directly with checkpoint values */
+  double &loglh = search_state.loglh;
+
+  CheckpointStep resume_step = search_state.step;
+
+  nni_round_params& nni_params = search_state.nni_params;
+  nni_params.tolerance = _nni_tolerance;
+  nni_params.lh_epsilon = _nni_epsilon;
+  nni_params.max_rounds = 10;
+
+  /* Compute initial LH of the starting tree */
+  loglh = treeinfo.loglh();
+
+  auto do_step = [&search_state,resume_step](CheckpointStep step) -> bool
+      {
+        if (step >= resume_step)
+        {
+          search_state.step = step;
+          return true;
+        }
+        else
+          return false;;
+      };
+
+  /* Initial fast model optimization */
+  if (do_step(CheckpointStep::modOpt1))
+  {
+    cm.update_and_write(treeinfo);
+    LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << modopt_eps << ")" << endl;
+    loglh = optimize_model(treeinfo, modopt_eps);
+  }
+
+  // do NNIs
+  if (do_step(CheckpointStep::radiusDetectOrNNI))
+  {
+    nni(treeinfo, nni_params, loglh);
+
+    /* optimize ALL branches */
+    loglh = treeinfo.optimize_branches(_lh_epsilon, 1);
+  }
+
+  if (do_step(CheckpointStep::finish))
+    cm.update_and_write(treeinfo);
+
   return loglh;
 }
 
@@ -783,10 +789,11 @@ double Optimizer::evaluate(TreeInfo& treeinfo, CheckpointManager& cm)
   return loglh;
 }
 
-int Optimizer::fast_spr_radius_adaptive(double difficulty){
-  if(difficulty < 0) {
-    return 10;
-  } else if (difficulty < 0.4) {
+int Optimizer::adaptive_radius(double difficulty){
+  
+  assert (difficulty >= 0);
+
+  if (difficulty < 0.4) {
     return (int) ( 12.5*difficulty + 5);
   } else if (difficulty <= 0.6){
     return 10;

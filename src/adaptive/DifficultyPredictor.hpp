@@ -14,23 +14,11 @@
 
 using namespace std;
 
-struct AdaptiveCheckpoint
-{
-    double pythiaScore;
-
-    AdaptiveCheckpoint() : pythiaScore(0.0) {}
-    AdaptiveCheckpoint(double pScore) : 
-            pythiaScore(pScore) {}
-};
-
 class DifficultyPredictor
 {
     private:
         double _difficulty;
-        size_t _states;
-        const corax_state_t *_states_map;
         const ParsimonyMSA* _parsimony_msa_ptr;
-        string _outfile;
         
         // Parsimony trees treelist
         TreeList _pars_tree_list;
@@ -40,33 +28,38 @@ class DifficultyPredictor
 
         // features
         corax_msa_features* _features;
+        double _prop_uniq;
+        double _avg_rrf;
+
 
         // more functions
         double normal_pdf(double x, double m, double s);
-        void print_features(double avg_rff, double prop_unique);
+        void print_features();
 
     public:
 
         // constructors
-        DifficultyPredictor(const string& outfile = "");
+        DifficultyPredictor();
         ~DifficultyPredictor();
         
         // getter
-        double difficulty() { return _difficulty; }
+        double difficulty() const { return _difficulty; }
+        const corax_msa_features* features() const { return _features; }
+        double prop_uniq() const { return _prop_uniq; }
+        double avg_rrf() const { return _avg_rrf; }
 
         // difficulty prediction
         double predict_difficulty(int n_trees);
+        double predict_difficulty(const TreeList& pars_trees);
         int num_start_trees(double difficulty, double amp, double mean = 0.5, double s = 0.2);
 
         // setters
-        void set_parsimony_msa_ptr(ParsimonyMSA* _pmsa);
-        void compute_msa_features(corax_msa_t* original_msa, size_t states, const corax_state_t *states_map);
-
-        void write_adaptive_chkpt();
-        double load_adaptive_chkpt();
+        void compute_msa_features(ParsimonyMSA* _pmsa);
 
         double load_pythia_score_from_log_file(const string& old_log_file);
 };
+
+LogStream& operator<<(LogStream& stream, const DifficultyPredictor& dp);
 
 
 #endif /* RAXML_ADAPTIVE_DIFFICULTYPREDICTOR_HPP_ */
