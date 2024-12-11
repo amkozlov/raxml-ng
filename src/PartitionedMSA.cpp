@@ -339,7 +339,8 @@ void AutoPartitioner::update_partition_ranges(PartitionedMSA& part_msa)
 //  double binw = log2(mod.num_states())  / 4.;
   double maxe = column_entropies.empty() ? 0. :
                                           *std::max_element(column_entropies.cbegin(), column_entropies.cend());
-  double binw = maxe  / part_msa.part_count();
+  double binw = maxe  / part_msa.part_count() + 1e-9;
+//  printf("maxe : %lf, binw : %lf\n", maxe, binw);
 
   size_t p = 0;
   for (auto& pinfo: part_msa.part_list())
@@ -399,7 +400,7 @@ doubleVector AutoPartitioner::get_column_entropies(const PartitionedMSA& part_ms
 
 //  printf("Site entropy: ");
 //  for (size_t i = 0; i < full_len; ++i)
-//    printf("%.3f ", e[i]);
+//    if (i == 110) printf("%.3f ", e[i]);
 //  printf("\n\n");
 
   column_entropies.assign(e, e + full_len);
