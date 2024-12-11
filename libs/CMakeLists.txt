@@ -1,6 +1,6 @@
 message(STATUS "Building dependencies in: ${RAXML_LOCALDEPS_DIR}")
 
-# build LIBPLL and LIBPLL-MODULES
+# build CORAXLIB
 if (USE_CORAXLIB_CMAKE)
   add_subdirectory(coraxlib)
   set(CORAXLIB_SRC "${CMAKE_CURRENT_SOURCE_DIR}/coraxlib/src")
