@@ -546,7 +546,21 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 20: /* SIMD instruction set */
         if (strcasecmp(optarg, "none") == 0 || strcasecmp(optarg, "scalar") == 0)
         {
+#ifdef HAVE_AUTOVEC
+          throw InvalidOptionValueException("Non-vectorized kernels not available!\n"
+              "Please recompile RAxML-NG in portable mode, or use '--simd native' for auto-vectorized kernels.");
+#else
           opts.simd_arch = CORAX_ATTRIB_ARCH_CPU;
+#endif
+        }
+        else if (strcasecmp(optarg, "native") == 0 || strcasecmp(optarg, "autovec") == 0)
+        {
+#ifdef HAVE_AUTOVEC
+          opts.simd_arch = CORAX_ATTRIB_ARCH_CPU;
+#else
+          throw InvalidOptionValueException("Auto-vectorized kernels not available!\n"
+              "Please recompile RAxML-NG in native mode, or use '--simd none' for non-vectorized kernels.");
+#endif
         }
         else if (strcasecmp(optarg, "sse3") == 0 || strcasecmp(optarg, "sse") == 0)
         {
@@ -560,7 +574,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         {
           opts.simd_arch = CORAX_ATTRIB_ARCH_AVX2;
         }
-        else
+        else if (strcasecmp(optarg, "auto") != 0)
         {
           throw InvalidOptionValueException("Unknown SIMD instruction set: " + string(optarg));
         }
@@ -1238,7 +1252,12 @@ void CommandLineParser::print_help()
             "  --site-repeats on | off                    use site repeats optimization, 10%-60% faster than tip-inner (default: ON)\n" <<
             "  --threads      VALUE                       number of parallel threads to use (default: " << sysutil_get_cpu_cores() << ")\n" <<
             "  --workers      VALUE                       number of tree searches to run in parallel (default: 1)\n" <<
-            "  --simd         none | sse3 | avx | avx2    vector instruction set to use (default: auto-detect).\n"
+#ifdef HAVE_AUTOVEC
+            "  --simd         native | sse3 | avx | avx2  "
+#else
+            "  --simd         none | sse3 | avx | avx2    "
+#endif
+                                                      << "vector instruction set to use (default: auto-detect).\n"
             "  --rate-scalers on | off                    use individual CLV scalers for each rate category (default: ON for >2000 taxa)\n"
             "  --force        [ <CHECKS> ]                disable safety checks (please think twice!)\n"
             "\n"

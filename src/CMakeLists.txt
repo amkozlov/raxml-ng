@@ -1,3 +1,6 @@
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/libs/coraxlib/cmake")
+include(simd)
+
 file(GLOB RAXML_SOURCES ${PROJECT_SOURCE_DIR}/src/common.h
                         ${PROJECT_SOURCE_DIR}/src/*.cpp 
                         ${PROJECT_SOURCE_DIR}/src/util/*.cpp
@@ -37,6 +40,12 @@ if (BUILD_AS_LIBRARY)
   add_library(raxml_module MODULE ${RAXML_SOURCES})
 else()
   add_executable(raxml_module ${RAXML_SOURCES})
+endif()
+
+if (PORTABLE_BUILD)
+    target_add_vnone_definitions(raxml_module)
+else()
+    target_add_vnative_definitions(raxml_module)
 endif()
 
 if (USE_CORAXLIB_CMAKE)

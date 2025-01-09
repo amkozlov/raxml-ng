@@ -214,7 +214,11 @@ string Options::simd_arch_name() const
   switch(simd_arch)
   {
     case CORAX_ATTRIB_ARCH_CPU:
-      return "NONE";
+#ifdef HAVE_AUTOVEC
+      return "NATIVE (autovec)";
+#else
+      return "NONE (scalar)";
+#endif
       break;
     case CORAX_ATTRIB_ARCH_SSE:
       return "SSE3";
