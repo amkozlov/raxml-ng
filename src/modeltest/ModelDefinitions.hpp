@@ -33,10 +33,10 @@ enum class rate_heterogeneity_t {
     FREE_RATE
 };
 
-const array<rate_heterogeneity_t, 4> default_rate_heterogeneity{
-    rate_heterogeneity_t::INVARIANT_GAMMA,
+const array<rate_heterogeneity_t, 2> default_rate_heterogeneity{
+    //    rate_heterogeneity_t::INVARIANT_GAMMA,
     rate_heterogeneity_t::GAMMA,
-    rate_heterogeneity_t::INVARIANT,
+    //    rate_heterogeneity_t::INVARIANT,
     rate_heterogeneity_t::UNIFORM,
 };
 

@@ -1,6 +1,7 @@
 
 #include "ModelTest.hpp"
 #include "ModelDefinitions.hpp"
+#include "corax/tree/treeinfo.h"
 
 ModelTest::ModelTest(TreeInfo &treeinfo, const Tree &tree, Optimizer &optimizer) : treeinfo(treeinfo), tree(tree),
     optimizer(optimizer) {
@@ -18,6 +19,9 @@ void ModelTest::optimize_model() {
                             default_rate_heterogeneity.size();
 
     auto index = 1U;
+
+
+    assert(treeinfo.pll_treeinfo().partition_count == 1);
 
     std::vector<ModelEvaluation> result;
     for (const auto &entry: dna_substitution_matrix_names) {
