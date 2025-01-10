@@ -3383,24 +3383,24 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
   }
 
   if (opts.command == Command::modeltest) {
-    LOG_INFO << "Starting model test, #starting trees = " << instance.start_trees.size() << ", worker start trees = " << instance.get_worker().start_trees.size() << endl;
+    LOG_INFO << "Starting model test, #starting trees = " << instance.start_trees.size() << ", worker start trees = " <<
+        instance.get_worker().start_trees.size() << endl;
 
-      if (instance.start_trees.size() == 0) {
-        LOG_ERROR << "Please specify a tree to use for model testing" << endl;
-      } else {
-        auto const& master_msa = *instance.parted_msa;
+    if (instance.start_trees.size() == 0) {
+      LOG_ERROR << "Please specify a tree to use for model testing" << endl;
+    } else {
+      auto const &master_msa = *instance.parted_msa;
 
-        auto tree = instance.start_trees.at(0);
+      auto tree = instance.start_trees.at(0);
 
-        auto const& part_assign = instance.proc_part_assign.at(ParallelContext::local_proc_id());
+      auto const &part_assign = instance.proc_part_assign.at(ParallelContext::local_proc_id());
 
-        TreeInfo treeinfo(instance.opts, tree, master_msa, instance.tip_msa_idmap, part_assign);
+      TreeInfo treeinfo(instance.opts, tree, master_msa, instance.tip_msa_idmap, part_assign);
 
-        Optimizer optimizer(instance.opts);
-        ModelTest modeltest(treeinfo, tree, optimizer);
-        modeltest.optimize_model();
-      }
-
+      Optimizer optimizer(instance.opts);
+      ModelTest modeltest(treeinfo, tree, optimizer);
+      modeltest.optimize_model();
+    }
   }
 
   ParallelContext::global_barrier();

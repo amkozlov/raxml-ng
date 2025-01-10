@@ -114,8 +114,7 @@ void CommandLineParser::check_options(Options &opts)
       opts.command == Command::bootstrap || opts.command == Command::all ||
       opts.command == Command::terrace || opts.command == Command::check ||
       opts.command == Command::parse || opts.command == Command::start ||
-      opts.command == Command::ancestral || opts.command == Command::modeltest)
-  {
+      opts.command == Command::ancestral || opts.command == Command::modeltest) {
     if (opts.msa_file.empty())
       throw OptionException("You must specify a multiple alignment file with --msa switch");
   }
@@ -219,7 +218,8 @@ void CommandLineParser::check_options(Options &opts)
 
 
   if (opts.num_workers > 1 && opts.command == Command::modeltest) {
-    throw OptionException("Model testing currently does not work with parallel tree searches. Please use only a single worker.");
+    throw OptionException(
+      "Model testing currently does not work with parallel tree searches. Please use only a single worker.");
   }
 }
 

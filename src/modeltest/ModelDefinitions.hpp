@@ -14,42 +14,43 @@ using std::array;
 
 
 enum class frequency_type_t {
-  FIXED,
-  ESTIMATED
+    FIXED,
+    ESTIMATED
 };
-const array<frequency_type_t, 2> default_frequency_type {frequency_type_t::FIXED, frequency_type_t::ESTIMATED};
 
-const unordered_map<frequency_type_t, std::string> frequency_type_label {
-  {frequency_type_t::FIXED, "+FE"},
-  {frequency_type_t::ESTIMATED, "+FO"},
+const array<frequency_type_t, 2> default_frequency_type{frequency_type_t::FIXED, frequency_type_t::ESTIMATED};
+
+const unordered_map<frequency_type_t, std::string> frequency_type_label{
+    {frequency_type_t::FIXED, "+FE"},
+    {frequency_type_t::ESTIMATED, "+FO"},
 };
 
 enum class rate_heterogeneity_t {
-  UNIFORM,
-  INVARIANT,
-  GAMMA,
-  INVARIANT_GAMMA,
-  FREE_RATE
+    UNIFORM,
+    INVARIANT,
+    GAMMA,
+    INVARIANT_GAMMA,
+    FREE_RATE
 };
 
-const array<rate_heterogeneity_t, 4> default_rate_heterogeneity {
-  rate_heterogeneity_t::INVARIANT_GAMMA,
-  rate_heterogeneity_t::GAMMA,
-  rate_heterogeneity_t::INVARIANT,
-  rate_heterogeneity_t::UNIFORM,
+const array<rate_heterogeneity_t, 4> default_rate_heterogeneity{
+    rate_heterogeneity_t::INVARIANT_GAMMA,
+    rate_heterogeneity_t::GAMMA,
+    rate_heterogeneity_t::INVARIANT,
+    rate_heterogeneity_t::UNIFORM,
 };
 
-const unordered_map<rate_heterogeneity_t, string> rate_heterogeneity_label {
-  {rate_heterogeneity_t::UNIFORM, ""},
-  {rate_heterogeneity_t::INVARIANT, "+I"},
-  {rate_heterogeneity_t::GAMMA, "+G"},
-  {rate_heterogeneity_t::INVARIANT_GAMMA, "+I+G"},
-  {rate_heterogeneity_t::FREE_RATE, "+R4"},
+const unordered_map<rate_heterogeneity_t, string> rate_heterogeneity_label{
+    {rate_heterogeneity_t::UNIFORM, ""},
+    {rate_heterogeneity_t::INVARIANT, "+I"},
+    {rate_heterogeneity_t::GAMMA, "+G"},
+    {rate_heterogeneity_t::INVARIANT_GAMMA, "+I+G"},
+    {rate_heterogeneity_t::FREE_RATE, "+R4"},
 };
 
 
 // Names of DNA models. Resolved into matrix indices by means of the `dna_model_matrices_indices` array below
-const std::vector<std::pair<string, size_t>> dna_substitution_matrix_names {
+const std::vector<std::pair<string, size_t> > dna_substitution_matrix_names{
     {"JC", 0},
     {"K80", 18},
     {"TrN", 59},
@@ -63,8 +64,8 @@ const std::vector<std::pair<string, size_t>> dna_substitution_matrix_names {
     {"GTR", 202},
 };
 
-const array<string, N_DNA_ALLMATRIX_COUNT> dna_model_matrices {
-    "000000",                                                             // 0
+const array<string, N_DNA_ALLMATRIX_COUNT> dna_model_matrices{
+    "000000", // 0
 
     "000001", "000010", "000011", "000100", "000101", "000110", "000111", // 1
     "001000", "001001", "001010", "001011", "001100", "001101", "001110",
@@ -101,12 +102,9 @@ const array<string, N_DNA_ALLMATRIX_COUNT> dna_model_matrices {
     "012314", "012324", "012334", "012340", "012341", "012342", "012343",
     "012344",
 
-    "012345"                                                              //202
+    "012345" //202
 };
 #endif
-
-
-
 
 
 #if 0

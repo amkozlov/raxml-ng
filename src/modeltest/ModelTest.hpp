@@ -6,17 +6,15 @@
 
 class ModelTest {
 public:
-    ModelTest(TreeInfo &treeinfo, const Tree &tree, Optimizer& optimizer);
+    ModelTest(TreeInfo &treeinfo, const Tree &tree, Optimizer &optimizer);
 
     void optimize_model();
-private:
 
+private:
     TreeInfo &treeinfo;
     const Tree &tree;
-    Optimizer& optimizer;
-
+    Optimizer &optimizer;
 };
-
 
 
 #endif //MODELTEST_HPP_
