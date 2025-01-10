@@ -56,6 +56,7 @@
 #include "topology/ConstraintTree.hpp"
 #include "util/EnergyMonitor.hpp"
 #include "adaptive/DifficultyPredictor.hpp"
+#include "modeltest/ModelTest.hpp"
 
 #ifdef _RAXML_TERRAPHAST
 #include "terraces/TerraceWrapper.hpp"
@@ -3381,6 +3382,27 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
     ParallelContext::global_barrier();
   }
 
+  if (opts.command == Command::modeltest) {
+    LOG_INFO << "Starting model test, #starting trees = " << instance.start_trees.size() << ", worker start trees = " << instance.get_worker().start_trees.size() << endl;
+
+      if (instance.start_trees.size() == 0) {
+        LOG_ERROR << "Please specify a tree to use for model testing" << endl;
+      } else {
+        auto const& master_msa = *instance.parted_msa;
+
+        auto tree = instance.start_trees.at(0);
+
+        auto const& part_assign = instance.proc_part_assign.at(ParallelContext::local_proc_id());
+
+        TreeInfo treeinfo(instance.opts, tree, master_msa, instance.tip_msa_idmap, part_assign);
+
+        Optimizer optimizer(instance.opts);
+        ModelTest modeltest(treeinfo, tree, optimizer);
+        modeltest.optimize_model();
+      }
+
+  }
+
   ParallelContext::global_barrier();
 
   if ((opts.command == Command::bootstrap || opts.command == Command::all))
@@ -3719,6 +3741,7 @@ int internal_main(int argc, char** argv, void* comm)
         cm.disable();
         /* fall through */
       case Command::evaluate:
+      case Command::modeltest:
       case Command::search:
       case Command::bootstrap:
       case Command::all:
