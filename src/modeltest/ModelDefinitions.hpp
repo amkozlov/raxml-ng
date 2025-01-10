@@ -1,6 +1,7 @@
 #pragma once
 #include <cassert>
 #include <stdexcept>
+#include <type_traits>
 #ifndef MODEL_DEFS_H
 #define MODEL_DEFS_H
 
@@ -52,7 +53,7 @@ inline std::string frequency_type_label(const DataType &datatype, const frequenc
 }
 
 
-enum class rate_heterogeneity_t {
+enum class rate_heterogeneity_type {
     UNIFORM,
     INVARIANT,
     GAMMA,
@@ -60,52 +61,112 @@ enum class rate_heterogeneity_t {
     FREE_RATE
 };
 
-const array<rate_heterogeneity_t, 5> default_rate_heterogeneity{
-    rate_heterogeneity_t::FREE_RATE, // Compute free-rate first, to resolve among-category-count dependency quickly
-    rate_heterogeneity_t::UNIFORM,
-    rate_heterogeneity_t::INVARIANT,
-    rate_heterogeneity_t::GAMMA,
-    rate_heterogeneity_t::INVARIANT_GAMMA,
+const array<rate_heterogeneity_type, 5> default_rate_heterogeneity{
+    rate_heterogeneity_type::FREE_RATE, // Compute free-rate first, to resolve among-category-count dependency quickly
+    rate_heterogeneity_type::UNIFORM,
+    rate_heterogeneity_type::INVARIANT,
+    rate_heterogeneity_type::GAMMA,
+    rate_heterogeneity_type::INVARIANT_GAMMA,
 };
 
-const unordered_map<rate_heterogeneity_t, string> rate_heterogeneity_label{
-    {rate_heterogeneity_t::UNIFORM, ""},
-    {rate_heterogeneity_t::INVARIANT, "+I"},
-    {rate_heterogeneity_t::GAMMA, "+G4"},
-    {rate_heterogeneity_t::INVARIANT_GAMMA, "+I+G4"},
-    {rate_heterogeneity_t::FREE_RATE, "+R"},
+const unordered_map<rate_heterogeneity_type, string> rate_heterogeneity_label{
 };
 
-/** Description of a model that is to be tested.
+class rate_heterogeneity_t {
+public:
+    rate_heterogeneity_t(rate_heterogeneity_type type, unsigned int count)
+        : type{type}, category_count{count} {
+    }
+
+    rate_heterogeneity_t(const rate_heterogeneity_t &other) = default;
+
+    const rate_heterogeneity_type type;
+    const unsigned int category_count;
+
+    std::string label() const {
+        const std::string cat = std::to_string(category_count);
+        switch (type) {
+            case rate_heterogeneity_type::UNIFORM:
+                return "";
+            case rate_heterogeneity_type::INVARIANT:
+                return "+I";
+            case rate_heterogeneity_type::GAMMA:
+                return "+G" + cat;
+            case rate_heterogeneity_type::INVARIANT_GAMMA:
+                return "+I+G" + cat;
+            case rate_heterogeneity_type::FREE_RATE:
+                return "+R" + cat;
+            default:
+                assert(0);
+        }
+    }
+
+    bool operator==(const rate_heterogeneity_t &other) const {
+        return type == other.type && category_count == other.category_count;
+    }
+};
+
+template<>
+struct std::hash<rate_heterogeneity_t> {
+    std::size_t operator()(const rate_heterogeneity_t &r) const {
+        return (static_cast<unsigned int>(r.type) << 16) ^ r.category_count;
+    }
+};
+static_assert(std::is_copy_constructible<rate_heterogeneity_t>(), "necessary for use as key in std::unordered_map");
+
+class substitution_model_t {
+    public:
+        std::string matrix_name;
+        frequency_type_t base_frequency;
+
+        substitution_model_t(std::string matrix_name, frequency_type_t base_frequency)
+            : matrix_name{matrix_name}, base_frequency{base_frequency}
+        {}
+
+        substitution_model_t(const substitution_model_t &other) = default;
+
+        bool operator==(const substitution_model_t &other) const {
+            return matrix_name == other.matrix_name && base_frequency == other.base_frequency;
+        }
+
+        bool operator!=(const substitution_model_t &other) const {
+            return !(*this == other);
+        }
+
+};
+
+template<>
+struct std::hash<substitution_model_t> {
+    std::size_t operator()(const substitution_model_t &m) const {
+        return (static_cast<unsigned int>(m.base_frequency) << 24) ^ std::hash<std::string>{}(m.matrix_name);
+    }
+};
+static_assert(std::is_copy_constructible<substitution_model_t>(), "necessary for use as key in std::unordered_map");
+
+/**
+ * Description of a model that is to be tested.
  * It only describes the model matrix, frequency modifier and rate heterogeneity type, unlike the Model class, which also
  * associates values with these parameters.
  */
 class candidate_model_t {
 public:
     const DataType datatype;
-    const string matrix_name;
-    const frequency_type_t frequency;
+    const substitution_model_t substitution_model;
     const rate_heterogeneity_t rate_heterogeneity;
-    const unsigned int rate_categories;
-    const unsigned int max_rate_categories;
-    const string descriptor;
 
     candidate_model_t(DataType datatype, string matrix_name, const frequency_type_t frequency_type,
-                      const rate_heterogeneity_t rate_heterogeneity, const unsigned int rate_categories = 1,
-                      unsigned int max_rate_categories = 1)
-        : datatype(datatype), matrix_name(std::move(matrix_name)), frequency(frequency_type),
-          rate_heterogeneity(rate_heterogeneity), rate_categories(rate_categories),
-          max_rate_categories(max_rate_categories),
-          descriptor(generate_descriptor()) {
-        assert(
-            (rate_categories == 1 && max_rate_categories == 1) || rate_heterogeneity == rate_heterogeneity_t::
-            FREE_RATE); // Currently, variable number of rate categories only support for freerate
+                      const rate_heterogeneity_type rate_heterogeneity, const unsigned int rate_categories = 1)
+        : datatype(datatype), substitution_model(matrix_name, frequency_type),
+          rate_heterogeneity(rate_heterogeneity, rate_categories) {
     }
 
-private:
-    std::string generate_descriptor() const {
-        return matrix_name + frequency_type_label(datatype, frequency) + rate_heterogeneity_label.
-               at(rate_heterogeneity);
+    std::string descriptor() const {
+        return substitution_model.matrix_name + frequency_type_label(datatype, substitution_model.base_frequency) + rate_heterogeneity.label();
+    }
+
+    bool operator==(const candidate_model_t &other) const {
+        return datatype == other.datatype && substitution_model == other.substitution_model &&
+               rate_heterogeneity == other.rate_heterogeneity;
     }
 };
 

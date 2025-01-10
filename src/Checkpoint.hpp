@@ -1,6 +1,7 @@
 #ifndef RAXML_CHECKPOINT_HPP_
 #define RAXML_CHECKPOINT_HPP_
 
+#include "Model.hpp"
 #include "common.h"
 #include "TreeInfo.hpp"
 #include "io/binary_io.hpp"

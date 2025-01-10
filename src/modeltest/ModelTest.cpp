@@ -3,6 +3,7 @@
 
 #include <memory>
 
+#include "FreerateHeuristic.hpp"
 #include "ModelDefinitions.hpp"
 #include "../ICScoreCalculator.hpp"
 #include "RHASHeuristic.hpp"
@@ -27,23 +28,24 @@ vector<candidate_model_t> ModelTest::generate_candidate_model_names(const DataTy
 
     const auto &matrix_names = dt == DataType::dna ? dna_substitution_matrix_names : aa_model_names;
 
-//    const auto freerate_cmin = options.free_rate_min_categories;
-//    const auto freerate_cmax = options.free_rate_max_categories;
-
-    const auto freerate_cmin = 0;
-    const auto freerate_cmax = 0;
-//    const auto freerate_cmin = 2;
-//    const auto freerate_cmax = 6;
+    const auto freerate_cmin = options.free_rate_min_categories;
+    const auto freerate_cmax = options.free_rate_max_categories;
+    const auto gamma_category_count = 4;
 
     for (const auto &subst_model: matrix_names) {
         for (const auto &frequency_type: default_frequency_type) {
             for (const auto &rate_heterogeneity: default_rate_heterogeneity) {
-                if (rate_heterogeneity == rate_heterogeneity_t::FREE_RATE) {
+                if (rate_heterogeneity == rate_heterogeneity_type::FREE_RATE) {
                     // If category range is not positive, skip freerate models
                     if (freerate_cmin == 0 && freerate_cmax == 0) {
                         continue;
                     }
 
+                    for (unsigned int c = freerate_cmin; c < freerate_cmax; ++c) {
+                        candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity, c);
+                    }
+                } else if (rate_heterogeneity == rate_heterogeneity_type::GAMMA || rate_heterogeneity ==
+                           rate_heterogeneity_type::INVARIANT_GAMMA) {
                     candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity,
                                                   freerate_cmin, freerate_cmax);
                 } else {
@@ -63,7 +65,9 @@ public:
                         use_rhas_heuristic(false) {
     }
 
-    void initialize(std::vector<candidate_model_t> candidate_models, size_t partition_count, bool use_rhas_heuristic = false) {
+    void initialize(std::vector<candidate_model_t> candidate_models, size_t partition_count,
+            unsigned int min_freerate_cats, unsigned int max_freerate_cats,
+            bool use_rhas_heuristic = false, bool use_freerate_heuristic = false) {
         this->partition_index = 0;
         this->model_index = 0;
         this->partition_count = partition_count;
@@ -72,10 +76,14 @@ public:
         this->results = std::unique_ptr<Results>(
             new std::vector<vector<PartitionModelEvaluation>>(partition_count));
         this->use_rhas_heuristic = use_rhas_heuristic;
+        this->use_freerate_heuristic = use_freerate_heuristic;
 
-        const auto reference_matrix = this->candidate_models.at(0).matrix_name;
+        const auto &reference_model = this->candidate_models.at(0).substitution_model;
         this->rhas_heuristic_per_part.clear();
-        this->rhas_heuristic_per_part.resize(partition_count, RHASHeuristic(reference_matrix));
+        this->rhas_heuristic_per_part.resize(partition_count, RHASHeuristic(reference_model));
+
+        this->freerate_heuristic_per_part.clear();
+        this->freerate_heuristic_per_part.resize(partition_count, FreerateHeuristic(min_freerate_cats, max_freerate_cats));
     }
 
     virtual ~ExecutionStatus() = default;
@@ -89,9 +97,33 @@ public:
 //        printf("thread: %u, model#: %s\n", ParallelContext::thread_id(), result.model.to_string().c_str());
 
         if (use_rhas_heuristic) {
-            const double bic = result.ic_criteria.at(InformationCriterion::bic);
             this->rhas_heuristic_per_part.at(partition_index).update(candidate_model, bic);
+
+            if (candidate_model.substitution_model != candidate_models.at(0).substitution_model) {
+                this->rhas_heuristic_per_part.at(partition_index).reference_complete();
+            }
         }
+        if (use_freerate_heuristic) {
+            this->freerate_heuristic_per_part.at(partition_index).update(candidate_model, bic);
+        }
+    }
+
+    bool skip_heuristically() const {
+        if (!is_index_valid())
+            return false;
+
+        const auto candidate_model = candidate_models.at(model_index);
+        if (use_freerate_heuristic &&
+            freerate_heuristic_per_part.at(partition_index).can_skip(candidate_model)) {
+            return true;
+        }
+
+        if (use_rhas_heuristic &&
+            rhas_heuristic_per_part.at(partition_index).can_skip(candidate_model)) {
+            return true;
+        }
+
+        return false;
     }
 
     void print_results(int partition_index, PartitionModelEvaluation &result) {
@@ -113,10 +145,7 @@ public:
         std::lock_guard<std::mutex> lock(mutex_model_index);
 
         // Skip computation of models according to RHAS heuristic
-        while (use_rhas_heuristic && 
-                is_index_valid() &&
-                rhas_heuristic_per_part.at(partition_index)\
-                    .can_skip(candidate_models.at(model_index))) {
+        while (skip_heuristically()) {
             increment_model_index();
         }
 
@@ -149,6 +178,8 @@ private:
 
     bool use_rhas_heuristic;
     std::vector<RHASHeuristic> rhas_heuristic_per_part;
+    bool use_freerate_heuristic;
+    std::vector<FreerateHeuristic> freerate_heuristic_per_part;
 
     std::unique_ptr<Results> results;
 
@@ -179,7 +210,7 @@ vector<string> ModelTest::optimize_model() {
     if (ParallelContext::master()) {
         // TODO: support multiple partitions with mixed datatypes
         auto candidate_models = generate_candidate_model_names(msa.part_info(0).model().data_type());
-        execution_status.initialize(candidate_models, msa.part_count(), enable_rhas_heuristic);
+        execution_status.initialize(candidate_models, msa.part_count(), options.free_rate_min_categories, options.free_rate_max_categories, enable_rhas_heuristic, enable_freerate_heuristic);
     }
 
     // sync ALL threads across ALL workers
@@ -214,7 +245,6 @@ vector<string> ModelTest::optimize_model() {
             // partition id is always 0, since our treeinfo only contains a single partition
             assign(model, treeinfo, 0); 
 
-
             const double partition_loglh = treeinfo.pll_treeinfo().partition_loglh[0];
             const size_t free_params = model.num_free_params() + treeinfo.tree().num_branches();
             const size_t sample_size = msa.part_info(partition_index).stats().site_count;
@@ -226,7 +256,7 @@ vector<string> ModelTest::optimize_model() {
             execution_status.store_results(partition_index, *candidate_model, partition_results);
             execution_status.print_results(partition_index, partition_results);
 
-            if (candidate_model->rate_heterogeneity == rate_heterogeneity_t::FREE_RATE && enable_freerate_heuristic &&
+            if (candidate_model->rate_heterogeneity.type == rate_heterogeneity_type::FREE_RATE && enable_freerate_heuristic &&
                 new_score >= last_score) {
                 break; // Skip evaluating freerate
             }

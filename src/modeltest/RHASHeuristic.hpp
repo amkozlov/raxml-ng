@@ -1,6 +1,5 @@
 #pragma once
 
-#include <vector>
 #include <unordered_map>
 #include "ModelDefinitions.hpp"
 
@@ -21,28 +20,32 @@
  */
 class RHASHeuristic {
     public:
-        RHASHeuristic(std::string reference_matrix = "GTR", double delta_bic = 10.0);
+    RHASHeuristic(substitution_model_t reference_model, double delta_bic = 10.0);
 
-        /** Add model testing result that this heuristic should consider.
-         *  If the model matrix does not coincide with the reference matrix specified
-         *  in the constructor, the new finding will be ignored
-         */
-        void update(const candidate_model_t &candidate_model, double score);
-        
-        /** Check whether a given candidate model can be skipped because of poor expectations of its RHAS model
-         */
-        bool can_skip(const candidate_model_t &candidate_model);
+    /** Add model testing result that this heuristic should consider.
+     *  If the model matrix does not coincide with the reference matrix specified
+     *  in the constructor, the new finding will be ignored
+     */
+    void update(const candidate_model_t &candidate_model, double score);
 
-        /** Reset previously recorded BIC scores */
-        void clear();
+    /**
+     * Signals that all reference RHAS variants have been computed and that evaluation of heuristic can start now.
+     */
+    void reference_complete();
+
+    /** Check whether a given candidate model can be skipped because of poor expectations of its RHAS model
+     */
+    bool can_skip(const candidate_model_t &candidate_model) const;
+
+    /** Reset previously recorded BIC scores */
+    void clear();
 
 
-    private:
-        void populate_skip();
+private:
 
-        std::string reference_matrix;
-        std::unordered_map<rate_heterogeneity_t, double> observed_bic_score;
-        std::unordered_map<rate_heterogeneity_t, bool> skip;
-        double delta_bic;
+    substitution_model_t reference_model;
+    double delta_bic;
 
+    std::unordered_map<rate_heterogeneity_t, double> observed_bic_score;
+    std::unordered_map<rate_heterogeneity_t, bool> skip;
 };

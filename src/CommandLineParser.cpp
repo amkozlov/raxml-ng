@@ -7,6 +7,8 @@
 #include <thread>
 #endif
 
+#include <regex>
+
 using namespace std;
 
 static struct option long_options[] =
@@ -95,6 +97,7 @@ static struct option long_options[] =
   {"ebg",                no_argument,       0, 0 },  /*  70 */
   {"fast",               no_argument,       0, 0 },  /*  71 */
   {"modeltest",          no_argument,       0, 0 },  /*  72 */
+  {"modeltest-freerate-categories", optional_argument, 0, 0}, /*  73 */
 
   { 0, 0, 0, 0 }
 };
@@ -1365,6 +1368,33 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           optarg_tree = "pars{1}";
         num_commands++;
         break;
+      case 73: /* modeltest free rate categories */ {
+        const std::regex pattern(R"(^(\d+)(?:-(\d+))?$)");
+        std::string soptarg(optarg);
+        std::smatch match;
+        if (!std::regex_match(soptarg, match, pattern)) {
+          throw InvalidOptionValueException(
+            "Invalid freerate category specification: " + soptarg +
+            ", argument must be specified as single integer or range of two positive integers, e.g. \"5\" or \"2-10\".");
+        }
+
+        auto min = std::stoi(match[1]);
+        auto max = match[2].matched ? std::stoi(match[2]) : min;
+        assert(min >= 0 && max >= 0); // regex should disallow negative integers
+
+        if (min == 0) {
+          throw InvalidOptionValueException("Error, number of free rate categories must be greater than 0: " + soptarg);
+        }
+
+        if (min > max) {
+          throw InvalidOptionValueException(
+            "Error, minimum number of freerate categories higher than maximum: " + soptarg);
+        }
+
+        opts.free_rate_min_categories = min;
+        opts.free_rate_max_categories = max;
+        break;
+      }
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -1511,6 +1541,9 @@ void CommandLineParser::print_help()
             "  --opt-branches on | off                    ML optimization of all branch lengths (default: ON)\n"
             "  --prob-msa     on | off                    use probabilistic alignment (works with CATG and VCF)\n"
             "  --lh-epsilon   VALUE                       log-likelihood epsilon for optimization/tree search (default: 10)\n"
+            "\n"
+            "Modeltest options:\n"
+            "  --modeltest-freerate-categories n[-m]      Test freerate models with n categories (optionally up to and including m)\n"
             "\n"
             "Topology search options:\n"
             "  --opt-topology        classic | adaptive   topology optimization method (default: adaptive)\n"
