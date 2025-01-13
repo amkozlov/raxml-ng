@@ -102,6 +102,14 @@ void ModelTest::optimize_model() {
         LOG_INFO << "Partition #" << p << ": " << best_fit[p].model.to_string() << " BIC = " << best_fit[p].ic_criteria.
                 at(InformationCriterion::bic) << endl;
     }
+
+
+    LOG_INFO << endl << "Partition File:" << endl;
+
+    for (auto p = 0U; p < msa.part_count(); ++p) {
+        LOG_INFO << best_fit[p].model.to_string() << ", " << msa.part_info(p).name() << " = " << msa.part_info(p).
+                range_string() << endl;
+    }
 }
 
 vector<PartitionModelEvaluation> ModelTest::choose_best_fit(const EvaluationResults &results,
