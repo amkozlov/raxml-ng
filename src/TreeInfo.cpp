@@ -213,18 +213,6 @@ void TreeInfo::model(size_t partition_id, const Model& model)
   _pll_treeinfo->alphas[partition_id] = model.alpha();
   if (_pll_treeinfo->brlen_scalers)
     _pll_treeinfo->brlen_scalers[partition_id] = model.brlen_scaler();
-
-  // Copy matrix symmetries into treeinfo
-  assert(model.num_submodels() == 1);
-  auto model_subst_matrix_symmetries = model.submodel(0).rate_sym();
-  auto *partition_subst_matrix_symmetries = _pll_treeinfo->subst_matrix_symmetries[partition_id];
-
-  assert(partition_subst_matrix_symmetries != nullptr);
-  std::copy_n(model_subst_matrix_symmetries.begin(), model_subst_matrix_symmetries.size(),
-              partition_subst_matrix_symmetries);
-
-
-  corax_treeinfo_invalidate_all(_pll_treeinfo);
 }
 
 //#define DBG printf
@@ -765,87 +753,6 @@ corax_partition_t* create_pll_partition(const Options& opts, const PartitionInfo
   return partition;
 }
 
-corax_partition_t *recreate_pll_partition(const Options &opts, const PartitionInfo &pinfo,
-                                          const IDVector &tip_msa_idmap,
-                                          const PartitionRange &part_region, const uintVector &weights) {
-  const MSA &msa = pinfo.msa();
-  const Model &model = pinfo.model();
-  const auto pstart = msa.get_local_offset(part_region.start);
-
-  //  printf("\n\n rank %lu, GLOBAL OFFSET %lu, LOCAL OFFSET %lu \n\n", ParallelContext::proc_id(), part_region.start, pstart);
-
-  /* part_length doesn't include columns with zero weight */
-  const size_t part_length = weights.empty()
-                               ? part_region.length
-                               : std::count_if(weights.begin() + pstart,
-                                               weights.begin() + pstart + part_region.length,
-                                               [](uintVector::value_type w) -> bool { return w > 0; }
-                               );
-
-  unsigned int attrs = 0;
-
-  if (opts.simd_arch > CORAX_ATTRIB_ARCH_SSE &&
-      model.num_states() * model.num_ratecats() < 4) {
-    /* AVX needs at least 4 CLV elements per site -> fall back to SSE */
-    attrs = CORAX_ATTRIB_ARCH_SSE;
-  } else
-    attrs = opts.simd_arch;
-
-
-  if (opts.use_rate_scalers && model.num_ratecats() > 1) {
-    attrs |= CORAX_ATTRIB_RATE_SCALERS;
-  }
-
-  if (opts.use_repeats) {
-    assert(!(opts.use_prob_msa));
-    attrs |= CORAX_ATTRIB_SITE_REPEATS;
-  } else if (opts.use_tip_inner) {
-    assert(!(opts.use_prob_msa));
-    // 1) SSE3 tip-inner kernels are not implemented so far, so generic version will be faster
-    // 2) same for state-rich models
-    if (opts.simd_arch != CORAX_ATTRIB_ARCH_SSE && model.num_states() <= 20) {
-      // TODO: use proper auto-tuning
-      const unsigned long min_len_ti = model.num_states() > 4 ? 40 : 100;
-      if ((unsigned long) part_length > min_len_ti)
-        attrs |= CORAX_ATTRIB_PATTERN_TIP;
-    }
-  }
-
-  // NOTE: if partition is split among multiple threads, asc. bias correction must be applied only once!
-  if (model.ascbias_type() == AscBiasCorrection::lewis ||
-      (model.ascbias_type() != AscBiasCorrection::none && part_region.master())) {
-    attrs |= CORAX_ATTRIB_AB_FLAG;
-    attrs |= (unsigned int) model.ascbias_type();
-  }
-
-  BasicTree tree(msa.size());
-  corax_partition_t *partition = corax_partition_create(
-    tree.num_tips(), /* number of tip sequences */
-    tree.num_inner(), /* number of CLV buffers */
-    model.num_states(), /* number of states in the data */
-    part_length, /* number of alignment sites/patterns */
-    model.num_submodels(), /* number of different substitution models (LG4 = 4) */
-    tree.num_branches(), /* number of probability matrices */
-    model.num_ratecats(), /* number of (GAMMA) rate categories */
-    tree.num_inner(), /* number of scaling buffers */
-    attrs /* list of flags (SSE3/AVX, TIP-INNER special cases etc.) */
-  );
-
-  libpll_check_error("ERROR creating pll_partition");
-  assert(partition);
-
-  if (part_region.master() && !model.ascbias_weights().empty())
-    corax_set_asc_state_weights(partition, model.ascbias_weights().data());
-
-  if (part_length == part_region.length)
-    set_partition_tips(opts, msa, tip_msa_idmap, part_region, partition, model.charmap());
-  else
-    set_partition_tips(opts, msa, tip_msa_idmap, part_region, partition, model.charmap(), weights);
-
-  assign(partition, model);
-
-  return partition;
-}
 
 /* 
 int TreeInfo::savePartition(const char* filename, int partIndex){

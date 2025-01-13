@@ -1137,11 +1137,8 @@ void assign(Model& model, const corax_partition_t * partition)
 void assign(corax_partition_t * partition, const Model& model)
 {
   if (model.num_states() == partition->states &&
-      model.num_submodels() == partition->rate_matrices &&
-      model.num_ratecats() <= partition->alloc_rate_cats) {
-    /* set number of rate categories */
-    partition->rate_cats = model.num_ratecats();
-
+      model.num_submodels() == partition->rate_matrices)
+  {
     /* set rate categories & weights */
     corax_set_category_rates(partition, model.ratecat_rates().data());
     corax_set_category_weights(partition, model.ratecat_weights().data());
@@ -1156,8 +1153,6 @@ void assign(corax_partition_t * partition, const Model& model)
       /* set substitution rates */
       assert(!model.subst_rates(i).empty());
       corax_set_subst_params(partition, i, model.subst_rates(i).data());
-
-      // TODO: set ascertainment bias correction with corax_set_asc_bias_type
 
       /* set p-inv value */
       corax_update_invariant_sites_proportion (partition, i, model.pinv());
