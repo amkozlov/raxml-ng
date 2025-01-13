@@ -3389,7 +3389,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
     if (instance.start_trees.size() == 0) {
       LOG_ERROR << "Please specify a tree to use for model testing" << endl;
     } else {
-      auto const &master_msa = *instance.parted_msa;
+      auto &master_msa = *instance.parted_msa;
 
       auto tree = instance.start_trees.at(0);
 
@@ -3398,7 +3398,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
       TreeInfo treeinfo(instance.opts, tree, master_msa, instance.tip_msa_idmap, part_assign);
 
       Optimizer optimizer(instance.opts);
-      ModelTest modeltest(treeinfo, tree, optimizer);
+      ModelTest modeltest(instance.opts, master_msa, tree, instance.tip_msa_idmap, part_assign, optimizer);
       modeltest.optimize_model();
     }
   }

@@ -3,17 +3,32 @@
 #include "../TreeInfo.hpp"
 #include "../Optimizer.hpp"
 
+struct PartitionModelEvaluation {
+    Model model;
+    double partition_loglh;
+    std::map<InformationCriterion, double> ic_criteria;
+};
 
 class ModelTest {
 public:
-    ModelTest(TreeInfo &treeinfo, const Tree &tree, Optimizer &optimizer);
+    ModelTest(const Options &options, PartitionedMSA &msa, const Tree &tree, const IDVector &tip_msa_idmap,
+              const PartitionAssignment &part_assign, Optimizer &optimizer);
 
     void optimize_model();
 
 private:
-    TreeInfo &treeinfo;
+    const Options &options;
+    PartitionedMSA &msa;
     const Tree &tree;
+    const IDVector &tip_msa_idmap;
+    const PartitionAssignment &part_assign;
     Optimizer &optimizer;
+
+    /// map from model descriptor to per-partition evaluation results
+    using EvaluationResults = unordered_map<string, vector<PartitionModelEvaluation> >;
+
+
+    vector<PartitionModelEvaluation> choose_best_fit(const EvaluationResults &results, InformationCriterion ic) const;
 };
 
 

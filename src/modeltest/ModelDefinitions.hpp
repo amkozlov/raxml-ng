@@ -33,17 +33,17 @@ enum class rate_heterogeneity_t {
     FREE_RATE
 };
 
-const array<rate_heterogeneity_t, 2> default_rate_heterogeneity{
-    //    rate_heterogeneity_t::INVARIANT_GAMMA,
-    rate_heterogeneity_t::GAMMA,
-    //    rate_heterogeneity_t::INVARIANT,
+const array<rate_heterogeneity_t, 4> default_rate_heterogeneity{
     rate_heterogeneity_t::UNIFORM,
+    rate_heterogeneity_t::INVARIANT,
+    rate_heterogeneity_t::GAMMA,
+    rate_heterogeneity_t::INVARIANT_GAMMA,
 };
 
 const unordered_map<rate_heterogeneity_t, string> rate_heterogeneity_label{
     {rate_heterogeneity_t::UNIFORM, ""},
     {rate_heterogeneity_t::INVARIANT, "+I"},
-    {rate_heterogeneity_t::GAMMA, "+G"},
+    {rate_heterogeneity_t::GAMMA, "+G4"},
     {rate_heterogeneity_t::INVARIANT_GAMMA, "+I+G"},
     {rate_heterogeneity_t::FREE_RATE, "+R4"},
 };
@@ -51,8 +51,8 @@ const unordered_map<rate_heterogeneity_t, string> rate_heterogeneity_label{
 
 // Names of DNA models. Resolved into matrix indices by means of the `dna_model_matrices_indices` array below
 const std::vector<std::pair<string, size_t> > dna_substitution_matrix_names{
-    {"JC", 0},
-    {"K80", 18},
+    {"F81", 0},
+    {"HKY", 18},
     {"TrN", 59},
     {"TPM1", 116},
     {"TPM2", 72},
@@ -63,6 +63,28 @@ const std::vector<std::pair<string, size_t> > dna_substitution_matrix_names{
     {"TVM", 194},
     {"GTR", 202},
 };
+
+
+const std::array<std::pair<string, string>, 3> model_name_with_freq{
+    {
+        {"F81+FE", "JC"},
+        {"HKY+FE", "K80"},
+        {"GTR+FE", "SYM"}
+    }
+};
+
+std::string normalize_model_name(const std::string &model_name) {
+    for (const auto &e: model_name_with_freq) {
+        const auto &search_str = e.first;
+        const auto &replacement = e.second;
+
+        if (search_str == model_name.substr(0, search_str.size())) {
+            return replacement + model_name.substr(search_str.size());
+        }
+    }
+
+    return model_name;
+}
 
 const array<string, N_DNA_ALLMATRIX_COUNT> dna_model_matrices{
     "000000", // 0
