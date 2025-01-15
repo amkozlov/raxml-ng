@@ -54,6 +54,12 @@ public:
   double difficulty_score() const { return _difficulty_score; }
   void difficulty_score(double score) { _difficulty_score = score; }
 
+  const uintVector& subst_linkage() const { return _subst_linkage; }
+  const uintVector& freqs_linkage() const { return _freqs_linkage; }
+
+  void subst_linkage(const uintVector& v) { _subst_linkage = v; }
+  void freqs_linkage(const uintVector& v) { _freqs_linkage = v; }
+
   // operations
   void init_single_model(DataType data_type, const std::string &model_string);
   void append_part_info(PartitionInfo&& part_info) { _part_list.push_back(std::move(part_info)); };
@@ -77,6 +83,8 @@ private:
   NameIdMap _taxon_id_map;
   mutable uintVector _site_part_map;
   double _difficulty_score;
+  uintVector _subst_linkage;
+  uintVector _freqs_linkage;
 
   uintVector get_site_part_assignment() const;
   void set_taxon_names(const NameList& taxon_names);

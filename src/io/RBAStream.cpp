@@ -4,7 +4,7 @@
 using namespace std;
 
 const uint64_t RBA_MAGIC       = *(reinterpret_cast<const uint64_t*>("RBAF\x13\x12\x17\x0A"));
-const uint32_t RBA_VERSION     = 3;
+const uint32_t RBA_VERSION     = 4;
 const uint32_t RBA_MIN_VERSION = 2;
 
 struct RBAHeader
@@ -71,6 +71,9 @@ RBAStream& operator<<(RBAStream& stream, const PartitionedMSA& part_msa)
     bos << pinfo.stats();
     bos << std::make_tuple(std::ref(pinfo.model()), ModelBinaryFmt::full);
   }
+
+  // partition model linkage
+  bos << part_msa.subst_linkage() << part_msa.freqs_linkage();
 
   // per-partition alignment blocks
   for (const auto& pinfo: part_msa.part_list())
@@ -163,6 +166,18 @@ RBAStream& operator>>(RBAStream& stream, RBAStream::RBAOutput out)
 
     if (load_meta)
       part_msa.emplace_part_info(pname, pstats, m, prange);
+  }
+
+  // partition model linkage
+  if (header.version >= 4)
+  {
+    uintVector subst_linkage, freqs_linkage;
+    bos >> subst_linkage >> freqs_linkage;
+    if (load_meta)
+    {
+      part_msa.subst_linkage(subst_linkage);
+      part_msa.freqs_linkage(freqs_linkage);
+    }
   }
 
   if (load_seq)
