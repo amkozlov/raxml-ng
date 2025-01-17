@@ -415,6 +415,37 @@ bool check_msa(RaxmlInstance& instance)
     msa_valid &= parted_msa_view.taxon_name_map().empty();
   }
 
+  if (!parted_msa.unassigned_sites().empty())
+  {
+    auto extra_sites = parted_msa.unassigned_sites();
+    if (opts.safety_checks.isset(SafetyCheck::msa_extra_cols))
+    {
+      LOG_ERROR << "\nERROR: Found " << extra_sites.size() <<
+          " alignment site(s) which are not assigned to any partition:" << endl;
+
+      for (size_t i = 0; i < extra_sites.size(); ++i)
+      {
+        LOG_ERROR << extra_sites[i] << " ";
+        if (i >= 1000)
+        {
+          LOG_ERROR << "...";
+          break;
+        }
+      }
+
+      LOG_ERROR << "\nNOTE:  If you want to ignore these sites, "
+          "please add '--force msa_extra_cols' option." << endl;
+
+      msa_valid = false;
+    }
+    else
+    {
+      LOG_WARN << "\nWARNING: Found " << extra_sites.size() <<
+          " alignment site(s) which are not assigned to any partition."
+          " They will be ignored." << endl;
+    }
+  }
+
   /* check for duplicate sequences */
   if (opts.safety_checks.isset(SafetyCheck::msa_dups))
   {

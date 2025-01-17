@@ -17,6 +17,8 @@ SafetyCheck::Flags SafetyCheck::from_string(const string& s)
     return SafetyCheck::msa_dups;
   else if (s == "msa_allgaps")
     return SafetyCheck::msa_allgaps;
+  else if (s == "msa_extra_cols")
+    return SafetyCheck::msa_extra_cols;
   else if (s == "model")
     return SafetyCheck::model;
   else if (s == "model_zero_freqs")

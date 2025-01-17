@@ -16,6 +16,7 @@ PartitionedMSA& PartitionedMSA::operator=(PartitionedMSA&& other)
   _full_msa = std::move(other._full_msa);
   _taxon_names = std::move(other._taxon_names);
   _taxon_id_map = std::move(other._taxon_id_map);
+  _unassigned_sites = std::move(other._unassigned_sites);
   _subst_linkage = std::move(other._subst_linkage);
   _freqs_linkage = std::move(other._freqs_linkage);
    return *this;
@@ -64,16 +65,14 @@ uintVector PartitionedMSA::get_site_part_assignment() const
     p++;
   }
 
+  assert(p == part_count());
+
   /* check if all sites were assigned to partitions */
-  MissingPartitionForSiteException e_unassinged;
   for (size_t i = 0; i < full_len; ++i)
   {
     if (!spa[i])
-      e_unassinged.add_unassigned_site(i+1);
+      _unassigned_sites.push_back(i+1);
   }
-
-  if (e_unassinged.count() > 0)
-    throw e_unassinged;
 
   return spa;
 }
