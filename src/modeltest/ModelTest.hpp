@@ -25,10 +25,12 @@ private:
     Optimizer &optimizer;
 
     /// map from model descriptor to per-partition evaluation results
-    using EvaluationResults = unordered_map<string, vector<PartitionModelEvaluation> >;
+    using EvaluationResults = vector<vector<PartitionModelEvaluation>>;
 
 
-    vector<PartitionModelEvaluation> choose_best_fit(const EvaluationResults &results, InformationCriterion ic) const;
+    static void sort_by_score(EvaluationResults &results, InformationCriterion ic, unsigned int partition_idx);
+
+    static void print_xml(ostream &os, EvaluationResults &results);
 };
 
 

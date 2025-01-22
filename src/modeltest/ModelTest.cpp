@@ -75,7 +75,7 @@ void ModelTest::optimize_model() {
                         InformationCriterion::bic] << endl;
                 }
 
-                results[normalized_model_descriptor] = partition_results;
+                results.push_back(partition_results);
 
                 if (ParallelContext::thread_id() == 0) {
                     for (const auto *m: models) {
@@ -90,48 +90,128 @@ void ModelTest::optimize_model() {
 
 
     LOG_INFO << endl;
+    for (auto p = 0U; p < msa.part_count(); ++p) {
+        sort_by_score(results, InformationCriterion::bic, p);
+        LOG_INFO << "Partition #" << p << ": " << results[0][p].model.to_string() << " BIC = " << results[0][p].
+                ic_criteria.
+                at(InformationCriterion::bic) << " LogLH = " << results[0][p].partition_loglh << endl;
+    }
 
-    for (const auto &e: results) {
-        LOG_DEBUG << "Model " << e.first << endl;
+
+    if (ParallelContext::master()) {
+        auto part_fname = options.output_fname("modeltest.partitions.bic.txt");
+        fstream part_stream(part_fname, std::ios::out);
         for (auto p = 0U; p < msa.part_count(); ++p) {
-            const auto part_result = e.second[p];
-            LOG_DEBUG << "\t Partition #" << p << ": LogLH = " << part_result.partition_loglh << ", BIC =" <<
-                    part_result.ic_criteria.at(InformationCriterion::bic) << ",  " << part_result.model.
-                    to_string(true, 8) << endl;
+            sort_by_score(results, InformationCriterion::bic, p);
+            part_stream << results[0][p].model.to_string() << ", " << msa.part_info(p).name() << " = " << msa.
+                    part_info(p).
+                    range_string() << endl;
         }
-    }
+        part_stream.close();
 
-    LOG_INFO << endl;
-    const auto best_fit = choose_best_fit(results, InformationCriterion::bic);
-    for (auto p = 0U; p < msa.part_count(); ++p) {
-        LOG_INFO << "Partition #" << p << ": " << best_fit[p].model.to_string() << " BIC = " << best_fit[p].ic_criteria.
-        at(InformationCriterion::bic) << " LogLH = " << best_fit[p].partition_loglh << endl;
-    }
+        LOG_INFO << endl
+        << "Partitions file (BIC) written to " << part_fname << endl;
 
 
-    LOG_INFO << endl << "Partition File:" << endl;
+        auto xml_fname = options.output_fname("modeltest.xml");
+        fstream xml_stream(xml_fname, std::ios::out);
+        print_xml(xml_stream, results);
+        xml_stream.close();
 
-    for (auto p = 0U; p < msa.part_count(); ++p) {
-        LOG_INFO << best_fit[p].model.to_string() << ", " << msa.part_info(p).name() << " = " << msa.part_info(p).
-                range_string() << endl;
+        LOG_INFO << "XML model selection file written to " << xml_fname << endl;
     }
 }
 
-vector<PartitionModelEvaluation> ModelTest::choose_best_fit(const EvaluationResults &results,
-                                                            InformationCriterion ic) const {
-    const auto first = results.cbegin()->second;
-    vector<PartitionModelEvaluation> best_fit{first};
+void ModelTest::sort_by_score(EvaluationResults &results,
+                              InformationCriterion ic,
+                              unsigned int partition_idx) {
+    std::sort(results.begin(), results.end(),
+              [partition_idx, ic](const vector<PartitionModelEvaluation> &a,
+                                  const vector<PartitionModelEvaluation> &b) {
+                  return a.at(partition_idx).ic_criteria.at(ic) < b.at(partition_idx).ic_criteria.at(ic);
+              });
+}
 
-    for (const auto &result: results) {
-        const auto candidate_models = result.second;
 
-        for (auto p = 0U; p < msa.part_count(); ++p) {
-            if (candidate_models[p].ic_criteria.at(ic) < best_fit[p].ic_criteria.at(ic)) {
+vector<double> transform_delta_to_weight(const vector<double> &deltas) {
+    vector<double> weights(deltas.size());
+    weights.clear();
 
-                best_fit[p] = candidate_models[p];
-            }
-        }
+    for (const double &delta: deltas) {
+        weights.push_back(std::exp(-delta / 2));
     }
 
-    return best_fit;
+    // normalize
+    const double fac = 1 / std::accumulate(weights.begin(), weights.end(), 0.0);
+
+    for (double &w: weights) {
+        w *= fac;
+    }
+
+    return weights;
+}
+
+
+void ModelTest::print_xml(ostream &os, EvaluationResults &results) {
+    os << setprecision(17);
+    os << "<modeltestresults>" << endl;
+
+    const auto partition_count = (results.size() > 0) ? results.cbegin()->size() : 0;
+    const auto ic_count = (results.size() > 0) ? results.cbegin()->at(0).ic_criteria.size() : 0;
+
+
+    vector<double> deltas;
+    deltas.reserve(results.size());
+
+    for (auto p = 0U; p < partition_count; ++p) {
+        os << "<partition id=\"" << p << "\">" << endl;
+
+        for (auto ic_idx = 0U; ic_idx < ic_count; ++ic_idx) {
+            const auto ic = static_cast<InformationCriterion>(ic_idx);
+
+            sort_by_score(results, ic, p);
+
+            deltas.clear();
+
+            for (auto i = 0U; i < results.size(); ++i) {
+                deltas.emplace_back(results[i][p].ic_criteria.at(ic) - results[0][p].ic_criteria.at(ic));
+            }
+
+            const auto weights = transform_delta_to_weight(deltas);
+
+            os << "<selection type=\"";
+
+            switch (ic) {
+                case InformationCriterion::aic:
+                    os << "AIC";
+                    break;
+                case InformationCriterion::aicc:
+                    os << "AICc";
+                    break;
+                case InformationCriterion::bic:
+                    os << "BIC";
+                    break;
+            }
+
+            os << "\">" << endl;
+
+            for (auto i = 0U; i < results.size(); ++i) {
+                const auto &result = results[i][p];
+                os << "<model rank=\"" << i + 1 << "\" name=\"" << result.model.to_string()
+                        << "\" lnL=\"" << result.partition_loglh
+                        << "\" score=\"" << result.ic_criteria.at(ic)
+                        << "\" delta=\"" << deltas.at(i)
+                        << "\" weight=\"" << weights.at(i)
+                        << "\" />" << endl;
+            }
+
+
+            os << "</selection>" << endl;
+        }
+
+        os << "</partition>" << endl;
+    }
+
+
+    os << "</modeltestresults>" << endl;
 }
