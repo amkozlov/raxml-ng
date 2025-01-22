@@ -117,8 +117,8 @@ void assign(Model& model, const TreeInfo& treeinfo, size_t partition_id);
 void assign_models(TreeInfo& treeinfo, const ModelMap& models);
 
 
-corax_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& pinfo,
-                                      const IDVector& tip_msa_idmap,
-                                      const PartitionRange& part_region, const uintVector& weights);
+corax_partition_t *create_pll_partition(const Options &opts, const MSA &msa, const Model &model,
+                                        const IDVector& tip_msa_idmap,
+                                        const PartitionRange& part_region, const uintVector& weights);
 
 #endif /* RAXML_TREEINFO_HPP_ */

@@ -19,6 +19,13 @@ void ModelTest::optimize_model() {
 
     EvaluationResults results;
 
+    vector<Model *> models;
+
+
+    Options modified_options(options);
+
+    modified_options.brlen_linkage = CORAX_BRLEN_UNLINKED;
+
     for (const auto &entry: dna_substitution_matrix_names) {
         const auto subst_model = entry.first;
 
@@ -34,17 +41,17 @@ void ModelTest::optimize_model() {
                 LOG_DEBUG << "[" << index << "/" << num_models << "] Instantiating model " <<
                 normalized_model_descriptor << endl;
 
-
-                Model model(normalized_model_descriptor);
-
-                for (auto p = 0U; p < msa.part_count(); ++p) {
-                    msa.model(p, model);
+                if (ParallelContext::thread_id() == 0) {
+                    // Only first thread updates models to prevent race-condition
+                    for (auto p = 0U; p < msa.part_count(); ++p) {
+                        models.push_back(new Model(normalized_model_descriptor));
+                        msa.model(p, *models.back());
+                    }
                 }
 
-                TreeInfo treeinfo(options, tree, msa, tip_msa_idmap, part_assign);
-                const auto num_branches = treeinfo.tree().num_branches();
+                ParallelContext::thread_barrier();
 
-                //LOG_DEBUG << "\tInitial LogLH = " << treeinfo.loglh(false) << std::endl;
+                TreeInfo treeinfo(modified_options, tree, msa, tip_msa_idmap, part_assign);
 
                 const double final_loglh = optimizer.optimize_model(treeinfo);
 
@@ -54,18 +61,10 @@ void ModelTest::optimize_model() {
 
                 vector<PartitionModelEvaluation> partition_results(msa.part_count());
 
-
                 for (auto p = 0; p < msa.part_count(); ++p) {
                     const double partition_loglh = treeinfo.pll_treeinfo().partition_loglh[p];
                     const size_t free_params = msa.model(p).num_free_params() + treeinfo.tree().num_branches();
-
-                    /*
-                     * My intuition is to set sample size to the length of the partition, i.e.
-                     * sample_size = msa.part_info(p).length();
-                     *
-                     * However, ModelTest-NG uses the total sites.
-                     */
-                    const size_t sample_size = msa.total_sites();
+                    const size_t sample_size = msa.part_info(p).stats().site_count;
                     ICScoreCalculator ic_score_calculator(free_params, sample_size);
 
                     partition_results[p].ic_criteria = ic_score_calculator.all(partition_loglh);
@@ -78,6 +77,12 @@ void ModelTest::optimize_model() {
 
                 results[normalized_model_descriptor] = partition_results;
 
+                if (ParallelContext::thread_id() == 0) {
+                    for (const auto *m: models) {
+                        delete m;
+                    }
+                    models.clear();
+                }
                 ++index;
             }
         }
@@ -100,7 +105,7 @@ void ModelTest::optimize_model() {
     const auto best_fit = choose_best_fit(results, InformationCriterion::bic);
     for (auto p = 0U; p < msa.part_count(); ++p) {
         LOG_INFO << "Partition #" << p << ": " << best_fit[p].model.to_string() << " BIC = " << best_fit[p].ic_criteria.
-                at(InformationCriterion::bic) << endl;
+        at(InformationCriterion::bic) << " LogLH = " << best_fit[p].partition_loglh << endl;
     }
 
 

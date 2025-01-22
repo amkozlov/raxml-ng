@@ -62,8 +62,8 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
     if (part_range != part_assign.end())
     {
       /* create and init PLL partition structure */
-      corax_partition_t * partition = create_pll_partition(opts, pinfo, tip_msa_idmap,
-                                                         *part_range, weights);
+      corax_partition_t *partition = create_pll_partition(opts, pinfo.msa(), pinfo.model(), tip_msa_idmap,
+                                                          *part_range, weights);
 
       int retval = corax_treeinfo_init_partition(_pll_treeinfo, p, partition,
                                                   params_to_optimize,
@@ -662,12 +662,10 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
   corax_set_pattern_weights(partition, comp_weights.data());
 }
 
-corax_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& pinfo,
-                                      const IDVector& tip_msa_idmap,
-                                      const PartitionRange& part_region, const uintVector& weights)
+corax_partition_t *create_pll_partition(const Options &opts, const MSA &msa, const Model &model,
+                                        const IDVector& tip_msa_idmap,
+                                        const PartitionRange& part_region, const uintVector& weights)
 {
-  const MSA& msa = pinfo.msa();
-  const Model& model = pinfo.model();
   const auto pstart = msa.get_local_offset(part_region.start);
 
 //  printf("\n\n rank %lu, GLOBAL OFFSET %lu, LOCAL OFFSET %lu \n\n", ParallelContext::proc_id(), part_region.start, pstart);
@@ -754,7 +752,7 @@ corax_partition_t* create_pll_partition(const Options& opts, const PartitionInfo
 }
 
 
-/* 
+/*
 int TreeInfo::savePartition(const char* filename, int partIndex){
     
   int retval = CORAX_SUCCESS;
