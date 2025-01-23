@@ -110,6 +110,17 @@ endif()
 
 set_target_properties(raxml_module PROPERTIES PREFIX "")
 
+find_package(Git REQUIRED)
+execute_process(
+        COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        OUTPUT_VARIABLE RAXML_GIT_REVISION
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+target_compile_definitions(raxml_module PRIVATE RAXML_VERSION="${RAXML_GIT_REVISION}" #RAXML_VERSION="2.0.0-dev"
+        RAXML_DATE="11.12.2024"
+        RAXML_INTVER=200)
+
 # The binary will be copied to the old bin directory for backward compatibility.
 add_custom_command(TARGET raxml_module 
                    POST_BUILD
