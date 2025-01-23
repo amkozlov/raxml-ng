@@ -9,6 +9,7 @@ struct PartitionModelEvaluation {
     std::map<InformationCriterion, double> ic_criteria;
 };
 
+
 class ModelTest {
 public:
     ModelTest(const Options &options, PartitionedMSA &msa, const Tree &tree, const IDVector &tip_msa_idmap,
@@ -25,7 +26,7 @@ private:
     Optimizer &optimizer;
 
     /// map from model descriptor to per-partition evaluation results
-    using EvaluationResults = vector<vector<PartitionModelEvaluation>>;
+    using EvaluationResults = vector<vector<PartitionModelEvaluation> >;
 
 
     static void sort_by_score(EvaluationResults &results, InformationCriterion ic, unsigned int partition_idx);

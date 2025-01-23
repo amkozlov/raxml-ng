@@ -10,82 +10,90 @@ ModelTest::ModelTest(const Options &options, PartitionedMSA &msa, const Tree &tr
                                             part_assign(part_assign), optimizer(optimizer) {
 }
 
+
+vector<std::string> generate_candidate_model_names(const DataType &dt) {
+    vector<std::string> candidate_model_names;
+    check_supported_datatype(dt);
+
+
+    const auto &matrix_names = dt == DataType::dna ? dna_substitution_matrix_names : aa_model_names;
+
+    for (const auto &subst_model: matrix_names) {
+        for (const auto &frequency_type: default_frequency_type) {
+            for (const auto &rate_heterogeneity: default_rate_heterogeneity) {
+                const string model_descriptor = subst_model
+                                                + frequency_type_label(dt, frequency_type)
+                                                + rate_heterogeneity_label.at(rate_heterogeneity);
+
+                const auto normalized_model_descriptor = normalize_model_name(model_descriptor);
+
+                candidate_model_names.push_back(normalized_model_descriptor);
+            }
+        }
+    }
+
+    return candidate_model_names;
+}
+
 void ModelTest::optimize_model() {
-    const auto num_models = dna_substitution_matrix_names.size() * default_frequency_type.size() *
-                            default_rate_heterogeneity.size();
-
-    auto index = 1U;
-
-
     EvaluationResults results;
 
     vector<Model *> models;
 
-
     Options modified_options(options);
-
     modified_options.brlen_linkage = CORAX_BRLEN_UNLINKED;
 
-    for (const auto &entry: dna_substitution_matrix_names) {
-        const auto subst_model = entry.first;
+    LOG_INFO << std::setprecision(20) << std::setfill(' ') << std::left;
 
-        LOG_INFO << std::setprecision(20) << std::setfill(' ') << std::left;
+    auto candidate_models = generate_candidate_model_names(msa.part_info(0).model().data_type());
+    auto index = 1U;
+    for (const auto &model_descriptor: candidate_models) {
+        LOG_DEBUG << "[" << index << "/" << candidate_models.size() << "] Instantiating model " <<
+                model_descriptor << endl;
 
-        for (const auto &frequency_type: default_frequency_type) {
-            for (const auto &rate_heterogeneity: default_rate_heterogeneity) {
-                const string model_descriptor = subst_model
-                                                + frequency_type_label.at(frequency_type)
-                                                + rate_heterogeneity_label.at(rate_heterogeneity);
-
-                const auto normalized_model_descriptor = normalize_model_name(model_descriptor);
-                LOG_DEBUG << "[" << index << "/" << num_models << "] Instantiating model " <<
-                normalized_model_descriptor << endl;
-
-                if (ParallelContext::thread_id() == 0) {
-                    // Only first thread updates models to prevent race-condition
-                    for (auto p = 0U; p < msa.part_count(); ++p) {
-                        models.push_back(new Model(normalized_model_descriptor));
-                        msa.model(p, *models.back());
-                    }
-                }
-
-                ParallelContext::thread_barrier();
-
-                TreeInfo treeinfo(modified_options, tree, msa, tip_msa_idmap, part_assign);
-
-                const double final_loglh = optimizer.optimize_model(treeinfo);
-
-                LOG_INFO << "[" << index << "/" << num_models << "]\tModel " << std::setw(12) <<
-                        normalized_model_descriptor << "\t\t" << final_loglh << endl;
-
-
-                vector<PartitionModelEvaluation> partition_results(msa.part_count());
-
-                for (auto p = 0; p < msa.part_count(); ++p) {
-                    const double partition_loglh = treeinfo.pll_treeinfo().partition_loglh[p];
-                    const size_t free_params = msa.model(p).num_free_params() + treeinfo.tree().num_branches();
-                    const size_t sample_size = msa.part_info(p).stats().site_count;
-                    ICScoreCalculator ic_score_calculator(free_params, sample_size);
-
-                    partition_results[p].ic_criteria = ic_score_calculator.all(partition_loglh);
-                    partition_results[p].model = msa.model(p);
-                    partition_results[p].partition_loglh = partition_loglh;
-
-                    LOG_DEBUG << "\tPartition #" << p << " BIC " << partition_results[p].ic_criteria[
-                        InformationCriterion::bic] << endl;
-                }
-
-                results.push_back(partition_results);
-
-                if (ParallelContext::thread_id() == 0) {
-                    for (const auto *m: models) {
-                        delete m;
-                    }
-                    models.clear();
-                }
-                ++index;
+        if (ParallelContext::thread_id() == 0) {
+            // Only first thread updates models to prevent race-condition
+            for (auto p = 0U; p < msa.part_count(); ++p) {
+                models.push_back(new Model(model_descriptor));
+                msa.model(p, *models.back());
             }
         }
+
+        ParallelContext::thread_barrier();
+
+        TreeInfo treeinfo(modified_options, tree, msa, tip_msa_idmap, part_assign);
+
+        const double final_loglh = optimizer.optimize_model(treeinfo);
+
+        LOG_INFO << "[" << index << "/" << candidate_models.size() << "]\tModel " << std::setw(12) <<
+                model_descriptor << "\t\t" << final_loglh << endl;
+
+
+        vector<PartitionModelEvaluation> partition_results(msa.part_count());
+
+        for (auto p = 0; p < msa.part_count(); ++p) {
+            const double partition_loglh = treeinfo.pll_treeinfo().partition_loglh[p];
+            const size_t free_params = msa.model(p).num_free_params() + treeinfo.tree().num_branches();
+            const size_t sample_size = msa.part_info(p).stats().site_count;
+            ICScoreCalculator ic_score_calculator(free_params, sample_size);
+
+            partition_results[p].ic_criteria = ic_score_calculator.all(partition_loglh);
+            partition_results[p].model = msa.model(p);
+            partition_results[p].partition_loglh = partition_loglh;
+
+            LOG_DEBUG << "\tPartition #" << p << " BIC " << partition_results[p].ic_criteria[
+                InformationCriterion::bic] << endl;
+        }
+
+        results.push_back(partition_results);
+
+        if (ParallelContext::thread_id() == 0) {
+            for (const auto *m: models) {
+                delete m;
+            }
+            models.clear();
+        }
+        ++index;
     }
 
 
@@ -110,7 +118,7 @@ void ModelTest::optimize_model() {
         part_stream.close();
 
         LOG_INFO << endl
-        << "Partitions file (BIC) written to " << part_fname << endl;
+                << "Partitions file (BIC) written to " << part_fname << endl;
 
 
         auto xml_fname = options.output_fname("modeltest.xml");

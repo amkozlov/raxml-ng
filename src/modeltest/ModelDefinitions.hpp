@@ -5,6 +5,18 @@
 #include <array>
 #include <unordered_map>
 
+class unsupported_datatype_error : public std::logic_error {
+public:
+    unsupported_datatype_error() : std::logic_error("Modeltesting currently only supports DNA & AA data") {
+    }
+};
+
+void check_supported_datatype(const DataType &datatype) {
+    if (!(datatype == DataType::dna || datatype == DataType::protein)) {
+        throw unsupported_datatype_error();
+    }
+}
+
 constexpr auto N_DNA_ALLMATRIX_COUNT = 203;
 constexpr auto N_DNA_MODEL_MATRICES = 11;
 
@@ -20,10 +32,18 @@ enum class frequency_type_t {
 
 const array<frequency_type_t, 2> default_frequency_type{frequency_type_t::FIXED, frequency_type_t::ESTIMATED};
 
-const unordered_map<frequency_type_t, std::string> frequency_type_label{
-    {frequency_type_t::FIXED, "+FE"},
-    {frequency_type_t::ESTIMATED, "+FO"},
-};
+inline std::string frequency_type_label(const DataType &datatype, const frequency_type_t &f) {
+    check_supported_datatype(datatype);
+    switch (f) {
+        case frequency_type_t::FIXED:
+            return "";
+        case frequency_type_t::ESTIMATED:
+            return datatype == DataType::dna ? "+FO" : "+F";
+        default:
+            throw std::logic_error("unsupported frequency type");
+    }
+}
+
 
 enum class rate_heterogeneity_t {
     UNIFORM,
@@ -49,42 +69,20 @@ const unordered_map<rate_heterogeneity_t, string> rate_heterogeneity_label{
 };
 
 
-// Names of DNA models. Resolved into matrix indices by means of the `dna_model_matrices_indices` array below
-const std::vector<std::pair<string, size_t> > dna_substitution_matrix_names{
-    {"F81", 0},
-    {"HKY", 18},
-    {"TrN", 59},
-    {"TPM1", 116},
-    {"TPM2", 72},
-    {"TPM3", 100},
-    {"TIM1", 167},
-    {"TIM2", 139},
-    {"TIM3", 155},
-    {"TVM", 194},
-    {"GTR", 202},
+// Names of DNA models.
+const std::vector<string> dna_substitution_matrix_names{
+    "F81",
+    "HKY",
+    "TrN",
+    "TPM1",
+    "TPM2",
+    "TPM3",
+    "TIM1",
+    "TIM2",
+    "TIM3",
+    "TVM",
+    "GTR"
 };
-
-
-const std::array<std::pair<string, string>, 3> model_name_with_freq{
-    {
-        {"F81+FE", "JC"},
-        {"HKY+FE", "K80"},
-        {"GTR+FE", "SYM"}
-    }
-};
-
-std::string normalize_model_name(const std::string &model_name) {
-    for (const auto &e: model_name_with_freq) {
-        const auto &search_str = e.first;
-        const auto &replacement = e.second;
-
-        if (search_str == model_name.substr(0, search_str.size())) {
-            return replacement + model_name.substr(search_str.size());
-        }
-    }
-
-    return model_name;
-}
 
 const array<string, N_DNA_ALLMATRIX_COUNT> dna_model_matrices{
     "000000", // 0
@@ -126,4 +124,54 @@ const array<string, N_DNA_ALLMATRIX_COUNT> dna_model_matrices{
 
     "012345" //202
 };
+
+const std::array<std::pair<string, string>, 3> dna_model_name_with_freq{
+    {
+        {"F81+FE", "JC"},
+        {"HKY+FE", "K80"},
+        {"GTR+FE", "SYM"}
+    }
+};
+
+std::string normalize_model_name(const std::string &model_name) {
+    for (const auto &e: dna_model_name_with_freq) {
+        const auto &search_str = e.first;
+        const auto &replacement = e.second;
+
+        if (search_str == model_name.substr(0, search_str.size())) {
+            return replacement + model_name.substr(search_str.size());
+        }
+    }
+
+    return model_name;
+}
+
+const std::vector<std::string> aa_model_names{
+    "DAYHOFF", //  0
+    "LG", //  1
+    "DCMUT", //  2
+    "JTT", //  3
+    "MTREV", //  4
+    "WAG", //  5
+    "RTREV", //  6
+    "CPREV", //  7
+    "VT", //  8
+    "BLOSUM62", //  9
+    "MTMAM", // 10
+    "MTART", // 11
+    "MTZOA", // 12
+    "PMB", // 13
+    "HIVB", // 14
+    "HIVW", // 15
+    "JTT-DCMUT", // 16
+    "FLU", // 17
+    "STMTREV", // 18
+    /* additional mixture matrices
+    "LG4M",      // 19
+    "LG4X",      // 20
+    * matrices not included by default*
+    "GTR"        // 21
+    */
+};
+
 #endif
