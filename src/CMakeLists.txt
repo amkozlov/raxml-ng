@@ -117,9 +117,7 @@ execute_process(
         OUTPUT_VARIABLE RAXML_GIT_REVISION
         OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-target_compile_definitions(raxml_module PRIVATE RAXML_VERSION="${RAXML_GIT_REVISION}" #RAXML_VERSION="2.0.0-dev"
-        RAXML_DATE="11.12.2024"
-        RAXML_INTVER=200)
+target_compile_definitions(raxml_module PRIVATE RAXML_VERSION="${RAXML_GIT_REVISION}")
 
 # The binary will be copied to the old bin directory for backward compatibility.
 add_custom_command(TARGET raxml_module 
