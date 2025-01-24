@@ -27,7 +27,6 @@
 #include <corax/corax.h>
 #include "difficulty.h"
 
-#include "version.h"
 #include "common.h"
 
 #include "MSA.hpp"

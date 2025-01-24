@@ -1,5 +1,4 @@
 #include "CommandLineParser.hpp"
-#include "version.h"
 
 #include <getopt.h>
 
