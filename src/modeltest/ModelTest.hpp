@@ -10,6 +10,8 @@ struct PartitionModelEvaluation {
 };
 
 
+vector<std::string> generate_candidate_model_names(const DataType &dt);
+
 class ModelTest {
 public:
     ModelTest(const Options &options, PartitionedMSA &msa, const Tree &tree, const IDVector &tip_msa_idmap,
@@ -29,7 +31,8 @@ private:
     using EvaluationResults = vector<vector<PartitionModelEvaluation> >;
 
 
-    static void sort_by_score(EvaluationResults &results, InformationCriterion ic, unsigned int partition_idx);
+    [[nodiscard]]
+    static vector<size_t> rank_by_score(const EvaluationResults &results, InformationCriterion ic, unsigned int partition_idx);
 
     static void print_xml(ostream &os, EvaluationResults &results);
 };

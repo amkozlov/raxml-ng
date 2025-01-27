@@ -1,3 +1,4 @@
+#pragma once
 #ifndef MODEL_DEFS_H
 #define MODEL_DEFS_H
 
@@ -11,7 +12,7 @@ public:
     }
 };
 
-void check_supported_datatype(const DataType &datatype) {
+inline void check_supported_datatype(const DataType &datatype) {
     if (!(datatype == DataType::dna || datatype == DataType::protein)) {
         throw unsupported_datatype_error();
     }
@@ -36,7 +37,7 @@ inline std::string frequency_type_label(const DataType &datatype, const frequenc
     check_supported_datatype(datatype);
     switch (f) {
         case frequency_type_t::FIXED:
-            return "";
+            return datatype == DataType::dna ? "+FE" : "+FE";
         case frequency_type_t::ESTIMATED:
             return datatype == DataType::dna ? "+FO" : "+F";
         default:
@@ -64,7 +65,7 @@ const unordered_map<rate_heterogeneity_t, string> rate_heterogeneity_label{
     {rate_heterogeneity_t::UNIFORM, ""},
     {rate_heterogeneity_t::INVARIANT, "+I"},
     {rate_heterogeneity_t::GAMMA, "+G4"},
-    {rate_heterogeneity_t::INVARIANT_GAMMA, "+I+G"},
+    {rate_heterogeneity_t::INVARIANT_GAMMA, "+I+G4"},
     {rate_heterogeneity_t::FREE_RATE, "+R4"},
 };
 
@@ -133,7 +134,7 @@ const std::array<std::pair<string, string>, 3> dna_model_name_with_freq{
     }
 };
 
-std::string normalize_model_name(const std::string &model_name) {
+inline std::string normalize_model_name(const std::string &model_name) {
     for (const auto &e: dna_model_name_with_freq) {
         const auto &search_str = e.first;
         const auto &replacement = e.second;
