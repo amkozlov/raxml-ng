@@ -28,14 +28,14 @@ private:
     Optimizer &optimizer;
 
     /// map from model descriptor to per-partition evaluation results
-    using EvaluationResults = vector<vector<PartitionModelEvaluation> >;
+    using EvaluationResults = vector<PartitionModelEvaluation>;
 
 
     [[nodiscard]]
     static vector<size_t> rank_by_score(const EvaluationResults &results, InformationCriterion ic,
-                                        unsigned int partition_idx);
+                                        unsigned int partition_idx, unsigned int part_count);
 
-    static void print_xml(ostream &os, EvaluationResults &results);
+    static void print_xml(ostream &os, EvaluationResults &results, unsigned int partition_count);
 };
 
 

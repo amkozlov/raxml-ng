@@ -71,21 +71,24 @@ void ModelTest::optimize_model() {
 
         vector<PartitionModelEvaluation> partition_results(msa.part_count());
 
-        for (auto p = 0; p < msa.part_count(); ++p) {
+        for (auto p = 0U; p < msa.part_count(); ++p) {
+            PartitionModelEvaluation partition_results;
+
             const double partition_loglh = treeinfo.pll_treeinfo().partition_loglh[p];
             const size_t free_params = msa.model(p).num_free_params() + treeinfo.tree().num_branches();
             const size_t sample_size = msa.part_info(p).stats().site_count;
             ICScoreCalculator ic_score_calculator(free_params, sample_size);
 
-            partition_results[p].ic_criteria = ic_score_calculator.all(partition_loglh);
-            partition_results[p].model = msa.model(p);
-            partition_results[p].partition_loglh = partition_loglh;
+            partition_results.ic_criteria = ic_score_calculator.all(partition_loglh);
+            partition_results.model = msa.model(p);
+            partition_results.partition_loglh = partition_loglh;
 
-            LOG_DEBUG << "\tPartition #" << p << " BIC " << partition_results[p].ic_criteria[
+            LOG_DEBUG << "\tPartition #" << p << " BIC " << partition_results.ic_criteria[
                 InformationCriterion::bic] << endl;
+
+            results.push_back(partition_results);
         }
 
-        results.push_back(partition_results);
 
         if (ParallelContext::thread_id() == 0) {
             for (const auto *m: models) {
@@ -99,11 +102,11 @@ void ModelTest::optimize_model() {
 
     LOG_INFO << endl;
     for (auto p = 0U; p < msa.part_count(); ++p) {
-        auto bic_ranking = rank_by_score(results, InformationCriterion::bic, p);
-        const auto &best_model = results[bic_ranking.at(0)][p];
+        auto bic_ranking = rank_by_score(results, InformationCriterion::bic, p, msa.part_count());
+        const auto &best_model = results[bic_ranking.at(0) * msa.part_count() + p];
         LOG_INFO << "Partition #" << p << ": " << best_model.model.to_string() << " BIC = " << best_model.
                 ic_criteria.
-        at(InformationCriterion::bic) << " LogLH = " << best_model.partition_loglh << endl;
+                at(InformationCriterion::bic) << " LogLH = " << best_model.partition_loglh << endl;
     }
 
 
@@ -111,8 +114,8 @@ void ModelTest::optimize_model() {
         auto part_fname = options.output_fname("modeltest.partitions.bic.txt");
         fstream part_stream(part_fname, std::ios::out);
         for (auto p = 0U; p < msa.part_count(); ++p) {
-            const auto &ranking = rank_by_score(results, InformationCriterion::bic, p);
-            const auto &best_model = results[ranking.at(0)][p];
+            const auto &ranking = rank_by_score(results, InformationCriterion::bic, p, msa.part_count());
+            const auto &best_model = results[ranking.at(0) * msa.part_count() + p];
             part_stream << best_model.model.to_string() << ", " << best_model.model.name() << " = " << msa.
                     part_info(p).
                     range_string() << endl;
@@ -120,12 +123,12 @@ void ModelTest::optimize_model() {
         part_stream.close();
 
         LOG_INFO << endl
-        << "Partitions file (BIC) written to " << part_fname << endl;
+                << "Partitions file (BIC) written to " << part_fname << endl;
 
 
         auto xml_fname = options.output_fname("modeltest.xml");
         fstream xml_stream(xml_fname, std::ios::out);
-        print_xml(xml_stream, results);
+        print_xml(xml_stream, results, msa.part_count());
         xml_stream.close();
 
         LOG_INFO << "XML model selection file written to " << xml_fname << endl;
@@ -133,16 +136,18 @@ void ModelTest::optimize_model() {
 }
 
 vector<size_t> ModelTest::rank_by_score(const EvaluationResults &results,
-                              InformationCriterion ic,
-                              unsigned int partition_idx) {
-
-    std::vector<size_t> ranking(results.size(), 0);
+                                        InformationCriterion ic,
+                                        unsigned int partition_idx,
+                                        unsigned int part_count) {
+    std::vector<size_t> ranking(results.size() / part_count, 0);
     std::iota(ranking.begin(), ranking.end(), 0);
 
     std::sort(ranking.begin(), ranking.end(),
-              [partition_idx, ic, &results](const size_t &a, const size_t &b) {
-                  return results.at(a).at(partition_idx).ic_criteria.at(ic) < results.at(b).at(partition_idx).ic_criteria.at(ic);
-      });
+              [partition_idx, part_count, ic, &results](const size_t &a, const size_t &b) {
+                  return results.at(a * part_count + partition_idx).ic_criteria.at(ic) < results.at(
+                             b * part_count + partition_idx).
+                         ic_criteria.at(ic);
+              });
 
     return ranking;
 }
@@ -167,12 +172,11 @@ vector<double> transform_delta_to_weight(const vector<double> &deltas) {
 }
 
 
-void ModelTest::print_xml(ostream &os, EvaluationResults &results) {
+void ModelTest::print_xml(ostream &os, EvaluationResults &results, unsigned int partition_count) {
     os << setprecision(17);
     os << "<modeltestresults>" << endl;
 
-    const auto partition_count = (results.size() > 0) ? results.cbegin()->size() : 0;
-    const auto ic_count = (results.size() > 0) ? results.cbegin()->at(0).ic_criteria.size() : 0;
+    const auto ic_count = results.empty() ? 0 : results.at(0).ic_criteria.size();
 
 
     vector<double> deltas;
@@ -184,13 +188,13 @@ void ModelTest::print_xml(ostream &os, EvaluationResults &results) {
         for (auto ic_idx = 0U; ic_idx < ic_count; ++ic_idx) {
             const auto ic = static_cast<InformationCriterion>(ic_idx);
 
-            const auto &ranking = rank_by_score(results, ic, p);
+            const auto &ranking = rank_by_score(results, ic, p, partition_count);
 
             deltas.clear();
 
-            const auto &best_score = results.at(ranking.at(0)).at(p).ic_criteria.at(ic);
-            for (auto i = 0U; i < results.size(); ++i) {
-                deltas.emplace_back(results[i][p].ic_criteria.at(ic) - best_score);
+            const auto &best_score = results.at(ranking.at(0) * partition_count + p).ic_criteria.at(ic);
+            for (auto i = 0U; i < results.size() / partition_count; ++i) {
+                deltas.emplace_back(results[i * partition_count + p].ic_criteria.at(ic) - best_score);
             }
 
             const auto weights = transform_delta_to_weight(deltas);
@@ -211,8 +215,8 @@ void ModelTest::print_xml(ostream &os, EvaluationResults &results) {
 
             os << "\">" << endl;
 
-            for (auto i = 0U; i < results.size(); ++i) {
-                const auto &result = results[ranking.at(i)][p];
+            for (auto i = 0U; i < results.size() / partition_count; ++i) {
+                const auto &result = results[ranking.at(i) * partition_count + p];
                 os << "<model rank=\"" << i + 1 << "\" name=\"" << result.model.to_string()
                         << "\" lnL=\"" << result.partition_loglh
                         << "\" score=\"" << result.ic_criteria.at(ic)
