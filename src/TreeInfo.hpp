@@ -51,11 +51,17 @@ struct sh_support_params
 class TreeInfo
 {
 public:
-  TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
-            const IDVector& tip_msa_idmap, const PartitionAssignment& part_assign);
-  TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
-            const IDVector& tip_msa_idmap, const PartitionAssignment& part_assign,
-            const std::vector<uintVector>& site_weights);
+  TreeInfo(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
+           const IDVector &tip_msa_idmap, const PartitionAssignment &part_assign);
+
+  TreeInfo(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
+           const IDVector &tip_msa_idmap, const PartitionAssignment &part_assign,
+           const std::vector<uintVector> &site_weights);
+
+  TreeInfo(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
+           const IDVector &tip_msa_idmap,
+           const PartitionAssignment &part_assign, int partition_id, const Model &model);
+
   virtual
   ~TreeInfo ();
 
@@ -105,9 +111,13 @@ private:
   bool _use_spr_fastclv;
   doubleVector _partition_contributions;
 
-  void init(const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
-            const IDVector& tip_msa_idmap, const PartitionAssignment& part_assign,
-            const std::vector<uintVector>& site_weights);
+  void init(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
+            const IDVector &tip_msa_idmap, const PartitionAssignment &part_assign,
+            const std::vector<uintVector> &site_weights, int single_partition_id, const Model &model);
+
+  void init(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
+            const IDVector &tip_msa_idmap, const PartitionAssignment &part_assign,
+            const std::vector<uintVector> &site_weights);
 
   void assert_lh_improvement(double old_lh, double new_lh, const std::string& where = "");
 };

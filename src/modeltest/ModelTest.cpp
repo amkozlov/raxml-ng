@@ -1,5 +1,8 @@
 
 #include "ModelTest.hpp"
+
+#include <memory>
+
 #include "ModelDefinitions.hpp"
 #include "../ICScoreCalculator.hpp"
 #include "corax/tree/treeinfo.h"
@@ -35,10 +38,68 @@ vector<std::string> generate_candidate_model_names(const DataType &dt) {
     return candidate_model_names;
 }
 
-void ModelTest::optimize_model() {
-    EvaluationResults results;
 
+class ExecutionStatus final {
+public:
+    ExecutionStatus() : partition_index(0), partition_count(0), model_index(0), model_count(0) {
+    }
+
+    void initialize(size_t model_count, size_t partition_count) {
+        this->partition_index = 0;
+        this->model_index = 0;
+        this->partition_count = partition_count;
+        this->model_count = model_count;
+        this->results = std::unique_ptr<Results>(
+            new std::vector<PartitionModelEvaluation>(model_count * partition_count));
+    }
+
+    virtual ~ExecutionStatus() = default;
+
+
+    void store_results(size_t partition_index, size_t model_index, PartitionModelEvaluation result) const {
+        results->at(model_index * partition_count + partition_index) = std::move(result);
+    }
+
+    bool get_next_model(size_t &next_partition_index, size_t &next_model_index) {
+        if (partition_count < 1 || model_count < 1) {
+            throw std::logic_error("attempted to get next model before initialization");
+        }
+        mutex.lock();
+
+        next_partition_index = partition_index;
+        next_model_index = model_index;
+
+        if (model_index == model_count - 1) {
+            ++partition_index;
+        }
+
+        model_index = (model_index + 1) % model_count;
+
+
+        mutex.unlock();
+
+        return (next_partition_index < partition_count && next_model_index < model_count);
+    }
+
+    vector<PartitionModelEvaluation> &get_results() const {
+        return *results;
+    }
+
+private:
+    using Results = vector<PartitionModelEvaluation>;
+    size_t partition_index, partition_count;
+    size_t model_index, model_count;
+    std::mutex mutex;
+
+    // Results in flat array with models being the major index, i.e. the results for a single model are grouped by partition
+    std::unique_ptr<Results> results;
+};
+
+ExecutionStatus execution_status; // shared across all threads.
+
+void ModelTest::optimize_model() {
     vector<Model *> models;
+    //models.resize
 
     Options modified_options(options);
     modified_options.brlen_linkage = CORAX_BRLEN_UNLINKED;
@@ -47,91 +108,59 @@ void ModelTest::optimize_model() {
 
     auto candidate_models = generate_candidate_model_names(msa.part_info(0).model().data_type());
     auto index = 1U;
-    for (const auto &model_descriptor: candidate_models) {
-        LOG_DEBUG << "[" << index << "/" << candidate_models.size() << "] Instantiating model " <<
-                model_descriptor << endl;
 
-        if (ParallelContext::thread_id() == 0) {
-            // Only first thread updates models to prevent race-condition
-            for (auto p = 0U; p < msa.part_count(); ++p) {
-                models.push_back(new Model(model_descriptor));
-                msa.model(p, *models.back());
-            }
-        }
-
-        ParallelContext::thread_barrier();
-
-        TreeInfo treeinfo(modified_options, tree, msa, tip_msa_idmap, part_assign);
-
-        const double final_loglh = optimizer.optimize_model(treeinfo);
-
-        LOG_INFO << "[" << index << "/" << candidate_models.size() << "]\tModel " << std::setw(12) <<
-                model_descriptor << "\t\t" << final_loglh << endl;
-
-
-        vector<PartitionModelEvaluation> partition_results(msa.part_count());
-
-        for (auto p = 0U; p < msa.part_count(); ++p) {
-            PartitionModelEvaluation partition_results;
-
-            const double partition_loglh = treeinfo.pll_treeinfo().partition_loglh[p];
-            const size_t free_params = msa.model(p).num_free_params() + treeinfo.tree().num_branches();
-            const size_t sample_size = msa.part_info(p).stats().site_count;
-            ICScoreCalculator ic_score_calculator(free_params, sample_size);
-
-            partition_results.ic_criteria = ic_score_calculator.all(partition_loglh);
-            partition_results.model = msa.model(p);
-            partition_results.partition_loglh = partition_loglh;
-
-            LOG_DEBUG << "\tPartition #" << p << " BIC " << partition_results.ic_criteria[
-                InformationCriterion::bic] << endl;
-
-            results.push_back(partition_results);
-        }
-
-
-        if (ParallelContext::thread_id() == 0) {
-            for (const auto *m: models) {
-                delete m;
-            }
-            models.clear();
-        }
-        ++index;
+    if (ParallelContext::master()) {
+        execution_status.initialize(candidate_models.size(), msa.part_count());
     }
 
+    ParallelContext::barrier();
 
-    LOG_INFO << endl;
+    size_t partition_index, model_index;
+
+    while (execution_status.get_next_model(partition_index, model_index)) {
+        printf("Thread %zu works on part %zu model %zu (%s)\n", ParallelContext::thread_id(), partition_index,
+               model_index, candidate_models.at(model_index).c_str());
+
+        const auto &model_descriptor = candidate_models.at(model_index);
+
+        Model model(model_descriptor);
+        TreeInfo treeinfo(modified_options, tree, msa, tip_msa_idmap, part_assign, partition_index, model);
+        optimizer.optimize_model(treeinfo);
+
+        PartitionModelEvaluation partition_results;
+
+        const double partition_loglh = treeinfo.pll_treeinfo().partition_loglh[0];
+        const size_t free_params = model.num_free_params() + treeinfo.tree().num_branches();
+        const size_t sample_size = msa.part_info(partition_index).stats().site_count;
+        ICScoreCalculator ic_score_calculator(free_params, sample_size);
+
+        partition_results.ic_criteria = ic_score_calculator.all(partition_loglh);
+        partition_results.model = model;
+        partition_results.partition_loglh = partition_loglh;
+
+        execution_status.store_results(partition_index, model_index, partition_results);
+        printf("Thread %zu result = %f\n", ParallelContext::thread_id(), partition_loglh);
+    }
+
+    ParallelContext::barrier();
+
+    if (ParallelContext::master()) {
+        auto xml_fname = options.output_fname("modeltest.xml");
+        fstream xml_stream(xml_fname, std::ios::out);
+
+        print_xml(xml_stream, execution_status.get_results(), msa.part_count());
+        xml_stream.close();
+
+        LOG_INFO << "XML model selection file written to " << xml_fname << endl;
+    }
+
+    auto results = execution_status.get_results();
     for (auto p = 0U; p < msa.part_count(); ++p) {
         auto bic_ranking = rank_by_score(results, InformationCriterion::bic, p, msa.part_count());
         const auto &best_model = results[bic_ranking.at(0) * msa.part_count() + p];
         LOG_INFO << "Partition #" << p << ": " << best_model.model.to_string() << " BIC = " << best_model.
                 ic_criteria.
                 at(InformationCriterion::bic) << " LogLH = " << best_model.partition_loglh << endl;
-    }
-
-
-    if (ParallelContext::master()) {
-        auto part_fname = options.output_fname("modeltest.partitions.bic.txt");
-        fstream part_stream(part_fname, std::ios::out);
-        for (auto p = 0U; p < msa.part_count(); ++p) {
-            const auto &ranking = rank_by_score(results, InformationCriterion::bic, p, msa.part_count());
-            const auto &best_model = results[ranking.at(0) * msa.part_count() + p];
-            part_stream << best_model.model.to_string() << ", " << best_model.model.name() << " = " << msa.
-                    part_info(p).
-                    range_string() << endl;
-        }
-        part_stream.close();
-
-        LOG_INFO << endl
-                << "Partitions file (BIC) written to " << part_fname << endl;
-
-
-        auto xml_fname = options.output_fname("modeltest.xml");
-        fstream xml_stream(xml_fname, std::ios::out);
-        print_xml(xml_stream, results, msa.part_count());
-        xml_stream.close();
-
-        LOG_INFO << "XML model selection file written to " << xml_fname << endl;
     }
 }
 
