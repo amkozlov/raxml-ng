@@ -446,6 +446,7 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
       ParallelContext::barrier();
 
       _lh_epsilon = _criterion->get_epsilon(ParallelContext::group_id());
+      //LOG_PROGRESS(loglh) << approach << " apporach. Epsilon = " << _lh_epsilon << endl;
       LOG_DEBUG << approach << " apporach. Epsilon = " << _lh_epsilon << endl;
 
       if(ParallelContext::group_master_thread())
@@ -494,6 +495,7 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
           
           double p_value = _criterion->get_pvalue(ParallelContext::group_id());
           epsilon = _criterion->get_epsilon(ParallelContext::group_id()); 
+          //LOG_PROGRESS(loglh) << "KH multiple-testing epsilon = " << epsilon << endl;
           LOG_DEBUG << "KH multiple-testing epsilon = " << epsilon << endl;
           impr = ((loglh - old_loglh > epsilon) && (p_value < 1));
           
@@ -571,6 +573,7 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
           
           double p_value = _criterion->get_pvalue(ParallelContext::group_id());
           epsilon = _criterion->get_epsilon(ParallelContext::group_id()); 
+          //LOG_PROGRESS(loglh) << "KH multiple-testing epsilon = " << epsilon << endl;
           LOG_DEBUG << "KH multiple-testing epsilon = " << epsilon << endl;
           impr = ((loglh - old_loglh > epsilon) && (p_value < 1));
 

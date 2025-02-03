@@ -240,10 +240,11 @@ void StoppingCriterion::set_thread_offset(TreeInfo* treeinfo, const PartitionAss
     {
         ParallelContext::GroupLock lock;
         int part = 0;
-        //int tsites = 0;
-
+        
         for (const auto& pa: part_assignment){
             
+            part = pa.part_id;
+
             if(thread_offset[local_thread_id][part] == -1 ) 
                 thread_offset[local_thread_id][part] = pa.start;
             
@@ -260,8 +261,6 @@ void StoppingCriterion::set_thread_offset(TreeInfo* treeinfo, const PartitionAss
                     //tsites += vec[part][i];
                 }
             }
-
-            part++;
             
         }
         //assert(tsites == total_sites);
@@ -279,8 +278,14 @@ vector<double *> StoppingCriterion::get_vec(int group_id, int local_thread_id, b
     else 
         vec = plnl ? persite_lnl_uncompressed[group_id] : persite_lnl_uncompressed_new[group_id] ;
 
-    for(unsigned int part = 0; part < vec.size(); part++)
-        vec[part] += get_offset(local_thread_id, part);
+    for(unsigned int part = 0; part < vec.size(); part++){
+        //cout << "Thread " << ParallelContext::local_thread_id() 
+        //        << ", Part " << part 
+        //        << ", offset " << get_offset(local_thread_id, part) << endl;
+        
+        int thread_offset = get_offset(local_thread_id, part);
+        if (thread_offset != -1) vec[part] += get_offset(local_thread_id, part);
+    }
 
     return vec;
 }
