@@ -103,7 +103,8 @@ enum class BranchSupportMetric
   fbp = 0,
   tbe,
   rbs,
-  sh_alrt
+  sh_alrt,
+  ebg
 };
 
 enum class InformationCriterion

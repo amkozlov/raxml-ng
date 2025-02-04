@@ -56,6 +56,7 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.fbp_support_tree, "supportFBP");
   set_default_outfile(outfile_names.rbs_support_tree, "supportRBS");
   set_default_outfile(outfile_names.tbe_support_tree, "supportTBE");
+  set_default_outfile(outfile_names.ebg_support_tree, "supportEBG");
   set_default_outfile(outfile_names.sh_support_tree, "supportSH");
   set_default_outfile(outfile_names.terrace, "terrace");
   set_default_outfile(outfile_names.binary_msa, "rba");
@@ -92,6 +93,8 @@ const std::string& Options::support_tree_file(BranchSupportMetric bsm) const
       return outfile_names.rbs_support_tree;
     else if (bsm == BranchSupportMetric::tbe)
       return outfile_names.tbe_support_tree;
+    else if (bsm == BranchSupportMetric::ebg)
+      return outfile_names.ebg_support_tree;
     else if (bsm == BranchSupportMetric::sh_alrt)
       return outfile_names.sh_support_tree;
     else
@@ -361,6 +364,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
           break;
         case BranchSupportMetric::tbe:
           stream << "Transfer Bootstrap";
+          break;
+        case BranchSupportMetric::ebg:
+          stream << "Educated Bootstrap Guesser";
           break;
         case BranchSupportMetric::sh_alrt:
           stream << "SH-aLRT";

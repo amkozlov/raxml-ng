@@ -19,6 +19,8 @@ set(PORTABLE_BUILD OFF CACHE BOOL "Build a portable RAxML-NG binary (slightly sl
 set(USE_TERRAPHAST OFF CACHE BOOL "Use phylogentic terraces library (terraphast) ")
 set(USE_GMP OFF CACHE BOOL "Use GNU Multiple precision (GMP) library ")
 
+set(USE_EBG ON CACHE BOOL "Use Educated Bootstrap Guesser (EBG) ")
+
 set(ENABLE_PTHREADS ${USE_PTHREADS})
 
 if(USE_TERRAPHAST)

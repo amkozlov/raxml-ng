@@ -52,10 +52,14 @@ if (USE_CORAXLIB_CMAKE)
   target_include_directories(raxml_module PUBLIC ${PROJECT_SOURCE_DIR}/libs/coraxlib/src ${PROJECT_SOURCE_DIR}/libs/coraxlib/lib/difficulty_prediction/src)
   #target_link_libraries(raxml_module PUBLIC corax)
   target_link_directories(raxml_module PUBLIC ${PROJECT_SOURCE_DIR}/libs/coraxlib/bin)
-  set(LIBPLL_LIBS corax)
+  set(CORAX_LIBS corax)
 endif()
 
-set(RAXML_LIBS ${LIBPLL_LIBS} m)
+set(RAXML_LIBS ${CORAX_LIBS} m)
+
+if(USE_EBG)
+  set(RAXML_LIBS ebg ${RAXML_LIBS})
+endif()
 
 if(USE_TERRAPHAST)
   set(RAXML_LIBS ${RAXML_LOCALDEPS_DIR}/lib/libterraces.a ${RAXML_LIBS})

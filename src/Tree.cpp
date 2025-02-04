@@ -385,6 +385,37 @@ void Tree::reset_tip_ids(const NameIdMap& label_id_map)
   }
 }
 
+doubleVector Tree::brlens(bool outer /* = true */) const
+{
+  doubleVector bl(num_branches(), 0.);
+  size_t branches = outer ? num_branches() : (num_branches() - num_tips());
+
+  for (auto n: subnodes())
+  {
+    assert(n);
+    if (n->node_index < n->back->node_index && (n->next || outer))
+    {
+      bl.at(n->pmatrix_index) = n->length;
+      branches--;
+    }
+  }
+
+  assert(branches == 0);
+
+  return bl;
+}
+
+double Tree::sum_of_brlens(bool outer /* = true */) const
+{
+  if (empty())
+    return 0.;
+  else
+  {
+    auto bl = brlens(outer);
+    return  std::accumulate(bl.cbegin(), bl.cend(), 0.);
+  }
+}
+
 void Tree::fix_outbound_brlens(double min_brlen, double max_brlen)
 {
   for (auto n: subnodes())

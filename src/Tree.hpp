@@ -106,6 +106,9 @@ public:
   TreeTopology topology() const;
   void topology(const TreeTopology& topol);
 
+  doubleVector brlens(bool outer = true) const;
+  double sum_of_brlens(bool outer = true) const;
+
   const std::vector<doubleVector>& partition_brlens() const { return _partition_brlens; }
   const doubleVector& partition_brlens(size_t partition_idx) const;
   void partition_brlens(size_t partition_idx, const doubleVector& brlens);

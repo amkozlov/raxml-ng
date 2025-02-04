@@ -28,3 +28,7 @@ if(USE_TERRAPHAST)
   add_subdirectory(terraphast)
   set(TERRACES_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/terraphast/include PARENT_SCOPE)
 endif()
+
+if(USE_EBG)
+  add_subdirectory(ebg)
+endif()				

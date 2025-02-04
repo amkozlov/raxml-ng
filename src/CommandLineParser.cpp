@@ -915,6 +915,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
             {
               opts.bs_metrics.insert(BranchSupportMetric::tbe);
             }
+            else if (strncasecmp(m.c_str(), "ebg", 3) == 0)
+            {
+              opts.bs_metrics.insert(BranchSupportMetric::ebg);
+            }
             else if (strncasecmp(m.c_str(), "sh", 3) == 0 || strncasecmp(m.c_str(), "alrt", 3) == 0)
             {
               opts.bs_metrics.insert(BranchSupportMetric::sh_alrt);
@@ -1286,8 +1290,8 @@ void CommandLineParser::print_help()
             "  --bs-trees     autoMRE{N}                  use MRE-based bootstrap convergence criterion, up to N replicates (default: 1000)\n"
             "  --bs-trees     FILE                        Newick file containing set of bootstrap replicate trees (with --support)\n"
             "  --bs-cutoff    VALUE                       cutoff threshold for the MRE-based bootstopping criteria (default: 0.03)\n"
-            "  --bs-metric    fbp | rbs | tbe | sh        branch support metric: fbp = Felsenstein bootstrap (default), rbs = Rapid bootstrap\n"
-            "                                             tbe = Transfer bootstrap estimate, sh = SH-like aLRT\n"
+            "  --bs-metric    fbp | rbs |                 branch support metric: fbp = Felsenstein bootstrap (default), rbs = Rapid bootstrap\n"
+            "                 ebg | tbe | sh              ebg = Educated bootstrap guesser, tbe = Transfer bootstrap estimate, sh = SH-like aLRT\n"
             "  --bs-write-msa on | off                    write all bootstrap alignments (default: OFF)\n"
             "\n"
             "SH-like test options:\n"
