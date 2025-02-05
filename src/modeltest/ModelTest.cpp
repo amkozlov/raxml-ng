@@ -98,16 +98,9 @@ private:
 ExecutionStatus execution_status; // shared across all threads.
 
 void ModelTest::optimize_model() {
-    vector<Model *> models;
-    //models.resize
-
-    Options modified_options(options);
-    modified_options.brlen_linkage = CORAX_BRLEN_UNLINKED;
-
     LOG_INFO << std::setprecision(20) << std::setfill(' ') << std::left;
 
     auto candidate_models = generate_candidate_model_names(msa.part_info(0).model().data_type());
-    auto index = 1U;
 
     if (ParallelContext::master()) {
         execution_status.initialize(candidate_models.size(), msa.part_count());
@@ -118,13 +111,12 @@ void ModelTest::optimize_model() {
     size_t partition_index, model_index;
 
     while (execution_status.get_next_model(partition_index, model_index)) {
-        printf("Thread %zu works on part %zu model %zu (%s)\n", ParallelContext::thread_id(), partition_index,
-               model_index, candidate_models.at(model_index).c_str());
-
         const auto &model_descriptor = candidate_models.at(model_index);
+        LOG_INFO << RAXML_LOG_TIMESTAMP << "Partition " << partition_index << " model " << model_index << " " <<
+                model_descriptor << endl;
 
         Model model(model_descriptor);
-        TreeInfo treeinfo(modified_options, tree, msa, tip_msa_idmap, part_assign, partition_index, model);
+        TreeInfo treeinfo(options, tree, msa, tip_msa_idmap, part_assign, partition_index, model);
         optimizer.optimize_model(treeinfo);
 
         PartitionModelEvaluation partition_results;
@@ -138,8 +130,7 @@ void ModelTest::optimize_model() {
         partition_results.model = model;
         partition_results.partition_loglh = partition_loglh;
 
-        execution_status.store_results(partition_index, model_index, partition_results);
-        printf("Thread %zu result = %f\n", ParallelContext::thread_id(), partition_loglh);
+        execution_status.store_results(partition_index, model_index, std::move(partition_results));
     }
 
     ParallelContext::barrier();
