@@ -64,7 +64,8 @@ public:
         if (partition_count < 1 || model_count < 1) {
             throw std::logic_error("attempted to get next model before initialization");
         }
-        mutex.lock();
+
+        std::lock_guard<std::mutex> lock(mutex);
 
         next_partition_index = partition_index;
         next_model_index = model_index;
@@ -75,8 +76,6 @@ public:
 
         model_index = (model_index + 1) % model_count;
 
-
-        mutex.unlock();
 
         return (next_partition_index < partition_count && next_model_index < model_count);
     }
