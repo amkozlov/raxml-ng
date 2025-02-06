@@ -37,7 +37,7 @@ inline std::string frequency_type_label(const DataType &datatype, const frequenc
     check_supported_datatype(datatype);
     switch (f) {
         case frequency_type_t::FIXED:
-            return datatype == DataType::dna ? "+FE" : "+FE";
+            return datatype == DataType::dna ? "+FE" : "";
         case frequency_type_t::ESTIMATED:
             return datatype == DataType::dna ? "+FO" : "+F";
         default:
@@ -74,7 +74,7 @@ const unordered_map<rate_heterogeneity_t, string> rate_heterogeneity_label{
 const std::vector<string> dna_substitution_matrix_names{
     "F81",
     "HKY",
-    "TrN",
+    "TN93",
     "TPM1",
     "TPM2",
     "TPM3",
