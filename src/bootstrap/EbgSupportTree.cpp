@@ -67,10 +67,9 @@ void EbgSupportTree::add_parsimony_boostrap_trees(const TreeList& treelist)
 
 bool EbgSupportTree::compute_support()
 {
-//   using namespace ebg;
    ebg_light_features features;
 
-   double total_brlen = sum_of_brlens(false);
+//   double total_brlen = sum_of_brlens(false);
    const auto& ps_support = _ps_tree.support();
    const auto& pbs_support = _pbs_tree.support();
 
@@ -78,8 +77,8 @@ bool EbgSupportTree::compute_support()
    features.mean_norm_rf_distance = _pbs_avg_rrf;
    features.skewness_bootstrap_pars_support_tree = _pbs_skewness;
 
-   printf("avg_rrf: %lf, pbs_skew: %lf, total_brlen: %lf\n",
-          features.mean_norm_rf_distance, features.skewness_bootstrap_pars_support_tree, total_brlen);
+//   printf("avg_rrf: %lf, pbs_skew: %lf, total_brlen: %lf\n",
+//          features.mean_norm_rf_distance, features.skewness_bootstrap_pars_support_tree, total_brlen);
 
   _support.resize(_pll_splits_hash->entry_count);
 
@@ -96,13 +95,13 @@ bool EbgSupportTree::compute_support()
       features.parsimony_support = ps_support.at(features.branch_id);
       features.parsimony_bootstrap_support = pbs_support.at(features.branch_id);
       features.branch_length = node->length;
-      features.norm_branch_length = features.branch_length / total_brlen;
+//      features->norm_branch_length = features.branch_length / total_brlen;
       double support = ebg_predict_branch_support(&features);
       _support[e->bip_number] = support;
 
-      printf("branch_id: %u, support: %lf, brlen: %lf, norm_brlen: %lf, ps: %lf, pbs: %lf\n",
-             features.branch_id, support, features.branch_length, features.norm_branch_length,
-             features.parsimony_support, features.parsimony_bootstrap_support);
+//      printf("branch_id: %u, support: %lf, brlen: %lf, norm_brlen: %lf, ps: %lf, pbs: %lf\n",
+//             features.branch_id, support, features.branch_length, features.norm_branch_length,
+//             features.parsimony_support, features.parsimony_bootstrap_support);
       e = e->next;
     }
   }

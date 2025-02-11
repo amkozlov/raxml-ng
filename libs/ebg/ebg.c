@@ -8,13 +8,11 @@ double ebg_predict_branch_support(const ebg_light_features *features)
   union Entry *feat = (union Entry *)calloc(num_features, sizeof(union Entry));
 
   double prediction_features[] = {
-//      (double) features->branch_id,  // not used for regression (?)
-      features->parsimony_bootstrap_support,
       features->parsimony_support,
-//      features->norm_branch_length,
       features->branch_length,
-      features->mean_norm_rf_distance,
-      features->skewness_bootstrap_pars_support_tree
+      features->parsimony_bootstrap_support,
+      features->skewness_bootstrap_pars_support_tree,
+      features->mean_norm_rf_distance
   };
 
   for (int i = 0; i < num_features; ++i)
@@ -23,7 +21,7 @@ double ebg_predict_branch_support(const ebg_light_features *features)
   }
 
   int prediction_margin = 0;
-  double prediction;
+  double prediction = 0.;
   ebg_predict(feat, prediction_margin, &prediction);
   free(feat);
 

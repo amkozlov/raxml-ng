@@ -27,6 +27,7 @@ int32_t ebg_get_num_feature(void) {
 
 void ebg_predict(union Entry* data, int pred_margin, double* result) {
 //  unsigned int tmp;
+
   predict_unit0(data, result);
   predict_unit1(data, result);
   predict_unit2(data, result);
@@ -47,8 +48,6 @@ void ebg_predict(union Entry* data, int pred_margin, double* result) {
   // Apply base_scores
   result[0] += 0;
   
-  printf("ebg RESULT  = %lf\n", result[0]);
-
   // Apply postprocessor
   if (!pred_margin) { ebg_postprocess(result); }
 }

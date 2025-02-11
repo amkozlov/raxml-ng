@@ -28,7 +28,7 @@ extern "C"
     double parsimony_support;
 
     /**
-     * Normalized length of the branch (relative to sum of brlens in the tree)
+     * DEPRECATED: Normalized length of the branch
      */
     double norm_branch_length;
 
