@@ -59,6 +59,7 @@ const array<rate_heterogeneity_t, 4> default_rate_heterogeneity{
     rate_heterogeneity_t::INVARIANT,
     rate_heterogeneity_t::GAMMA,
     rate_heterogeneity_t::INVARIANT_GAMMA,
+    //rate_heterogeneity_t::FREE_RATE
 };
 
 const unordered_map<rate_heterogeneity_t, string> rate_heterogeneity_label{

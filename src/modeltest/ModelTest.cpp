@@ -204,50 +204,15 @@ void ModelTest::print_xml(ostream &os, EvaluationResults &results, unsigned int 
     for (auto p = 0U; p < partition_count; ++p) {
         os << "<partition id=\"" << p << "\">" << endl;
 
-        for (auto ic_idx = 0U; ic_idx < ic_count; ++ic_idx) {
-            const auto ic = static_cast<InformationCriterion>(ic_idx);
-
-            const auto &ranking = rank_by_score(results, ic, p, partition_count);
-
-            deltas.clear();
-
-            const auto &best_score = results.at(ranking.at(0) * partition_count + p).ic_criteria.at(ic);
-            for (auto i = 0U; i < results.size() / partition_count; ++i) {
-                deltas.emplace_back(results[i * partition_count + p].ic_criteria.at(ic) - best_score);
-            }
-
-            const auto weights = transform_delta_to_weight(deltas);
-
-            os << "<selection type=\"";
-
-            switch (ic) {
-                case InformationCriterion::aic:
-                    os << "AIC";
-                    break;
-                case InformationCriterion::aicc:
-                    os << "AICc";
-                    break;
-                case InformationCriterion::bic:
-                    os << "BIC";
-                    break;
-            }
-
-            os << "\">" << endl;
-
-            for (auto i = 0U; i < results.size() / partition_count; ++i) {
-                const auto &result = results[ranking.at(i) * partition_count + p];
-                os << "<model rank=\"" << i + 1 << "\" name=\"" << result.model.to_string()
-                        << "\" lnL=\"" << result.partition_loglh
-                        << "\" score=\"" << result.ic_criteria.at(ic)
-                        << "\" delta=\"" << deltas.at(ranking.at(i))
-                        << "\" weight=\"" << weights.at(ranking.at(i))
-                        << "\" />" << endl;
-            }
-
-
-            os << "</selection>" << endl;
+        for (auto i = 0U; i < results.size() / partition_count; ++i) {
+            const auto &result = results[i * partition_count + p];
+            os << "<model name=\"" << result.model.to_string()
+                    << "\" lnL=\"" << result.partition_loglh
+                    << "\" score-bic=\"" << result.ic_criteria.at(InformationCriterion::bic)
+                    << "\" score-aic=\"" << result.ic_criteria.at(InformationCriterion::aic)
+                    << "\" score-aicc=\"" << result.ic_criteria.at(InformationCriterion::aicc)
+                    << "\" free-params=\"" << result.model.num_free_params() << "\" />" << endl;
         }
-
         os << "</partition>" << endl;
     }
 
