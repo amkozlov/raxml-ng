@@ -4,6 +4,19 @@
 
 using namespace std;
 
+SupportMetricSet BS_METRICS_WITH_ML_TREES   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
+                                              BranchSupportMetric::tbe };
+
+SupportMetricSet BS_METRICS_WITH_PB_TREES   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
+                                              BranchSupportMetric::tbe, BranchSupportMetric::ebg,
+                                              BranchSupportMetric::pbs };
+
+SupportMetricSet BS_METRICS_WITH_PARS_TREES { BranchSupportMetric::ps };
+
+SupportMetricSet BS_METRICS_WITH_MSA_REPS   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
+                                              BranchSupportMetric::tbe, BranchSupportMetric::ebg,
+                                              BranchSupportMetric::pbs, BranchSupportMetric::sh_alrt };
+
 Options::Options() : opt_version(RAXML_OPT_VERSION), cmdline(""), command(Command::none),
 use_tip_inner(true), use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false),
 use_repeats(true), use_rba_partload(true), use_energy_monitor(true), use_old_constraint(false),
@@ -17,15 +30,46 @@ spr_radius(-1), spr_cutoff(1.0),
 brlen_linkage(CORAX_BRLEN_SCALED), brlen_opt_method(CORAX_OPT_BLO_NEWTON_FAST),
 brlen_min(RAXML_BRLEN_MIN), brlen_max(RAXML_BRLEN_MAX),
 num_searches(1), terrace_maxsize(100),
-num_bootstraps(1000), bootstop_criterion(BootstopCriterion::none), bootstop_cutoff(0.03),
+num_bootstraps(1000), bootstop_criterion(BootstopCriterion::none), bootstop_cutoff(RAXML_BOOTSTOP_CUTOFF),
 bootstop_interval(RAXML_BOOTSTOP_INTERVAL), bootstop_permutations(RAXML_BOOTSTOP_PERMUTES),
 tbe_naive(false), consense_cutoff(ConsenseCutoff::MR), tree_file(""), constraint_tree_file(""),
 msa_file(""), model_file(""), weights_file(""), outfile_prefix(""),
 num_threads(1), num_threads_max(1), num_ranks(1), num_workers(1), num_workers_max(UINT_MAX),
 simd_arch(CORAX_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(LoadBalancing::benoit),
 diff_pred_pars_trees(RAXML_CPYTHIA_TREES_NUM), nni_tolerance(1.0), nni_epsilon(10),
-num_sh_reps(1000), sh_epsilon(0.1)
+num_sh_reps(RAXML_SH_ALRT_REPS), sh_epsilon(RAXML_SH_ALRT_EPSILON)
 {}
+
+unsigned int Options::max_num_replicates(const SupportMetricSet& mset) const
+{
+  unsigned int num = 0;
+  for (auto& m: bs_replicate_counts)
+  {
+    if (mset.count(m.first))
+      num = std::max(num, m.second);
+  }
+  return num;
+}
+
+unsigned int Options::num_bootstrap_ml_trees() const
+{
+  return max_num_replicates(BS_METRICS_WITH_ML_TREES);
+}
+
+unsigned int Options::num_bootstrap_pars_trees() const
+{
+  return max_num_replicates(BS_METRICS_WITH_PB_TREES);
+}
+
+unsigned int Options::num_pars_trees() const
+{
+  return max_num_replicates(BS_METRICS_WITH_PARS_TREES);
+}
+
+unsigned int Options::num_bootstrap_msa_reps() const
+{
+  return max_num_replicates(BS_METRICS_WITH_MSA_REPS);
+}
 
 string Options::output_fname(const string& suffix) const
 {
@@ -370,6 +414,12 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
           break;
         case BranchSupportMetric::sh_alrt:
           stream << "SH-aLRT";
+          break;
+        case BranchSupportMetric::ps:
+          stream << "Parsimony Support";
+          break;
+        case BranchSupportMetric::pbs:
+          stream << "Parsimony Bootstrap";
           break;
       }
     }

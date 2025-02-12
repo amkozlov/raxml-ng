@@ -167,9 +167,10 @@ void print_banner()
 {
   LOG_INFO << endl << "RAxML-NG v. " << RAXML_VERSION << " released on " << RAXML_DATE <<
       " by The Exelixis Lab." << endl;
-  LOG_INFO << "Developed by: Alexey M. Kozlov and Alexandros Stamatakis." << endl;
+  LOG_INFO << "Developed by: Oleksiy M. Kozlov and Alexandros Stamatakis." << endl;
   LOG_INFO << "Contributors: Diego Darriba, Tomas Flouri, Benoit Morel, "
-              "Sarah Lutteropp, Ben Bettisworth, Julia Haag, Anastasis Togkousidis." << endl;
+              "Sarah Lutteropp, Ben Bettisworth," << endl <<
+              "              Julia Haag, Anastasis Togkousidis, Julius Wiegert." << endl;
   LOG_INFO << "Latest version: https://github.com/amkozlov/raxml-ng" << endl;
   LOG_INFO << "Questions/problems/suggestions? "
               "Please visit: https://groups.google.com/forum/#!forum/raxml" << endl << endl;
@@ -1013,7 +1014,8 @@ void autotune_threads(RaxmlInstance& instance)
       res.num_threads_response << " / " << res.num_threads_balanced <<
       " / " << res.num_threads_throughput << endl << endl;
 
-  unsigned int max_workers = std::max(opts.num_searches, opts.num_bootstraps);
+  unsigned int num_bs_searches = opts.num_bootstrap_ml_trees();
+  unsigned int max_workers = std::max(opts.num_searches, num_bs_searches);
   unsigned int max_workers_mem = 0.9 * num_ranks * sysutil_get_memtotal() / res.total_mem_size;
   max_workers = std::min(max_workers, max_workers_mem);
   max_workers = std::min(max_workers, opts.num_workers_max);
@@ -1761,6 +1763,7 @@ void predict_msa_difficulty(RaxmlInstance& instance)
     }
   }
 }
+
 void load_parted_msa(RaxmlInstance& instance)
 {
   init_part_info(instance);
@@ -1871,7 +1874,9 @@ void balance_load_coarse(RaxmlInstance& instance, const CheckpointFile& ckpfile)
       todo_start_trees.push_back(i);
   }
 
-  for (size_t i = 1; i <= instance.bs_seeds.size(); ++i)
+  auto num_bs_trees = instance.opts.num_bootstrap_ml_trees();
+  assert(num_bs_trees <= instance.bs_seeds.size());
+  for (size_t i = 1; i <= num_bs_trees; ++i)
   {
     if (!instance.done_bs_trees.count(i))
       todo_bs_trees.push_back(i);
@@ -1906,20 +1911,30 @@ void generate_bootstraps(RaxmlInstance& instance, const CheckpointFile& checkp)
   {
     assert(instance.parted_msa);
 
-    bool is_sh = instance.opts.bs_metrics.count(BranchSupportMetric::sh_alrt);
-    bool is_bs = (instance.opts.bs_metrics.count(BranchSupportMetric::fbp) ||
-                  instance.opts.bs_metrics.count(BranchSupportMetric::rbs) ||
-                  instance.opts.bs_metrics.count(BranchSupportMetric::tbe) ||
-                  instance.opts.bs_metrics.count(BranchSupportMetric::ebg));
+    bool is_bsmsa = instance.opts.command == Command::bsmsa;
+    bool is_sh    = instance.opts.bs_metrics.count(BranchSupportMetric::sh_alrt);
+    bool is_ebg   = instance.opts.bs_metrics.count(BranchSupportMetric::ebg);
 
-    unsigned int num_bstrees = is_bs ? instance.opts.num_bootstraps : 0;
-    unsigned int num_bsreps = is_sh ? std::max(instance.opts.num_sh_reps, num_bstrees) : num_bstrees;
+    unsigned int num_bstrees = is_bsmsa ? 0 : instance.opts.num_bootstrap_pars_trees();
+    unsigned int num_bsreps = instance.opts.num_bootstrap_msa_reps();
 
-    build_parsimony_msa(instance);
+    LOG_VERB_TS << "Branch support: Will generate " << num_bsreps << " MSA replicates and "
+                <<  num_bstrees << " parsimony trees." << endl;
 
-    if (instance.opts.bs_metrics.count(BranchSupportMetric::ebg))
+    assert(num_bsreps >= num_bstrees);
+
+    // init seeds
+    auto& seeds = instance.bs_seeds;
+    seeds.resize(num_bsreps);
+    for (size_t i = 0; i < seeds.size(); ++i)
+      seeds[i] = rand();
+
+    /* generate missing parsimony trees from the original MSA */
+    if (instance.opts.num_pars_trees() > instance.pars_trees.size())
     {
-      size_t trees_to_generate = 1000 - instance.pars_trees.size();
+      size_t trees_to_generate = instance.opts.num_pars_trees() - instance.pars_trees.size();
+
+      build_parsimony_msa(instance);
 
       if (!instance.opts.use_par_pars)
       {
@@ -1936,14 +1951,6 @@ void generate_bootstraps(RaxmlInstance& instance, const CheckpointFile& checkp)
       }
     }
 
-    // init seeds
-    auto& seeds = instance.bs_seeds;
-    seeds.resize(num_bsreps);
-    for (size_t i = 0; i < seeds.size(); ++i)
-      seeds[i] = rand();
-
-//    build_parsimony_msa(instance);
-
     /* in parallel parsimony mode, replicate MSAs will be generated later "just-in-time" */
     if (!instance.opts.use_par_pars || is_sh)
     {
@@ -1959,7 +1966,7 @@ void generate_bootstraps(RaxmlInstance& instance, const CheckpointFile& checkp)
       }
     }
 
-    /* in parallel parsimony mode, starting trees will be generated later "just-in-time" */
+    /* in parallel parsimony mode, BS starting trees will be generated later "just-in-time"... */
     if (!instance.opts.use_par_pars)
     {
       /* generate starting trees for bootstrap searches */
@@ -1974,8 +1981,9 @@ void generate_bootstraps(RaxmlInstance& instance, const CheckpointFile& checkp)
         instance.bs_start_trees.emplace_back(move(tree));
       }
     }
-    else if (instance.opts.bs_metrics.count(BranchSupportMetric::ebg))
+    else if (is_ebg)
     {
+      /* ... except with EBG: it does not run ML search, so we generate all trees now */
       build_trees_parallel(instance, instance.bs_start_trees, StartingTree::parsimony,
                            num_bstrees, instance.num_threads_parsimony, true);
     }
@@ -3348,11 +3356,12 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
     }
   }
 
-  // TEMP!!
+  // TEMP WORKAROUND: here we reset random seed once again to make sure that BS replicates
+  // are not affected by the number of ML search starting trees that has been generated before
+  srand(instance.opts.random_seed);
+
   /* generate bootstrap replicates */
   generate_bootstraps(instance, cm.checkp_file());
-
-  // TEMP!!
 
   ParallelContext::init_pthreads(opts, std::bind(thread_main,
                                                 std::ref(instance),
@@ -3404,13 +3413,6 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
     RBAStream bs(opts.msa_file);
     bs >> RBAStream::RBAOutput(parted_msa, RBAStream::RBAElement::seqdata, &local_part_ranges);
   }
-
-  // TEMP WORKAROUND: here we reset random seed once again to make sure that BS replicates
-  // are not affected by the number of ML search starting trees that has been generated before
-  srand(instance.opts.random_seed);
-
-  /* generate bootstrap replicates */
-//  generate_bootstraps(instance, cm.checkp_file());
 
   balance_load_coarse(instance, cm.checkp_file());
 

@@ -104,8 +104,13 @@ enum class BranchSupportMetric
   tbe,
   rbs,
   sh_alrt,
-  ebg
+  ebg,
+  ps,
+  pbs
 };
+
+typedef std::set<BranchSupportMetric> SupportMetricSet;
+typedef std::map<BranchSupportMetric,unsigned int> SupportMetricMap;
 
 enum class InformationCriterion
 {

@@ -42,6 +42,12 @@
 
 #define RAXML_CPYTHIA_TREES_NUM   24
 
+#define RAXML_SH_ALRT_REPS        1000
+#define RAXML_SH_ALRT_EPSILON     0.1
+
+#define RAXML_EBG_PS_TREES_NUM    1000
+#define RAXML_EBG_PBS_TREES_NUM   200
+
 // cpu features
 #define RAXML_CPU_SSE3  (1<<0)
 #define RAXML_CPU_AVX   (1<<1)
