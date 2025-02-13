@@ -1913,7 +1913,6 @@ void generate_bootstraps(RaxmlInstance& instance, const CheckpointFile& checkp)
 
     bool is_bsmsa = instance.opts.command == Command::bsmsa;
     bool is_sh    = instance.opts.bs_metrics.count(BranchSupportMetric::sh_alrt);
-    bool is_ebg   = instance.opts.bs_metrics.count(BranchSupportMetric::ebg);
 
     unsigned int num_bstrees = is_bsmsa ? 0 : instance.opts.num_bootstrap_pars_trees();
     unsigned int num_bsreps = instance.opts.num_bootstrap_msa_reps();
@@ -1981,9 +1980,10 @@ void generate_bootstraps(RaxmlInstance& instance, const CheckpointFile& checkp)
         instance.bs_start_trees.emplace_back(move(tree));
       }
     }
-    else if (is_ebg)
+    else if (instance.opts.bs_metrics.count(BranchSupportMetric::ebg) ||
+             instance.opts.bs_metrics.count(BranchSupportMetric::pbs))
     {
-      /* ... except with EBG: it does not run ML search, so we generate all trees now */
+      /* ... except with EBG/PBS: they do not run ML search, so we generate all trees now */
       build_trees_parallel(instance, instance.bs_start_trees, StartingTree::parsimony,
                            num_bstrees, instance.num_threads_parsimony, true);
     }
@@ -2070,6 +2070,24 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree,
       {
         sup_tree = make_shared<EbgSupportTree>(ref_tree, instance.pars_trees,
                                                instance.bs_start_trees);
+        support_in_pct = true;
+      }
+      else if (metric == BranchSupportMetric::ps)
+      {
+        sup_tree = make_shared<BootstrapTree>(ref_tree);
+        for (const auto& tree: instance.pars_trees)
+        {
+          sup_tree->add_replicate_tree(tree);
+        }
+        support_in_pct = true;
+      }
+      else if (metric == BranchSupportMetric::pbs)
+      {
+        sup_tree = make_shared<BootstrapTree>(ref_tree);
+        for (const auto& tree: instance.bs_start_trees)
+        {
+          sup_tree->add_replicate_tree(tree);
+        }
         support_in_pct = true;
       }
       else if (metric == BranchSupportMetric::sh_alrt)

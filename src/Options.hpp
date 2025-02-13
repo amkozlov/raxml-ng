@@ -21,6 +21,8 @@ struct OutputFileNames
   std::string support_tree;
   std::string tbe_support_tree;
   std::string ebg_support_tree;
+  std::string ps_support_tree;
+  std::string pbs_support_tree;
   std::string fbp_support_tree;
   std::string rbs_support_tree;
   std::string sh_support_tree;

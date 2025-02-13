@@ -299,6 +299,10 @@ void CommandLineParser::parse_bs_trees(Options &opts, const string& arg)
       {
         opts.bs_replicate_counts[BranchSupportMetric::ps] = num;
       }
+      else if (sscanf(m.c_str(), "pbs{%u}", &num) == 1)
+      {
+        opts.bs_replicate_counts[BranchSupportMetric::pbs] = num;
+      }
       else if (sscanf(m.c_str(), "sh{%u}", &num) == 1)
       {
         opts.bs_replicate_counts[BranchSupportMetric::sh_alrt] = num;
@@ -338,6 +342,10 @@ void CommandLineParser::parse_bs_trees(Options &opts, const string& arg)
         else if (m == BranchSupportMetric::ebg)
         {
           opts.bs_replicate_counts[m] = RAXML_EBG_PBS_TREES_NUM;
+        }
+        else if (m == BranchSupportMetric::ps || m == BranchSupportMetric::pbs)
+        {
+          opts.bs_replicate_counts[m] = RAXML_PS_PBS_TREES_NUM;
         }
         else if (m == BranchSupportMetric::sh_alrt)
           opts.bs_replicate_counts[m] = opts.num_sh_reps ? opts.num_sh_reps : RAXML_SH_ALRT_REPS;
@@ -1000,6 +1008,14 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
             {
               opts.bs_metrics.insert(BranchSupportMetric::ebg);
             }
+            else if (strncasecmp(m.c_str(), "ps", 2) == 0)
+            {
+              opts.bs_metrics.insert(BranchSupportMetric::ps);
+            }
+            else if (strncasecmp(m.c_str(), "pbs", 3) == 0)
+            {
+              opts.bs_metrics.insert(BranchSupportMetric::pbs);
+            }
             else if (strncasecmp(m.c_str(), "sh", 3) == 0 || strncasecmp(m.c_str(), "alrt", 3) == 0)
             {
               opts.bs_metrics.insert(BranchSupportMetric::sh_alrt);
@@ -1376,6 +1392,7 @@ void CommandLineParser::print_help()
             "  --bs-cutoff    VALUE                       cutoff threshold for the MRE-based bootstopping criteria (default: 0.03)\n"
             "  --bs-metric    fbp | rbs |                 branch support metric: fbp = Felsenstein bootstrap (default), rbs = Rapid bootstrap\n"
             "                 ebg | tbe | sh              ebg = Educated bootstrap guesser, tbe = Transfer bootstrap estimate, sh = SH-like aLRT\n"
+            "                 ps  | pbs                   ps = Parsimony support, pbs = Parsimony bootstrap support\n"
             "  --bs-write-msa on | off                    write all bootstrap alignments (default: OFF)\n"
             "\n"
             "SH-like test options:\n"
