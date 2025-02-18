@@ -215,8 +215,10 @@ void CommandLineParser::compute_num_searches(Options &opts)
     {
       if (it.first == StartingTree::user)
         it.second = 1;
-      else if (it.first != StartingTree::adaptive)
-        it.second = it.second > 0 ? it.second : def_tree_count;
+      else if (it.first == StartingTree::adaptive)
+        it.second = 0;
+      else
+        it.second = it.second != RAXML_UINT32_NONE ? it.second : def_tree_count;
     }
 
     for (const auto& it: opts.start_trees)
@@ -237,7 +239,7 @@ void CommandLineParser::parse_start_trees(Options &opts, const string& arg)
   for (const auto& st_tree: start_trees)
   {
     StartingTree st_tree_type;
-    unsigned int num_searches = 0;
+    unsigned int num_searches = RAXML_UINT32_NONE;
     if (st_tree == "rand" || st_tree == "random" ||
         sscanf(st_tree.c_str(), "rand{%u}", &num_searches) == 1 ||
         sscanf(st_tree.c_str(), "random{%u}", &num_searches) == 1)
@@ -259,7 +261,9 @@ void CommandLineParser::parse_start_trees(Options &opts, const string& arg)
       opts.tree_file += (opts.tree_file.empty() ? "" : ",") + st_tree;
       st_tree_type = StartingTree::user;
     }
-    if (!opts.start_trees.count(st_tree_type) || num_searches > 0)
+    if (num_searches == 0)
+      throw InvalidOptionValueException("Number of starting trees must be positive!");
+    if (!opts.start_trees.count(st_tree_type) || num_searches != RAXML_UINT32_NONE)
       opts.start_trees[st_tree_type] = num_searches;
   }
 }

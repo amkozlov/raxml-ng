@@ -1,6 +1,8 @@
 #ifndef RAXML_CONSTANTS_HPP_
 #define RAXML_CONSTANTS_HPP_
 
+#define RAXML_UINT32_NONE         UINT32_MAX
+
 // defaults
 #define RAXML_DEF_START_TREE      "rand{10},pars{10}"
 #define RAXML_DEF_START_TREE1     "pars{1}}"
