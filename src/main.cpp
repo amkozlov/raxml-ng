@@ -2623,19 +2623,34 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
 
   if (opts.command == Command::bootstrap || opts.command == Command::all)
   {
-    // TODO now only master process writes the output, this will have to change with
-    // coarse-grained parallelization scheme (parallel start trees/bootstraps)
-    if (!opts.bootstrap_trees_file().empty() && !checkp.bs_trees.empty())
+    if (!opts.bootstrap_trees_file().empty())
     {
   //    NewickStream nw(opts.bootstrap_trees_file(), std::ios::out | std::ios::app);
       NewickStream nw(opts.bootstrap_trees_file(), std::ios::out);
 
-      for (auto& topol: checkp.bs_trees)
+      if (!checkp.bs_trees.empty())
       {
-        Tree bs_tree = checkp.tree();
-        bs_tree.topology(topol.second.second);
-        postprocess_tree(opts, bs_tree);
-        nw << bs_tree;
+        for (auto& topol: checkp.bs_trees)
+        {
+          Tree bs_tree = checkp.tree();
+          bs_tree.topology(topol.second.second);
+          postprocess_tree(opts, bs_tree);
+          nw << bs_tree;
+        }
+      }
+      else if (opts.bs_metrics.count(BranchSupportMetric::pbs) && !instance.bs_start_trees.empty())
+      {
+        for (auto& bs_tree: instance.bs_start_trees)
+        {
+          nw << bs_tree;
+        }
+      }
+      else if (opts.bs_metrics.count(BranchSupportMetric::ps) && !instance.pars_trees.empty())
+      {
+        for (auto& bs_tree: instance.pars_trees)
+        {
+          nw << bs_tree;
+        }
       }
 
       LOG_INFO << "Bootstrap trees saved to: " << sysutil_realpath(opts.bootstrap_trees_file()) << endl;
