@@ -167,7 +167,7 @@ const std::vector<std::string> aa_model_names{
     "HIVW", // 15
     "JTT-DCMUT", // 16
     "FLU", // 17
-    "STMTREV", // 18
+    //"STMTREV", // 18
     /* additional mixture matrices
     "LG4M",      // 19
     "LG4X",      // 20
