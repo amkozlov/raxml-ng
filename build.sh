@@ -1,5 +1,5 @@
 #!/bin/bash
-binarytreesummation_version=0e2cd01960c808942314867f7f73b24ead8e558d
+binarytreesummation_version=e1e3b5d2f5142fdc450b29ce811002f838dee1e8
 ${CMAKE:-cmake} -B cmake-build-release -S . -DUSE_MPI=ON -DBUILD_TESTS=OFF \
     -DREPRODUCIBLE=ON \
     -Dbinarytreesummation_version=$binarytreesummation_version \
