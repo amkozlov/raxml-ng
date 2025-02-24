@@ -39,7 +39,7 @@ inline std::string frequency_type_label(const DataType &datatype, const frequenc
         case frequency_type_t::FIXED:
             return datatype == DataType::dna ? "+FE" : "";
         case frequency_type_t::ESTIMATED:
-            return datatype == DataType::dna ? "+FO" : "+F";
+            return datatype == DataType::dna ? "+FO" : "+FC";
         default:
             throw std::logic_error("unsupported frequency type");
     }
