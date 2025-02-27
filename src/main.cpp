@@ -1988,6 +1988,11 @@ void generate_bootstraps(RaxmlInstance& instance, const CheckpointFile& checkp)
       build_trees_parallel(instance, instance.bs_start_trees, StartingTree::parsimony,
                            num_bstrees, instance.num_threads_parsimony, true);
     }
+    else if (instance.opts.use_bs_pars && instance.opts.num_bootstrap_ml_trees() > 0)
+    {
+      /* initialize parsimony MSA for later use in BS starting tree generation */
+      build_parsimony_msa(instance);
+    }
 
   }
   RAXML_UNUSED(checkp); // might need it again for re-using previously computed replicates
