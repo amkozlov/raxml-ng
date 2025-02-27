@@ -135,6 +135,18 @@ void CommandLineParser::check_options(Options &opts)
         "Please choose whether you want to generate parsimony or random starting trees!");
   }
 
+  if (opts.command == Command::support)
+  {
+    /* only FBP or TBE are allowed in support mapping mode; other values are ignored */
+    opts.bs_metrics.erase(BranchSupportMetric::rbs);
+    opts.bs_metrics.erase(BranchSupportMetric::ps);
+    opts.bs_metrics.erase(BranchSupportMetric::pbs);
+    opts.bs_metrics.erase(BranchSupportMetric::ebg);
+    opts.bs_metrics.erase(BranchSupportMetric::sh_alrt);
+    if (opts.bs_metrics.empty())
+      opts.bs_metrics.insert(BranchSupportMetric::fbp);
+  }
+
   if (opts.command == Command::support || opts.command == Command::bsconverge)
   {
     if (opts.outfile_names.bootstrap_trees.empty())
