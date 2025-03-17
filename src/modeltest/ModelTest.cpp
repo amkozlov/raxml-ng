@@ -115,6 +115,7 @@ void ModelTest::optimize_model() {
                 model_descriptor << endl;
 
         Model model(model_descriptor);
+        assign(model, msa.part_info(partition_index).stats());
         TreeInfo treeinfo(options, tree, msa, tip_msa_idmap, part_assign, partition_index, model);
         optimizer.optimize_model(treeinfo);
 
