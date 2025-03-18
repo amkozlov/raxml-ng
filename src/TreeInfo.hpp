@@ -23,11 +23,11 @@ struct spr_round_params
   unsigned long int * total_moves;
   unsigned long int * increasing_moves;
 
-  void reset_cutoff_info(double loglh)
+  void reset_cutoff_info(double loglh,bool adaptive = false)
   {
     cutoff_info.lh_dec_count = 0;
     cutoff_info.lh_dec_sum = 0.;
-    cutoff_info.lh_cutoff = loglh / -1000.0;
+    cutoff_info.lh_cutoff = adaptive ? loglh / -100.0 : loglh / -1000.0;
   }
 };
 

@@ -308,11 +308,11 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.spr_cutoff = 1.0;
 
   /* default: nni parameters */
-  opts.nni_tolerance = 1.0;
-  opts.nni_epsilon = DEF_LH_EPSILON;
+  opts.nni_tolerance = DEF_NNI_TOLERANCE;
+  opts.nni_epsilon = DEF_NNI_BR_LEN_EPSILON;
 
   /* Stopping criteria */
-  opts.stopping_rule = StoppingRule::kh_mult; // by default, we use the KH-multiple testing as a stopping rule
+  opts.stopping_rule = StoppingRule::kh; // by default, we use the KH-multiple testing as a stopping rule
 
   /* default: SH parameters */
   opts.num_sh_reps = 1000;
@@ -1122,9 +1122,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           throw InvalidOptionValueException("Unknown topology optimization method: " + string(optarg));
         break;
       
-      case 69:
-        /* 0: rell, 1: no-rell, 2: kh*/
-        /* If the user specifies a stopping criterion, the algorithm uses a different heuristic */
+      case 69: /* Stopping criterion */
         if (strcasecmp(optarg, "sn-rell") == 0) {
           opts.stopping_rule = StoppingRule::sn_rell;
         } else if (strcasecmp(optarg, "sn-normal") == 0) {
