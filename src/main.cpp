@@ -1232,7 +1232,7 @@ void autotune_start_trees(RaxmlInstance& instance)
     {
       //int pars_trees = diff_pred->num_start_trees(difficulty, 10.0, 0.5, 0.3);
 
-      opts.start_trees[StartingTree::random] = diff_pred->num_start_trees(difficulty, 10.0, 0.5, 0.25);
+      opts.start_trees[StartingTree::random] = diff_pred->num_start_trees(difficulty, 5.0, 0.5, 0.25);
       opts.start_trees[StartingTree::parsimony] = diff_pred->num_start_trees(difficulty, 10.0, 0.5, 0.3);
 
     }

@@ -436,7 +436,7 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
     spr_params.radius_min = 1;
     spr_params.radius_max = fast_spr_radius;
     spr_params.ntopol_keep = _spr_ntopol_keep;
-    spr_params.subtree_cutoff = _topology_opt_method == TopologyOptMethod::adaptive ? 1.2 * _spr_cutoff : _spr_cutoff;
+    spr_params.subtree_cutoff = _spr_cutoff;
     spr_params.reset_cutoff_info(loglh, _topology_opt_method == TopologyOptMethod::adaptive);
 
     if(spr_params.increasing_moves)
