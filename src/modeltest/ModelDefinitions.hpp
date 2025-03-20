@@ -54,12 +54,12 @@ enum class rate_heterogeneity_t {
     FREE_RATE
 };
 
-const array<rate_heterogeneity_t, 4> default_rate_heterogeneity{
+const array<rate_heterogeneity_t, 5> default_rate_heterogeneity{
     rate_heterogeneity_t::UNIFORM,
     rate_heterogeneity_t::INVARIANT,
     rate_heterogeneity_t::GAMMA,
     rate_heterogeneity_t::INVARIANT_GAMMA,
-    //rate_heterogeneity_t::FREE_RATE
+    rate_heterogeneity_t::FREE_RATE
 };
 
 const unordered_map<rate_heterogeneity_t, string> rate_heterogeneity_label{
@@ -67,7 +67,7 @@ const unordered_map<rate_heterogeneity_t, string> rate_heterogeneity_label{
     {rate_heterogeneity_t::INVARIANT, "+I"},
     {rate_heterogeneity_t::GAMMA, "+G4"},
     {rate_heterogeneity_t::INVARIANT_GAMMA, "+I+G4"},
-    {rate_heterogeneity_t::FREE_RATE, "+R4"},
+    {rate_heterogeneity_t::FREE_RATE, "+R"},
 };
 
 

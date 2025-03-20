@@ -14,7 +14,7 @@ ModelTest::ModelTest(const Options &options, PartitionedMSA &msa, const Tree &tr
 }
 
 
-vector<std::string> generate_candidate_model_names(const DataType &dt) {
+vector<std::string> ModelTest::generate_candidate_model_names(const DataType &dt) const {
     vector<std::string> candidate_model_names;
     check_supported_datatype(dt);
 
@@ -28,9 +28,17 @@ vector<std::string> generate_candidate_model_names(const DataType &dt) {
                                                 + frequency_type_label(dt, frequency_type)
                                                 + rate_heterogeneity_label.at(rate_heterogeneity);
 
-                const auto normalized_model_descriptor = normalize_model_name(model_descriptor);
-
-                candidate_model_names.push_back(normalized_model_descriptor);
+                if (rate_heterogeneity == rate_heterogeneity_t::FREE_RATE) {
+                    for (unsigned int r = options.free_rate_min_categories;
+                         r > 0 && r <= options.free_rate_max_categories; ++r) {
+                        const auto normalized_model_descriptor =
+                                normalize_model_name(model_descriptor + std::to_string(r));
+                        candidate_model_names.push_back(normalized_model_descriptor);
+                    }
+                } else {
+                    const auto normalized_model_descriptor = normalize_model_name(model_descriptor);
+                    candidate_model_names.push_back(normalized_model_descriptor);
+                }
             }
         }
     }

@@ -143,6 +143,11 @@ public:
   unsigned int num_sh_reps;
   double sh_epsilon;
 
+
+  /* Modeltest */
+  unsigned int free_rate_min_categories;
+  unsigned int free_rate_max_categories;
+
   bool coarse() const { return num_workers > 1; };
 
   unsigned int num_bootstrap_ml_trees() const;

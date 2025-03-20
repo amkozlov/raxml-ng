@@ -10,12 +10,12 @@ struct PartitionModelEvaluation {
 };
 
 
-vector<std::string> generate_candidate_model_names(const DataType &dt);
-
 class ModelTest {
 public:
     ModelTest(const Options &options, PartitionedMSA &msa, const Tree &tree, const IDVector &tip_msa_idmap,
               const PartitionAssignment &part_assign, Optimizer &optimizer);
+
+    vector<std::string> generate_candidate_model_names(const DataType &dt) const;
 
     void optimize_model();
 
