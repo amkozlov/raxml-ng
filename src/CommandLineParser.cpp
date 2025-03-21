@@ -1293,8 +1293,6 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
             ", argument must be specified as single integer or range of two positive integers, e.g. \"5\" or \"2-10\".");
         }
 
-        std::cout << "Arg: '" << soptarg << "', matchsize: " << match.size() << " maxsize: " << match.max_size() <<
-            endl;
         auto min = std::stoi(match[1]);
         auto max = match[2].matched ? std::stoi(match[2]) : min;
         assert(min >= 0 && max >= 0); // regex should disallow negative integers
