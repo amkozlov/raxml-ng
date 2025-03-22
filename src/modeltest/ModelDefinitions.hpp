@@ -55,11 +55,11 @@ enum class rate_heterogeneity_t {
 };
 
 const array<rate_heterogeneity_t, 5> default_rate_heterogeneity{
+    rate_heterogeneity_t::FREE_RATE, // Compute free-rate first, to resolve among-category-count dependency quickly
     rate_heterogeneity_t::UNIFORM,
     rate_heterogeneity_t::INVARIANT,
     rate_heterogeneity_t::GAMMA,
     rate_heterogeneity_t::INVARIANT_GAMMA,
-    rate_heterogeneity_t::FREE_RATE
 };
 
 const unordered_map<rate_heterogeneity_t, string> rate_heterogeneity_label{
@@ -70,6 +70,38 @@ const unordered_map<rate_heterogeneity_t, string> rate_heterogeneity_label{
     {rate_heterogeneity_t::FREE_RATE, "+R"},
 };
 
+/** Description of a model that is to be tested.
+ * It only describes the model matrix, frequency modifier and rate heterogeneity type, unlike the Model class, which also
+ * associates values with these parameters.
+ */
+class candidate_model_t {
+public:
+    const DataType datatype;
+    const string matrix_name;
+    const frequency_type_t frequency;
+    const rate_heterogeneity_t rate_heterogeneity;
+    const unsigned int rate_categories;
+    const unsigned int max_rate_categories;
+    const string descriptor;
+
+    candidate_model_t(DataType datatype, string matrix_name, const frequency_type_t frequency_type,
+                      const rate_heterogeneity_t rate_heterogeneity, const unsigned int rate_categories = 1,
+                      unsigned int max_rate_categories = 1)
+        : datatype(datatype), matrix_name(std::move(matrix_name)), frequency(frequency_type),
+          rate_heterogeneity(rate_heterogeneity), rate_categories(rate_categories),
+          max_rate_categories(max_rate_categories),
+          descriptor(generate_descriptor()) {
+        assert(
+            (rate_categories == 1 && max_rate_categories == 1) || rate_heterogeneity == rate_heterogeneity_t::
+            FREE_RATE); // Currently, variable number of rate categories only support for freerate
+    }
+
+private:
+    std::string generate_descriptor() const {
+        return matrix_name + frequency_type_label(datatype, frequency) + rate_heterogeneity_label.
+               at(rate_heterogeneity);
+    }
+};
 
 // Names of DNA models.
 const std::vector<string> dna_substitution_matrix_names{

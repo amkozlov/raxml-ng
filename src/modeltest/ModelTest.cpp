@@ -2,6 +2,7 @@
 #include "ModelTest.hpp"
 
 #include <memory>
+#include <utility>
 
 #include "ModelDefinitions.hpp"
 #include "../ICScoreCalculator.hpp"
@@ -14,36 +15,36 @@ ModelTest::ModelTest(const Options &options, PartitionedMSA &msa, const Tree &tr
 }
 
 
-vector<std::string> ModelTest::generate_candidate_model_names(const DataType &dt) const {
-    vector<std::string> candidate_model_names;
+vector<candidate_model_t> ModelTest::generate_candidate_model_names(const DataType &dt) const {
+    vector<candidate_model_t> candidate_models;
     check_supported_datatype(dt);
-
 
     const auto &matrix_names = dt == DataType::dna ? dna_substitution_matrix_names : aa_model_names;
 
-    for (const auto &subst_model: matrix_names) {
-        for (const auto &frequency_type: default_frequency_type) {
-            for (const auto &rate_heterogeneity: default_rate_heterogeneity) {
-                const string model_descriptor = subst_model
-                                                + frequency_type_label(dt, frequency_type)
-                                                + rate_heterogeneity_label.at(rate_heterogeneity);
+    const auto freerate_cmin = options.free_rate_min_categories;
+    const auto freerate_cmax = options.free_rate_max_categories;
 
+    // TODO: balance memory consumption by varying rate heterogeneity the fastest but still computing _all_ free rate models
+    // first
+    for (const auto &rate_heterogeneity: default_rate_heterogeneity) {
+        for (const auto &subst_model: matrix_names) {
+            for (const auto &frequency_type: default_frequency_type) {
                 if (rate_heterogeneity == rate_heterogeneity_t::FREE_RATE) {
-                    for (unsigned int r = options.free_rate_min_categories;
-                         r > 0 && r <= options.free_rate_max_categories; ++r) {
-                        const auto normalized_model_descriptor =
-                                normalize_model_name(model_descriptor + std::to_string(r));
-                        candidate_model_names.push_back(normalized_model_descriptor);
+                    // If category range is not positive, skip freerate models
+                    if (freerate_cmin == 0 && freerate_cmax == 0) {
+                        continue;
                     }
+
+                    candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity,
+                                                  options.free_rate_min_categories, options.free_rate_max_categories);
                 } else {
-                    const auto normalized_model_descriptor = normalize_model_name(model_descriptor);
-                    candidate_model_names.push_back(normalized_model_descriptor);
+                    candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity);
                 }
             }
         }
     }
 
-    return candidate_model_names;
+    return candidate_models;
 }
 
 
@@ -58,14 +59,15 @@ public:
         this->partition_count = partition_count;
         this->model_count = model_count;
         this->results = std::unique_ptr<Results>(
-            new std::vector<PartitionModelEvaluation>(model_count * partition_count));
+            new std::vector<vector<PartitionModelEvaluation> >(partition_count));
     }
 
     virtual ~ExecutionStatus() = default;
 
 
-    void store_results(size_t partition_index, size_t model_index, PartitionModelEvaluation result) const {
-        results->at(model_index * partition_count + partition_index) = std::move(result);
+    void store_results(int partition_index, PartitionModelEvaluation &result) {
+        std::lock_guard<std::mutex> lock(mutex_results);
+        results->at(partition_index).push_back(result);
     }
 
     bool get_next_model(size_t &next_partition_index, size_t &next_model_index) {
@@ -73,7 +75,7 @@ public:
             throw std::logic_error("attempted to get next model before initialization");
         }
 
-        std::lock_guard<std::mutex> lock(mutex);
+        std::lock_guard<std::mutex> lock(mutex_model_index);
 
         next_partition_index = partition_index;
         next_model_index = model_index;
@@ -88,15 +90,16 @@ public:
         return (next_partition_index < partition_count && next_model_index < model_count);
     }
 
-    vector<PartitionModelEvaluation> &get_results() const {
+    vector<vector<PartitionModelEvaluation> > &get_results() const {
         return *results;
     }
 
 private:
-    using Results = vector<PartitionModelEvaluation>;
+    using Results = vector<vector<PartitionModelEvaluation> >;
     size_t partition_index, partition_count;
     size_t model_index, model_count;
-    std::mutex mutex;
+    std::mutex mutex_model_index;
+    std::mutex mutex_results;
 
     // Results in flat array with models being the major index, i.e. the results for a single model are grouped by partition
     std::unique_ptr<Results> results;
@@ -117,28 +120,48 @@ void ModelTest::optimize_model() {
 
     size_t partition_index, model_index;
 
+    const bool enable_freerate_heuristic = std::getenv("MODELTEST_FREERATE_NOSKIP") == nullptr;
+
     while (execution_status.get_next_model(partition_index, model_index)) {
-        const auto &model_descriptor = candidate_models.at(model_index);
-        LOG_INFO << RAXML_LOG_TIMESTAMP << "Partition " << partition_index << " model " << model_index << " " <<
-                model_descriptor << endl;
+        const auto &model_under_test = candidate_models.at(model_index);
 
-        Model model(model_descriptor);
-        assign(model, msa.part_info(partition_index).stats());
-        TreeInfo treeinfo(options, tree, msa, tip_msa_idmap, part_assign, partition_index, model);
-        optimizer.optimize_model(treeinfo);
+        double last_score = std::numeric_limits<double>::infinity();
+        for (unsigned int num_rate_cats = model_under_test.rate_categories;
+             num_rate_cats <= model_under_test.max_rate_categories; ++num_rate_cats) {
+            const auto &model_descriptor = model_under_test.descriptor + (
+                                               model_under_test.rate_heterogeneity == rate_heterogeneity_t::FREE_RATE
+                                                   ? std::to_string(num_rate_cats)
+                                                   : "");
 
-        PartitionModelEvaluation partition_results;
+            LOG_INFO << RAXML_LOG_TIMESTAMP << "Partition " << partition_index << " model " << model_index << " " <<
+                    model_descriptor << endl;
 
-        const double partition_loglh = treeinfo.pll_treeinfo().partition_loglh[0];
-        const size_t free_params = model.num_free_params() + treeinfo.tree().num_branches();
-        const size_t sample_size = msa.part_info(partition_index).stats().site_count;
-        ICScoreCalculator ic_score_calculator(free_params, sample_size);
+            Model model(model_descriptor);
+            assign(model, msa.part_info(partition_index).stats());
+            TreeInfo treeinfo(options, tree, msa, tip_msa_idmap, part_assign, partition_index, model);
+            optimizer.optimize_model(treeinfo);
 
-        partition_results.ic_criteria = ic_score_calculator.all(partition_loglh);
-        partition_results.model = model;
-        partition_results.partition_loglh = partition_loglh;
+            PartitionModelEvaluation partition_results;
 
-        execution_status.store_results(partition_index, model_index, std::move(partition_results));
+            const double partition_loglh = treeinfo.pll_treeinfo().partition_loglh[0];
+            const size_t free_params = model.num_free_params() + treeinfo.tree().num_branches();
+            const size_t sample_size = msa.part_info(partition_index).stats().site_count;
+            ICScoreCalculator ic_score_calculator(free_params, sample_size);
+
+            partition_results.ic_criteria = ic_score_calculator.all(partition_loglh);
+            partition_results.model = model;
+            partition_results.partition_loglh = partition_loglh;
+
+            const double new_score = partition_results.ic_criteria.at(InformationCriterion::bic);
+            execution_status.store_results(partition_index, partition_results);
+
+            if (model_under_test.rate_heterogeneity == rate_heterogeneity_t::FREE_RATE && enable_freerate_heuristic &&
+                new_score >= last_score) {
+                break; // Skip evaluating freerate
+            }
+
+            last_score = new_score;
+        }
     }
 
     ParallelContext::barrier();
@@ -156,7 +179,7 @@ void ModelTest::optimize_model() {
     auto results = execution_status.get_results();
     for (auto p = 0U; p < msa.part_count(); ++p) {
         auto bic_ranking = rank_by_score(results, InformationCriterion::bic, p, msa.part_count());
-        const auto &best_model = results[bic_ranking.at(0) * msa.part_count() + p];
+        const auto &best_model = results.at(p).at(bic_ranking.at(0));
         LOG_INFO << "Partition #" << p << ": " << best_model.model.to_string() << " BIC = " << best_model.
                 ic_criteria.
                 at(InformationCriterion::bic) << " LogLH = " << best_model.partition_loglh << endl;
@@ -171,10 +194,9 @@ vector<size_t> ModelTest::rank_by_score(const EvaluationResults &results,
     std::iota(ranking.begin(), ranking.end(), 0);
 
     std::sort(ranking.begin(), ranking.end(),
-              [partition_idx, part_count, ic, &results](const size_t &a, const size_t &b) {
-                  return results.at(a * part_count + partition_idx).ic_criteria.at(ic) < results.at(
-                             b * part_count + partition_idx).
-                         ic_criteria.at(ic);
+              [partition_idx, ic, &results](const size_t &a, const size_t &b) {
+                  return results.at(partition_idx).at(a).ic_criteria.at(ic) <
+                         results.at(partition_idx).at(b).ic_criteria.at(ic);
               });
 
     return ranking;
@@ -204,17 +226,11 @@ void ModelTest::print_xml(ostream &os, EvaluationResults &results, unsigned int 
     os << setprecision(17);
     os << "<modeltestresults>" << endl;
 
-    const auto ic_count = results.empty() ? 0 : results.at(0).ic_criteria.size();
+    unsigned int partition_index = 0;
 
-
-    vector<double> deltas;
-    deltas.reserve(results.size());
-
-    for (auto p = 0U; p < partition_count; ++p) {
-        os << "<partition id=\"" << p << "\">" << endl;
-
-        for (auto i = 0U; i < results.size() / partition_count; ++i) {
-            const auto &result = results[i * partition_count + p];
+    for (const auto &partition_result: results) {
+        os << "<partition id=\"" << partition_index++ << "\">" << endl;
+        for (const auto &result: partition_result) {
             os << "<model name=\"" << result.model.to_string()
                     << "\" lnL=\"" << result.partition_loglh
                     << "\" score-bic=\"" << result.ic_criteria.at(InformationCriterion::bic)
@@ -224,7 +240,6 @@ void ModelTest::print_xml(ostream &os, EvaluationResults &results, unsigned int 
         }
         os << "</partition>" << endl;
     }
-
 
     os << "</modeltestresults>" << endl;
 }
