@@ -3630,11 +3630,14 @@ int internal_main(int argc, char** argv, void* comm)
 
     switch (opts.command)
     {
+      case Command::sitelh:
+        /* checkpointing not supported */
+        cm.disable();
+        /* fall through */
       case Command::evaluate:
       case Command::search:
       case Command::bootstrap:
       case Command::all:
-      case Command::sitelh:
       case Command::ancestral:
       {
         master_main(instance, cm);
