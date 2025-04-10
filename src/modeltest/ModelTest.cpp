@@ -2,10 +2,10 @@
 #include "ModelTest.hpp"
 
 #include <memory>
-#include <utility>
 
 #include "ModelDefinitions.hpp"
 #include "../ICScoreCalculator.hpp"
+#include "RHASHeuristic.hpp"
 #include "corax/tree/treeinfo.h"
 
 ModelTest::ModelTest(const Options &options, PartitionedMSA &msa, const Tree &tree, const IDVector &tip_msa_idmap,
@@ -24,11 +24,9 @@ vector<candidate_model_t> ModelTest::generate_candidate_model_names(const DataTy
     const auto freerate_cmin = options.free_rate_min_categories;
     const auto freerate_cmax = options.free_rate_max_categories;
 
-    // TODO: balance memory consumption by varying rate heterogeneity the fastest but still computing _all_ free rate models
-    // first
-    for (const auto &rate_heterogeneity: default_rate_heterogeneity) {
-        for (const auto &subst_model: matrix_names) {
-            for (const auto &frequency_type: default_frequency_type) {
+    for (const auto &subst_model: matrix_names) {
+        for (const auto &frequency_type: default_frequency_type) {
+            for (const auto &rate_heterogeneity: default_rate_heterogeneity) {
                 if (rate_heterogeneity == rate_heterogeneity_t::FREE_RATE) {
                     // If category range is not positive, skip freerate models
                     if (freerate_cmin == 0 && freerate_cmax == 0) {
@@ -53,88 +51,129 @@ public:
     ExecutionStatus() : partition_index(0), partition_count(0), model_index(0), model_count(0) {
     }
 
-    void initialize(size_t model_count, size_t partition_count) {
+    void initialize(std::vector<candidate_model_t> candidate_models, size_t partition_count, bool use_rhas_heuristic = false) {
         this->partition_index = 0;
         this->model_index = 0;
         this->partition_count = partition_count;
-        this->model_count = model_count;
+        this->model_count = candidate_models.size();
+        this->candidate_models = std::move(candidate_models);
         this->results = std::unique_ptr<Results>(
-            new std::vector<vector<PartitionModelEvaluation> >(partition_count));
+            new std::vector<vector<PartitionModelEvaluation>>(partition_count));
+        this->use_rhas_heuristic = use_rhas_heuristic;
+
+        const auto reference_matrix = this->candidate_models.at(0).matrix_name;
+        this->rhas_heuristic_per_part.clear();
+        this->rhas_heuristic_per_part.resize(partition_count, RHASHeuristic(reference_matrix));
     }
 
     virtual ~ExecutionStatus() = default;
 
 
-    void store_results(int partition_index, PartitionModelEvaluation &result) {
+    void store_results(int partition_index, const candidate_model_t &candidate_model, PartitionModelEvaluation &result) {
         std::lock_guard<std::mutex> lock(mutex_results);
+
         results->at(partition_index).push_back(result);
+
+        if (use_rhas_heuristic) {
+            const double bic = result.ic_criteria.at(InformationCriterion::bic);
+            this->rhas_heuristic_per_part.at(partition_index).update(candidate_model, bic);
+        }
     }
 
-    bool get_next_model(size_t &next_partition_index, size_t &next_model_index) {
+    bool get_next_model(size_t &next_partition_index, candidate_model_t **next_candidate_model) {
         if (partition_count < 1 || model_count < 1) {
             throw std::logic_error("attempted to get next model before initialization");
         }
 
         std::lock_guard<std::mutex> lock(mutex_model_index);
 
-        next_partition_index = partition_index;
-        next_model_index = model_index;
-
-        if (model_index == model_count - 1) {
-            ++partition_index;
+        // Skip computation of models according to RHAS heuristic
+        while (use_rhas_heuristic && 
+                is_index_valid() &&
+                rhas_heuristic_per_part.at(partition_index)\
+                    .can_skip(candidate_models.at(model_index))) {
+            increment_model_index();
         }
 
-        model_index = (model_index + 1) % model_count;
+        bool found_model = is_index_valid();
+        if (found_model) {
+            *next_candidate_model = &candidate_models.at(model_index);
+            next_partition_index = partition_index;
+        } else {
+            next_candidate_model = nullptr;
+        }
+
+        increment_model_index();
 
 
-        return (next_partition_index < partition_count && next_model_index < model_count);
+        return found_model;
     }
+
 
     vector<vector<PartitionModelEvaluation> > &get_results() const {
         return *results;
     }
 
 private:
-    using Results = vector<vector<PartitionModelEvaluation> >;
+    using Results = vector<vector<PartitionModelEvaluation>>;
+    std::vector<candidate_model_t> candidate_models;
     size_t partition_index, partition_count;
     size_t model_index, model_count;
     std::mutex mutex_model_index;
     std::mutex mutex_results;
 
-    // Results in flat array with models being the major index, i.e. the results for a single model are grouped by partition
+    bool use_rhas_heuristic;
+    std::vector<RHASHeuristic> rhas_heuristic_per_part;
+
     std::unique_ptr<Results> results;
+
+    void increment_model_index() {
+        // Increment model index and optionally partition index
+        if (model_index == model_count - 1) {
+            ++partition_index;
+        }
+
+        model_index = (model_index + 1) % model_count;
+
+    }
+
+    bool is_index_valid() const {
+        return partition_index < partition_count && model_index < model_count; 
+    }
 };
 
 ExecutionStatus execution_status; // shared across all threads.
 
 void ModelTest::optimize_model() {
+    const bool enable_rhas_heuristic = std::getenv("MODELTEST_RHAS_NOSKIP") == nullptr;
+    const bool enable_freerate_heuristic = std::getenv("MODELTEST_FREERATE_NOSKIP") == nullptr;
+
     LOG_INFO << std::setprecision(20) << std::setfill(' ') << std::left;
 
-    auto candidate_models = generate_candidate_model_names(msa.part_info(0).model().data_type());
 
     if (ParallelContext::master()) {
-        execution_status.initialize(candidate_models.size(), msa.part_count());
+        // TODO: support multiple partitions with mixed datatypes
+        auto candidate_models = generate_candidate_model_names(msa.part_info(0).model().data_type());
+        execution_status.initialize(candidate_models, msa.part_count(), enable_rhas_heuristic);
     }
 
     ParallelContext::barrier();
 
-    size_t partition_index, model_index;
+    size_t partition_index;
+    candidate_model_t *candidate_model;
 
-    const bool enable_freerate_heuristic = std::getenv("MODELTEST_FREERATE_NOSKIP") == nullptr;
 
-    while (execution_status.get_next_model(partition_index, model_index)) {
-        const auto &model_under_test = candidate_models.at(model_index);
 
+    while (execution_status.get_next_model(partition_index, &candidate_model)) {
         double last_score = std::numeric_limits<double>::infinity();
-        for (unsigned int num_rate_cats = model_under_test.rate_categories;
-             num_rate_cats <= model_under_test.max_rate_categories; ++num_rate_cats) {
-            const auto &model_descriptor = model_under_test.descriptor + (
-                                               model_under_test.rate_heterogeneity == rate_heterogeneity_t::FREE_RATE
+        for (unsigned int num_rate_cats = candidate_model->rate_categories;
+             num_rate_cats <= candidate_model->max_rate_categories; ++num_rate_cats) {
+            const auto &model_descriptor = candidate_model->descriptor + (
+                                               candidate_model->rate_heterogeneity == rate_heterogeneity_t::FREE_RATE
                                                    ? std::to_string(num_rate_cats)
                                                    : "");
 
-            LOG_INFO << RAXML_LOG_TIMESTAMP << "Partition " << partition_index << " model " << model_index << " " <<
-                    model_descriptor << endl;
+            LOG_INFO << RAXML_LOG_TIMESTAMP << "Partition " << partition_index << " model " << normalize_model_name(model_descriptor) << endl;
 
             Model model(model_descriptor);
             assign(model, msa.part_info(partition_index).stats());
@@ -153,9 +192,9 @@ void ModelTest::optimize_model() {
             partition_results.partition_loglh = partition_loglh;
 
             const double new_score = partition_results.ic_criteria.at(InformationCriterion::bic);
-            execution_status.store_results(partition_index, partition_results);
+            execution_status.store_results(partition_index, *candidate_model, partition_results);
 
-            if (model_under_test.rate_heterogeneity == rate_heterogeneity_t::FREE_RATE && enable_freerate_heuristic &&
+            if (candidate_model->rate_heterogeneity == rate_heterogeneity_t::FREE_RATE && enable_freerate_heuristic &&
                 new_score >= last_score) {
                 break; // Skip evaluating freerate
             }

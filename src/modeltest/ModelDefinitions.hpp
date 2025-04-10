@@ -1,10 +1,16 @@
 #pragma once
+#include <cassert>
+#include <stdexcept>
 #ifndef MODEL_DEFS_H
 #define MODEL_DEFS_H
+
+#include <corax/corax.h>
+#include "../types.hpp"
 
 #include <string>
 #include <array>
 #include <unordered_map>
+#include <vector>
 
 class unsupported_datatype_error : public std::logic_error {
 public:
@@ -31,7 +37,7 @@ enum class frequency_type_t {
     ESTIMATED
 };
 
-const array<frequency_type_t, 2> default_frequency_type{frequency_type_t::FIXED, frequency_type_t::ESTIMATED};
+const array<frequency_type_t, 2> default_frequency_type{frequency_type_t::ESTIMATED, frequency_type_t::FIXED};
 
 inline std::string frequency_type_label(const DataType &datatype, const frequency_type_t &f) {
     check_supported_datatype(datatype);
@@ -105,6 +111,7 @@ private:
 
 // Names of DNA models.
 const std::vector<string> dna_substitution_matrix_names{
+    "GTR",
     "F81",
     "HKY",
     "TN93",
@@ -115,7 +122,6 @@ const std::vector<string> dna_substitution_matrix_names{
     "TIM2",
     "TIM3",
     "TVM",
-    "GTR"
 };
 
 const array<string, N_DNA_ALLMATRIX_COUNT> dna_model_matrices{
