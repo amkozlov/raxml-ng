@@ -78,6 +78,12 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
       else
         return optimize_topology_standard(treeinfo, cm);
       break;
+    case TopologyOptMethod::fast:
+      if (cm.checkp_file().pythia_score >= 0.)
+        return optimize_topology_adaptive(treeinfo, cm);
+      else
+        return optimize_topology_standard(treeinfo, cm);
+      break;
     case TopologyOptMethod::rapidBS:
       return optimize_topology_rbs(treeinfo, cm);
       break;
@@ -113,7 +119,9 @@ double Optimizer::optimize_topology_standard(TreeInfo& treeinfo, CheckpointManag
 
   spr_params.lh_epsilon_brlen_full = _lh_epsilon;
   spr_params.lh_epsilon_brlen_triplet = _lh_epsilon_brlen_triplet;
-
+  spr_params.total_moves = nullptr;
+  spr_params.increasing_moves = nullptr;
+  
   CheckpointStep resume_step = search_state.step;
 
   /* Compute initial LH of the starting tree */
@@ -418,10 +426,17 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
     LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << fast_modopt_eps << ")" << endl;
     loglh = optimize_model(treeinfo, fast_modopt_eps);
 
-    /* Set FAST SPR radius */
+    /* Set FAST SPR radius
+      sRAxML-NG: 10
+      adaptive: 3*
+      fast: 2*
+    */
     fast_spr_radius = difficulty >= 0. ? 
-        min(3 * adaptive_radius(difficulty),25) : 10;
+        min(3 * adaptive_radius(difficulty), 25) : 10;
     
+    if(_topology_opt_method == TopologyOptMethod::fast)
+      fast_spr_radius = 2*adaptive_radius(difficulty);
+
     // in case the user has specified their own values
     if(_spr_radius > 0){
       fast_spr_radius =_spr_radius;
@@ -485,12 +500,6 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
       LOG_PROGRESS(old_loglh) << (spr_params.thorough ? "SLOW" : "FAST") <<
           " spr round " << iter << " (radius: " << spr_params.radius_max << ")" << endl;
       
-      /*
-      LOG_PROGRESS(old_loglh) << (spr_params.thorough ? "SLOW" : "FAST") <<
-          " spr round " << iter << " (radius: " << spr_params.radius_max << ")" << ") - " << 
-          "LH cutoff = " << spr_params.cutoff_info.lh_cutoff <<
-          ", LH_dec_count = " << spr_params.cutoff_info.lh_dec_count << endl;
-      */
       loglh = treeinfo.spr_round(spr_params);
 
       /* optimize ALL branches */
@@ -512,7 +521,6 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
           
           double p_value = _criterion->get_pvalue(ParallelContext::group_id());
           epsilon = _criterion->get_epsilon(ParallelContext::group_id()); 
-          //LOG_PROGRESS(loglh) << "KH multiple-testing epsilon = " << epsilon << endl;
           LOG_DEBUG << "KH multiple-testing epsilon = " << epsilon << endl;
           impr = ((loglh - old_loglh > epsilon) && (p_value < 1));
 
@@ -543,6 +551,9 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
     slow_spr_radius = difficulty >= 0. ? 
         min(adaptive_radius(difficulty),7) : 10;
     
+    if(_topology_opt_method == TopologyOptMethod::fast)
+      slow_spr_radius = adaptive_radius(difficulty);
+    
     // in case the user has specified their own values
     if(_spr_radius > 0)
       slow_spr_radius =_spr_radius;
@@ -562,8 +573,8 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
   
   if (do_step(CheckpointStep::slowSPR))
   {
-    //if(iter == 0 && _topology_opt_method == TopologyOptMethod::adaptive)
-    //  nni(treeinfo, nni_params, loglh);
+    if(iter == 0 && _topology_opt_method == TopologyOptMethod::fast)
+      nni(treeinfo, nni_params, loglh);
 
     do
     {
@@ -573,9 +584,8 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
       ++iter;
       old_loglh = loglh;
 
-      if(use_kh_test) _criterion->compute_loglh(treeinfo, persite_lnl, true);
-
-      /*
+      //if(use_kh_test) _criterion->compute_loglh(treeinfo, persite_lnl, true);
+      
       if(use_kh_test && spr_params.radius_min == 1)
       {
         _criterion->compute_loglh(treeinfo, persite_lnl, true);
@@ -587,17 +597,10 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
           *(spr_params.total_moves) = 0;
         }
       }
-      */
+     
 
       LOG_PROGRESS(old_loglh) << (spr_params.thorough ? "SLOW" : "FAST") <<
           " spr round " << iter << " (radius: " << spr_params.radius_max << ")" << endl;
-      
-      /*
-      LOG_PROGRESS(old_loglh) << (spr_params.thorough ? "SLOW" : "FAST") <<
-          " spr round " << iter << " (radius: " << spr_params.radius_max << ")" << ") - " << 
-          "LH cutoff = " << spr_params.cutoff_info.lh_cutoff <<
-          ", LH_dec_count = " << spr_params.cutoff_info.lh_dec_count << endl;
-      */
       
       loglh = treeinfo.spr_round(spr_params);
       loglh = treeinfo.optimize_branches(br_len_epsilon, 1);
@@ -620,7 +623,7 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
           epsilon = _criterion->get_epsilon(ParallelContext::group_id()); 
           //LOG_PROGRESS(loglh) << "KH multiple-testing epsilon = " << epsilon << endl;
           LOG_DEBUG << "KH multiple-testing epsilon = " << epsilon << endl;
-          impr = ((loglh - old_loglh > epsilon) && (p_value < 1));
+          impr = ((loglh - old_loglh_kh > epsilon) && (p_value < 1));
 
           *(spr_params.increasing_moves) = 0;
           *(spr_params.total_moves) = 0;
@@ -629,7 +632,7 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
 
           epsilon = _criterion->get_epsilon(ParallelContext::group_id());
           LOG_DEBUG << "KH criterion epsilon = " << epsilon << endl;
-          impr = (loglh - old_loglh > epsilon);
+          impr = (loglh - old_loglh_kh > epsilon);
         }
       } else {
 
@@ -688,7 +691,9 @@ double Optimizer::optimize_topology_rbs(TreeInfo& treeinfo, CheckpointManager& c
 
   spr_params.lh_epsilon_brlen_full = _lh_epsilon;
   spr_params.lh_epsilon_brlen_triplet = _lh_epsilon_brlen_triplet;
-
+  spr_params.total_moves = nullptr;
+  spr_params.increasing_moves = nullptr;
+  
   CheckpointStep resume_step = search_state.step;
 
   /* Compute initial LH of the starting tree */

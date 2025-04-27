@@ -1231,10 +1231,18 @@ void autotune_start_trees(RaxmlInstance& instance)
     if (opts.constraint_tree_file.empty() || !opts.use_old_constraint)
     {
       //int pars_trees = diff_pred->num_start_trees(difficulty, 10.0, 0.5, 0.3);
-
-      opts.start_trees[StartingTree::random] = diff_pred->num_start_trees(difficulty, 5.0, 0.5, 0.25);
-      opts.start_trees[StartingTree::parsimony] = diff_pred->num_start_trees(difficulty, 10.0, 0.5, 0.3);
-
+      if(opts.topology_opt_method == TopologyOptMethod::fast)
+      {
+        opts.start_trees[StartingTree::random] = 0;
+        opts.start_trees[StartingTree::parsimony] = 
+          diff_pred->num_start_trees(difficulty, 10.0, 0.5, 0.3) + 
+          diff_pred->num_start_trees(difficulty, 5.0, 0.5, 0.25);
+      }
+      else
+      {
+        opts.start_trees[StartingTree::random] = diff_pred->num_start_trees(difficulty, 5.0, 0.5, 0.25);
+        opts.start_trees[StartingTree::parsimony] = diff_pred->num_start_trees(difficulty, 10.0, 0.5, 0.3);
+      }
     }
     else
       opts.start_trees[StartingTree::random] = 2*diff_pred->num_start_trees(difficulty, 8.0, 0.5, 0.3);
@@ -3353,9 +3361,10 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   {    
      /* Use Stopping rule only in the adaptive or the sRAxML-NG heuristcs */
     if(opts.topology_opt_method != TopologyOptMethod::adaptive && 
-      opts.topology_opt_method != TopologyOptMethod::simplified) {
+      opts.topology_opt_method != TopologyOptMethod::simplified &&
+      opts.topology_opt_method != TopologyOptMethod::fast) {
       
-      LOG_INFO << "Stopping criteria are only used in adaptive and sRAxML-NG heuristics. "
+      LOG_INFO << "Stopping criteria are only used in adaptive/fast and sRAxML-NG heuristics. "
                 << "Hence disabled." << endl;
       
       instance.criterion = nullptr;

@@ -120,7 +120,8 @@ enum class TopologyOptMethod
   adaptive,
   rapidBS,
   nniRound,
-  simplified
+  simplified,
+  fast
 };
 
 enum class StoppingRule

@@ -1117,7 +1117,11 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.topology_opt_method = TopologyOptMethod::simplified;
           opts.stopping_rule = StoppingRule::none;
           opts.use_pythia = false;
-        }
+        } else if (strcasecmp(optarg, "fast") == 0) {
+          opts.topology_opt_method = TopologyOptMethod::fast;
+          opts.stopping_rule = StoppingRule::kh_mult;
+          opts.use_pythia = true;
+        } 
         else
           throw InvalidOptionValueException("Unknown topology optimization method: " + string(optarg));
         break;
