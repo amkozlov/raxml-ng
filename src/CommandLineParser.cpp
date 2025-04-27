@@ -85,7 +85,14 @@ static struct option long_options[] =
   {"diff_pred_trees",    required_argument, 0, 0},   /*  60 */
   {"nni-tolerance",      required_argument, 0, 0 },  /*  61 */
   {"nni-epsilon",        required_argument, 0, 0 },  /*  62 */
-  {"stopping-criterion", required_argument, 0, 0 },  /*  63 */
+  {"pythia",             optional_argument, 0, 0 },  /*  63 */
+  {"pt",                 optional_argument, 0, 0 },  /*  64 */
+  {"sh",                 optional_argument, 0, 0 },  /*  65 */
+  {"sh-reps",            required_argument, 0, 0 },  /*  66 */
+  {"sh-epsilon",         required_argument, 0, 0 },  /*  67 */
+  {"opt-topology",       required_argument, 0, 0 },  /*  68 */
+  {"stopping-criterion", required_argument, 0, 0 },  /*  69 */
+
   { 0, 0, 0, 0 }
 };
 
@@ -301,16 +308,18 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.spr_cutoff = 1.0;
 
   /* default: nni parameters */
-  opts.nni_tolerance = 1.0;
-  opts.nni_epsilon = DEF_LH_EPSILON;
+  opts.nni_tolerance = DEF_NNI_TOLERANCE;
+  opts.nni_epsilon = DEF_NNI_BR_LEN_EPSILON;
 
   /* Stopping criteria */
-  opts.stopping_rule = 3; // by default, we use the KH-multiple testing as a stopping rule
-  opts.modified_version = false;
-  opts.count_spr_moves = true;
+  opts.stopping_rule = StoppingRule::kh; // by default, we use the KH-multiple testing as a stopping rule
+
+  /* default: SH parameters */
+  opts.num_sh_reps = 1000;
+  opts.sh_epsilon = 0.1;
 
   /* bootstrapping / bootstopping */
-  opts.bs_metrics.push_back(BranchSupportMetric::fbp);
+  opts.bs_metrics.insert(BranchSupportMetric::fbp);
   opts.bootstop_criterion = BootstopCriterion::autoMRE;
   opts.bootstop_cutoff = RAXML_BOOTSTOP_CUTOFF;
   opts.bootstop_interval = RAXML_BOOTSTOP_INTERVAL;
@@ -327,6 +336,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   /* Difficulty preditction num trees */
   opts.diff_pred_pars_trees = RAXML_CPYTHIA_TREES_NUM;
+
+  bool use_adaptive_search = true;
+  opts.topology_opt_method = TopologyOptMethod::adaptive;
 
   /* max #threads = # available CPU cores */
 #if !defined(_RAXML_PTHREADS)
@@ -362,9 +374,6 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.nofiles_mode = false;
 
   opts.tbe_naive = false;
-
-  /* parallel parsimony not yet supported in adaptive mode */
-  opts.use_par_pars = false;
 
   int compat_ver = RAXML_INTVER;
   bool log_level_set = false;
@@ -466,10 +475,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.use_tip_inner = false;
           opts.use_repeats = false;
           opts.use_pythia = false;
-          opts.use_adaptive_search = false;
-          opts.stopping_rule = -1;
-          opts.modified_version = false;
-          opts.count_spr_moves = true;
+          opts.stopping_rule = StoppingRule::none;
+          use_adaptive_search = false;
         }
         else
           opts.use_prob_msa = false;
@@ -857,11 +864,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_par_pars = true;
             else if (eopt == "pars-seq")
               opts.use_par_pars = false;
-            else if (eopt == "simplified-on"){
-              opts.modified_version = true;
-              opts.stopping_rule = -1;
-              opts.count_spr_moves = false;
-            } else if (eopt == "pythia-on")
+            else if (eopt == "pythia-on")
               opts.use_pythia = true;
             else if (eopt == "pythia-off")
               opts.use_pythia = false;
@@ -872,10 +875,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_bs_pars = false;
               opts.use_par_pars = false;
               opts.use_pythia = false;
-              opts.use_adaptive_search = false;
-              opts.stopping_rule = -1;
-              opts.modified_version = false;
-              opts.count_spr_moves = false;
+              opts.stopping_rule = StoppingRule::none;
+              opts.topology_opt_method = TopologyOptMethod::classic;
               if (!lh_epsilon_set)
                 opts.lh_epsilon = DEF_LH_EPSILON_V11;
               opts.lh_epsilon_brlen_triplet = DEF_LH_EPSILON_V11;
@@ -894,15 +895,27 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           {
             if (strncasecmp(m.c_str(), "fbp", 3) == 0)
             {
-              opts.bs_metrics.push_back(BranchSupportMetric::fbp);
+              opts.bs_metrics.insert(BranchSupportMetric::fbp);
+            }
+            else if (strncasecmp(m.c_str(), "rbs", 3) == 0)
+            {
+              opts.bs_metrics.insert(BranchSupportMetric::rbs);
             }
             else if (strncasecmp(m.c_str(), "tbe", 3) == 0)
             {
-              opts.bs_metrics.push_back(BranchSupportMetric::tbe);
+              opts.bs_metrics.insert(BranchSupportMetric::tbe);
+            }
+            else if (strncasecmp(m.c_str(), "sh", 3) == 0 || strncasecmp(m.c_str(), "alrt", 3) == 0)
+            {
+              opts.bs_metrics.insert(BranchSupportMetric::sh_alrt);
             }
             else
             {
               throw InvalidOptionValueException("Unknown branch support metric: " + string(optarg));
+            }
+            if (opts.bs_metrics.count(BranchSupportMetric::fbp) && opts.bs_metrics.count(BranchSupportMetric::rbs))
+            {
+              throw OptionException("Invalid branch support metric: FBP and RBS can not be used together!");
             }
           }
         }
@@ -1006,18 +1019,18 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 59: /* Adaptive RAxML-ng analysis with difficulty prediction */
         if (!optarg || (strcasecmp(optarg, "on") == 0))
         {
-          opts.use_adaptive_search = true;
+          use_adaptive_search = true;
           opts.use_pythia = true;
         }
         else if (strcasecmp(optarg, "start") == 0)
         {
-          opts.use_adaptive_search = false;
+          use_adaptive_search = false;
           opts.use_pythia = true;
           optarg_tree = "adaptive";
         }
         else if (strcasecmp(optarg, "off") == 0)
         {
-          opts.use_adaptive_search = false;
+          use_adaptive_search = false;
           opts.use_pythia = false;
         }
         else
@@ -1050,28 +1063,88 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
                                             ", please provide a positive real number!\n");
         }
         break;
+
+      case 63: /* pythia: msa difficulty prediction */
+        opts.command = Command::pythia;
+        num_commands++;
+        break;
+
+      case 64: /* pythia quiet */
+        opts.command = Command::pythia;
+        num_commands++;
+        opts.nofiles_mode = true;
+        opts.log_level = LogLevel::result;
+        log_level_set = true;
+        break;
+
+      case 65: /* sh: compute SH-like ALRT branch supports for a given tree */
+        opts.command = Command::all;
+        opts.bs_metrics.clear();
+        opts.bs_metrics.insert(BranchSupportMetric::sh_alrt);
+        opts.topology_opt_method = TopologyOptMethod::nniRound;
+        opts.use_pythia = false;
+        num_commands++;
+        /* fall through */
+      case 66: /* number of SH replicates */
+        if (optarg)
+        {
+          if (sscanf(optarg, "%u", &opts.num_sh_reps) != 1 || opts.num_sh_reps == 0)
+          {
+            throw InvalidOptionValueException("Invalid number of SH replicates: " + string(optarg) +
+                ", please provide a positive integer number!");
+          }
+        }
+        break;
+      case 67: /* SH epsilon */
+        if(sscanf(optarg, "%lf", &opts.sh_epsilon) != 1 || opts.sh_epsilon <= 0.)
+        {
+          throw InvalidOptionValueException("Invalid SH epsilon  : " + string(optarg) +
+                                            ", please provide a positive real number!\n");
+        }
+        break;
+      case 68: /* topology optimization method */
+        if (strcasecmp(optarg, "off") == 0 || strcasecmp(optarg, "none") == 0)
+          opts.topology_opt_method = TopologyOptMethod::none;
+        else if (strcasecmp(optarg, "classic") == 0 || strcasecmp(optarg, "v1") == 0)
+          opts.topology_opt_method = TopologyOptMethod::classic;
+        else if (strcasecmp(optarg, "adaptive") == 0)
+          opts.topology_opt_method = TopologyOptMethod::adaptive;
+        else if (strcasecmp(optarg, "rapidbs") == 0 || strcasecmp(optarg, "rbs") == 0)
+          opts.topology_opt_method = TopologyOptMethod::rapidBS;
+        else if (strcasecmp(optarg, "nni-round") == 0 || strcasecmp(optarg, "nni") == 0)
+          opts.topology_opt_method = TopologyOptMethod::nniRound;
+        else if (strcasecmp(optarg, "simplified") == 0 || strcasecmp(optarg, "sRAxML-NG") == 0){
+          opts.topology_opt_method = TopologyOptMethod::simplified;
+          opts.stopping_rule = StoppingRule::none;
+          opts.use_pythia = false;
+        } else if (strcasecmp(optarg, "fast") == 0) {
+          opts.topology_opt_method = TopologyOptMethod::fast;
+          opts.stopping_rule = StoppingRule::kh_mult;
+          opts.use_pythia = true;
+        } 
+        else
+          throw InvalidOptionValueException("Unknown topology optimization method: " + string(optarg));
+        break;
       
-      case 63:
-        /* 0: rell, 1: no-rell, 2: kh*/
-        /* If the user specifies a stopping criterion, the algorithm uses a different heuristic */
-        opts.modified_version = true;
-        opts.count_spr_moves = false;
+      case 69: /* Stopping criterion */
         if (strcasecmp(optarg, "sn-rell") == 0) {
-          opts.stopping_rule = 0;
+          opts.stopping_rule = StoppingRule::sn_rell;
         } else if (strcasecmp(optarg, "sn-normal") == 0) {
-          opts.stopping_rule = 1;
+          opts.stopping_rule = StoppingRule::sn_normal;
         } else if (strcasecmp(optarg, "KH") == 0) {
-          opts.stopping_rule = 2;
+          opts.stopping_rule = StoppingRule::kh;
         } else if (strcasecmp(optarg, "KH-mult") == 0) {
-          opts.stopping_rule = 3;
-          opts.count_spr_moves = true;
+          opts.stopping_rule = StoppingRule::kh_mult;
+        } else if (strcasecmp(optarg, "off") == 0) {
+          opts.stopping_rule = StoppingRule::none;
         } else {
           throw InvalidOptionValueException("Invalid stopping criterion: " + string(optarg) +
                                             ", please provide one of the following options: \n" +
                                             "- sn-rell : Sampling Noise RELL apporach\n" +
                                             "- sn-normal : Sampling Noise Normal apporach\n" + 
                                             "- KH : KH test\n" +
-                                            "- KH-mult : KH test with multiple correction\n");
+                                            "- KH-mult : KH test with multiple correction\n"  +
+                                            "- off : To turn off stopping rules\n");
         }
         break;
               
@@ -1087,13 +1160,16 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   if (num_commands > 1)
     throw OptionException("More than one command specified");
 
+  if (!use_adaptive_search && opts.topology_opt_method == TopologyOptMethod::adaptive)
+    opts.topology_opt_method = TopologyOptMethod::classic;
+
   /* process start tree defaults */
   if (opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::start)
   {
     if (optarg_tree.empty())
     {
-      if (opts.use_adaptive_search)
+      if (use_adaptive_search)
         optarg_tree = "adaptive";
       else
         optarg_tree = opts.use_old_constraint ? "rand{20}" : RAXML_DEF_START_TREE;
@@ -1104,7 +1180,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   parse_start_trees(opts, optarg_tree);
 
   /* process LH epsilon defaults */
-  if (opts.command == Command::search || opts.command == Command::all)
+  if (opts.command == Command::search || opts.command == Command::bootstrap ||
+      opts.command == Command::all)
   {
     if (!lh_epsilon_set)
       opts.lh_epsilon = compat_ver < 120 ? DEF_LH_EPSILON_V11 : DEF_LH_EPSILON;
@@ -1119,7 +1196,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   check_options(opts);
 
   if ((opts.command == Command::bootstrap || opts.command == Command::all) &&
-      opts.num_bootstraps == 0)
+      opts.num_bootstraps == 0 &&
+      opts.bs_metrics.size() > opts.bs_metrics.count(BranchSupportMetric::sh_alrt))
   {
     opts.num_bootstraps = (opts.bootstop_criterion == BootstopCriterion::none) ? 100 : 1000;
   }
@@ -1164,11 +1242,14 @@ void CommandLineParser::print_help()
             "                                             eg: --consense MR75 --tree bsrep.nw\n"
             "  --ancestral                                ancestral state reconstruction at all inner nodes\n"
             "  --sitelh                                   print per-site log-likelihood values\n"
+            "  --pythia                                   compute and print Pythia MSA difficulty score\n"
             "\n"
             "Command shortcuts (mutually exclusive):\n"
-            "  --search1                                  Alias for: --search --tree rand{1}\n"
+            "  --search1                                  Alias for: --search --tree pars{1}\n"
             "  --loglh                                    Alias for: --evaluate --opt-model off --opt-branches off --nofiles --log result\n"
             "  --rf                                       Alias for: --rfdist --nofiles --log result\n"
+            "  --pt                                       Alias for: --pythia --nofiles --log result\n"
+            "  --sh [ REPS ]                              Alias for: --all --opt-topology nni --bs-metic sh [ --sh-reps REPS ]\n"
             "\n"
             "Input and output options:\n"
             "  --tree            rand{N} | pars{N} |      starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
@@ -1209,6 +1290,8 @@ void CommandLineParser::print_help()
             "  --lh-epsilon   VALUE                       log-likelihood epsilon for optimization/tree search (default: 10)\n"
             "\n"
             "Topology search options:\n"
+            "  --opt-topology        classic | adaptive   Topology optimization method (default: adaptive)\n"
+            "                        nni | rbs | off      \n"
             "  --adaptive            [ on | off | start ] Adaptive ML tree search (start = starting trees only)\n"
             "  --spr-radius          VALUE                SPR re-insertion radius for fast iterations (default: AUTO)\n"
             "  --spr-cutoff          VALUE | off          relative LH cutoff for descending into subtrees (default: 1.0)\n"
@@ -1219,8 +1302,13 @@ void CommandLineParser::print_help()
             "  --bs-trees     autoMRE{N}                  use MRE-based bootstrap convergence criterion, up to N replicates (default: 1000)\n"
             "  --bs-trees     FILE                        Newick file containing set of bootstrap replicate trees (with --support)\n"
             "  --bs-cutoff    VALUE                       cutoff threshold for the MRE-based bootstopping criteria (default: 0.03)\n"
-            "  --bs-metric    fbp | tbe                   branch support metric: fbp = Felsenstein bootstrap (default), tbe = transfer distance\n"
-            "  --bs-write-msa on | off                    write all bootstrap alignments (default: OFF)\n";
+            "  --bs-metric    fbp | rbs | tbe | sh        branch support metric: fbp = Felsenstein bootstrap (default), rbs = Rapid bootstrap\n"
+            "                                             tbe = Transfer bootstrap estimate, sh = SH-like aLRT\n"
+            "  --bs-write-msa on | off                    write all bootstrap alignments (default: OFF)\n"
+            "\n"
+            "SH-like test options:\n"
+            "  --sh-reps      VALUE                       number of bootstrap replicates for SH-aLRT test (default: 1000)\n"
+            "  --sh-epsilon   VALUE                       log-likelihood epsilon for SH-aLRT test (default: 0.1)\n";
 
   cout << "\n"
             "EXAMPLES:\n"

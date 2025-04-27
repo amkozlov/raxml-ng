@@ -303,7 +303,10 @@ std::ostream& operator<<(std::ostream& stream, const PartitionedMSA& part_msa)
 
 void AutoPartitioner::init_from_string(PartitionedMSA& part_msa, DataType data_type, const std::string &model_string)
 {
-  size_t pos = model_string.find_first_of("/");
+  // TODO proper parsing, we look for the last "/" outside of curly brackets
+  size_t pos = model_string.find_last_of("/");
+  size_t pos2 = model_string.find_last_of("}");
+  if (pos2 != string::npos && pos < pos2) pos = string::npos;
   const string model_def = pos == string::npos ? model_string : model_string.substr(0, pos);
   const string part_def = pos == string::npos ? "" : model_string.substr(pos+1);
 

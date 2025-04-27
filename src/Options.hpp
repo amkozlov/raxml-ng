@@ -5,7 +5,7 @@
 #include "PartitionedMSA.hpp"
 #include "util/SafetyCheck.hpp"
 
-constexpr int RAXML_OPT_VERSION = 2;
+constexpr int RAXML_OPT_VERSION = 3;
 
 struct OutputFileNames
 {
@@ -21,6 +21,8 @@ struct OutputFileNames
   std::string support_tree;
   std::string tbe_support_tree;
   std::string fbp_support_tree;
+  std::string rbs_support_tree;
+  std::string sh_support_tree;
   std::string terrace;
   std::string binary_msa;
   std::string bootstrap_msa;
@@ -63,10 +65,11 @@ public:
   bool use_bs_pars;
   bool use_par_pars;
   bool use_pythia;
-  bool use_adaptive_search;
 
   bool optimize_model;
   bool optimize_brlen;
+  TopologyOptMethod topology_opt_method;
+  StoppingRule stopping_rule;
 
   bool force_mode;
   SafetyCheck safety_checks;
@@ -94,7 +97,7 @@ public:
   unsigned long long terrace_maxsize;
 
   unsigned int num_bootstraps;
-  std::vector<BranchSupportMetric> bs_metrics;
+  std::set<BranchSupportMetric> bs_metrics;
   BootstopCriterion bootstop_criterion;
   double bootstop_cutoff;
   unsigned int bootstop_interval;
@@ -131,10 +134,9 @@ public:
   double nni_tolerance;
   double nni_epsilon;
 
-  /* Stopping Criteria */
-  int  stopping_rule; /* 0: Noise Sampling RELL approach, 1: Noise Sampling RELL approach, 2: KH test, 3: KH multiple testing correction */
-  bool modified_version;
-  bool count_spr_moves;
+  /* SH-like test */
+  unsigned int num_sh_reps;
+  double sh_epsilon;
 
   bool coarse() const { return num_workers > 1; };
 

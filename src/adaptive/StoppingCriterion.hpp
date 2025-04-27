@@ -106,19 +106,27 @@ class NoiseSampling : public StoppingCriterion {
                 int _n_groups, 
                 int _n_threads,
                 bool _rell = false,
-                int _seed = 0) : StoppingCriterion(parted_msa, _n_groups, _n_threads, false, false, _seed) { rell = _rell; };
+                int _seed = 0) : 
+                    StoppingCriterion(parted_msa, _n_groups, _n_threads, false, false, _seed),
+                    rell(_rell) {}
 
         void run_test() override;
 };
 
 class KH : public StoppingCriterion {
 
+    private:
+        double lh_epsilon;
+
     public:
         KH(shared_ptr<PartitionedMSA> parted_msa, 
             int _n_groups, 
             int _n_threads, 
             bool _count_spr_moves = false,
-            int _seed = 0) : StoppingCriterion(parted_msa, _n_groups, _n_threads, true, _count_spr_moves, _seed) {}
+            int _seed = 0,
+            double _lh_epsilon = 10.0) : 
+                StoppingCriterion(parted_msa, _n_groups, _n_threads, true, _count_spr_moves, _seed),
+                lh_epsilon(_lh_epsilon) {}
 
         void run_test() override;
 

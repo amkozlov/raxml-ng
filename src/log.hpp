@@ -125,6 +125,7 @@ Logging& logger();
 #define FMT_LH(lh) setprecision(logger().precision(LogElement::loglh)) << lh
 #define FMT_MOD(p) setprecision(logger().precision(LogElement::model)) << p
 #define FMT_BL(bl) setprecision(logger().precision(LogElement::brlen)) << bl
+#define FMT_PREC2(val) setprecision(2) << val
 #define FMT_PREC3(val) setprecision(3) << val
 #define FMT_PREC6(val) setprecision(6) << val
 #define FMT_PREC9(val) setprecision(9) << val

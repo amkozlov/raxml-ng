@@ -7,6 +7,9 @@ ConsensusTree::ConsensusTree (const TreeList& trees, unsigned int consense_cutof
   assert(consense_cutoff <= 100);
   assert(!trees.empty());
 
+  /* add new splits from replicates */
+  _ref_splits_only = false;
+
   _cutoff = ((double) consense_cutoff) / 100.;
   pll_utree(trees[0].pll_utree());
 

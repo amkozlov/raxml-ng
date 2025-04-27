@@ -43,7 +43,7 @@ if (USE_CORAXLIB_CMAKE)
   target_include_directories(raxml_module PUBLIC ${PROJECT_SOURCE_DIR}/libs/coraxlib/src ${PROJECT_SOURCE_DIR}/libs/coraxlib/lib/difficulty_prediction/src)
   #target_link_libraries(raxml_module PUBLIC corax)
   target_link_directories(raxml_module PUBLIC ${PROJECT_SOURCE_DIR}/libs/coraxlib/bin)
-  set(LIBPLL_LIBS coraxlib_difficulty_prediction_lib corax)
+  set(LIBPLL_LIBS corax)
 endif()
 
 set(RAXML_LIBS ${LIBPLL_LIBS} m)

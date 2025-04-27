@@ -17,6 +17,9 @@
 
 #define DEF_LH_EPSILON_V11         0.1
 
+#define DEF_NNI_TOLERANCE         1.0
+#define DEF_NNI_BR_LEN_EPSILON    10
+
 #define RAXML_BRLEN_SMOOTHINGS    32
 #define RAXML_BRLEN_DEFAULT       0.1
 #define RAXML_BRLEN_MIN           1.0e-6
@@ -40,7 +43,7 @@
 #define RAXML_BOOTSTOP_INTERVAL   50
 #define RAXML_BOOTSTOP_PERMUTES   1000
 
-#define RAXML_CPYTHIA_TREES_NUM   100
+#define RAXML_CPYTHIA_TREES_NUM   24
 
 // cpu features
 #define RAXML_CPU_SSE3  (1<<0)
