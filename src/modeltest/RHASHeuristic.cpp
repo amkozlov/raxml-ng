@@ -27,7 +27,7 @@ void RHASHeuristic::update(const candidate_model_t &candidate_model, double scor
 }
 
 void RHASHeuristic::populate_skip() {
-    LOG_INFO << "RHAS Heuristic engaged" << std::endl;
+    LOG_DEBUG << "RHAS Heuristic engaged" << std::endl;
     using map_type = decltype(observed_bic_score)::value_type;
     double bic_min = std::min_element(observed_bic_score.cbegin(), observed_bic_score.cend(),
             [](const map_type &a, const map_type &b) {
@@ -38,7 +38,7 @@ void RHASHeuristic::populate_skip() {
         bool exceeding_bic_limit = it->second - bic_min > delta_bic;
 
         if (exceeding_bic_limit) {
-            LOG_INFO << "Skipping rate het " << static_cast<int>(it->first) << "\n";
+            LOG_DEBUG << "Skipping rate het " << static_cast<int>(it->first) << "\n";
         }
         skip[it->first] = exceeding_bic_limit;
     }

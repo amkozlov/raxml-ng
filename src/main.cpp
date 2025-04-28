@@ -2450,7 +2450,7 @@ void print_final_output(const RaxmlInstance &instance, const CheckpointFile &che
   }
 
   if (opts.command == Command::search || opts.command == Command::all ||
-      opts.command == Command::evaluate || opts.command == Command::sitelh) {
+      opts.command == Command::evaluate || opts.command == Command::sitelh || opts.command == Command::modeltest) {
     if (!opts.best_model_file().empty()) {
       RaxmlPartitionStream model_stream(opts.best_model_file(), true);
       model_stream.print_model_params(true);

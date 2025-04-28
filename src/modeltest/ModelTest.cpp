@@ -173,23 +173,25 @@ void ModelTest::optimize_model() {
                                                    ? std::to_string(num_rate_cats)
                                                    : "");
 
-            LOG_INFO << RAXML_LOG_TIMESTAMP << "Partition " << partition_index << " model " << normalize_model_name(model_descriptor) << endl;
+            LOG_INFO << RAXML_LOG_TIMESTAMP << "partition " << partition_index + 1 << "/" << msa.part_count()
+                << " model " << normalize_model_name(model_descriptor) << endl;
 
             Model model(model_descriptor);
             assign(model, msa.part_info(partition_index).stats());
             TreeInfo treeinfo(options, tree, msa, tip_msa_idmap, part_assign, partition_index, model);
             optimizer.optimize_model(treeinfo);
 
-            PartitionModelEvaluation partition_results;
+            // Retrieve values from optimized partition
+            // partition id is always 0, since our treeinfo only contains a single partition
+            assign(model, treeinfo, 0); 
+
 
             const double partition_loglh = treeinfo.pll_treeinfo().partition_loglh[0];
             const size_t free_params = model.num_free_params() + treeinfo.tree().num_branches();
             const size_t sample_size = msa.part_info(partition_index).stats().site_count;
             ICScoreCalculator ic_score_calculator(free_params, sample_size);
 
-            partition_results.ic_criteria = ic_score_calculator.all(partition_loglh);
-            partition_results.model = model;
-            partition_results.partition_loglh = partition_loglh;
+            PartitionModelEvaluation partition_results { model, partition_loglh, ic_score_calculator.all(partition_loglh) };
 
             const double new_score = partition_results.ic_criteria.at(InformationCriterion::bic);
             execution_status.store_results(partition_index, *candidate_model, partition_results);
@@ -212,16 +214,28 @@ void ModelTest::optimize_model() {
         print_xml(xml_stream, execution_status.get_results(), msa.part_count());
         xml_stream.close();
 
-        LOG_INFO << "XML model selection file written to " << xml_fname << endl;
-    }
+        LOG_DEBUG << "XML model selection file written to " << xml_fname << endl;
 
-    auto results = execution_status.get_results();
-    for (auto p = 0U; p < msa.part_count(); ++p) {
-        auto bic_ranking = rank_by_score(results, InformationCriterion::bic, p, msa.part_count());
-        const auto &best_model = results.at(p).at(bic_ranking.at(0));
-        LOG_INFO << "Partition #" << p << ": " << best_model.model.to_string() << " BIC = " << best_model.
-                ic_criteria.
-                at(InformationCriterion::bic) << " LogLH = " << best_model.partition_loglh << endl;
+
+
+
+        auto bestmodel_fname = options.output_fname("modeltest.bestModel");
+        fstream bestmodel_stream(bestmodel_fname, std::ios::out);
+
+        auto results = execution_status.get_results();
+        for (auto p = 0U; p < msa.part_count(); ++p) {
+            auto bic_ranking = rank_by_score(results, InformationCriterion::bic, p, msa.part_count());
+            const auto &best_model = results.at(p).at(bic_ranking.at(0));
+            LOG_DEBUG << "Partition #" << p << ": " << best_model.model.to_string() << " BIC = " << best_model.
+                    ic_criteria.
+                    at(InformationCriterion::bic) << " LogLH = " << best_model.partition_loglh << endl;
+
+            msa.model(p, best_model.model);
+
+            bestmodel_stream << best_model.model.to_string(true, logger().precision(LogElement::model)) << ", " << msa.part_info(p).name() 
+                << " = " << msa.part_info(p).range_string() << endl;
+        }
+
     }
 }
 
