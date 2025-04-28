@@ -222,11 +222,12 @@ void ModelTest::optimize_model() {
         auto bestmodel_fname = options.output_fname("modeltest.bestModel");
         fstream bestmodel_stream(bestmodel_fname, std::ios::out);
 
+        LOG_INFO << endl;
         auto results = execution_status.get_results();
         for (auto p = 0U; p < msa.part_count(); ++p) {
             auto bic_ranking = rank_by_score(results, InformationCriterion::bic, p, msa.part_count());
             const auto &best_model = results.at(p).at(bic_ranking.at(0));
-            LOG_DEBUG << "Partition #" << p << ": " << best_model.model.to_string() << " BIC = " << best_model.
+            LOG_INFO << "Partition #" << p << ": " << best_model.model.to_string() << " BIC = " << best_model.
                     ic_criteria.
                     at(InformationCriterion::bic) << " LogLH = " << best_model.partition_loglh << endl;
 

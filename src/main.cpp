@@ -27,6 +27,7 @@
 #include <corax/corax.h>
 #include "difficulty.h"
 
+#include "types.hpp"
 #include "version.h"
 #include "common.h"
 
@@ -249,8 +250,15 @@ void init_part_info(RaxmlInstance &instance) {
   } else if (!opts.model_file.empty()) {
     // create and init single pseudo-partition
     parted_msa.init_single_model(opts.data_type, opts.model_file);
-  } else
+  } else if (opts.command == Command::modeltest && (opts.data_type == DataType::dna || opts.data_type == DataType::protein)) {
+    // Use dummy model (will be overwritten by ModelTest)
+    const string dummy_model = opts.data_type == DataType::dna ? "JC" : "DAYHOFF";
+    parted_msa.init_single_model(opts.data_type, dummy_model);
+  } else if (opts.command == Command::modeltest) {
+    throw runtime_error("Specify the datatype for modeltesting with --data-type [AA|DNA]");
+  } else {
     throw runtime_error("Please specify an evolutionary model with --model switch");
+  }
 
   assert(parted_msa.part_count() > 0);
 
