@@ -5,17 +5,20 @@
 using namespace std;
 
 SupportMetricSet BS_METRICS_WITH_ML_TREES   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
-                                              BranchSupportMetric::tbe };
+                                              BranchSupportMetric::tbe,
+                                              BranchSupportMetric::ic1, BranchSupportMetric::ica};
 
 SupportMetricSet BS_METRICS_WITH_PB_TREES   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
                                               BranchSupportMetric::tbe, BranchSupportMetric::ebg,
-                                              BranchSupportMetric::pbs };
+                                              BranchSupportMetric::pbs,
+                                              BranchSupportMetric::ic1, BranchSupportMetric::ica};
 
 SupportMetricSet BS_METRICS_WITH_PARS_TREES { BranchSupportMetric::ps };
 
 SupportMetricSet BS_METRICS_WITH_MSA_REPS   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
                                               BranchSupportMetric::tbe, BranchSupportMetric::ebg,
-                                              BranchSupportMetric::pbs, BranchSupportMetric::sh_alrt };
+                                              BranchSupportMetric::pbs, BranchSupportMetric::sh_alrt,
+                                              BranchSupportMetric::ic1, BranchSupportMetric::ica };
 
 Options::Options() : opt_version(RAXML_OPT_VERSION), cmdline(""), command(Command::none),
 use_tip_inner(true), use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false),
@@ -104,6 +107,8 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.ps_support_tree, "supportPS");
   set_default_outfile(outfile_names.pbs_support_tree, "supportPBS");
   set_default_outfile(outfile_names.sh_support_tree, "supportSH");
+  set_default_outfile(outfile_names.ic1_support_tree, "supportIC1");
+  set_default_outfile(outfile_names.ica_support_tree, "supportICA");
   set_default_outfile(outfile_names.terrace, "terrace");
   set_default_outfile(outfile_names.binary_msa, "rba");
   set_default_outfile(outfile_names.bootstrap_msa, "bootstrapMSA");
@@ -147,6 +152,10 @@ const std::string& Options::support_tree_file(BranchSupportMetric bsm) const
       return outfile_names.pbs_support_tree;
     else if (bsm == BranchSupportMetric::sh_alrt)
       return outfile_names.sh_support_tree;
+    else if (bsm == BranchSupportMetric::ic1)
+      return outfile_names.ic1_support_tree;
+    else if (bsm == BranchSupportMetric::ica)
+      return outfile_names.ica_support_tree;
     else
       return outfile_names.support_tree;
   }
@@ -427,6 +436,12 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
         case BranchSupportMetric::pbs:
           stream << "Parsimony Bootstrap";
           break;
+        case BranchSupportMetric::ic1:
+          stream << "Internode Certainty";
+          break;
+        case BranchSupportMetric::ica:
+          stream << "Internode Certainty All";
+          break;
       }
     }
     stream << ")";
@@ -459,6 +474,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
         break;
       case StartingTree::adaptive:
         stream << "adaptive";
+        break;
+      case StartingTree::consensus:
+        stream << "consensus (cutoff: " << opts.consense_cutoff << "%)";
         break;
     }
   }

@@ -52,6 +52,9 @@
 
 #define RAXML_PS_PBS_TREES_NUM    1000
 
+#define RAXML_ICTC_SPLIT_CUTOFF   0.05
+#define RAXML_ICTC_SPLIT_FILTER   true
+
 // cpu features
 #define RAXML_CPU_SSE3  (1<<0)
 #define RAXML_CPU_AVX   (1<<1)

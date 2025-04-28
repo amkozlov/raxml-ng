@@ -40,6 +40,7 @@ private:
   void check_options(Options &opts);
   void parse_start_trees(Options &opts, const std::string& arg);
   void parse_bs_trees(Options &opts, const std::string& arg);
+  void parse_consense_cutoff(Options &opts, const char* optarg);
 };
 
 #endif /* SRC_COMMANDLINEPARSER_HPP_ */

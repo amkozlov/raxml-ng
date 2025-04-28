@@ -26,6 +26,8 @@ struct OutputFileNames
   std::string fbp_support_tree;
   std::string rbs_support_tree;
   std::string sh_support_tree;
+  std::string ic1_support_tree;
+  std::string ica_support_tree;
   std::string terrace;
   std::string binary_msa;
   std::string bootstrap_msa;

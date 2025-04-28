@@ -10,9 +10,10 @@ public:
   virtual
   ~ConsensusTree ();
 
+  virtual bool compute_support();
+
 protected:
   virtual void add_tree(const corax_unode_t& root);
-  virtual bool compute_support();
 
 private:
    double _cutoff;

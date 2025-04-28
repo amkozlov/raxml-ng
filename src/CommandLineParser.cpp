@@ -124,7 +124,7 @@ void CommandLineParser::check_options(Options &opts)
       opts.command == Command::sitelh || opts.command == Command::ancestral ||
       opts.command == Command::consense)
   {
-    if (opts.tree_file.empty())
+    if (opts.tree_file.empty() && opts.start_trees.count(StartingTree::user))
       throw OptionException("Please provide a valid Newick file as an argument of --tree option.");
   }
 
@@ -137,7 +137,7 @@ void CommandLineParser::check_options(Options &opts)
 
   if (opts.command == Command::support)
   {
-    /* only FBP or TBE are allowed in support mapping mode; other values are ignored */
+    /* only FBP, TBE and IC1/ICA are allowed in support mapping mode; other values are ignored */
     opts.bs_metrics.erase(BranchSupportMetric::rbs);
     opts.bs_metrics.erase(BranchSupportMetric::ps);
     opts.bs_metrics.erase(BranchSupportMetric::pbs);
@@ -159,10 +159,13 @@ void CommandLineParser::check_options(Options &opts)
   if (opts.command == Command::support || opts.command == Command::rfdist ||
       opts.command == Command::consense)
   {
-    assert(!opts.tree_file.empty());
+    assert(!opts.tree_file.empty() || !opts.outfile_names.bootstrap_trees.empty());
 
     if (opts.outfile_prefix.empty())
-      opts.outfile_prefix = opts.tree_file;
+    {
+      opts.outfile_prefix = !opts.tree_file.empty() ? opts.tree_file :
+                                                      opts.outfile_names.bootstrap_trees;
+    }
   }
 
   if (opts.command == Command::bsconverge)
@@ -248,6 +251,7 @@ void CommandLineParser::compute_num_searches(Options &opts)
 void CommandLineParser::parse_start_trees(Options &opts, const string& arg)
 {
   auto start_trees = split_string(arg, ',');
+  char strarg[11];
   for (const auto& st_tree: start_trees)
   {
     StartingTree st_tree_type;
@@ -267,6 +271,11 @@ void CommandLineParser::parse_start_trees(Options &opts, const string& arg)
     else if (st_tree ==  "auto" || st_tree == "adaptive")
     {
       st_tree_type = StartingTree::adaptive;
+    }
+    else if (sscanf(st_tree.c_str(), "cons:%10s", strarg) == 1)
+    {
+      parse_consense_cutoff(opts, strarg);
+      st_tree_type = StartingTree::consensus;
     }
     else
     {
@@ -347,14 +356,6 @@ void CommandLineParser::parse_bs_trees(Options &opts, const string& arg)
       {
         if (opts.bs_metrics.size() == 1 && opts.num_bootstraps > 0)
           opts.bs_replicate_counts[m] = opts.num_bootstraps;
-        else if (m == BranchSupportMetric::fbp || m == BranchSupportMetric::rbs ||
-                 m == BranchSupportMetric::tbe)
-        {
-          if (opts.num_bootstraps)
-            opts.bs_replicate_counts[m] = opts.num_bootstraps;
-          else
-            opts.bs_replicate_counts[m] = (opts.bootstop_criterion == BootstopCriterion::none) ? 100 : 1000;
-        }
         else if (m == BranchSupportMetric::ebg)
         {
           opts.bs_replicate_counts[m] = RAXML_EBG_PBS_TREES_NUM;
@@ -365,6 +366,13 @@ void CommandLineParser::parse_bs_trees(Options &opts, const string& arg)
         }
         else if (m == BranchSupportMetric::sh_alrt)
           opts.bs_replicate_counts[m] = opts.num_sh_reps ? opts.num_sh_reps : RAXML_SH_ALRT_REPS;
+        else
+        {
+          if (opts.num_bootstraps)
+            opts.bs_replicate_counts[m] = opts.num_bootstraps;
+          else
+            opts.bs_replicate_counts[m] = (opts.bootstop_criterion == BootstopCriterion::none) ? 100 : 1000;
+        }
       }
     }
   }
@@ -380,6 +388,24 @@ void CommandLineParser::parse_bs_trees(Options &opts, const string& arg)
       opts.num_bootstraps == 0)
   {
     opts.num_bootstraps = opts.num_bootstrap_ml_trees();
+  }
+}
+
+void CommandLineParser::parse_consense_cutoff(Options &opts, const char* optarg)
+{
+  if (strcasecmp(optarg, "mr") == 0)
+    opts.consense_cutoff = ConsenseCutoff::MR;
+  else if (strcasecmp(optarg, "mre") == 0)
+    opts.consense_cutoff = ConsenseCutoff::MRE;
+  else if (strcasecmp(optarg, "strict") == 0)
+    opts.consense_cutoff = ConsenseCutoff::strict;
+  else if (sscanf(optarg, "%*[Mm]%*[Rr]%u", &opts.consense_cutoff) != 1 ||
+           opts.consense_cutoff < 50 || opts.consense_cutoff > 100)
+  {
+    auto errmsg = "Invalid consensus type or threshold value: " +
+                  string(optarg) + "\n" +
+                  "Allowed values: MR, MRE, STRICT or MR<n>, where 50 <= n <= 100.";
+    throw  InvalidOptionValueException(errmsg);
   }
 }
 
@@ -1032,9 +1058,17 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
             {
               opts.bs_metrics.insert(BranchSupportMetric::pbs);
             }
-            else if (strncasecmp(m.c_str(), "sh", 3) == 0 || strncasecmp(m.c_str(), "alrt", 3) == 0)
+            else if (strncasecmp(m.c_str(), "sh", 2) == 0 || strncasecmp(m.c_str(), "alrt", 4) == 0)
             {
               opts.bs_metrics.insert(BranchSupportMetric::sh_alrt);
+            }
+            else if (strncasecmp(m.c_str(), "ic1", 3) == 0)
+            {
+              opts.bs_metrics.insert(BranchSupportMetric::ic1);
+            }
+            else if (strncasecmp(m.c_str(), "ica", 3) == 0)
+            {
+              opts.bs_metrics.insert(BranchSupportMetric::ica);
             }
             else
             {
@@ -1080,22 +1114,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.command = Command::consense;
         num_commands++;
         if (optarg)
-        {
-          if (strcasecmp(optarg, "mr") == 0)
-            opts.consense_cutoff = ConsenseCutoff::MR;
-          else if (strcasecmp(optarg, "mre") == 0)
-            opts.consense_cutoff = ConsenseCutoff::MRE;
-          else if (strcasecmp(optarg, "strict") == 0)
-            opts.consense_cutoff = ConsenseCutoff::strict;
-          else if (sscanf(optarg, "%*[Mm]%*[Rr]%u", &opts.consense_cutoff) != 1 ||
-                   opts.consense_cutoff < 50 || opts.consense_cutoff > 100)
-          {
-            auto errmsg = "Invalid consensus type or threshold value: " +
-                          string(optarg) + "\n" +
-                          "Allowed values: MR, MRE, STRICT or MR<n>, where 50 <= n <= 100.";
-            throw  InvalidOptionValueException(errmsg);
-          }
-        }
+          parse_consense_cutoff(opts, optarg);
         else
           opts.consense_cutoff = ConsenseCutoff::MR;
         break;
@@ -1408,7 +1427,8 @@ void CommandLineParser::print_help()
             "  --bs-cutoff    VALUE                       cutoff threshold for the MRE-based bootstopping criteria (default: 0.03)\n"
             "  --bs-metric    fbp | rbs |                 branch support metric: fbp = Felsenstein bootstrap (default), rbs = Rapid bootstrap\n"
             "                 ebg | tbe | sh              ebg = Educated bootstrap guesser, tbe = Transfer bootstrap estimate, sh = SH-like aLRT\n"
-            "                 ps  | pbs                   ps = Parsimony support, pbs = Parsimony bootstrap support\n"
+            "                 ps  | pbs |                 ps = Parsimony support, pbs = Parsimony bootstrap support\n"
+            "                 ic1 | ica                   ic1 = Internode certainty (most prevalent), ica = Internode certainty (all)\n"
             "  --bs-write-msa on | off                    write all bootstrap alignments (default: OFF)\n"
             "\n"
             "SH-like test options:\n"
