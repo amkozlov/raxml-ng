@@ -242,9 +242,8 @@ void ModelTest::optimize_model() {
 
 vector<size_t> ModelTest::rank_by_score(const EvaluationResults &results,
                                         InformationCriterion ic,
-                                        unsigned int partition_idx,
-                                        unsigned int part_count) {
-    std::vector<size_t> ranking(results.size() / part_count, 0);
+                                        unsigned int partition_idx) {
+    std::vector<size_t> ranking(results.at(partition_idx).size(), 0);
     std::iota(ranking.begin(), ranking.end(), 0);
 
     std::sort(ranking.begin(), ranking.end(),
