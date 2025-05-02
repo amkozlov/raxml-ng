@@ -457,6 +457,8 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Options& o)
   stream << o.diff_pred_pars_trees << o.nni_tolerance << o.nni_epsilon;
   stream << o.num_sh_reps << o.sh_epsilon;
 
+  stream << o.bs_replicate_counts;
+
   return stream;
 }
 
@@ -511,6 +513,9 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, Options& o)
     stream >> o.diff_pred_pars_trees >> o.nni_tolerance >> o.nni_epsilon;
     stream >> o.num_sh_reps >> o.sh_epsilon;
   }
+
+  if (o.opt_version >= 4)
+    stream >> o.bs_replicate_counts;
 
   return stream;
 }

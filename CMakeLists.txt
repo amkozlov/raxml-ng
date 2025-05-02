@@ -1,9 +1,9 @@
-cmake_minimum_required (VERSION 3.0.2 FATAL_ERROR)
+cmake_minimum_required (VERSION 3.5 FATAL_ERROR)
 
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES  ON)
 
-set(RAXML_BINARY_NAME "raxml-ng-adaptive" CACHE STRING "Custom RAxML-NG binary name")
+set(RAXML_BINARY_NAME "raxml-ng-2" CACHE STRING "Custom RAxML-NG binary name")
 set(USE_CORAXLIB_CMAKE ON CACHE BOOL "Use CMake to build Coraxlib")
 set(BUILD_AS_LIBRARY OFF CACHE BOOL "Build RAxML-NG as shared library (instead of stand-alone executable)")
 set(PLLMOD_DEBUG OFF CACHE BOOL "Debug pll-modules (tons of console output!)")
@@ -12,16 +12,14 @@ set (USE_PTHREADS ON CACHE BOOL "Enable multi-threading support (PTHREADS)")
 set (USE_MPI OFF CACHE BOOL "Enable MPI support")
 set (USE_VCF OFF)
 
-# set both following options to OFF to build a portable binary 
-# (don't worry, libpll will still have full SIMD support!)
-set (ENABLE_RAXML_SIMD OFF CACHE BOOL "Enable SIMD instructions in RAxML (non-portable but slightly faster)")
-set (ENABLE_PLLMOD_SIMD OFF CACHE BOOL "Enable SIMD instructions in pll-modules (non-portable but slightly faster)")
-
 # build a static binary
 set(STATIC_BUILD OFF CACHE BOOL "Build static binary")
+set(PORTABLE_BUILD OFF CACHE BOOL "Build a portable RAxML-NG binary (slightly slower)")
 
 set(USE_TERRAPHAST OFF CACHE BOOL "Use phylogentic terraces library (terraphast) ")
 set(USE_GMP OFF CACHE BOOL "Use GNU Multiple precision (GMP) library ")
+
+set(USE_EBG ON CACHE BOOL "Use Educated Bootstrap Guesser (EBG) ")
 
 set(ENABLE_PTHREADS ${USE_PTHREADS})
 
@@ -91,23 +89,6 @@ if (ENABLE_GMP)
   set(GMP_FOUND ON)
   set(GMP_LIBRARIES gmpxx gmp)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_RAXML_GMP")
-endif()
-
-if (ENABLE_RAXML_SIMD)
-  include(CheckCXXCompilerFlag)
-  CHECK_CXX_COMPILER_FLAG(-mavx HAS_AVX)
-  CHECK_CXX_COMPILER_FLAG(-msse3 HAS_SSE3)
-  if(HAS_AVX)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx -D__AVX")
-  elseif(HAS_SSE3)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse3 -D__SSE3")
-  endif()
-endif()
-
-if(ENABLE_PLLMOD_SIMD)
-  set(PLLMOD_AUTOCONF_ARGS "--enable-avx --enable-sse")
-else()
-  set(PLLMOD_AUTOCONF_ARGS "")
 endif()
 
 if(ENABLE_PTHREADS)

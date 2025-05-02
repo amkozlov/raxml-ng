@@ -1,6 +1,8 @@
 #ifndef RAXML_CONSTANTS_HPP_
 #define RAXML_CONSTANTS_HPP_
 
+#define RAXML_UINT32_NONE         UINT32_MAX
+
 // defaults
 #define RAXML_DEF_START_TREE      "rand{10},pars{10}"
 #define RAXML_DEF_START_TREE1     "pars{1}}"
@@ -44,6 +46,17 @@
 #define RAXML_BOOTSTOP_PERMUTES   1000
 
 #define RAXML_CPYTHIA_TREES_NUM   24
+
+#define RAXML_SH_ALRT_REPS        1000
+#define RAXML_SH_ALRT_EPSILON     0.1
+
+#define RAXML_EBG_PS_TREES_NUM    1000
+#define RAXML_EBG_PBS_TREES_NUM   200
+
+#define RAXML_PS_PBS_TREES_NUM    1000
+
+#define RAXML_ICTC_SPLIT_CUTOFF   0.05
+#define RAXML_ICTC_SPLIT_FILTER   true
 
 // cpu features
 #define RAXML_CPU_SSE3  (1<<0)

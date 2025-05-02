@@ -5,7 +5,7 @@
 #include "PartitionedMSA.hpp"
 #include "util/SafetyCheck.hpp"
 
-constexpr int RAXML_OPT_VERSION = 3;
+constexpr int RAXML_OPT_VERSION = 4;
 
 struct OutputFileNames
 {
@@ -20,9 +20,14 @@ struct OutputFileNames
   std::string bootstrap_trees;
   std::string support_tree;
   std::string tbe_support_tree;
+  std::string ebg_support_tree;
+  std::string ps_support_tree;
+  std::string pbs_support_tree;
   std::string fbp_support_tree;
   std::string rbs_support_tree;
   std::string sh_support_tree;
+  std::string ic1_support_tree;
+  std::string ica_support_tree;
   std::string terrace;
   std::string binary_msa;
   std::string bootstrap_msa;
@@ -98,6 +103,7 @@ public:
 
   unsigned int num_bootstraps;
   std::set<BranchSupportMetric> bs_metrics;
+  SupportMetricMap bs_replicate_counts;
   BootstopCriterion bootstop_criterion;
   double bootstop_cutoff;
   unsigned int bootstop_interval;
@@ -140,6 +146,11 @@ public:
 
   bool coarse() const { return num_workers > 1; };
 
+  unsigned int num_bootstrap_ml_trees() const;
+  unsigned int num_bootstrap_pars_trees() const;
+  unsigned int num_pars_trees() const;
+  unsigned int num_bootstrap_msa_reps() const;
+
   std::string simd_arch_name() const;
   std::string consense_type_name() const;
 
@@ -179,6 +190,7 @@ public:
 
 private:
   void set_default_outfile(std::string& fname, const std::string& suffix);
+  unsigned int max_num_replicates(const SupportMetricSet& mset) const;
 };
 
 std::ostream& operator<<(std::ostream& stream, const Options& opts);

@@ -6,7 +6,10 @@
 class ParsimonyMSA
 {
 public:
-  ParsimonyMSA(std::shared_ptr<PartitionedMSA> parted_msa, unsigned int attributes, bool compress_patterns);
+  ParsimonyMSA(std::shared_ptr<PartitionedMSA> parted_msa, unsigned int attributes);
+  ParsimonyMSA(std::shared_ptr<PartitionedMSA> parted_msa, unsigned int attributes,
+               bool compress_patterns, bool combine_partitions,
+               const std::vector<WeightVector>& site_weights);
 
   virtual
   ~ParsimonyMSA ();
@@ -22,9 +25,11 @@ private:
   std::shared_ptr<PartitionedMSA> _pars_msa;
   std::vector<corax_partition*> _pll_partitions;
 
-  void init_pars_msa(std::shared_ptr<PartitionedMSA> parted_msa, bool compress_patterns);
+  void init_pars_msa(std::shared_ptr<PartitionedMSA> parted_msa,
+                     bool compress_patterns, bool combine_partitions);
 
-  void create_pll_partitions(unsigned int attributes);
+  void create_pll_partitions(unsigned int attributes,
+                             const std::vector<WeightVector>& site_weights);
   void free_pll_partitions();
 };
 

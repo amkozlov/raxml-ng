@@ -103,6 +103,10 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
     }
   }
 
+  corax_treeinfo_set_partition_linkage(_pll_treeinfo,
+                                       parted_msa.subst_linkage().data(),
+                                       parted_msa.freqs_linkage().data());
+
   // finalize partition contribution computation
   for (auto& c: _partition_contributions)
     c /= total_weight;

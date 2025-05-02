@@ -1,24 +1,12 @@
 message(STATUS "Building dependencies in: ${RAXML_LOCALDEPS_DIR}")
 
-# build LIBPLL and LIBPLL-MODULES
+# build CORAXLIB
 if (USE_CORAXLIB_CMAKE)
+  set(CORAX_BUILD_PORTABLE ${PORTABLE_BUILD} CACHE BOOL "" FORCE)
+
   add_subdirectory(coraxlib)
   set(CORAXLIB_SRC "${CMAKE_CURRENT_SOURCE_DIR}/coraxlib/src")
 endif()
-
-#target_include_directories(raxml_module PRIVATE ${RAXML_LIBPLL_HEADERS})
-
-#else()
-#  add_custom_command(
-#    OUTPUT ${RAXML_LOCALDEPS_DIR}/lib/libpll.a
-#    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/pll-modules
-#    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/pll-modules/install-with-libpll.sh ${RAXML_LOCALDEPS_DIR} '' ${PLLMOD_AUTOCONF_ARGS}
-#  )
-
-#  add_custom_target(libpll ALL
-#    DEPENDS ${RAXML_LOCALDEPS_DIR}/lib/libpll.a
-#  )
-# endif()
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${RAXML_LOCALDEPS_DIR}/lib)
 
@@ -33,6 +21,14 @@ if(USE_TERRAPHAST)
   set(TERRAPHAST_BUILD_TESTS OFF CACHE BOOL "terraphast: Build the tests")
   set(TERRAPHAST_ARCH_NATIVE OFF CACHE BOOL "terraphast: Use non-portable compiler optimizations")
 
+  if(NOT PORTABLE_BUILD)
+    set(TERRAPHAST_ARCH_NATIVE ON)
+  endif()
+
   add_subdirectory(terraphast)
   set(TERRACES_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/terraphast/include PARENT_SCOPE)
 endif()
+
+if(USE_EBG)
+  add_subdirectory(ebg)
+endif()				

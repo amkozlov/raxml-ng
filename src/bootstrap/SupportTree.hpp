@@ -14,8 +14,13 @@ public:
   ~SupportTree ();
 
   virtual void add_replicate_tree(const Tree& tree);
+  void add_splits_from_support_tree(const SupportTree& other);
 
+  virtual bool compute_support();
   void draw_support(bool support_in_pct = true);
+
+  size_t num_bs_trees() const { return _num_bs_trees; }
+  const doubleVector& support() const { return _support; }
 
 protected:
   PllSplitSharedPtr extract_splits_from_tree(const corax_unode_t& root,
@@ -29,7 +34,6 @@ protected:
 
   void normalize_support_in_hashtable();
   void collect_support();
-  virtual bool compute_support();
 
 protected:
   size_t _num_bs_trees;
