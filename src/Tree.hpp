@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "ParsimonyMSA.hpp"
+#include "types.hpp"
 
 // seems to be the only way to have custom deleter for unique_ptr
 // without having to specify it every time during object creation

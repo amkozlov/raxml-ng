@@ -31,6 +31,7 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
   _check_lh_impr = opts.safety_checks.isset(SafetyCheck::model_lh_impr);
   _use_old_constraint = opts.use_old_constraint;
   _use_spr_fastclv = opts.use_spr_fastclv;
+  _lh_epsilon = opts.lh_epsilon;
 
   _partition_contributions.resize(parted_msa.part_count());
   double total_weight = 0;
@@ -397,9 +398,15 @@ double TreeInfo::spr_round(spr_round_params& params)
                                params.subtree_cutoff > 0. ? &params.cutoff_info : nullptr,
                                params.subtree_cutoff, 
                                params.lh_epsilon_brlen_triplet,
-                               _use_spr_fastclv);
+                               _use_spr_fastclv,
+                               params.total_moves,
+                               params.increasing_moves);
 
   libpll_check_error("ERROR in SPR round");
+
+  if(params.total_moves)
+    LOG_DEBUG << "SPR moves = " << (*params.total_moves) << 
+      ", Increasing moves = " << (*params.increasing_moves) << endl; 
 
   assert(isfinite(loglh) && loglh);
 

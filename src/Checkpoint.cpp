@@ -102,6 +102,7 @@ void CheckpointManager::init_checkpoints(const Tree& tree, const ModelCRefMap& m
 
   for (auto& ckp: _checkp_file.checkp_list)
   {
+    ckp.lh_epsilon = DEF_LH_EPSILON;
     ckp.tree = tree;
     for (auto& it: models)
       ckp.models[it.first] = it.second;
@@ -386,6 +387,8 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Checkpoint& ckp)
 
   stream << ckp.models;
 
+  stream << ckp.lh_epsilon;
+
   return stream;
 }
 
@@ -398,6 +401,8 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, Checkpoint& ckp)
   ckp.tree.topology(stream.get<TreeTopology>());
 
   stream >> ckp.models;
+
+  stream >> ckp.lh_epsilon;
 
   return stream;
 }

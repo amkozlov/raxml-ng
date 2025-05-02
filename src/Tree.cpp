@@ -13,6 +13,7 @@ Tree::Tree (const Tree& other) : BasicTree(other._num_tips),
 Tree::Tree (Tree&& other) : BasicTree(other._num_tips), _pll_utree(other._pll_utree.release())
 {
   other._num_tips = 0;
+
   swap(_pll_utree_tips, other._pll_utree_tips);
   swap(_partition_brlens, other._partition_brlens);
 }

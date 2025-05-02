@@ -74,6 +74,7 @@ public:
   bool optimize_model;
   bool optimize_brlen;
   TopologyOptMethod topology_opt_method;
+  StoppingRule stopping_rule;
 
   bool force_mode;
   SafetyCheck safety_checks;

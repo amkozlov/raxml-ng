@@ -128,9 +128,19 @@ enum class TopologyOptMethod
   classic,
   adaptive,
   rapidBS,
-  nniRound
+  nniRound,
+  simplified,
+  fast
 };
 
+enum class StoppingRule
+{
+  none = 0,
+  sn_rell,
+  sn_normal,
+  kh,
+  kh_mult
+};
 
 namespace ConsenseCutoff
 {

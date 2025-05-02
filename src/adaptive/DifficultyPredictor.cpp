@@ -130,10 +130,11 @@ int DifficultyPredictor::num_start_trees(double diff, double amp, double mean, d
 
 double DifficultyPredictor::normal_pdf(double x, double m, double s)
 {
-  static const double inv_sqrt_2pi = 0.3989422804014327;
+  //static const double inv_sqrt_2pi = 0.3989422804014327;
   double a = (x - m) / s;
 
-  return inv_sqrt_2pi / s * std::exp(-0.5f * a * a);
+  //return inv_sqrt_2pi / s * std::exp(-0.5f * a * a);
+  return std::exp(-0.5f * a * a);
 }
 
 void DifficultyPredictor::print_features()

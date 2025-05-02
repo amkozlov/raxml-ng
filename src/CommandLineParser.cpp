@@ -85,15 +85,14 @@ static struct option long_options[] =
   {"diff_pred_trees",    required_argument, 0, 0},   /*  60 */
   {"nni-tolerance",      required_argument, 0, 0 },  /*  61 */
   {"nni-epsilon",        required_argument, 0, 0 },  /*  62 */
-
   {"pythia",             optional_argument, 0, 0 },  /*  63 */
   {"pt",                 optional_argument, 0, 0 },  /*  64 */
-
   {"sh",                 optional_argument, 0, 0 },  /*  65 */
   {"sh-reps",            required_argument, 0, 0 },  /*  66 */
   {"sh-epsilon",         required_argument, 0, 0 },  /*  67 */
   {"opt-topology",       required_argument, 0, 0 },  /*  68 */
-  {"ebg",                no_argument, 0, 0 },        /*  69 */
+  {"stopping-criterion", required_argument, 0, 0 },  /*  69 */
+  {"ebg",                no_argument, 0, 0 },        /*  70 */
 
   { 0, 0, 0, 0 }
 };
@@ -455,8 +454,11 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.spr_cutoff = 1.0;
 
   /* default: nni parameters */
-  opts.nni_tolerance = 1.0;
-  opts.nni_epsilon = 10;
+  opts.nni_tolerance = DEF_NNI_TOLERANCE;
+  opts.nni_epsilon = DEF_NNI_BR_LEN_EPSILON;
+
+  /* Stopping criteria */
+  opts.stopping_rule = StoppingRule::kh; // by default, we use the KH-multiple testing as a stopping rule
 
   /* default: SH parameters */
   opts.num_sh_reps = RAXML_SH_ALRT_REPS;
@@ -620,6 +622,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.use_tip_inner = false;
           opts.use_repeats = false;
           opts.use_pythia = false;
+          opts.stopping_rule = StoppingRule::none;
           use_adaptive_search = false;
         }
         else
@@ -1017,6 +1020,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_bs_pars = false;
               opts.use_par_pars = false;
               opts.use_pythia = false;
+              opts.stopping_rule = StoppingRule::none;
               opts.topology_opt_method = TopologyOptMethod::classic;
               if (!lh_epsilon_set)
                 opts.lh_epsilon = DEF_LH_EPSILON_V11;
@@ -1259,10 +1263,40 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.topology_opt_method = TopologyOptMethod::rapidBS;
         else if (strcasecmp(optarg, "nni-round") == 0 || strcasecmp(optarg, "nni") == 0)
           opts.topology_opt_method = TopologyOptMethod::nniRound;
+        else if (strcasecmp(optarg, "simplified") == 0 || strcasecmp(optarg, "sRAxML-NG") == 0){
+          opts.topology_opt_method = TopologyOptMethod::simplified;
+          opts.stopping_rule = StoppingRule::none;
+          opts.use_pythia = false;
+        } else if (strcasecmp(optarg, "fast") == 0) {
+          opts.topology_opt_method = TopologyOptMethod::fast;
+          opts.stopping_rule = StoppingRule::kh_mult;
+          opts.use_pythia = true;
+        } 
         else
           throw InvalidOptionValueException("Unknown topology optimization method: " + string(optarg));
         break;
-      case 69: /* ebg: use educated bootstrap guesser to estimate branch support */
+      case 69: /* Stopping criterion */
+        if (strcasecmp(optarg, "sn-rell") == 0) {
+          opts.stopping_rule = StoppingRule::sn_rell;
+        } else if (strcasecmp(optarg, "sn-normal") == 0) {
+          opts.stopping_rule = StoppingRule::sn_normal;
+        } else if (strcasecmp(optarg, "KH") == 0) {
+          opts.stopping_rule = StoppingRule::kh;
+        } else if (strcasecmp(optarg, "KH-mult") == 0) {
+          opts.stopping_rule = StoppingRule::kh_mult;
+        } else if (strcasecmp(optarg, "off") == 0) {
+          opts.stopping_rule = StoppingRule::none;
+        } else {
+          throw InvalidOptionValueException("Invalid stopping criterion: " + string(optarg) +
+                                            ", please provide one of the following options: \n" +
+                                            "- sn-rell : Sampling Noise RELL apporach\n" +
+                                            "- sn-normal : Sampling Noise Normal apporach\n" + 
+                                            "- KH : KH test\n" +
+                                            "- KH-mult : KH test with multiple correction\n"  +
+                                            "- off : To turn off stopping rules\n");
+        }
+        break;
+      case 70: /* ebg: use educated bootstrap guesser to estimate branch support */
         opts.command = Command::all;
         opts.bs_metrics.clear();
         opts.bs_metrics.insert(BranchSupportMetric::ebg);

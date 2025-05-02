@@ -56,6 +56,7 @@
 #include "topology/ConstraintTree.hpp"
 #include "util/EnergyMonitor.hpp"
 #include "adaptive/DifficultyPredictor.hpp"
+#include "adaptive/StoppingCriterion.hpp"
 
 #ifdef _RAXML_TERRAPHAST
 #include "terraces/TerraceWrapper.hpp"
@@ -134,6 +135,7 @@ struct RaxmlInstance
   doubleVector sh_support_values;
 
   shared_ptr<DifficultyPredictor> msa_diff_predictor;
+  StoppingCriterion * criterion; // pointer fors stopping criteria
 
   vector<RaxmlWorker> workers;
   RaxmlWorker& get_worker() { return workers.at(ParallelContext::local_group_id()); }
@@ -1258,12 +1260,19 @@ void autotune_start_trees(RaxmlInstance& instance)
   {
     if (opts.constraint_tree_file.empty() || !opts.use_old_constraint)
     {
-      int pars_trees = diff_pred->num_start_trees(difficulty, 7.0, 0.5, 0.25);
-
-      opts.start_trees[StartingTree::random] = difficulty >= 0.7 ? 0 :
-          diff_pred->num_start_trees(difficulty, 3.5, 0.5, 0.25);
-      opts.start_trees[StartingTree::parsimony] = difficulty >= 0.7 ? (int) (1.5 * pars_trees) : pars_trees;
-
+      //int pars_trees = diff_pred->num_start_trees(difficulty, 10.0, 0.5, 0.3);
+      if(opts.topology_opt_method == TopologyOptMethod::fast)
+      {
+        opts.start_trees[StartingTree::random] = 0;
+        opts.start_trees[StartingTree::parsimony] = 
+          diff_pred->num_start_trees(difficulty, 10.0, 0.5, 0.3) + 
+          diff_pred->num_start_trees(difficulty, 5.0, 0.5, 0.25);
+      }
+      else
+      {
+        opts.start_trees[StartingTree::random] = diff_pred->num_start_trees(difficulty, 5.0, 0.5, 0.25);
+        opts.start_trees[StartingTree::parsimony] = diff_pred->num_start_trees(difficulty, 10.0, 0.5, 0.3);
+      }
     }
     else
       opts.start_trees[StartingTree::random] = 2*diff_pred->num_start_trees(difficulty, 8.0, 0.5, 0.3);
@@ -3055,6 +3064,15 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
 
     auto log_level = instance.start_trees.size() > 1 ? LogLevel::result : LogLevel::info;
     Optimizer optimizer(opts);
+    
+    if(instance.criterion){
+      instance.criterion->initialize_persite_lnl_vectors(treeinfo.get());
+      instance.criterion->set_thread_offset(treeinfo.get(), part_assign, ParallelContext::local_proc_id());
+      optimizer.set_stopping_criterion(instance.criterion);
+    } else {
+      optimizer.disable_stopping_rule();
+    }
+
     if (opts.command == Command::evaluate || opts.command == Command::sitelh ||
         opts.command == Command::ancestral)
     { 
@@ -3543,11 +3561,82 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   init_persite_loglh(instance);
 
+  if(opts.stopping_rule != StoppingRule::none)
+  {    
+     /* Use Stopping rule only in the adaptive or the sRAxML-NG heuristcs */
+    if(opts.topology_opt_method != TopologyOptMethod::adaptive && 
+      opts.topology_opt_method != TopologyOptMethod::simplified &&
+      opts.topology_opt_method != TopologyOptMethod::fast) {
+      
+      LOG_INFO << "Stopping criteria are only used in adaptive/fast and sRAxML-NG heuristics. "
+                << "Hence disabled." << endl;
+      
+      instance.criterion = nullptr;
+    
+    } else {
+
+      switch (opts.stopping_rule)
+      {
+        case StoppingRule::sn_rell:
+          instance.criterion = 
+            new NoiseSampling(instance.parted_msa, 
+                              ParallelContext::num_groups(), 
+                              ParallelContext::num_threads(), 
+                              true, 
+                              opts.random_seed);
+          break;
+        
+        case StoppingRule::sn_normal:
+          instance.criterion = 
+            new NoiseSampling(instance.parted_msa, 
+                              ParallelContext::num_groups(), 
+                              ParallelContext::num_threads(), 
+                              false, 
+                              opts.random_seed);
+          break;
+
+        case StoppingRule::kh:
+          instance.criterion = 
+            new KH(instance.parted_msa, 
+                  ParallelContext::num_groups(), 
+                  ParallelContext::num_threads(), 
+                  false, 
+                  opts.random_seed,
+                  opts.lh_epsilon);
+          break;
+        
+        case StoppingRule::kh_mult:
+          instance.criterion = 
+            new KH(instance.parted_msa, 
+                  ParallelContext::num_groups(), 
+                  ParallelContext::num_threads(), 
+                  true, 
+                  opts.random_seed,
+                  opts.lh_epsilon);
+          break;
+        
+        default:
+          break;
+      }
+    }
+  } else {
+    /*
+     * Here, object opts is const, and I cannot set opts.stopping_rule = StoppingRule::none;
+     * The default stopping rule, which is StoppingRule::kh_mult is passed into the optimizer constructor.
+     * Hence, I double check whether (instance.criterion == nullptr) and disable stopping rules afterwards
+     * Search for: optimizer.disable_stopping_rule();
+     */
+    instance.criterion = nullptr;
+  }
+
   if (ParallelContext::master_rank())
     instance.opts.remove_result_files();
   
   // Main routines
   thread_main(instance, cm);
+
+  if(instance.criterion) 
+    delete instance.criterion;
 
   if (ParallelContext::master_rank())
   {

@@ -20,11 +20,14 @@ struct spr_round_params
   double lh_epsilon_brlen_full;
   double lh_epsilon_brlen_triplet;
 
-  void reset_cutoff_info(double loglh)
+  unsigned long int * total_moves;
+  unsigned long int * increasing_moves;
+
+  void reset_cutoff_info(double loglh,bool adaptive = false)
   {
     cutoff_info.lh_dec_count = 0;
     cutoff_info.lh_dec_sum = 0.;
-    cutoff_info.lh_cutoff = loglh / -1000.0;
+    cutoff_info.lh_cutoff = adaptive ? loglh / -100.0 : loglh / -1000.0;
   }
 };
 
@@ -103,6 +106,7 @@ private:
   bool _check_lh_impr;
   bool _use_old_constraint;
   bool _use_spr_fastclv;
+  double _lh_epsilon;
   doubleVector _partition_contributions;
 
   void init(const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
