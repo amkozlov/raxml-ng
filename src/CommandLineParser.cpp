@@ -92,7 +92,7 @@ static struct option long_options[] =
   {"sh-epsilon",         required_argument, 0, 0 },  /*  67 */
   {"opt-topology",       required_argument, 0, 0 },  /*  68 */
   {"stopping-criterion", required_argument, 0, 0 },  /*  69 */
-
+  {"fast",               no_argument,       0, 0 },  /*  70 */
   { 0, 0, 0, 0 }
 };
 
@@ -312,7 +312,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.nni_epsilon = DEF_NNI_BR_LEN_EPSILON;
 
   /* Stopping criteria */
-  opts.stopping_rule = StoppingRule::kh; // by default, we use the KH-multiple testing as a stopping rule
+  opts.stopping_rule = StoppingRule::kh; // by default, we use the KH-simple as a stopping rule
 
   /* default: SH parameters */
   opts.num_sh_reps = 1000;
@@ -528,6 +528,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
                                             string(optarg) +
                                             ", please provide a positive real number.");
         lh_epsilon_set = true;
+        opts.stopping_rule = StoppingRule::none;
         break;
 
       case 18: /* random seed */
@@ -1021,17 +1022,20 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         {
           use_adaptive_search = true;
           opts.use_pythia = true;
+          opts.stopping_rule = StoppingRule::kh;
         }
         else if (strcasecmp(optarg, "start") == 0)
         {
           use_adaptive_search = false;
           opts.use_pythia = true;
           optarg_tree = "adaptive";
+          opts.stopping_rule = StoppingRule::none;
         }
         else if (strcasecmp(optarg, "off") == 0)
         {
           use_adaptive_search = false;
           opts.use_pythia = false;
+          opts.stopping_rule = StoppingRule::none;
         }
         else
         {
@@ -1147,7 +1151,13 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
                                             "- off : To turn off stopping rules\n");
         }
         break;
-              
+      
+      /* --fast (shortcut): equivalent to --opt-topology fast */
+      case 70:
+        opts.topology_opt_method = TopologyOptMethod::fast;
+        opts.stopping_rule = StoppingRule::kh_mult;
+        opts.use_pythia = true;
+        break;
       default:
         throw  OptionException("Internal error in option parsing");
     }
