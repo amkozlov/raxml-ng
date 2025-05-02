@@ -16,6 +16,9 @@ PartitionedMSA& PartitionedMSA::operator=(PartitionedMSA&& other)
   _full_msa = std::move(other._full_msa);
   _taxon_names = std::move(other._taxon_names);
   _taxon_id_map = std::move(other._taxon_id_map);
+  _unassigned_sites = std::move(other._unassigned_sites);
+  _subst_linkage = std::move(other._subst_linkage);
+  _freqs_linkage = std::move(other._freqs_linkage);
    return *this;
 }
 
@@ -62,16 +65,14 @@ uintVector PartitionedMSA::get_site_part_assignment() const
     p++;
   }
 
+  assert(p == part_count());
+
   /* check if all sites were assigned to partitions */
-  MissingPartitionForSiteException e_unassinged;
   for (size_t i = 0; i < full_len; ++i)
   {
     if (!spa[i])
-      e_unassinged.add_unassigned_site(i+1);
+      _unassigned_sites.push_back(i+1);
   }
-
-  if (e_unassinged.count() > 0)
-    throw e_unassinged;
 
   return spa;
 }
@@ -245,10 +246,22 @@ size_t PartitionedMSA::total_patterns() const
 size_t PartitionedMSA::total_free_model_params() const
 {
   size_t sum = 0;
+  size_t i = 0;
 
   for (const auto& pinfo: _part_list)
   {
-    sum += pinfo.model().num_free_params();
+    /* Account for linked model parameters across partitions.
+     * NB: Linkage affects ML-estimated parameters only! */
+    int param_mask = CORAX_OPT_PARAM_ALL;
+    if (!_subst_linkage.empty() && _subst_linkage[i] != i &&
+        pinfo.model().param_mode(CORAX_OPT_PARAM_SUBST_RATES) == ParamValue::ML)
+      param_mask &= ~CORAX_OPT_PARAM_SUBST_RATES;
+    if (!_freqs_linkage.empty() && _freqs_linkage[i] != i &&
+        pinfo.model().param_mode(CORAX_OPT_PARAM_FREQUENCIES) == ParamValue::ML)
+      param_mask &= ~CORAX_OPT_PARAM_FREQUENCIES;
+
+    sum += pinfo.model().num_free_params(param_mask);
+    ++i;
   }
 
   return sum;
@@ -282,6 +295,16 @@ std::ostream& operator<<(std::ostream& stream, const PartitionedMSA& part_msa)
     const auto pstats = pinfo.stats();
     stream << "Partition " << p << ": " << pinfo.name() << endl;
     stream << "Model: " << pinfo.model().to_string() << endl;
+
+    auto subst_link = part_msa.subst_linkage().empty() ? p : part_msa.subst_linkage().at(p);
+    auto freqs_link = part_msa.freqs_linkage().empty() ? p : part_msa.freqs_linkage().at(p);
+    if (subst_link != p || freqs_link != p)
+    {
+      stream << "Linkage subst. rates / freqs: "
+             << (subst_link != p ? part_msa.part_info(subst_link).name() : "OFF") << " / "
+             << (freqs_link != p ? part_msa.part_info(freqs_link).name() : "OFF") << endl;
+    }
+
     if (pinfo.msa().num_patterns())
     {
       stream << "Alignment sites / patterns: " << pstats.site_count <<
@@ -309,13 +332,35 @@ void AutoPartitioner::init_from_string(PartitionedMSA& part_msa, DataType data_t
   if (pos2 != string::npos && pos < pos2) pos = string::npos;
   const string model_def = pos == string::npos ? model_string : model_string.substr(0, pos);
   const string part_def = pos == string::npos ? "" : model_string.substr(pos+1);
+  bool linked_subst = false;
+  bool linked_freqs = false;
 
   if (!part_def.empty())
   {
     /* automatic partitioning */
     istringstream ss(part_def);
-    if (toupper(ss.get()) != 'P')
-      throw runtime_error(string("Invalid auto-partition specification: ") + part_def);
+    switch (toupper(ss.get()))
+    {
+      case 'P':
+        /* classical partitioning - no linkage*/
+        linked_subst = linked_freqs = false;
+        break;
+      case 'C':
+      {
+        /* PSR-like model - full linkage for substitution matrices and freqs */
+        linked_subst = linked_freqs = true;
+        break;
+      }
+      case 'F':
+      {
+        /* linked substitution matrices, independent freqs */
+        linked_subst = true;
+        linked_freqs = false;
+        break;
+      }
+      default:
+        throw runtime_error(string("Invalid auto-partition specification: ") + part_def);
+    }
 
     size_t num_part = 4;
     if (isdigit(ss.peek()))
@@ -328,6 +373,13 @@ void AutoPartitioner::init_from_string(PartitionedMSA& part_msa, DataType data_t
     {
       part_msa.emplace_part_info(ap_name + std::to_string(i+1), data_type, model_def, "auto");
     }
+
+    /* configure model linkage */
+    uintVector full_linkage(part_msa.part_count(), 0);
+    if (linked_subst)
+      part_msa.subst_linkage(full_linkage);
+    if (linked_freqs)
+      part_msa.freqs_linkage(full_linkage);
   }
   else
     part_msa.emplace_part_info("noname", data_type, model_def);
@@ -339,7 +391,8 @@ void AutoPartitioner::update_partition_ranges(PartitionedMSA& part_msa)
 //  double binw = log2(mod.num_states())  / 4.;
   double maxe = column_entropies.empty() ? 0. :
                                           *std::max_element(column_entropies.cbegin(), column_entropies.cend());
-  double binw = maxe  / part_msa.part_count();
+  double binw = maxe  / part_msa.part_count() + 1e-9;
+//  printf("maxe : %lf, binw : %lf\n", maxe, binw);
 
   size_t p = 0;
   for (auto& pinfo: part_msa.part_list())
@@ -402,7 +455,7 @@ doubleVector AutoPartitioner::get_column_entropies(const PartitionedMSA& part_ms
 
 //  printf("Site entropy: ");
 //  for (size_t i = 0; i < full_len; ++i)
-//    printf("%.3f ", e[i]);
+//    if (i == 110) printf("%.3f ", e[i]);
 //  printf("\n\n");
 
   column_entropies.assign(e, e + full_len);

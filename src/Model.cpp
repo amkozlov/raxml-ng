@@ -1007,32 +1007,38 @@ int Model::params_to_optimize() const
   return params_to_optimize;
 }
 
-bool Model::param_estimated(int param) const
+bool Model::param_estimated(int param, int mask /* = CORAX_OPT_PARAM_ALL*/) const
 {
-  return (_param_mode.at(param) == ParamValue::ML) || (_param_mode.at(param) == ParamValue::empirical);
+  if (param & mask)
+    return (_param_mode.at(param) == ParamValue::ML) || (_param_mode.at(param) == ParamValue::empirical);
+  else
+    return false;
 }
 
-unsigned int Model::num_free_params() const
+unsigned int Model::num_free_params(int mask /*  = CORAX_OPT_PARAM_ALL */) const
 {
   unsigned int  free_params = 0;
 
-  if (param_estimated(CORAX_OPT_PARAM_FREQUENCIES))
+  if (param_estimated(CORAX_OPT_PARAM_FREQUENCIES, mask))
   {
     assert(num_submodels() == 1 || param_mode(CORAX_OPT_PARAM_FREQUENCIES) != ParamValue::ML);
     free_params += _num_states - 1;
   }
 
-  if (param_mode(CORAX_OPT_PARAM_SUBST_RATES) == ParamValue::empirical)
+  if (param_estimated(CORAX_OPT_PARAM_SUBST_RATES, mask))
   {
-    free_params += submodel(0).num_rates() - 1;
-  }
-  else if (param_mode(CORAX_OPT_PARAM_SUBST_RATES) == ParamValue::ML)
-  {
-    assert(num_submodels() == 1);
-    free_params += submodel(0).num_uniq_rates() - 1;
+   if (param_mode(CORAX_OPT_PARAM_SUBST_RATES) == ParamValue::empirical)
+   {
+     free_params += submodel(0).num_rates() - 1;
+   }
+   else if (param_mode(CORAX_OPT_PARAM_SUBST_RATES) == ParamValue::ML)
+   {
+     assert(num_submodels() == 1);
+     free_params += submodel(0).num_uniq_rates() - 1;
+   }
   }
 
-  if (param_estimated(CORAX_OPT_PARAM_PINV))
+  if (param_estimated(CORAX_OPT_PARAM_PINV, mask))
     free_params += 1;
 
   if (_num_ratecats > 1)
@@ -1040,13 +1046,13 @@ unsigned int Model::num_free_params() const
     switch(_rate_het)
     {
     case CORAX_UTIL_MIXTYPE_GAMMA:
-      if (param_estimated(CORAX_OPT_PARAM_ALPHA))
+      if (param_estimated(CORAX_OPT_PARAM_ALPHA, mask))
         free_params += 1;
       break;
     case CORAX_UTIL_MIXTYPE_FREE:
-      if (param_estimated(CORAX_OPT_PARAM_FREE_RATES))
+      if (param_estimated(CORAX_OPT_PARAM_FREE_RATES, mask))
         free_params += _num_ratecats - 1;
-      if (param_estimated(CORAX_OPT_PARAM_RATE_WEIGHTS))
+      if (param_estimated(CORAX_OPT_PARAM_RATE_WEIGHTS, mask))
         free_params += _num_ratecats - 1;
       break;
     }

@@ -42,9 +42,9 @@ void sysutil_fatal_libpll()
 void libpll_check_error(const std::string& errmsg, bool force)
 {
   if (corax_errno)
-    throw runtime_error(errmsg +  " (LIBPLL-" + to_string(corax_errno) + "): " + string(corax_errmsg));
+    throw runtime_error(errmsg +  " (CORAX-" + to_string(corax_errno) + "): " + string(corax_errmsg));
   else if (force)
-    throw runtime_error("Unknown LIBPLL error.");
+    throw runtime_error("Unknown CORAXLIB error.");
 }
 
 void libpll_reset_error()

@@ -86,6 +86,14 @@ bool ConsensusTree::compute_support()
     }
   }
 
+  // after calling corax_utree_split_consensus(), node->data contains
+  // non-owning pointers to a separate data structure which we do not need
+  // and which will be destroyed before return -> hence reset those pointers!
+  for (auto n: subnodes())
+  {
+    n->data = 0;
+  }
+
   corax_utree_split_system_destroy(split_system);
   corax_utree_consensus_destroy(cons_tree);
 

@@ -17,7 +17,8 @@ enum class StartingTree
   random,
   parsimony,
   user,
-  adaptive
+  adaptive,
+  consensus
 };
 
 enum class Command
@@ -103,8 +104,16 @@ enum class BranchSupportMetric
   fbp = 0,
   tbe,
   rbs,
-  sh_alrt
+  sh_alrt,
+  ebg,
+  ps,
+  pbs,
+  ic1,
+  ica
 };
+
+typedef std::set<BranchSupportMetric> SupportMetricSet;
+typedef std::map<BranchSupportMetric,unsigned int> SupportMetricMap;
 
 enum class InformationCriterion
 {

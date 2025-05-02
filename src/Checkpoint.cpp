@@ -462,7 +462,12 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, CheckpointFile& ckpfile
     for (size_t i = 0; i < num_ckp_in_file; ++i)
     {
       if (i < num_ckp_to_load)
+      {
         stream >> ckpfile.checkp_list[i];
+        // this worker is done with all trees assign to it -> reset search state
+        if (!ckpfile.checkp_list[i].tree_index)
+          ckpfile.checkp_list[i].reset_search_state();
+      }
       else
         stream >> dummy_ckp;
     }

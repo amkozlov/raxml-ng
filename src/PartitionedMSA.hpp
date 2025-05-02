@@ -25,6 +25,7 @@ public:
   std::vector<PartitionInfo>& part_list() { return _part_list; };
   const NameList& taxon_names()  const { return _taxon_names; };
   const NameIdMap& taxon_id_map() const { return _taxon_id_map; }
+  const IDVector& unassigned_sites()  const { return _unassigned_sites; };
 
   size_t full_msa_site(size_t index, size_t site) const;
   const uintVector& site_part_map() const;
@@ -41,6 +42,7 @@ public:
   /* given in elements (NOT in bytes) */
   size_t taxon_clv_size() const;
 
+
   // setters
   void full_msa(MSA&& msa);
   void part_msa(size_t index, MSA&& msa) { _part_list.at(index).msa(std::move(msa)); };
@@ -53,6 +55,12 @@ public:
 
   double difficulty_score() const { return _difficulty_score; }
   void difficulty_score(double score) { _difficulty_score = score; }
+
+  const uintVector& subst_linkage() const { return _subst_linkage; }
+  const uintVector& freqs_linkage() const { return _freqs_linkage; }
+
+  void subst_linkage(const uintVector& v) { _subst_linkage = v; }
+  void freqs_linkage(const uintVector& v) { _freqs_linkage = v; }
 
   // operations
   void init_single_model(DataType data_type, const std::string &model_string);
@@ -76,7 +84,10 @@ private:
   NameList _taxon_names;
   NameIdMap _taxon_id_map;
   mutable uintVector _site_part_map;
+  mutable IDVector _unassigned_sites;
   double _difficulty_score;
+  uintVector _subst_linkage;
+  uintVector _freqs_linkage;
 
   uintVector get_site_part_assignment() const;
   void set_taxon_names(const NameList& taxon_names);

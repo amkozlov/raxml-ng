@@ -81,7 +81,7 @@ void SupportTree::get_replicate_supports(const corax_unode_t& root,
 void SupportTree::add_replicate_tree(const Tree& tree)
 {
   if (tree.num_tips() != _num_tips)
-    throw runtime_error("Incompatible tree!");
+    throw runtime_error("SupportTree: Incompatible replicate tree!");
 
   _num_bs_trees++;
 
@@ -94,6 +94,23 @@ void SupportTree::add_replicate_tree(const Tree& tree)
 
   add_splits_to_hashtable(splits, support, _ref_splits_only);
 //  LOG_DEBUG_TS << "Added replicate trees: " << _num_bs_trees << endl;
+}
+
+void SupportTree::add_splits_from_support_tree(const SupportTree& other)
+{
+  if (other.num_tips() != _num_tips)
+    throw runtime_error("SupportTree: Incompatible replicate tree!");
+
+  /* copy splits from existing hashtable in other support tree */
+  auto splits_added = corax_utree_split_hashtable_insert_copy(_pll_splits_hash,
+                                                              other._pll_splits_hash);
+
+  libpll_check_error();
+
+  _num_bs_trees += other.num_bs_trees();
+
+  LOG_DEBUG_TS << "Added " << splits_added << " splits from "
+               << other.num_bs_trees() << " replicate trees." << endl;
 }
 
 void SupportTree::normalize_support_in_hashtable()

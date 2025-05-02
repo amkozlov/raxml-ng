@@ -334,7 +334,7 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
 
   /* These parameters are only used in adaptive version */
   const int radius_limit = (int) treeinfo.pll_treeinfo().tip_count - 3;
-  
+
   /* KH multiple testing criterion - init */
   unsigned long int total_moves = 0, increasing_moves = 0;
   spr_params.total_moves = (_stopping_rule == StoppingRule::kh_mult) ? &total_moves : nullptr;
@@ -569,10 +569,10 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
 
   bool repeat = true;
   int slow_spr_limit = min(2*slow_spr_radius, radius_limit);
+  double old_loglh_kh = 0;
   
   if (do_step(CheckpointStep::slowSPR))
   {
-    // NNI used only in fast mode
     if(iter == 0 && _topology_opt_method == TopologyOptMethod::fast)
       nni(treeinfo, nni_params, loglh);
 
@@ -580,13 +580,21 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
     {
       epsilon = _lh_epsilon;
 
-      cm.update_and_write(treeinfo);
+      if(_topology_opt_method == TopologyOptMethod::adaptive && use_kh_test)
+      {
+        if(spr_params.radius_min == 1)
+          cm.update_and_write(treeinfo);
+      }
+      else
+        cm.update_and_write(treeinfo);
+      
       ++iter;
       old_loglh = loglh;
 
-      if(use_kh_test)
+      if(use_kh_test && spr_params.radius_min == 1)
       {
         _criterion->compute_loglh(treeinfo, persite_lnl, true);
+        old_loglh_kh = loglh;
         
         if(spr_params.increasing_moves)
         {
@@ -618,13 +626,13 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
           double p_value = _criterion->get_pvalue(ParallelContext::group_id());
           epsilon = _criterion->get_epsilon(ParallelContext::group_id()); 
           LOG_DEBUG << "KH multiple-testing epsilon = " << epsilon << endl;
-          impr = ((loglh - old_loglh > epsilon) && (p_value < 1));
+          impr = ((loglh - old_loglh_kh > epsilon) && (p_value < 1));
 
         } else {
 
           epsilon = _criterion->get_epsilon(ParallelContext::group_id());
           LOG_DEBUG << "KH criterion epsilon = " << epsilon << endl;
-          impr = (loglh - old_loglh > epsilon);
+          impr = (loglh - old_loglh_kh > epsilon);
         }
       } else {
 

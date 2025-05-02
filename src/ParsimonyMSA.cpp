@@ -1,14 +1,25 @@
 #include "ParsimonyMSA.hpp"
 
-ParsimonyMSA::ParsimonyMSA (std::shared_ptr<PartitionedMSA> parted_msa, unsigned int attributes, bool compress_patterns)
+ParsimonyMSA::ParsimonyMSA(std::shared_ptr<PartitionedMSA> parted_msa, unsigned int attributes) :
+ParsimonyMSA(parted_msa, attributes, true, true, std::vector<WeightVector>())
 {
-  init_pars_msa(parted_msa, compress_patterns);
-  create_pll_partitions(attributes);
 }
 
-void ParsimonyMSA::init_pars_msa(std::shared_ptr<PartitionedMSA> orig_msa, bool compress_patterns)
+ParsimonyMSA::ParsimonyMSA (std::shared_ptr<PartitionedMSA> parted_msa, unsigned int attributes,
+                            bool compress_patterns, bool combine_partitions,
+                            const std::vector<WeightVector>& site_weights)
 {
-  if (orig_msa->part_count() == 1)
+  // TODO: check if there is any reason not to use tip-inner
+  attributes |= CORAX_ATTRIB_PATTERN_TIP;
+
+  init_pars_msa(parted_msa, compress_patterns, combine_partitions);
+  create_pll_partitions(attributes, site_weights);
+}
+
+void ParsimonyMSA::init_pars_msa(std::shared_ptr<PartitionedMSA> orig_msa,
+                                 bool compress_patterns, bool combine_partitions)
+{
+  if (orig_msa->part_count() == 1 || !combine_partitions)
   {
     _pars_msa = orig_msa;
     return;
@@ -91,14 +102,17 @@ void ParsimonyMSA::init_pars_msa(std::shared_ptr<PartitionedMSA> orig_msa, bool 
 
 }
 
-void ParsimonyMSA::create_pll_partitions(unsigned int attributes)
+void ParsimonyMSA::create_pll_partitions(unsigned int attributes,
+                                         const std::vector<WeightVector>& site_weights)
 {
   free_pll_partitions();
 
+  size_t p = 0;
   for (const auto& pinfo: _pars_msa->part_list())
   {
     const auto& model = pinfo.model();
     const auto& msa = pinfo.msa();
+    const auto& weights = site_weights.empty() ? msa.weights() : site_weights.at(p);
 
     auto partition = corax_partition_create(_pars_msa->taxon_count(),
                                              0,   /* number of CLVs */
@@ -111,8 +125,8 @@ void ParsimonyMSA::create_pll_partitions(unsigned int attributes)
                                              attributes);
 
     /* set pattern weights */
-    if (!msa.weights().empty())
-      corax_set_pattern_weights(partition, msa.weights().data());
+    if (!weights.empty())
+      corax_set_pattern_weights(partition, weights.data());
 
     /* set tip states */
     for (size_t j = 0; j < msa.size(); ++j)
@@ -121,6 +135,7 @@ void ParsimonyMSA::create_pll_partitions(unsigned int attributes)
     }
 
     _pll_partitions.push_back(partition);
+    ++p;
   }
   assert(_pll_partitions.size() == _pars_msa->part_count());
 }

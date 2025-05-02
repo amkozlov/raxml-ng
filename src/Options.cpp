@@ -4,6 +4,22 @@
 
 using namespace std;
 
+SupportMetricSet BS_METRICS_WITH_ML_TREES   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
+                                              BranchSupportMetric::tbe,
+                                              BranchSupportMetric::ic1, BranchSupportMetric::ica};
+
+SupportMetricSet BS_METRICS_WITH_PB_TREES   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
+                                              BranchSupportMetric::tbe, BranchSupportMetric::ebg,
+                                              BranchSupportMetric::pbs,
+                                              BranchSupportMetric::ic1, BranchSupportMetric::ica};
+
+SupportMetricSet BS_METRICS_WITH_PARS_TREES { BranchSupportMetric::ps };
+
+SupportMetricSet BS_METRICS_WITH_MSA_REPS   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
+                                              BranchSupportMetric::tbe, BranchSupportMetric::ebg,
+                                              BranchSupportMetric::pbs, BranchSupportMetric::sh_alrt,
+                                              BranchSupportMetric::ic1, BranchSupportMetric::ica };
+
 Options::Options() : opt_version(RAXML_OPT_VERSION), cmdline(""), command(Command::none),
 use_tip_inner(true), use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false),
 use_repeats(true), use_rba_partload(true), use_energy_monitor(true), use_old_constraint(false),
@@ -17,15 +33,46 @@ spr_radius(-1), spr_cutoff(1.0),
 brlen_linkage(CORAX_BRLEN_SCALED), brlen_opt_method(CORAX_OPT_BLO_NEWTON_FAST),
 brlen_min(RAXML_BRLEN_MIN), brlen_max(RAXML_BRLEN_MAX),
 num_searches(1), terrace_maxsize(100),
-num_bootstraps(1000), bootstop_criterion(BootstopCriterion::none), bootstop_cutoff(0.03),
+num_bootstraps(1000), bootstop_criterion(BootstopCriterion::none), bootstop_cutoff(RAXML_BOOTSTOP_CUTOFF),
 bootstop_interval(RAXML_BOOTSTOP_INTERVAL), bootstop_permutations(RAXML_BOOTSTOP_PERMUTES),
 tbe_naive(false), consense_cutoff(ConsenseCutoff::MR), tree_file(""), constraint_tree_file(""),
 msa_file(""), model_file(""), weights_file(""), outfile_prefix(""),
 num_threads(1), num_threads_max(1), num_ranks(1), num_workers(1), num_workers_max(UINT_MAX),
 simd_arch(CORAX_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(LoadBalancing::benoit),
 diff_pred_pars_trees(RAXML_CPYTHIA_TREES_NUM), nni_tolerance(1.0), nni_epsilon(10),
-num_sh_reps(1000), sh_epsilon(0.1)
+num_sh_reps(RAXML_SH_ALRT_REPS), sh_epsilon(RAXML_SH_ALRT_EPSILON)
 {}
+
+unsigned int Options::max_num_replicates(const SupportMetricSet& mset) const
+{
+  unsigned int num = 0;
+  for (auto& m: bs_replicate_counts)
+  {
+    if (mset.count(m.first))
+      num = std::max(num, m.second);
+  }
+  return num;
+}
+
+unsigned int Options::num_bootstrap_ml_trees() const
+{
+  return max_num_replicates(BS_METRICS_WITH_ML_TREES);
+}
+
+unsigned int Options::num_bootstrap_pars_trees() const
+{
+  return max_num_replicates(BS_METRICS_WITH_PB_TREES);
+}
+
+unsigned int Options::num_pars_trees() const
+{
+  return max_num_replicates(BS_METRICS_WITH_PARS_TREES);
+}
+
+unsigned int Options::num_bootstrap_msa_reps() const
+{
+  return max_num_replicates(BS_METRICS_WITH_MSA_REPS);
+}
 
 string Options::output_fname(const string& suffix) const
 {
@@ -56,7 +103,12 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.fbp_support_tree, "supportFBP");
   set_default_outfile(outfile_names.rbs_support_tree, "supportRBS");
   set_default_outfile(outfile_names.tbe_support_tree, "supportTBE");
+  set_default_outfile(outfile_names.ebg_support_tree, "supportEBG");
+  set_default_outfile(outfile_names.ps_support_tree, "supportPS");
+  set_default_outfile(outfile_names.pbs_support_tree, "supportPBS");
   set_default_outfile(outfile_names.sh_support_tree, "supportSH");
+  set_default_outfile(outfile_names.ic1_support_tree, "supportIC1");
+  set_default_outfile(outfile_names.ica_support_tree, "supportICA");
   set_default_outfile(outfile_names.terrace, "terrace");
   set_default_outfile(outfile_names.binary_msa, "rba");
   set_default_outfile(outfile_names.bootstrap_msa, "bootstrapMSA");
@@ -92,8 +144,18 @@ const std::string& Options::support_tree_file(BranchSupportMetric bsm) const
       return outfile_names.rbs_support_tree;
     else if (bsm == BranchSupportMetric::tbe)
       return outfile_names.tbe_support_tree;
+    else if (bsm == BranchSupportMetric::ebg)
+      return outfile_names.ebg_support_tree;
+    else if (bsm == BranchSupportMetric::ps)
+      return outfile_names.ps_support_tree;
+    else if (bsm == BranchSupportMetric::pbs)
+      return outfile_names.pbs_support_tree;
     else if (bsm == BranchSupportMetric::sh_alrt)
       return outfile_names.sh_support_tree;
+    else if (bsm == BranchSupportMetric::ic1)
+      return outfile_names.ic1_support_tree;
+    else if (bsm == BranchSupportMetric::ica)
+      return outfile_names.ica_support_tree;
     else
       return outfile_names.support_tree;
   }
@@ -214,7 +276,11 @@ string Options::simd_arch_name() const
   switch(simd_arch)
   {
     case CORAX_ATTRIB_ARCH_CPU:
-      return "NONE";
+#ifdef HAVE_AUTOVEC
+      return "NATIVE (autovec)";
+#else
+      return "NONE (scalar)";
+#endif
       break;
     case CORAX_ATTRIB_ARCH_SSE:
       return "SSE3";
@@ -364,8 +430,23 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
         case BranchSupportMetric::tbe:
           stream << "Transfer Bootstrap";
           break;
+        case BranchSupportMetric::ebg:
+          stream << "Educated Bootstrap Guesser";
+          break;
         case BranchSupportMetric::sh_alrt:
           stream << "SH-aLRT";
+          break;
+        case BranchSupportMetric::ps:
+          stream << "Parsimony Support";
+          break;
+        case BranchSupportMetric::pbs:
+          stream << "Parsimony Bootstrap";
+          break;
+        case BranchSupportMetric::ic1:
+          stream << "Internode Certainty";
+          break;
+        case BranchSupportMetric::ica:
+          stream << "Internode Certainty All";
           break;
       }
     }
@@ -399,6 +480,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
         break;
       case StartingTree::adaptive:
         stream << "adaptive";
+        break;
+      case StartingTree::consensus:
+        stream << "consensus (cutoff: " << opts.consense_cutoff << "%)";
         break;
     }
   }

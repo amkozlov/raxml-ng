@@ -28,6 +28,11 @@ RaxmlPartitionStream& operator>>(RaxmlPartitionStream& stream, PartitionInfo& pa
       case '\t':
         /* ignore whitespace */
         break;
+      case '#':
+        /* comment: ignore line */
+        while (stream.peek() != '\n' && stream.peek() != EOF)
+          stream.get();
+        break;
       case '\r':
         /* handle Windows line breaks (\r\n) */
         if (stream.peek() == '\n')

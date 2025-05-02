@@ -8,20 +8,6 @@
 #include <sstream>
 #include <stdexcept>
 
-
-extern "C" {
-//#include <libpll/pll.h>
-
- //#include <corax/corax.h>
-
-/* #include <libpll/pllmod_common.h>
-#include <libpll/pll_optimize.h>
-#include <libpll/pll_msa.h>
-#include <libpll/pll_tree.h>
-#include <libpll/pllmod_util.h>
-#include <libpll/pllmod_algorithm.h> */
-}
-
 #include <corax/corax.h>
 #include "types.hpp"
 #include "constants.hpp"
