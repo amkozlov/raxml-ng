@@ -41,7 +41,7 @@ private:
     static vector<size_t> rank_by_score(const EvaluationResults &results, InformationCriterion ic,
                                         unsigned int partition_idx);
 
-    static void print_xml(ostream &os, EvaluationResults &results, unsigned int partition_count);
+    static void print_xml(ostream &os, EvaluationResults &results);
 };
 
 

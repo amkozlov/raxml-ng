@@ -211,7 +211,7 @@ void ModelTest::optimize_model() {
         auto xml_fname = options.output_fname("modeltest.xml");
         fstream xml_stream(xml_fname, std::ios::out);
 
-        print_xml(xml_stream, execution_status.get_results(), msa.part_count());
+        print_xml(xml_stream, execution_status.get_results());
         xml_stream.close();
 
         LOG_DEBUG << "XML model selection file written to " << xml_fname << endl;
@@ -225,7 +225,7 @@ void ModelTest::optimize_model() {
         LOG_INFO << endl;
         auto results = execution_status.get_results();
         for (auto p = 0U; p < msa.part_count(); ++p) {
-            auto bic_ranking = rank_by_score(results, InformationCriterion::bic, p, msa.part_count());
+            auto bic_ranking = rank_by_score(results, InformationCriterion::bic, p);
             const auto &best_model = results.at(p).at(bic_ranking.at(0));
             LOG_INFO << "Partition #" << p << ": " << best_model.model.to_string() << " BIC = " << best_model.
                     ic_criteria.
@@ -275,7 +275,7 @@ vector<double> transform_delta_to_weight(const vector<double> &deltas) {
 }
 
 
-void ModelTest::print_xml(ostream &os, EvaluationResults &results, unsigned int partition_count) {
+void ModelTest::print_xml(ostream &os, EvaluationResults &results) {
     os << setprecision(17);
     os << "<modeltestresults>" << endl;
 
