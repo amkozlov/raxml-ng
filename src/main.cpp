@@ -3065,13 +3065,14 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
     auto log_level = instance.start_trees.size() > 1 ? LogLevel::result : LogLevel::info;
     Optimizer optimizer(opts);
     
-    if(instance.criterion){
+    if (instance.criterion)
+    {
       instance.criterion->initialize_persite_lnl_vectors(treeinfo.get());
       instance.criterion->set_thread_offset(treeinfo.get(), part_assign, ParallelContext::local_proc_id());
       optimizer.set_stopping_criterion(instance.criterion);
-    } else {
-      optimizer.disable_stopping_rule();
     }
+    else
+      optimizer.disable_stopping_rule();
 
     if (opts.command == Command::evaluate || opts.command == Command::sitelh ||
         opts.command == Command::ancestral)
@@ -3352,6 +3353,9 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
     }
 
     treeinfo->set_topology_constraint(instance.constraint_tree);
+
+    /* stopping rule not supported for bootstrapping (yet?) -> disable it */
+    optimizer.disable_stopping_rule();
 
     if (rapidbs)
       optimizer.optimize_topology_rbs(*treeinfo, cm);
