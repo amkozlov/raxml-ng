@@ -5,7 +5,7 @@
 #include "PartitionedMSA.hpp"
 #include "util/SafetyCheck.hpp"
 
-constexpr int RAXML_OPT_VERSION = 4;
+constexpr int RAXML_OPT_VERSION = 5;
 
 struct OutputFileNames
 {
@@ -153,6 +153,7 @@ public:
 
   std::string simd_arch_name() const;
   std::string consense_type_name() const;
+  std::string stopping_rule_name() const;
 
   std::string output_fname(const std::string& suffix) const;
 

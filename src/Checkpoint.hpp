@@ -6,8 +6,8 @@
 #include "io/binary_io.hpp"
 #include "adaptive/DifficultyPredictor.hpp"
 
-constexpr int RAXML_CKP_VERSION = 6;
-constexpr int RAXML_CKP_MIN_SUPPORTED_VERSION = 5;
+constexpr int RAXML_CKP_VERSION = 7;
+constexpr int RAXML_CKP_MIN_SUPPORTED_VERSION = 7;
 
 struct MLTree
 {

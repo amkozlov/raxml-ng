@@ -91,7 +91,7 @@ static struct option long_options[] =
   {"sh-reps",            required_argument, 0, 0 },  /*  66 */
   {"sh-epsilon",         required_argument, 0, 0 },  /*  67 */
   {"opt-topology",       required_argument, 0, 0 },  /*  68 */
-  {"stopping-criterion", required_argument, 0, 0 },  /*  69 */
+  {"stop-rule",          required_argument, 0, 0 },  /*  69 */
   {"ebg",                no_argument, 0, 0 },        /*  70 */
   {"fast",               no_argument,       0, 0 },  /*  71 */
 
@@ -1410,6 +1410,7 @@ void CommandLineParser::print_help()
             "\n"
             "Command shortcuts (mutually exclusive):\n"
             "  --search1                                  Alias for: --search --tree pars{1}\n"
+            "  --fast                                     Alias for: --search --opt-topology fast\n"
             "  --loglh                                    Alias for: --evaluate --opt-model off --opt-branches off --nofiles --log result\n"
             "  --rf                                       Alias for: --rfdist --nofiles --log result\n"
             "  --pt                                       Alias for: --pythia --nofiles --log result\n"
@@ -1460,12 +1461,14 @@ void CommandLineParser::print_help()
             "  --lh-epsilon   VALUE                       log-likelihood epsilon for optimization/tree search (default: 10)\n"
             "\n"
             "Topology search options:\n"
-            "  --opt-topology        classic | adaptive   Topology optimization method (default: adaptive)\n"
+            "  --opt-topology        classic | adaptive   topology optimization method (default: adaptive)\n"
             "                        nni | rbs | off      \n"
-            "  --adaptive            [ on | off | start ] Adaptive ML tree search (start = starting trees only)\n"
+            "  --adaptive            [ on | off | start ] adaptive ML tree search (start = starting trees only)\n"
             "  --spr-radius          VALUE                SPR re-insertion radius for fast iterations (default: AUTO)\n"
             "  --spr-cutoff          VALUE | off          relative LH cutoff for descending into subtrees (default: 1.0)\n"
             "  --lh-epsilon-triplet  VALUE                log-likelihood epsilon for branch length triplet optimization (default: 1000)\n"
+            "  --stop-rule           sn-rell | sn-nprmal  stopping criterion for SPR rounds (default: kh)\n"
+            "                        kh | kh-mult | off   \n"
             "\n"
             "Bootstrapping and branch support options:\n"
             "  --bs-trees     N | fbp{N1},sh{N2},...      number of bootstrap replicates N, can be global or per-metric (see below)\n"

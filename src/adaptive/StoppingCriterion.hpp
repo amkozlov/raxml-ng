@@ -97,12 +97,12 @@ class StoppingCriterion {
 };
 
 // implement the inheritance tomorrow
-class NoiseSampling : public StoppingCriterion {
+class NoiseSamplingTest : public StoppingCriterion {
     
     bool rell;
     
     public:
-        NoiseSampling(shared_ptr<PartitionedMSA> parted_msa, 
+        NoiseSamplingTest(shared_ptr<PartitionedMSA> parted_msa, 
                 int _n_groups, 
                 int _n_threads,
                 bool _rell = false,
@@ -113,13 +113,13 @@ class NoiseSampling : public StoppingCriterion {
         void run_test() override;
 };
 
-class KH : public StoppingCriterion {
+class KHStoppingTest : public StoppingCriterion {
 
     private:
         double lh_epsilon;
 
     public:
-        KH(shared_ptr<PartitionedMSA> parted_msa, 
+        KHStoppingTest(shared_ptr<PartitionedMSA> parted_msa, 
             int _n_groups, 
             int _n_threads, 
             bool _count_spr_moves = false,

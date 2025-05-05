@@ -24,10 +24,15 @@ Optimizer::~Optimizer ()
   corax_random_destroy(_rstate);
 }
 
-void Optimizer::disable_stopping_rule(){
+void Optimizer::set_stopping_criterion(std::shared_ptr<StoppingCriterion> sc)
+{
+  _stop_criterion = sc;
+}
 
+void Optimizer::disable_stopping_rule()
+{
   _stopping_rule = StoppingRule::none; 
-  _criterion = nullptr;
+  _stop_criterion.reset();
 }
 
 double Optimizer::optimize_model(TreeInfo& treeinfo, double lh_epsilon)
@@ -98,6 +103,7 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
       break;
     default:
       assert(0);
+      return -INFINITY;
   }
 }
 
@@ -346,13 +352,18 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
   nni_params.lh_epsilon = _nni_epsilon;
 
   double difficulty = cm.checkp_file().pythia_score;
+  bool adaptive_spr_cutoff = (_topology_opt_method == TopologyOptMethod::adaptive);
   bool use_kh_test = (_stopping_rule == StoppingRule::kh || _stopping_rule == StoppingRule::kh_mult);
   vector<double *> persite_lnl, persite_lnl_new;
 
-  if(_criterion){
-    persite_lnl = _criterion->get_persite_lnl(ParallelContext::group_id(), ParallelContext::local_thread_id()); 
+  /* if stopping rule is specified, _stop_criterion object must be initialized */
+  assert(_stop_criterion || (_stopping_rule == StoppingRule::none));
+
+  if (_stop_criterion)
+  {
+    persite_lnl = _stop_criterion->get_persite_lnl(ParallelContext::group_id(), ParallelContext::local_thread_id()); 
     if (use_kh_test) 
-      persite_lnl_new = _criterion->get_persite_lnl_new(ParallelContext::group_id(),  ParallelContext::local_thread_id()); 
+      persite_lnl_new = _stop_criterion->get_persite_lnl_new(ParallelContext::group_id(),  ParallelContext::local_thread_id()); 
   }
 
   CheckpointStep resume_step = search_state.step;
@@ -372,13 +383,17 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
       };
 
   /* Print statement about which stopping criterion is used */
-  string approach;
-  string heuristic = (_topology_opt_method == TopologyOptMethod:: adaptive) ?
-                      "Adaptive RAxML-NG" :
-                      "simplified RAxML-NG (sRAxML-NG)";
+  string heuristic, approach;
 
-  if(_stopping_rule != StoppingRule::none){
-    
+  if (_topology_opt_method == TopologyOptMethod::adaptive)
+    heuristic = "adaptive";
+  else if (_topology_opt_method == TopologyOptMethod::fast)
+    heuristic = "fasr";
+  else if (_topology_opt_method == TopologyOptMethod::simplified)
+    heuristic = "simplified";
+
+  if (_stopping_rule != StoppingRule::none)
+  {
     switch (_stopping_rule)
     {
       case StoppingRule::sn_rell:
@@ -401,14 +416,14 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
         break;
     }
     
-    LOG_PROGRESS(loglh) << heuristic << ": Stopping criterion: " << approach << " apporach." << endl;
+    LOG_PROGRESS(loglh) << "Heuristic: " << heuristic << ", stopping rule: " << approach << endl;
 
     /* This is for the SN-based apporaches, since in the KH-based methods the epsilon is recalculated */
     if(resume_step > CheckpointStep::modOpt1) _lh_epsilon = cm.get_epsilon();
-    
-  } else {
-
-    LOG_PROGRESS(loglh) << heuristic << ": Stopping criteria off, epsilon = "<< _lh_epsilon << endl;  
+  }
+  else
+  {
+    LOG_PROGRESS(loglh) << "Heuristic: " << heuristic << ", stopping rules: off, epsilon = "<< _lh_epsilon << endl;
   }
 
   if (do_step(CheckpointStep::brlenOpt))
@@ -425,21 +440,26 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
     LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << fast_modopt_eps << ")" << endl;
     loglh = optimize_model(treeinfo, fast_modopt_eps);
 
-    /* Set FAST SPR radius
-      sRAxML-NG: 10
-      adaptive: 3*
-      fast: 2*
-    */
-    fast_spr_radius = difficulty >= 0. ? 
-        min(3 * adaptive_radius(difficulty), 25) : 10;
-    
-    if(difficulty >= 0. && _topology_opt_method == TopologyOptMethod::fast)
-      fast_spr_radius = 2*adaptive_radius(difficulty);
-
-    // in case the user has specified their own values
-    if(_spr_radius > 0){
+    /* fixed user-specified SPR radius */
+    if(_spr_radius > 0)
+    {
       fast_spr_radius =_spr_radius;
       LOG_PROGRESS(loglh) << "User specified SPR radius for FAST/SLOW iterations: " << _spr_radius << endl;
+    }
+    else
+    {
+      /* Set auto-determined FAST SPR radius
+        sRAxML-NG: 10
+        adaptive:  3 x adaptive_radius
+        fast:      2 x adaptive_radius
+      */
+      if (difficulty >= 0. && _topology_opt_method != TopologyOptMethod::simplified)
+      {
+        int factor = _topology_opt_method == TopologyOptMethod::fast ? 2 : 3;
+        fast_spr_radius = min(factor * adaptive_radius(difficulty), 25);
+      }
+      else
+        fast_spr_radius = 10;
     }
 
     fast_spr_radius = min(fast_spr_radius, radius_limit);
@@ -451,22 +471,22 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
     spr_params.radius_max = fast_spr_radius;
     spr_params.ntopol_keep = _spr_ntopol_keep;
     spr_params.subtree_cutoff = _spr_cutoff;
-    spr_params.reset_cutoff_info(loglh, _topology_opt_method == TopologyOptMethod::adaptive);
+    spr_params.reset_cutoff_info(loglh, adaptive_spr_cutoff);
 
     /* If the selected stopping criterion is either SN-Normal or SN-RELL,
       we have to compute the _lh_epsilon here */
-    if(_stopping_rule == StoppingRule::sn_rell || _stopping_rule == StoppingRule::sn_normal){
-
-      _criterion->compute_loglh(treeinfo, persite_lnl, true);
+    if(_stopping_rule == StoppingRule::sn_rell || _stopping_rule == StoppingRule::sn_normal)
+    {
+      _stop_criterion->compute_loglh(treeinfo, persite_lnl, true);
       
       if(ParallelContext::group_master_thread()) 
-        _criterion->run_test();
+        _stop_criterion->run_test();
         
       ParallelContext::barrier();
 
-      _lh_epsilon = _criterion->get_epsilon(ParallelContext::group_id());
+      _lh_epsilon = _stop_criterion->get_epsilon(ParallelContext::group_id());
       //LOG_PROGRESS(loglh) << approach << " apporach. Epsilon = " << _lh_epsilon << endl;
-      LOG_DEBUG << approach << " apporach. Epsilon = " << _lh_epsilon << endl;
+      LOG_DEBUG << approach << " approach. Epsilon = " << _lh_epsilon << endl;
 
       if(ParallelContext::group_master_thread())
         cm.set_epsilon(_lh_epsilon);
@@ -475,21 +495,19 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
     }
   }
 
-  double old_loglh, epsilon;
+  double old_loglh;
   bool impr = true;
   
   if (do_step(CheckpointStep::fastSPR))
   {
     do
     { 
-      epsilon = _lh_epsilon ;
-      
       cm.update_and_write(treeinfo);
       ++iter;
 
       if(use_kh_test)
       {
-        _criterion->compute_loglh(treeinfo, persite_lnl, true);
+        _stop_criterion->compute_loglh(treeinfo, persite_lnl, true);
         
         if(spr_params.increasing_moves)
         {
@@ -507,35 +525,8 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
       /* optimize ALL branches */
       loglh = treeinfo.optimize_branches(br_len_epsilon, 1);
 
-      if(use_kh_test){
-        
-        _criterion->compute_loglh(treeinfo,persite_lnl_new, false);
-        
-        if(_criterion->multi_test_correction()) 
-          _criterion->set_increasing_moves((*spr_params.increasing_moves));
-
-        if(ParallelContext::group_master_thread())
-          _criterion->run_test();
-          
-        ParallelContext::barrier();
-
-        if(spr_params.increasing_moves){
-          
-          double p_value = _criterion->get_pvalue(ParallelContext::group_id());
-          epsilon = _criterion->get_epsilon(ParallelContext::group_id()); 
-          LOG_DEBUG << "KH multiple-testing epsilon = " << epsilon << endl;
-          impr = ((loglh - old_loglh > epsilon) && (p_value < 1));
-
-        } else {
-
-          epsilon = _criterion->get_epsilon(ParallelContext::group_id());
-          LOG_DEBUG << "KH criterion epsilon = " << epsilon << endl;
-          impr = (loglh - old_loglh > epsilon);
-        }
-      } else {
-
-        impr = (loglh - old_loglh > epsilon);
-      }
+      impr = check_impr(treeinfo, loglh, old_loglh, old_loglh,
+                        use_kh_test, persite_lnl_new, spr_params.increasing_moves);
     }
     while (impr);
   }
@@ -563,7 +554,7 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
     spr_params.thorough = 1;
     spr_params.radius_min = 1;
     spr_params.radius_max = slow_spr_radius;
-    spr_params.reset_cutoff_info(loglh, _topology_opt_method == TopologyOptMethod::adaptive);
+    spr_params.reset_cutoff_info(loglh, adaptive_spr_cutoff);
     iter = 0;
   }
 
@@ -578,8 +569,6 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
 
     do
     {
-      epsilon = _lh_epsilon;
-
       if(_topology_opt_method == TopologyOptMethod::adaptive && use_kh_test)
       {
         if(spr_params.radius_min == 1)
@@ -593,7 +582,7 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
 
       if(use_kh_test && spr_params.radius_min == 1)
       {
-        _criterion->compute_loglh(treeinfo, persite_lnl, true);
+        _stop_criterion->compute_loglh(treeinfo, persite_lnl, true);
         old_loglh_kh = loglh;
         
         if(spr_params.increasing_moves)
@@ -609,36 +598,8 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
       loglh = treeinfo.spr_round(spr_params);
       loglh = treeinfo.optimize_branches(br_len_epsilon, 1);
 
-      if(use_kh_test){
-        
-        _criterion->compute_loglh(treeinfo, persite_lnl_new, false);
-
-        if(_criterion->multi_test_correction()) 
-          _criterion->set_increasing_moves((*spr_params.increasing_moves));
-
-        if(ParallelContext::group_master_thread())
-          _criterion->run_test();
-          
-        ParallelContext::barrier();
-
-        if(spr_params.increasing_moves){
-          
-          double p_value = _criterion->get_pvalue(ParallelContext::group_id());
-          epsilon = _criterion->get_epsilon(ParallelContext::group_id()); 
-          LOG_DEBUG << "KH multiple-testing epsilon = " << epsilon << endl;
-          impr = ((loglh - old_loglh_kh > epsilon) && (p_value < 1));
-
-        } else {
-
-          epsilon = _criterion->get_epsilon(ParallelContext::group_id());
-          LOG_DEBUG << "KH criterion epsilon = " << epsilon << endl;
-          impr = (loglh - old_loglh_kh > epsilon);
-        }
-      } else {
-
-        impr = (loglh - old_loglh > epsilon);
-      
-      }
+      impr = check_impr(treeinfo, loglh, old_loglh, old_loglh_kh,
+                        use_kh_test, persite_lnl_new, spr_params.increasing_moves);
 
       if(_topology_opt_method == TopologyOptMethod::adaptive)
       {
@@ -654,9 +615,7 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
           spr_params.radius_max += slow_spr_radius;
           repeat = spr_params.radius_max <= slow_spr_limit ? true : false;
         }
-      }
-      else
-      {
+      } else {
         repeat = impr;
       }
     }
@@ -878,3 +837,42 @@ int Optimizer::adaptive_radius(double difficulty){
     return (int) ((-12.5)*difficulty + 17.5);
   }
 }
+
+bool Optimizer::check_impr(TreeInfo& treeinfo, double loglh, double old_loglh, double old_loglh_kh,
+                           bool use_kh_test, vector<double*> persite_lnl_new,
+                           unsigned long int * increasing_moves)
+{
+  bool impr = true;
+  double epsilon = _lh_epsilon;
+  if (use_kh_test)
+  {
+    _stop_criterion->compute_loglh(treeinfo, persite_lnl_new, false);
+
+    if(_stop_criterion->multi_test_correction())
+      _stop_criterion->set_increasing_moves((*increasing_moves));
+
+    if(ParallelContext::group_master_thread())
+      _stop_criterion->run_test();
+
+    ParallelContext::barrier();
+
+    if(increasing_moves)
+    {
+      double p_value = _stop_criterion->get_pvalue(ParallelContext::group_id());
+      epsilon = _stop_criterion->get_epsilon(ParallelContext::group_id());
+      LOG_DEBUG << "KH multiple-testing epsilon = " << epsilon << endl;
+      impr = ((loglh - old_loglh_kh > epsilon) && (p_value < 1));
+    }
+    else
+    {
+      epsilon = _stop_criterion->get_epsilon(ParallelContext::group_id());
+      LOG_DEBUG << "KH criterion epsilon = " << epsilon << endl;
+      impr = (loglh - old_loglh_kh > epsilon);
+    }
+  } else {
+    impr = (loglh - old_loglh > epsilon);
+  }
+
+  return impr;
+}
+

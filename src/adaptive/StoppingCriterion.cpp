@@ -367,7 +367,7 @@ std::pair<int, int> StoppingCriterion::find_by_site_index(unsigned int site_inde
 }
 
 // statistical tests
-void NoiseSampling::run_test() {
+void NoiseSamplingTest::run_test() {
 
     int group_id = ParallelContext::group_id();
     assert(count_spr_moves == false);
@@ -433,7 +433,7 @@ void NoiseSampling::run_test() {
 }
 
 
-void KH::run_test(){
+void KHStoppingTest::run_test(){
     
     int group_id = ParallelContext::group_id();
     double ret_val = 0, L = old_loglh[group_id], NL = new_loglh[group_id];

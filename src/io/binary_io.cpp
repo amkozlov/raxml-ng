@@ -459,6 +459,8 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Options& o)
 
   stream << o.bs_replicate_counts;
 
+  stream << o.stopping_rule;
+
   return stream;
 }
 
@@ -516,6 +518,9 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, Options& o)
 
   if (o.opt_version >= 4)
     stream >> o.bs_replicate_counts;
+
+  if (o.opt_version >= 5)
+    stream >> o.stopping_rule;
 
   return stream;
 }

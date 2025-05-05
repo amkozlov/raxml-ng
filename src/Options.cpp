@@ -25,7 +25,7 @@ use_tip_inner(true), use_pattern_compression(true), use_prob_msa(false), use_rat
 use_repeats(true), use_rba_partload(true), use_energy_monitor(true), use_old_constraint(false),
 use_spr_fastclv(true), use_bs_pars(true), use_par_pars(true), use_pythia(true),
 optimize_model(true), optimize_brlen(true), topology_opt_method(TopologyOptMethod::adaptive),
-force_mode(false), safety_checks(SafetyCheck::all),
+stopping_rule(StoppingRule::none), force_mode(false), safety_checks(SafetyCheck::all),
 redo_mode(false), nofiles_mode(false), write_interim_results(true), write_bs_msa(false),
 log_level(LogLevel::progress), msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
 random_seed(0), start_trees(), lh_epsilon(DEF_LH_EPSILON), lh_epsilon_brlen_triplet(DEF_LH_EPSILON_BRLEN_TRIPLET),
@@ -317,6 +317,26 @@ string Options::consense_type_name() const
   }
 }
 
+string Options::stopping_rule_name() const
+{
+  switch (stopping_rule)
+  {
+    case StoppingRule::none:
+      return  "OFF";
+    case StoppingRule::sn_rell:
+      return  "Sampling Noise RELL";
+    case StoppingRule::sn_normal:
+      return "Sampling Noise Normal";
+    case StoppingRule::kh:
+      return "KH";
+    case StoppingRule::kh_mult:
+      return "KH - multiple testing correction";
+    default:
+      assert(0);
+      return "UNKNOWN";
+  }
+}
+
 std::ostream& operator<<(std::ostream& stream, const Options& opts)
 {
   stream << "RAxML-NG was called at " << sysutil_fmt_time(global_timer().start_time())
@@ -558,6 +578,8 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     if (opts.command == Command::search ||  opts.command == Command::all ||
         opts.command == Command::bootstrap)
     {
+      stream << "  stopping rule: " << opts.stopping_rule_name() << endl;
+
       if (opts.spr_radius > 0)
         stream << "  fast spr radius: " << opts.spr_radius << endl;
       else

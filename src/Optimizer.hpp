@@ -26,7 +26,7 @@ public:
   double evaluate(TreeInfo& treeinfo, CheckpointManager& cm);
   void nni(TreeInfo& treeinfo, nni_round_params& nni_params, double& loglh);
 
-  void set_stopping_criterion(StoppingCriterion* sc) { _criterion = sc; } // have to fix this
+  void set_stopping_criterion(std::shared_ptr<StoppingCriterion> sc);
   void disable_stopping_rule();
 
 private:
@@ -44,10 +44,12 @@ private:
 
   // stoping criteria
   StoppingRule _stopping_rule;
-  StoppingCriterion *_criterion;
+  std::shared_ptr<StoppingCriterion> _stop_criterion;
 
   // functions for adaptive mode
   int adaptive_radius(double difficulty);
+  bool check_impr(TreeInfo& treeinfo, double loglh, double old_loglh, double old_loglh_kh,
+                  bool use_kh_test, vector<double*> persite_lnl_new, unsigned long int * increasing_moves);
 };
 
 #endif /* RAXML_OPTIMIZER_H_ */
