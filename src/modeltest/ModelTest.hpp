@@ -26,7 +26,7 @@ public:
     void optimize_model();
 
 private:
-    const Options &options;
+    Options options;
     PartitionedMSA &msa;
     const Tree &tree;
     const IDVector &tip_msa_idmap;

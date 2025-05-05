@@ -12,6 +12,8 @@ ModelTest::ModelTest(const Options &options, PartitionedMSA &msa, const Tree &tr
                      const PartitionAssignment &part_assign,
                      Optimizer &optimizer): options(options), msa(msa), tree(tree), tip_msa_idmap(tip_msa_idmap),
                                             part_assign(part_assign), optimizer(optimizer) {
+
+    this->options.lh_epsilon = 0.01; // Use same LH-epsilon as ModelTest-NG
 }
 
 
