@@ -103,6 +103,14 @@ void CheckpointManager::init_checkpoints(const Tree& tree, const ModelCRefMap& m
   for (auto& ckp: _checkp_file.checkp_list)
   {
     ckp.tree = tree;
+  }
+
+  update_models(models);
+}
+
+void CheckpointManager::update_models(const ModelCRefMap& models) {
+  for (auto& ckp: _checkp_file.checkp_list)
+  {
     for (auto& it: models)
       ckp.models[it.first] = it.second;
   }

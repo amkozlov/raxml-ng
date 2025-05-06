@@ -247,15 +247,16 @@ void init_part_info(RaxmlInstance &instance) {
     } catch (exception &e) {
       throw runtime_error("Failed to read partition file:\n" + string(e.what()));
     }
-  } else if (!opts.model_file.empty()) {
-    // create and init single pseudo-partition
-    parted_msa.init_single_model(opts.data_type, opts.model_file);
-  } else if (opts.command == Command::modeltest && (opts.data_type == DataType::dna || opts.data_type == DataType::protein)) {
+  } else if ((opts.model_file == "auto" || opts.command == Command::modeltest)) {
+    if (opts.data_type != DataType::dna && opts.data_type != DataType::protein) {
+        throw runtime_error("Specify the datatype for modeltesting with --data-type [AA|DNA]");
+    }
     // Use dummy model (will be overwritten by ModelTest)
     const string dummy_model = opts.data_type == DataType::dna ? "JC" : "DAYHOFF";
     parted_msa.init_single_model(opts.data_type, dummy_model);
-  } else if (opts.command == Command::modeltest) {
-    throw runtime_error("Specify the datatype for modeltesting with --data-type [AA|DNA]");
+  } else if (!opts.model_file.empty()) {
+    // create and init single pseudo-partition
+    parted_msa.init_single_model(opts.data_type, opts.model_file);
   } else {
     throw runtime_error("Please specify an evolutionary model with --model switch");
   }
@@ -3064,15 +3065,7 @@ void thread_main(RaxmlInstance &instance, CheckpointManager &cm) {
   auto const &opts = instance.opts;
   check_oversubscribe(instance);
 
-  if ((opts.command == Command::search || opts.command == Command::all ||
-       opts.command == Command::evaluate || opts.command == Command::sitelh ||
-       opts.command == Command::ancestral) &&
-      !instance.start_trees.empty()) {
-    thread_infer_ml(instance, cm);
-    ParallelContext::global_barrier();
-  }
-
-  if (opts.command == Command::modeltest) {
+  if (opts.model_file == "auto" || opts.command == Command::modeltest) {
     LOG_INFO << "Starting model test, #starting trees = " << instance.start_trees.size() << ", worker start trees = " <<
         instance.get_worker().start_trees.size() << endl;
 
@@ -3085,13 +3078,22 @@ void thread_main(RaxmlInstance &instance, CheckpointManager &cm) {
 
       auto const &part_assign = instance.proc_part_assign.at(ParallelContext::local_proc_id());
 
-      TreeInfo treeinfo(instance.opts, tree, master_msa, instance.tip_msa_idmap, part_assign);
-
       Optimizer optimizer(instance.opts);
       ModelTest modeltest(instance.opts, master_msa, tree, instance.tip_msa_idmap, part_assign, optimizer);
       modeltest.optimize_model();
+
+      cm.update_models(instance.parted_msa->models());
     }
   }
+
+  if ((opts.command == Command::search || opts.command == Command::all ||
+       opts.command == Command::evaluate || opts.command == Command::sitelh ||
+       opts.command == Command::ancestral) &&
+      !instance.start_trees.empty()) {
+    thread_infer_ml(instance, cm);
+    ParallelContext::global_barrier();
+  }
+
 
   ParallelContext::global_barrier();
 
@@ -3245,6 +3247,8 @@ void master_main(RaxmlInstance &instance, CheckpointManager &cm) {
 
   // Main routines
   thread_main(instance, cm);
+
+printf("Model name: %s\n", instance.parted_msa->model(0).name().c_str());
 
   if (ParallelContext::master_rank()) {
     instance.ml_tree = cm.checkp_file().best_tree();
@@ -3406,6 +3410,7 @@ int internal_main(int argc, char **argv, void *comm) {
       case Command::ancestral:
       {
         master_main(instance, cm);
+        printf("Model name: %s\n", instance.parted_msa->model(0).name().c_str());
         break;
       }
       case Command::support:

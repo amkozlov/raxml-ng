@@ -175,7 +175,7 @@ void ModelTest::optimize_model() {
                                                    ? std::to_string(num_rate_cats)
                                                    : "");
 
-            LOG_INFO << RAXML_LOG_TIMESTAMP << "partition " << partition_index + 1 << "/" << msa.part_count()
+            LOG_WORKER_TS(LogLevel::info) << "partition " << partition_index + 1 << "/" << msa.part_count()
                 << " model " << normalize_model_name(model_descriptor) << endl;
 
             Model model(model_descriptor);
@@ -237,6 +237,10 @@ void ModelTest::optimize_model() {
 
             bestmodel_stream << best_model.model.to_string(true, logger().precision(LogElement::model)) << ", " << msa.part_info(p).name() 
                 << " = " << msa.part_info(p).range_string() << endl;
+
+
+            // Set model in MSA without copying the optimized parameters
+            msa.model(p, Model(best_model.model.to_string(false)));
         }
 
     }
