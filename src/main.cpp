@@ -3078,11 +3078,17 @@ void thread_main(RaxmlInstance &instance, CheckpointManager &cm) {
 
       auto const &part_assign = instance.proc_part_assign.at(ParallelContext::local_proc_id());
 
-      Optimizer optimizer(instance.opts);
-      ModelTest modeltest(instance.opts, master_msa, tree, instance.tip_msa_idmap, part_assign, optimizer);
-      modeltest.optimize_model();
+      ModelTest modeltest(instance.opts, master_msa, tree, instance.tip_msa_idmap, part_assign);
 
-      cm.update_models(instance.parted_msa->models());
+      const auto optimal_models = modeltest.optimize_model();
+
+      if (ParallelContext::master()) {
+        for (unsigned p = 0; p < optimal_models.size(); ++p) {
+                master_msa.model(p, Model(optimal_models.at(p)));
+        }
+
+        cm.update_models(instance.parted_msa->models());
+      }
     }
   }
 
@@ -3248,7 +3254,6 @@ void master_main(RaxmlInstance &instance, CheckpointManager &cm) {
   // Main routines
   thread_main(instance, cm);
 
-printf("Model name: %s\n", instance.parted_msa->model(0).name().c_str());
 
   if (ParallelContext::master_rank()) {
     instance.ml_tree = cm.checkp_file().best_tree();

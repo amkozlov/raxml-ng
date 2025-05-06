@@ -8,13 +8,17 @@
 #include "RHASHeuristic.hpp"
 #include "corax/tree/treeinfo.h"
 
-ModelTest::ModelTest(const Options &options, PartitionedMSA &msa, const Tree &tree, const IDVector &tip_msa_idmap,
-                     const PartitionAssignment &part_assign,
-                     Optimizer &optimizer): options(options), msa(msa), tree(tree), tip_msa_idmap(tip_msa_idmap),
-                                            part_assign(part_assign), optimizer(optimizer) {
+Options modify_options(const Options &other) {
+    Options options(other);
+    options.lh_epsilon = 0.01; // Use same LH-epsilon as ModelTest-NG
 
-    this->options.lh_epsilon = 0.01; // Use same LH-epsilon as ModelTest-NG
+    return options;
 }
+
+ModelTest::ModelTest(const Options &original_options, const PartitionedMSA &msa, const Tree &tree, const IDVector &tip_msa_idmap,
+                     const PartitionAssignment &part_assign)
+    : options(modify_options(original_options)), optimizer(options), msa(msa), tree(tree),
+                                            tip_msa_idmap(tip_msa_idmap), part_assign(part_assign) { }
 
 
 vector<candidate_model_t> ModelTest::generate_candidate_model_names(const DataType &dt) const {
@@ -146,7 +150,7 @@ private:
 
 ExecutionStatus execution_status; // shared across all threads.
 
-void ModelTest::optimize_model() {
+vector<string> ModelTest::optimize_model() {
     const bool enable_rhas_heuristic = std::getenv("MODELTEST_RHAS_NOSKIP") == nullptr;
     const bool enable_freerate_heuristic = std::getenv("MODELTEST_FREERATE_NOSKIP") == nullptr;
 
@@ -209,6 +213,7 @@ void ModelTest::optimize_model() {
 
     ParallelContext::barrier();
 
+    vector<string> best_model_per_part;
     if (ParallelContext::master()) {
         auto xml_fname = options.output_fname("modeltest.xml");
         fstream xml_stream(xml_fname, std::ios::out);
@@ -233,17 +238,14 @@ void ModelTest::optimize_model() {
                     ic_criteria.
                     at(InformationCriterion::bic) << " LogLH = " << best_model.partition_loglh << endl;
 
-            msa.model(p, best_model.model);
-
             bestmodel_stream << best_model.model.to_string(true, logger().precision(LogElement::model)) << ", " << msa.part_info(p).name() 
                 << " = " << msa.part_info(p).range_string() << endl;
 
 
-            // Set model in MSA without copying the optimized parameters
-            msa.model(p, Model(best_model.model.to_string(false)));
+            best_model_per_part.emplace_back(best_model.model.to_string(false));
         }
-
     }
+    return best_model_per_part;
 }
 
 vector<size_t> ModelTest::rank_by_score(const EvaluationResults &results,
