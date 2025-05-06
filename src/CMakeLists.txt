@@ -9,7 +9,8 @@ file(GLOB RAXML_SOURCES ${PROJECT_SOURCE_DIR}/src/common.h
                         ${PROJECT_SOURCE_DIR}/src/autotune/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/loadbalance/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/topology/*.cpp
-                        ${PROJECT_SOURCE_DIR}/src/adaptive/*.cpp)
+                        ${PROJECT_SOURCE_DIR}/src/adaptive/*.cpp
+                        ${PROJECT_SOURCE_DIR}/src/modeltest/*.cpp)
 
 if(USE_TERRAPHAST)
   file (GLOB TERRACE_SOURCES ${PROJECT_SOURCE_DIR}/src/terraces/*.cpp)
@@ -108,6 +109,15 @@ else()
 endif()
 
 set_target_properties(raxml_module PROPERTIES PREFIX "")
+
+find_package(Git REQUIRED)
+execute_process(
+        COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        OUTPUT_VARIABLE RAXML_GIT_REVISION
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+target_compile_definitions(raxml_module PRIVATE RAXML_VERSION="${RAXML_GIT_REVISION}")
 
 # The binary will be copied to the old bin directory for backward compatibility.
 add_custom_command(TARGET raxml_module 

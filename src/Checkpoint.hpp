@@ -1,6 +1,7 @@
 #ifndef RAXML_CHECKPOINT_HPP_
 #define RAXML_CHECKPOINT_HPP_
 
+#include "Model.hpp"
 #include "common.h"
 #include "TreeInfo.hpp"
 #include "io/binary_io.hpp"
@@ -108,6 +109,12 @@ public:
   void pythia_score(double score) { _checkp_file.pythia_score = score; }
 
   void init_checkpoints(const Tree& tree, const ModelCRefMap& models);
+
+  /* Allow reinitialization of models after modeltesting routine has completed.
+     Necessary because the partition models might be different from the ones
+     passed during initialization (init_checkpoints)
+    */
+  void update_models(const ModelCRefMap& models);
 
   void enable() { _active = true; }
   void disable() { _active = false; }

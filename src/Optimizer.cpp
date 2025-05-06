@@ -46,6 +46,8 @@ double Optimizer::optimize_model(TreeInfo& treeinfo, double lh_epsilon)
   }
   while (new_loglh - cur_loglh > lh_epsilon);
 
+  LOG_DEBUG << "\t\teps iterations " << iter_num << endl;
+
   return new_loglh;
 }
 

@@ -1137,8 +1137,7 @@ void assign(Model& model, const corax_partition_t * partition)
 void assign(corax_partition_t * partition, const Model& model)
 {
   if (model.num_states() == partition->states &&
-      model.num_submodels() == partition->rate_matrices)
-  {
+      model.num_submodels() == partition->rate_matrices) {
     /* set rate categories & weights */
     corax_set_category_rates(partition, model.ratecat_rates().data());
     corax_set_category_weights(partition, model.ratecat_weights().data());
