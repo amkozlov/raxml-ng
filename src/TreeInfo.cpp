@@ -20,11 +20,98 @@ TreeInfo::TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA&
   init(opts, tree, parted_msa, tip_msa_idmap, part_assign, site_weights);
 }
 
-void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
-                    const IDVector& tip_msa_idmap,
-                    const PartitionAssignment& part_assign,
-                    const std::vector<uintVector>& site_weights)
+TreeInfo::TreeInfo(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
+                   const IDVector &tip_msa_idmap, const PartitionAssignment &part_assign,
+                   int partition_id, const Model &model)
 {
+  init(opts, tree, parted_msa, tip_msa_idmap, part_assign, std::vector<uintVector>(), partition_id, model);
+}
+
+// modeltest edition
+// TODO try to merge with regular init()
+void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
+                    const IDVector &tip_msa_idmap,
+                    const PartitionAssignment &part_assign,
+                    const std::vector<uintVector> &site_weights,
+                    int single_partition_id, const Model &model)
+{
+   // might be used later for fine-grained parallelization
+   RAXML_UNUSED(part_assign);
+
+  _brlen_min = opts.brlen_min;
+  _brlen_max = opts.brlen_max;
+  _brlen_opt_method = opts.brlen_opt_method;
+  _check_lh_impr = opts.safety_checks.isset(SafetyCheck::model_lh_impr);
+  _use_old_constraint = opts.use_old_constraint;
+  _use_spr_fastclv = opts.use_spr_fastclv;
+
+  size_t partition_count = 1;
+
+  _partition_contributions.resize(partition_count);
+  double total_weight = 0;
+
+  _pll_treeinfo = corax_treeinfo_create(corax_utree_graph_clone(&tree.pll_utree_root()),
+                                        tree.num_tips(),
+                                        partition_count, opts.brlen_linkage);
+
+  libpll_check_error("ERROR creating treeinfo structure");
+  assert(_pll_treeinfo);
+
+  if (false) {
+    corax_treeinfo_set_parallel_context(_pll_treeinfo, (void *) nullptr,
+                                        ParallelContext::parallel_reduce_cb);
+  }
+
+  // init partitions
+  int optimize_branches = opts.optimize_brlen ? CORAX_OPT_PARAM_BRANCHES_ITERATIVE : 0;
+
+  const PartitionInfo &pinfo = parted_msa.part_info(single_partition_id);
+  const auto &weights = site_weights.empty() ? pinfo.msa().weights() : site_weights.at(single_partition_id);
+
+  int params_to_optimize = opts.optimize_model ? model.params_to_optimize() : 0;
+  params_to_optimize |= optimize_branches;
+
+  _partition_contributions[0] = std::accumulate(weights.begin(), weights.end(), 0);
+  total_weight += _partition_contributions[0];
+
+  PartitionRange part_range(0, 0, parted_msa.part_info(single_partition_id).length(), model.clv_entry_size());
+  /* create and init PLL partition structure */
+  corax_partition_t *partition = create_pll_partition(opts, pinfo.msa(), model, tip_msa_idmap,
+                                                      part_range, weights);
+
+  int retval = corax_treeinfo_init_partition(_pll_treeinfo, 0, partition,
+                                             params_to_optimize,
+                                             model.gamma_mode(),
+                                             model.alpha(),
+                                             model.ratecat_submodels().data(),
+                                             model.submodel(0).rate_sym().data());
+
+  if (!retval) {
+    assert(corax_errno);
+    libpll_check_error("ERROR adding treeinfo partition");
+  }
+
+  // set per-partition branch lengths or scalers
+  if (opts.brlen_linkage == CORAX_BRLEN_SCALED) {
+    assert(_pll_treeinfo->brlen_scalers);
+    _pll_treeinfo->brlen_scalers[0] = model.brlen_scaler();
+  } else if (opts.brlen_linkage == CORAX_BRLEN_UNLINKED && !tree.partition_brlens().empty()) {
+    assert(_pll_treeinfo->branch_lengths[0]);
+    memcpy(_pll_treeinfo->branch_lengths[0], tree.partition_brlens(single_partition_id).data(),
+           tree.num_branches() * sizeof(double));
+  }
+
+  _parts_master.insert(0);
+
+  // finalize partition contribution computation
+  for (auto &c: _partition_contributions)
+    c /= total_weight;
+}
+
+void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
+                    const IDVector &tip_msa_idmap,
+                    const PartitionAssignment &part_assign,
+                    const std::vector<uintVector> &site_weights) {
   _brlen_min = opts.brlen_min;
   _brlen_max = opts.brlen_max;
   _brlen_opt_method = opts.brlen_opt_method;
@@ -63,8 +150,8 @@ void TreeInfo::init(const Options &opts, const Tree& tree, const PartitionedMSA&
     if (part_range != part_assign.end())
     {
       /* create and init PLL partition structure */
-      corax_partition_t * partition = create_pll_partition(opts, pinfo, tip_msa_idmap,
-                                                         *part_range, weights);
+      corax_partition_t *partition = create_pll_partition(opts, pinfo.msa(), pinfo.model(),
+                                                          tip_msa_idmap, *part_range, weights);
 
       int retval = corax_treeinfo_init_partition(_pll_treeinfo, p, partition,
                                                   params_to_optimize,
@@ -669,12 +756,9 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
   corax_set_pattern_weights(partition, comp_weights.data());
 }
 
-corax_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& pinfo,
-                                      const IDVector& tip_msa_idmap,
-                                      const PartitionRange& part_region, const uintVector& weights)
-{
-  const MSA& msa = pinfo.msa();
-  const Model& model = pinfo.model();
+corax_partition_t *create_pll_partition(const Options &opts, const MSA &msa, const Model &model,
+                                        const IDVector &tip_msa_idmap,
+                                        const PartitionRange &part_region, const uintVector &weights) {
   const auto pstart = msa.get_local_offset(part_region.start);
 
 //  printf("\n\n rank %lu, GLOBAL OFFSET %lu, LOCAL OFFSET %lu \n\n", ParallelContext::proc_id(), part_region.start, pstart);

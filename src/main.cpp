@@ -57,6 +57,7 @@
 #include "util/EnergyMonitor.hpp"
 #include "adaptive/DifficultyPredictor.hpp"
 #include "adaptive/StoppingCriterion.hpp"
+#include "modeltest/ModelTest.hpp"
 
 #ifdef _RAXML_TERRAPHAST
 #include "terraces/TerraceWrapper.hpp"
@@ -173,7 +174,7 @@ void print_banner()
   LOG_INFO << "Developed by: Oleksiy M. Kozlov and Alexandros Stamatakis." << endl;
   LOG_INFO << "Contributors: Diego Darriba, Tomas Flouri, Benoit Morel, "
               "Sarah Lutteropp, Ben Bettisworth," << endl <<
-              "              Julia Haag, Anastasis Togkousidis, Julius Wiegert." << endl;
+              "              Julia Haag, Anastasis Togkousidis, Julius Wiegert, Christoph Stelz." << endl;
   LOG_INFO << "Latest version: https://github.com/amkozlov/raxml-ng" << endl;
   LOG_INFO << "Questions/problems/suggestions? "
               "Please visit: https://groups.google.com/forum/#!forum/raxml" << endl << endl;
@@ -260,6 +261,16 @@ void init_part_info(RaxmlInstance& instance)
     {
       throw runtime_error("Failed to read partition file:\n" + string(e.what()));
     }
+  }
+  else if ((opts.model_file == "auto" || opts.command == Command::modeltest))
+  {
+    if (opts.data_type != DataType::dna && opts.data_type != DataType::protein)
+    {
+      throw runtime_error("Specify the datatype for modeltesting with --data-type [AA|DNA]");
+    }
+    // Use dummy model (will be overwritten by ModelTest)
+    const string dummy_model = opts.data_type == DataType::dna ? "GTR+G" : "DAYHOFF+G";
+    parted_msa.init_single_model(opts.data_type, dummy_model);
   }
   else if (!opts.model_file.empty())
   {
@@ -3458,6 +3469,39 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
     gather_bs_trees(bs_batch_start, bs_batch_end);
 }
 
+void thread_infer_model(RaxmlInstance& instance, CheckpointManager& cm)
+{
+//  LOG_INFO << "Starting model test, #starting trees = " << instance.start_trees.size()
+//           << ", worker start trees = " << instance.get_worker().start_trees.size() << endl;
+
+  if (instance.start_trees.empty() && instance.pars_trees.empty()) {
+    LOG_ERROR << "Please specify a tree to use for model testing" << endl;
+  } else {
+    auto &master_msa = *instance.parted_msa;
+    bool user_tree = instance.opts.start_trees.count(StartingTree::user) || instance.pars_trees.empty();
+
+    LOG_INFO << "\nStarting ModelTest with " << (user_tree ? "user" : "parsimony") <<
+        " starting tree" << endl << endl;
+
+    // for now, use parsimony tree unless user tree is explicitly provided
+    auto tree = user_tree ? instance.start_trees.at(0) : instance.pars_trees.at(0);
+
+    auto const &part_assign = instance.proc_part_assign.at(ParallelContext::local_proc_id());
+
+    ModelTest modeltest(instance.opts, master_msa, tree, instance.tip_msa_idmap, part_assign);
+
+    const auto optimal_models = modeltest.optimize_model();
+
+    if (ParallelContext::master())
+    {
+      for (unsigned p = 0; p < optimal_models.size(); ++p) {
+        master_msa.model(p, Model(optimal_models.at(p)));
+      }
+
+      cm.update_models(instance.parted_msa->models());
+    }
+  }
+}
 
 void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 {
@@ -3467,6 +3511,12 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   auto const& opts = instance.opts;
   check_oversubscribe(instance);
+
+  if (opts.model_file == "auto" || opts.command == Command::modeltest)
+  {
+    thread_infer_model(instance, cm);
+    ParallelContext::global_barrier();
+  }
 
   if ((opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate || opts.command == Command::sitelh ||
@@ -3821,6 +3871,7 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::bootstrap:
       case Command::all:
       case Command::ancestral:
+      case Command::modeltest:
       {
         master_main(instance, cm);
         break;

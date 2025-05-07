@@ -56,9 +56,17 @@ class TreeInfo
 public:
   TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
             const IDVector& tip_msa_idmap, const PartitionAssignment& part_assign);
+
+  /* with custom site weights, e.g. for bootstrapping */
   TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
             const IDVector& tip_msa_idmap, const PartitionAssignment& part_assign,
             const std::vector<uintVector>& site_weights);
+
+  /* with single partition only, for modeltesting */
+  TreeInfo(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
+           const IDVector &tip_msa_idmap, const PartitionAssignment &part_assign,
+           int partition_id, const Model &model);
+
   virtual
   ~TreeInfo ();
 
@@ -113,6 +121,10 @@ private:
             const IDVector& tip_msa_idmap, const PartitionAssignment& part_assign,
             const std::vector<uintVector>& site_weights);
 
+  void init(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
+            const IDVector &tip_msa_idmap, const PartitionAssignment &part_assign,
+            const std::vector<uintVector> &site_weights, int single_partition_id, const Model &model);
+
   void assert_lh_improvement(double old_lh, double new_lh, const std::string& where = "");
 };
 
@@ -121,8 +133,8 @@ void assign(Model& model, const TreeInfo& treeinfo, size_t partition_id);
 void assign_models(TreeInfo& treeinfo, const ModelMap& models);
 
 
-corax_partition_t* create_pll_partition(const Options& opts, const PartitionInfo& pinfo,
-                                      const IDVector& tip_msa_idmap,
-                                      const PartitionRange& part_region, const uintVector& weights);
+corax_partition_t *create_pll_partition(const Options &opts, const MSA &msa, const Model &model,
+                                        const IDVector &tip_msa_idmap,
+                                        const PartitionRange &part_region, const uintVector &weights);
 
 #endif /* RAXML_TREEINFO_HPP_ */

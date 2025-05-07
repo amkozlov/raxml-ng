@@ -41,7 +41,8 @@ enum class Command
   consense,
   ancestral,
   sitelh,
-  pythia
+  pythia,
+  modeltest
 };
 
 enum class FileFormat

@@ -110,6 +110,18 @@ void CheckpointManager::init_checkpoints(const Tree& tree, const ModelCRefMap& m
 
   for (auto& it: models)
     _checkp_file.best_models[it.first] = it.second;
+
+  // TODO: do we need this?
+//  update_models(models);
+}
+
+void CheckpointManager::update_models(const ModelCRefMap& models)
+{
+  for (auto& ckp: _checkp_file.checkp_list)
+  {
+    for (auto& it: models)
+      ckp.models[it.first] = it.second;
+  }
 }
 
 void CheckpointManager::write(const std::string& ckp_fname) const

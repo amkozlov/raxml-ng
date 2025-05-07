@@ -92,8 +92,9 @@ static struct option long_options[] =
   {"sh-epsilon",         required_argument, 0, 0 },  /*  67 */
   {"opt-topology",       required_argument, 0, 0 },  /*  68 */
   {"stop-rule",          required_argument, 0, 0 },  /*  69 */
-  {"ebg",                no_argument, 0, 0 },        /*  70 */
+  {"ebg",                no_argument,       0, 0 },  /*  70 */
   {"fast",               no_argument,       0, 0 },  /*  71 */
+  {"modeltest",          no_argument,       0, 0 },  /*  72 */
 
   { 0, 0, 0, 0 }
 };
@@ -113,7 +114,7 @@ void CommandLineParser::check_options(Options &opts)
       opts.command == Command::bootstrap || opts.command == Command::all ||
       opts.command == Command::terrace || opts.command == Command::check ||
       opts.command == Command::parse || opts.command == Command::start ||
-      opts.command == Command::ancestral)
+      opts.command == Command::ancestral || opts.command == Command::modeltest)
   {
     if (opts.msa_file.empty())
       throw OptionException("You must specify a multiple alignment file with --msa switch");
@@ -215,13 +216,20 @@ void CommandLineParser::check_options(Options &opts)
                             "it is supported, please use --force option to disable this check.");
     }
   }
+
+  if (opts.num_workers > 1 && opts.command == Command::modeltest)
+  {
+    throw OptionException("Model testing currently does not work with parallel tree searches."
+        "Please use only a single worker.");
+  }
 }
 
 void CommandLineParser::compute_num_searches(Options &opts)
 {
   if (opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate || opts.command == Command::start ||
-      opts.command == Command::ancestral || opts.command == Command::sitelh)
+      opts.command == Command::ancestral || opts.command == Command::sitelh ||
+      opts.command == Command::modeltest)
   {
     assert(!opts.start_trees.empty());
 
@@ -1316,6 +1324,12 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.topology_opt_method = TopologyOptMethod::fast;
         opts.stopping_rule = StoppingRule::kh_mult;
         opts.use_pythia = true;
+        break;
+      case 72: /* model test */
+        opts.command = Command::modeltest;
+        if (optarg_tree.empty())
+          optarg_tree = "pars{1}";
+        num_commands++;
         break;
       default:
         throw  OptionException("Internal error in option parsing");

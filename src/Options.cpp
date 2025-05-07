@@ -395,6 +395,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     case Command::pythia:
       stream << "Phylogenetic difficulty prediction";
       break;
+    case Command::modeltest:
+      stream << "Model selection";
+      break;
     default:
       break;
   }

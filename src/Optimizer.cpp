@@ -388,7 +388,7 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
   if (_topology_opt_method == TopologyOptMethod::adaptive)
     heuristic = "adaptive";
   else if (_topology_opt_method == TopologyOptMethod::fast)
-    heuristic = "fasr";
+    heuristic = "fast";
   else if (_topology_opt_method == TopologyOptMethod::simplified)
     heuristic = "simplified";
 
