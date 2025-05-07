@@ -262,15 +262,20 @@ void init_part_info(RaxmlInstance& instance)
       throw runtime_error("Failed to read partition file:\n" + string(e.what()));
     }
   }
-  else if ((opts.model_file == "auto" || opts.command == Command::modeltest))
+  else if (opts.command == Command::modeltest ||
+           opts.model_file == "auto" || opts.model_file == "AUTO" ||
+           opts.model_file == "DNA"  || opts.model_file == "AA")
   {
-    if (opts.data_type != DataType::dna && opts.data_type != DataType::protein)
-    {
-      throw runtime_error("Specify the datatype for modeltesting with --data-type [AA|DNA]");
-    }
     // Use dummy model (will be overwritten by ModelTest)
-    const string dummy_model = opts.data_type == DataType::dna ? "GTR+G" : "DAYHOFF+G";
+    string dummy_model = "";
+    if (opts.data_type == DataType::dna || opts.model_file == "DNA")
+      dummy_model = "GTR+G";
+    else if (opts.data_type == DataType::protein || opts.model_file == "AA")
+      dummy_model = "LG+G";
+    else
+      throw runtime_error("Specify the datatype for modeltesting with --data-type [AA|DNA]");
     parted_msa.init_single_model(opts.data_type, dummy_model);
+    opts.model_file = "auto";
   }
   else if (!opts.model_file.empty())
   {
