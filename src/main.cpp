@@ -3486,6 +3486,7 @@ void thread_infer_model(RaxmlInstance& instance, CheckpointManager& cm)
     // for now, use parsimony tree unless user tree is explicitly provided
     auto tree = user_tree ? instance.start_trees.at(0) : instance.pars_trees.at(0);
 
+    // part_assign currently not used, since partitions assigned to threads dynamically in ModelTest
     auto const &part_assign = instance.proc_part_assign.at(ParallelContext::local_proc_id());
 
     ModelTest modeltest(instance.opts, master_msa, tree, instance.tip_msa_idmap, part_assign);

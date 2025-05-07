@@ -32,6 +32,8 @@ vector<candidate_model_t> ModelTest::generate_candidate_model_names(const DataTy
 
     const auto freerate_cmin = 0;
     const auto freerate_cmax = 0;
+//    const auto freerate_cmin = 2;
+//    const auto freerate_cmax = 6;
 
     for (const auto &subst_model: matrix_names) {
         for (const auto &frequency_type: default_frequency_type) {
@@ -90,6 +92,17 @@ public:
         }
     }
 
+    void print_results(int partition_index, PartitionModelEvaluation &result) {
+        std::lock_guard<std::mutex> lock(mutex_log);
+
+        const auto bic_score = result.ic_criteria.at(InformationCriterion::bic);
+        LOG_WORKER_TS(LogLevel::info) << "Partition #" << partition_index << ": model = "
+                                      << std::setfill(' ') << std::left << setw(20) << result.model.to_string()
+                                      << "  LogLH = " << std::right << setw(15) << FMT_LH(result.partition_loglh)
+                                      << "  BIC = "   << std::right << setw(15) << FMT_LH(bic_score)
+                                      << endl;
+    }
+
     bool get_next_model(size_t &next_partition_index, candidate_model_t **next_candidate_model) {
         if (partition_count < 1 || model_count < 1) {
             throw std::logic_error("attempted to get next model before initialization");
@@ -131,6 +144,7 @@ private:
     size_t model_index, model_count;
     std::mutex mutex_model_index;
     std::mutex mutex_results;
+    std::mutex mutex_log;
 
     bool use_rhas_heuristic;
     std::vector<RHASHeuristic> rhas_heuristic_per_part;
@@ -167,7 +181,9 @@ vector<string> ModelTest::optimize_model() {
         execution_status.initialize(candidate_models, msa.part_count(), enable_rhas_heuristic);
     }
 
-    ParallelContext::barrier();
+    // sync ALL threads across ALL workers
+    // TODO: MPI
+    ParallelContext::global_thread_barrier();
 
     size_t partition_index;
     candidate_model_t *candidate_model;
@@ -183,8 +199,8 @@ vector<string> ModelTest::optimize_model() {
                                                    ? std::to_string(num_rate_cats)
                                                    : "");
 
-            LOG_WORKER_TS(LogLevel::info) << "partition " << partition_index + 1 << "/" << msa.part_count()
-                << " model " << normalize_model_name(model_descriptor) << endl;
+//            LOG_WORKER_TS(LogLevel::info) << "partition " << partition_index + 1 << "/" << msa.part_count()
+//                << " model " << normalize_model_name(model_descriptor) << endl;
 
             Model model(model_descriptor);
             assign(model, msa.part_info(partition_index).stats());
@@ -205,6 +221,7 @@ vector<string> ModelTest::optimize_model() {
 
             const double new_score = partition_results.ic_criteria.at(InformationCriterion::bic);
             execution_status.store_results(partition_index, *candidate_model, partition_results);
+            execution_status.print_results(partition_index, partition_results);
 
             if (candidate_model->rate_heterogeneity == rate_heterogeneity_t::FREE_RATE && enable_freerate_heuristic &&
                 new_score >= last_score) {
@@ -215,7 +232,9 @@ vector<string> ModelTest::optimize_model() {
         }
     }
 
-    ParallelContext::barrier();
+    // sync ALL threads across ALL workers
+    // TODO: MPI
+    ParallelContext::global_thread_barrier();
 
     vector<string> best_model_per_part;
     if (ParallelContext::master()) {
@@ -233,14 +252,15 @@ vector<string> ModelTest::optimize_model() {
         auto bestmodel_fname = options.output_fname("modeltest.bestModel");
         fstream bestmodel_stream(bestmodel_fname, std::ios::out);
 
-        LOG_INFO << endl;
+        LOG_INFO << endl << "Best model(s):" << endl;
         auto results = execution_status.get_results();
         for (auto p = 0U; p < msa.part_count(); ++p) {
             auto bic_ranking = rank_by_score(results, InformationCriterion::bic, p);
             const auto &best_model = results.at(p).at(bic_ranking.at(0));
-            LOG_INFO << "Partition #" << p << ": " << best_model.model.to_string() << " (BIC = "
-                     << FMT_LH(best_model.ic_criteria.at(InformationCriterion::bic))
-                     << " LogLH = " << FMT_LH(best_model.partition_loglh) << ")" << endl;
+            LOG_INFO << "Partition #" << p << ": " << best_model.model.to_string()
+                     << " (LogLH = " << FMT_LH(best_model.partition_loglh)
+                     << "  BIC = "  << FMT_LH(best_model.ic_criteria.at(InformationCriterion::bic))
+                     << ")" << endl;
 
             bestmodel_stream << best_model.model.to_string(true, logger().precision(LogElement::model)) << ", " << msa.part_info(p).name() 
                 << " = " << msa.part_info(p).range_string() << endl;
