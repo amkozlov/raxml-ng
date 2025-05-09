@@ -902,13 +902,22 @@ void check_options_early(Options& opts)
   }
 
   /* autodetect if we can use partial RBA loading */
-  opts.use_rba_partload &= (opts.num_ranks > 1 && !opts.coarse());                // only useful for fine-grain MPI runs
-  opts.use_rba_partload &= (!opts.start_trees.count(StartingTree::parsimony));    // does not work with parsimony
+  opts.use_rba_partload &= (opts.num_ranks > 1 && opts.num_workers == 1);          // only useful for fine-grain MPI runs
+  opts.use_rba_partload &= (!opts.start_trees.count(StartingTree::parsimony) &&
+                            !opts.start_trees.count(StartingTree::adaptive) );    // does not work with parsimony
   opts.use_rba_partload &= (opts.command == Command::search ||                    // currently doesn't work with bootstrap
                             opts.command == Command::evaluate ||
                             opts.command == Command::ancestral);
 
   LOG_DEBUG << "RBA partial loading: " << (opts.use_rba_partload ? "ON" : "OFF") << endl;
+
+  /* disable stopping rule with MPI (not implemented yet)*/
+  if (opts.num_ranks > 1 && opts.stopping_rule != StoppingRule::none)
+  {
+    LOG_WARN << endl << "WARNING: Stopping rule is not supported with MPI and has been automatically disabled."
+             << endl << endl;
+    opts.stopping_rule = StoppingRule::none;
+  }
 }
 
 void check_options(RaxmlInstance& instance)
@@ -1039,6 +1048,9 @@ void autotune_threads(RaxmlInstance& instance)
   unsigned int max_workers_mem = 0.9 * num_ranks * sysutil_get_memtotal() / res.total_mem_size;
   max_workers = std::min(max_workers, max_workers_mem);
   max_workers = std::min(max_workers, opts.num_workers_max);
+
+  if (opts.use_rba_partload) max_workers = 1;
+
   if (opts.num_workers == 0)
   {
     if (max_workers > 1)

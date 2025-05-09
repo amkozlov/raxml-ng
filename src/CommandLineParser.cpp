@@ -148,6 +148,30 @@ void CommandLineParser::check_options(Options &opts)
       opts.bs_metrics.insert(BranchSupportMetric::fbp);
   }
 
+  if (opts.command == Command::bootstrap)
+  {
+    if (opts.bs_metrics.empty())
+      opts.bs_metrics.insert(BranchSupportMetric::fbp);
+    else if (opts.bs_metrics.size() > 1)
+      throw OptionException("Please provide a single value for the --bs-metric option.");
+    else if (!opts.bs_metrics.count(BranchSupportMetric::fbp) &&
+             !opts.bs_metrics.count(BranchSupportMetric::rbs) &&
+             !opts.bs_metrics.count(BranchSupportMetric::ps) &&
+             !opts.bs_metrics.count(BranchSupportMetric::pbs))
+    {
+      throw OptionException("Invalid --bs-metric value! Only FBP, RBS, PS or PBS are supported.");
+    }
+
+    /* only FBP, TBE and IC1/ICA are allowed in support mapping mode; other values are ignored */
+    opts.bs_metrics.erase(BranchSupportMetric::rbs);
+    opts.bs_metrics.erase(BranchSupportMetric::ps);
+    opts.bs_metrics.erase(BranchSupportMetric::pbs);
+    opts.bs_metrics.erase(BranchSupportMetric::ebg);
+    opts.bs_metrics.erase(BranchSupportMetric::sh_alrt);
+    if (opts.bs_metrics.empty())
+      opts.bs_metrics.insert(BranchSupportMetric::fbp);
+  }
+
   if (opts.command == Command::support || opts.command == Command::bsconverge)
   {
     if (opts.outfile_names.bootstrap_trees.empty())
@@ -217,10 +241,17 @@ void CommandLineParser::check_options(Options &opts)
     }
   }
 
-  if (opts.num_workers > 1 && opts.command == Command::modeltest)
+  if (opts.command == Command::modeltest && opts.num_workers > 1)
   {
-    throw OptionException("Model testing currently does not work with parallel tree searches."
+    throw OptionException("Model testing currently does not work with parallel tree searches. "
         "Please use only a single worker.");
+  }
+
+  if (opts.command == Command::modeltest || opts.model_file == "auto" || opts.model_file == "AUTO" ||
+      opts.model_file == "DNA"  || opts.model_file == "AA")
+  {
+    if (opts.num_ranks > 1)
+      throw OptionException("Model testing currently does not support MPI, sorry.");
   }
 }
 
@@ -533,6 +564,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   int compat_ver = RAXML_INTVER;
   bool log_level_set = false;
   bool lh_epsilon_set = false;
+  bool optarg_tree_required = false;
   string optarg_tree = "";
   string optarg_bs_trees = "";
 
@@ -1246,6 +1278,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.bs_metrics.insert(BranchSupportMetric::sh_alrt);
         opts.topology_opt_method = TopologyOptMethod::nniRound;
         opts.use_pythia = false;
+        optarg_tree_required = true;
         num_commands++;
         /* fall through */
       case 66: /* number of SH replicates */
@@ -1317,6 +1350,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.bs_metrics.insert(BranchSupportMetric::ebg);
         opts.topology_opt_method = TopologyOptMethod::none;
         opts.use_pythia = false;
+        optarg_tree_required = true;
         num_commands++;
         break;
       /* --fast (shortcut): equivalent to --opt-topology fast */
@@ -1342,6 +1376,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* if more than one independent command, fail */
   if (num_commands > 1)
     throw OptionException("More than one command specified");
+
+  if (optarg_tree.empty() && optarg_tree_required)
+    throw OptionException("This command requires a reference tree, please use --tree option!");
 
   if (!use_adaptive_search && opts.topology_opt_method == TopologyOptMethod::adaptive)
     opts.topology_opt_method = TopologyOptMethod::classic;
@@ -1428,8 +1465,8 @@ void CommandLineParser::print_help()
             "  --loglh                                    Alias for: --evaluate --opt-model off --opt-branches off --nofiles --log result\n"
             "  --rf                                       Alias for: --rfdist --nofiles --log result\n"
             "  --pt                                       Alias for: --pythia --nofiles --log result\n"
-            "  --sh [ REPS ]                              Alias for: --all --opt-topology nni --bs-metic sh [ --sh-reps REPS ]\n"
-            "  --ebg                                      Alias for: --all --opt-topology off --bs-metic ebg\n"
+            "  --sh [ REPS ]                              Alias for: --all --opt-topology nni --bs-metric sh [ --sh-reps REPS ]\n"
+            "  --ebg                                      Alias for: --all --opt-topology off --bs-metric ebg\n"
             "\n"
             "Input and output options:\n"
             "  --tree            rand{N} | pars{N} |      starting tree: rand(om), pars(imony) or user-specified (newick file)\n"

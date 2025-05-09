@@ -134,7 +134,7 @@ std::string Options::checkp_file() const
 
 const std::string& Options::support_tree_file(BranchSupportMetric bsm) const
 {
-  if (bs_metrics.size() < 2)
+  if (bs_metrics.size() < 2 && bsm == BranchSupportMetric::fbp)
     return outfile_names.support_tree;
   else
   {
