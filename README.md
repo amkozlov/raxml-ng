@@ -66,7 +66,7 @@ Portable PTHREADS version (static linkage, compatible with old non-AVX CPUs):
 git clone --recursive https://github.com/amkozlov/raxml-ng
 cd raxml-ng
 mkdir build && cd build
-cmake -DSTATIC_BUILD=ON -DENABLE_RAXML_SIMD=OFF -DENABLE_PLLMOD_SIMD=OFF ..
+cmake -DSTATIC_BUILD=ON -DPORTABLE_BUILD=ON ..
 make
 ```
 
