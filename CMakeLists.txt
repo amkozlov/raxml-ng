@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.0.2 FATAL_ERROR)
+cmake_minimum_required (VERSION 3.0.2...3.20 FATAL_ERROR)
 
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES  ON)

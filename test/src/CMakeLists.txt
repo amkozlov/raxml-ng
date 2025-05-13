@@ -6,6 +6,8 @@ if(NOT GTEST_FOUND)
     return()
 endif()
 
+set(CMAKE_CXX_STANDARD 14)
+
 message (STATUS "Building tests")
 
 file (GLOB_RECURSE RAXML_TEST_SOURCES ${PROJECT_SOURCE_DIR}/test/src/*.cpp ${RAXML_SOURCES})
