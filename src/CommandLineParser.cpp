@@ -125,7 +125,7 @@ void CommandLineParser::check_options(Options &opts)
       opts.command == Command::sitelh || opts.command == Command::ancestral ||
       opts.command == Command::consense)
   {
-    if (opts.tree_file.empty() && opts.start_trees.count(StartingTree::user))
+    if (opts.tree_file.empty() && (opts.start_trees.count(StartingTree::user) || opts.start_trees.empty()))
       throw OptionException("Please provide a valid Newick file as an argument of --tree option.");
   }
 

@@ -1,3 +1,3 @@
 #define RAXML_VERSION "2.0.0-adaptive"
-#define RAXML_DATE    "12.05.2025"
+#define RAXML_DATE    "14.05.2025"
 #define RAXML_INTVER  200
