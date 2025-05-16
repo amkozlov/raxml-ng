@@ -86,6 +86,8 @@ public:
 
         results->at(partition_index).push_back(result);
 
+//        printf("thread: %u, model#: %s\n", ParallelContext::thread_id(), result.model.to_string().c_str());
+
         if (use_rhas_heuristic) {
             const double bic = result.ic_criteria.at(InformationCriterion::bic);
             this->rhas_heuristic_per_part.at(partition_index).update(candidate_model, bic);
@@ -127,7 +129,6 @@ public:
         }
 
         increment_model_index();
-
 
         return found_model;
     }
@@ -185,12 +186,14 @@ vector<string> ModelTest::optimize_model() {
     // TODO: MPI
     ParallelContext::global_thread_barrier();
 
+
     size_t partition_index;
     candidate_model_t *candidate_model;
 
 
 
-    while (execution_status.get_next_model(partition_index, &candidate_model)) {
+    while (execution_status.get_next_model(partition_index, &candidate_model))
+    {
         double last_score = std::numeric_limits<double>::infinity();
         for (unsigned int num_rate_cats = candidate_model->rate_categories;
              num_rate_cats <= candidate_model->max_rate_categories; ++num_rate_cats) {

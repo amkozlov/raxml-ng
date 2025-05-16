@@ -10,8 +10,15 @@ RHASHeuristic::RHASHeuristic(std::string reference_matrix, double delta_bic) : r
 }
 
 void RHASHeuristic::update(const candidate_model_t &candidate_model, double score) {
+
+    // quickfix: use only +FO for DNA and fixed model freqs for AA
+    const auto def_freq = (candidate_model.datatype == DataType::dna) ?
+                                  frequency_type_t::ESTIMATED : frequency_type_t::FIXED;
+
     if (candidate_model.matrix_name != reference_matrix ||
-            candidate_model.rate_heterogeneity == rate_heterogeneity_t::FREE_RATE) {
+        candidate_model.frequency != def_freq ||
+        candidate_model.rate_heterogeneity == rate_heterogeneity_t::FREE_RATE)
+    {
         return;
     }
 
