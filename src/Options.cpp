@@ -357,7 +357,7 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       stream << "Bootstrapping";
       break;
     case Command::all:
-      stream << "ML tree search + bootstrapping";
+      stream << "Tree with branch support";
       break;
     case Command::support:
       stream << "Compute bipartition support";
@@ -402,8 +402,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       break;
   }
 
-  if (opts.command == Command::search || opts.command == Command::bootstrap ||
-      opts.command == Command::all)
+  if ((opts.command == Command::search || opts.command == Command::bootstrap ||
+      opts.command == Command::all) &&
+      opts.topology_opt_method != TopologyOptMethod::none)
   {
     stream << " (";
     switch (opts.topology_opt_method)

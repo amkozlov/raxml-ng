@@ -2822,6 +2822,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
 
   if (opts.command == Command::bootstrap || opts.command == Command::all)
   {
+    size_t bs_trees_written = 0;
     if (!opts.bootstrap_trees_file().empty())
     {
   //    NewickStream nw(opts.bootstrap_trees_file(), std::ios::out | std::ios::app);
@@ -2835,6 +2836,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
           bs_tree.topology(topol.second.second);
           postprocess_tree(opts, bs_tree);
           nw << bs_tree;
+          ++bs_trees_written;
         }
       }
       else if (opts.bs_metrics.count(BranchSupportMetric::pbs) && !instance.bs_start_trees.empty())
@@ -2842,6 +2844,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
         for (auto& bs_tree: instance.bs_start_trees)
         {
           nw << bs_tree;
+          ++bs_trees_written;
         }
       }
       else if (opts.bs_metrics.count(BranchSupportMetric::ps) && !instance.pars_trees.empty())
@@ -2849,10 +2852,14 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
         for (auto& bs_tree: instance.pars_trees)
         {
           nw << bs_tree;
+          ++bs_trees_written;
         }
       }
 
-      LOG_INFO << "Bootstrap trees saved to: " << sysutil_realpath(opts.bootstrap_trees_file()) << endl;
+      if (bs_trees_written > 0)
+        LOG_INFO << "Bootstrap trees saved to: " << sysutil_realpath(opts.bootstrap_trees_file()) << endl;
+      else
+        sysutil_file_remove(opts.bootstrap_trees_file());
     }
   }
 

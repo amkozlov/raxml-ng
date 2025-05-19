@@ -1439,7 +1439,7 @@ void CommandLineParser::print_help()
             "  --help                                     display help information\n"
             "  --version                                  display version information\n"
             "  --evaluate                                 evaluate the likelihood of a tree (with model+brlen optimization)\n"
-            "  --search                                   ML tree search (default: 10 parsimony + 10 random starting trees)\n"
+            "  --search                                   ML tree search (default: use adaptive heuristic)\n"
             "  --bootstrap                                bootstrapping (default: use bootstopping to auto-detect #replicates)\n"
             "  --all                                      all-in-one (ML search + bootstrapping)\n"
             "  --support                                  compute bipartition support for a given reference tree (e.g., best ML tree)\n"
@@ -1458,6 +1458,7 @@ void CommandLineParser::print_help()
             "  --ancestral                                ancestral state reconstruction at all inner nodes\n"
             "  --sitelh                                   print per-site log-likelihood values\n"
             "  --pythia                                   compute and print Pythia MSA difficulty score\n"
+            "  --modeltest                                select best-fit model of sequence evolution\n"
             "\n"
             "Command shortcuts (mutually exclusive):\n"
             "  --search1                                  Alias for: --search --tree pars{1}\n"
@@ -1466,7 +1467,7 @@ void CommandLineParser::print_help()
             "  --rf                                       Alias for: --rfdist --nofiles --log result\n"
             "  --pt                                       Alias for: --pythia --nofiles --log result\n"
             "  --sh [ REPS ]                              Alias for: --all --opt-topology nni --bs-metric sh [ --sh-reps REPS ]\n"
-            "  --ebg                                      Alias for: --all --opt-topology off --bs-metric ebg\n"
+            "  --ebg                                      Alias for: --all --bs-metric ebg --opt-topology off\n"
             "\n"
             "Input and output options:\n"
             "  --tree            rand{N} | pars{N} |      starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
@@ -1488,8 +1489,8 @@ void CommandLineParser::print_help()
             "  --pat-comp     on | off                    alignment pattern compression (default: ON)\n"
             "  --tip-inner    on | off                    tip-inner case optimization (default: OFF)\n"
             "  --site-repeats on | off                    use site repeats optimization, 10%-60% faster than tip-inner (default: ON)\n" <<
-            "  --threads      VALUE                       number of parallel threads to use (default: " << sysutil_get_cpu_cores() << ")\n" <<
-            "  --workers      VALUE                       number of tree searches to run in parallel (default: 1)\n" <<
+            "  --threads      VALUE                       number of parallel threads to use (default: auto{" << sysutil_get_cpu_cores() << "})\n" <<
+            "  --workers      VALUE                       number of tree searches to run in parallel (default: auto)\n" <<
 #ifdef HAVE_AUTOVEC
             "  --simd         native | sse3 | avx | avx2  "
 #else
@@ -1539,10 +1540,9 @@ void CommandLineParser::print_help()
   cout << "\n"
             "EXAMPLES:\n"
             "  1. Perform tree inference on DNA alignment \n"
-            "     (10 random + 10 parsimony starting trees, general time-reversible model, ML estimate of substitution rates and\n"
-            "      nucleotide frequencies, discrete GAMMA model of rate heterogeneity with 4 categories):\n"
+            "     (select best-fit model, adaptive search heuristic based on MSA difficulty\n"
             "\n"
-            "     ./raxml-ng --msa testDNA.fa --model GTR+G\n"
+            "     ./raxml-ng --msa testDNA.fa --model DNA\n"
             "\n";
 
   cout << "\n"
