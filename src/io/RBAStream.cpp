@@ -5,7 +5,7 @@ using namespace std;
 
 const uint64_t RBA_MAGIC       = *(reinterpret_cast<const uint64_t*>("RBAF\x13\x12\x17\x0A"));
 const uint32_t RBA_VERSION     = 4;
-const uint32_t RBA_MIN_VERSION = 2;
+const uint32_t RBA_MIN_VERSION = 3;
 
 struct RBAHeader
 {
@@ -97,6 +97,8 @@ RBAStream& operator>>(RBAStream& stream, RBAStream::RBAOutput out)
   RBAHeader header;
 
   bos >> header;
+
+  LOG_DEBUG << "RBA version: " << header.version << endl;
 
   if (!bos.good())
     throw runtime_error("Invalid RBA file!");
