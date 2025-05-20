@@ -6,14 +6,6 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/google/googletest.git
     GIT_TAG 58d77fa8070e8cec2dc1ed015d66b454c8d78850 # release-1.12.1
 )
-if(DEFINED REPRODUCIBLE)
-FetchContent_Declare(
-        reprored
-        GIT_REPOSITORY https://github.com/stelzch/reprored.git
-        GIT_TAG ${reprored_version}
-)
-FetchContent_MakeAvailable(reprored)
-endif()
 
 FetchContent_MakeAvailable(googletest)
 
@@ -144,6 +136,10 @@ endif()
 
 if(USE_TERRAPHAST)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_RAXML_TERRAPHAST")
+endif()
+
+if(DEFINED REPRODUCIBLE)
+add_subdirectory(${PROJECT_SOURCE_DIR}/libs/reprored)
 endif()
 
 message(STATUS "Using flags: ${CMAKE_CXX_FLAGS}")
