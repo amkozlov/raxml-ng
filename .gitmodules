@@ -8,3 +8,4 @@
 [submodule "libs/reprored"]
 	path = libs/reprored
 	url = https://github.com/stelzch/reprored.git
+    branch = main
