@@ -8,11 +8,11 @@ FetchContent_Declare(
 )
 if(DEFINED REPRODUCIBLE)
 FetchContent_Declare(
-        binarytreesummation
-        GIT_REPOSITORY https://git.ch-st.de/christoph/binary_tree_summation.git
-        GIT_TAG ${binarytreesummation_version}
+        reprored
+        GIT_REPOSITORY https://github.com/stelzch/reprored.git
+        GIT_TAG ${reprored_version}
 )
-FetcHContent_MakeAvailable(binarytreesummation)
+FetchContent_MakeAvailable(reprored)
 endif()
 
 FetchContent_MakeAvailable(googletest)

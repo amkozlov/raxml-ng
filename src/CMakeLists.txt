@@ -66,8 +66,8 @@ set(RAXML_LIBS ${RAXML_LIBS} PARENT_SCOPE)
 
 
 if (DEFINED REPRODUCIBLE) 
-message(STATUS Reproducibility mode ${REPRODUCIBLE}enabled)
-set(RAXML_LIBS ${RAXML_LIBS} binarytreesummation)
+message(STATUS Reproducibility mode ${REPRODUCIBLE})
+set(RAXML_LIBS ${RAXML_LIBS} reprored)
 add_definitions(-DREPRODUCIBLE=${REPRODUCIBLE})
 endif()
 
