@@ -2,15 +2,23 @@
 
 using namespace std;
 
+ConsensusTree::ConsensusTree(const SplitsTree& splits, unsigned int consense_cutoff) : SupportTree()
+{
+  init_cutoff(consense_cutoff);
+  pll_utree(splits.pll_utree());
+  init_hashtable();
+  add_splits(splits);
+}
+
+
 ConsensusTree::ConsensusTree (const TreeList& trees, unsigned int consense_cutoff) : SupportTree()
 {
-  assert(consense_cutoff <= 100);
   assert(!trees.empty());
 
+  init_cutoff(consense_cutoff);
   /* add new splits from replicates */
   _ref_splits_only = false;
 
-  _cutoff = ((double) consense_cutoff) / 100.;
   pll_utree(trees[0].pll_utree());
 
   LOG_DEBUG_TS << "Extractring splits from replicate trees..." << endl;
@@ -26,6 +34,12 @@ ConsensusTree::ConsensusTree (const TreeList& trees, unsigned int consense_cutof
 
 ConsensusTree::~ConsensusTree ()
 {
+}
+
+void ConsensusTree::init_cutoff(unsigned int consense_cutoff)
+{
+  assert(consense_cutoff <= 100);
+  _cutoff = ((double) consense_cutoff) / 100.;
 }
 
 void ConsensusTree::add_tree(const corax_unode_t& root)

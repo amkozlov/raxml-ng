@@ -21,96 +21,12 @@ char * support_fmt_prop(double support)
 }
 
 
-SupportTree::SupportTree(const Tree& tree) : Tree(tree), _num_bs_trees(0),
-    _ref_splits_only(true), _ref_splits(nullptr), _pll_splits_hash(nullptr)
+SupportTree::SupportTree(const Tree& tree) : SplitsTree(tree, true)
 {
-  if (num_splits() > 0)
-    set_reference_tree();
 }
 
 SupportTree::~SupportTree ()
 {
-  if (_pll_splits_hash)
-    corax_utree_split_hashtable_destroy(_pll_splits_hash);
-}
-
-PllSplitSharedPtr SupportTree::extract_splits_from_tree(const corax_unode_t& root,
-                                                        corax_unode_t ** node_split_map)
-{
-  PllSplitSharedPtr splits(corax_utree_split_create((corax_unode_t*) &root,
-                                                       _num_tips,
-                                                       node_split_map),
-                           corax_utree_split_destroy);
-
-  return splits;
-}
-
-void SupportTree::add_splits_to_hashtable(const PllSplitSharedPtr& splits,
-                                          const doubleVector& support, bool update_only)
-{
-  _pll_splits_hash = corax_utree_split_hashtable_insert(_pll_splits_hash,
-                                                         splits.get(),
-                                                         _num_tips,
-                                                         num_splits(),
-                                                         support.empty() ? nullptr: support.data(),
-                                                         update_only);
-}
-
-void SupportTree::set_reference_tree()
-{
-  assert(num_splits() > 0);
-
-  _node_split_map.resize(num_splits());
-   doubleVector support(num_splits(), 0.);
-
-  /* extract reference tree splits and add them into hashtable */
-  _ref_splits = extract_splits_from_tree(pll_utree_root(), _node_split_map.data());
-
-  add_splits_to_hashtable(_ref_splits, support, false);
-}
-
-void SupportTree::get_replicate_supports(const corax_unode_t& root,
-                                         PllSplitSharedPtr& splits, doubleVector& support)
-{
-  /* by default, do not modify support vector -> every split gets support +1 */
-  RAXML_UNUSED(root);
-  RAXML_UNUSED(splits);
-  RAXML_UNUSED(support);
-}
-
-void SupportTree::add_replicate_tree(const Tree& tree)
-{
-  if (tree.num_tips() != _num_tips)
-    throw runtime_error("SupportTree: Incompatible replicate tree!");
-
-  _num_bs_trees++;
-
-  /* extract replicate tree splits and add them into hashtable */
-  const corax_unode_t& root = tree.pll_utree_root();
-  auto splits = extract_splits_from_tree(root, nullptr);
-
-  doubleVector support;
-  get_replicate_supports(root, splits, support);
-
-  add_splits_to_hashtable(splits, support, _ref_splits_only);
-//  LOG_DEBUG_TS << "Added replicate trees: " << _num_bs_trees << endl;
-}
-
-void SupportTree::add_splits_from_support_tree(const SupportTree& other)
-{
-  if (other.num_tips() != _num_tips)
-    throw runtime_error("SupportTree: Incompatible replicate tree!");
-
-  /* copy splits from existing hashtable in other support tree */
-  auto splits_added = corax_utree_split_hashtable_insert_copy(_pll_splits_hash,
-                                                              other._pll_splits_hash);
-
-  libpll_check_error();
-
-  _num_bs_trees += other.num_bs_trees();
-
-  LOG_DEBUG_TS << "Added " << splits_added << " splits from "
-               << other.num_bs_trees() << " replicate trees." << endl;
 }
 
 void SupportTree::normalize_support_in_hashtable()

@@ -2161,7 +2161,7 @@ void postprocess_tree(const Options& opts, Tree& tree)
 }
 
 void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree,
-                            const TreeTopologyList& bs_trees, SupportTree& bs_splits)
+                            const TreeTopologyList& bs_trees, SplitsTree& bs_splits)
 {
   reroot_tree_with_outgroup(instance.opts, ref_tree, false);
 
@@ -2234,7 +2234,7 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree,
         /* do we have pre-extractred replicate splits? */
         if (!bs_splits.empty())
         {
-          sup_tree->add_splits_from_support_tree(bs_splits);
+          sup_tree->add_splits(bs_splits);
         }
         else
         {
@@ -2262,7 +2262,7 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree,
 }
 
 void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree,
-                            SupportTree& bs_splits)
+                            SplitsTree& bs_splits)
 {
   draw_bootstrap_support(instance, ref_tree, TreeTopologyList(), bs_splits);
 }
@@ -2332,8 +2332,9 @@ bool check_bootstop(const RaxmlInstance& instance, const TreeTopologyList& bs_tr
   return converged;
 }
 
-TreeTopologyList read_newick_trees(Tree& ref_tree, const std::string& fname,
-                                   const std::string& tree_kind)
+TreeTopologyList read_newick_trees(SplitsTree& ref_tree, const std::string& fname,
+                                   const std::string& tree_kind,
+                                   bool extract_splits = false, bool require_binary = true)
 {
   NameIdMap ref_tip_ids;
   TreeTopologyList trees;
@@ -2356,7 +2357,7 @@ TreeTopologyList read_newick_trees(Tree& ref_tree, const std::string& fname,
     if (trees.empty())
     {
       if (ref_tree.empty())
-        ref_tree = tree;
+        ref_tree = SplitsTree(tree);
       ref_tip_ids = ref_tree.tip_ids();
     }
 
@@ -2369,7 +2370,7 @@ TreeTopologyList read_newick_trees(Tree& ref_tree, const std::string& fname,
                           " (expected: " + to_string(ref_tree.num_tips()) + ")");
     }
 
-    if (!tree.binary())
+    if (require_binary && !tree.binary())
     {
       LOG_DEBUG << "REF #branches: " << ref_tree.num_branches()
                 << ", BS #branches: " << tree.num_branches() << endl;
@@ -2391,7 +2392,13 @@ TreeTopologyList read_newick_trees(Tree& ref_tree, const std::string& fname,
       throw runtime_error(tree_kind_cap + " tree #" + to_string(bs_num+1) +
                           " has wrong number of tips: " + to_string(tree.num_tips()));
     }
+
     trees.push_back(tree.topology());
+    if (extract_splits)
+    {
+      assert(!ref_tree.empty());
+      ref_tree.add_replicate_tree(tree);
+    }
     bs_num++;
   }
 
@@ -2401,9 +2408,11 @@ TreeTopologyList read_newick_trees(Tree& ref_tree, const std::string& fname,
   return trees;
 }
 
-TreeTopologyList read_bootstrap_trees(const RaxmlInstance& instance, Tree& ref_tree)
+TreeTopologyList read_bootstrap_trees(const RaxmlInstance& instance, SplitsTree& ref_tree,
+                                      bool extract_splits = false, bool require_binary = true)
 {
-  auto bs_trees = read_newick_trees(ref_tree, instance.opts.bootstrap_trees_file(), "bootstrap");
+  auto bs_trees = read_newick_trees(ref_tree, instance.opts.bootstrap_trees_file(),
+                                    "bootstrap", extract_splits, require_binary);
 
   if (bs_trees.size() < 2)
   {
@@ -2423,7 +2432,7 @@ void read_multiple_tree_files(RaxmlInstance& instance)
   else
     fname_list = split_string(opts.tree_file, ',');
 
-  Tree ref_tree = instance.random_tree;
+  SplitsTree ref_tree;
   for (const auto& fname: fname_list)
   {
     auto topos = read_newick_trees(ref_tree, fname, "input");
@@ -2437,16 +2446,23 @@ void read_multiple_tree_files(RaxmlInstance& instance)
 
 void command_bootstop(RaxmlInstance& instance)
 {
-  auto bs_trees = read_bootstrap_trees(instance, instance.random_tree);
-
+  SplitsTree ref_tree;
+  auto bs_trees = read_bootstrap_trees(instance, ref_tree);
+  instance.random_tree = Tree(ref_tree);
   check_bootstop(instance, bs_trees, true);
 }
 
 void command_support(RaxmlInstance& instance)
 {
   const auto& opts = instance.opts;
-  Tree ref_tree;
+  SplitsTree ref_tree;
   TreeTopologyList bs_trees;
+
+  /* some metrics require binary replicate trees, others can handle multifurcations */
+  // TODO check whether this is a hard requirement or just implementation detail
+  bool require_binary = opts.bs_metrics.count(BranchSupportMetric::ic1) ||
+                        opts.bs_metrics.count(BranchSupportMetric::ica) ||
+                        (opts.bs_metrics.count(BranchSupportMetric::tbe) && !opts.tbe_naive);
 
   assert(!opts.start_trees.empty());
 
@@ -2463,35 +2479,24 @@ void command_support(RaxmlInstance& instance)
 
     LOG_INFO << "Reference tree size: " << to_string(ref_tree.num_tips()) << endl << endl;
 
-    if (!ref_tree.binary())
-      throw runtime_error("Reference tree contains multifurcations, this is not supported!");
-
     /* read all bootstrap trees from a Newick file */
-    bs_trees = read_bootstrap_trees(instance, ref_tree);
+    bs_trees = read_bootstrap_trees(instance, ref_tree, true, require_binary);
 
-    draw_bootstrap_support(instance, ref_tree, bs_trees);
+    draw_bootstrap_support(instance, ref_tree, ref_tree);
   }
   else if (st_tree_type == StartingTree::consensus)
   {
     /* read all bootstrap trees from a Newick file */
-    bs_trees = read_bootstrap_trees(instance, ref_tree);
+    bs_trees = read_bootstrap_trees(instance, ref_tree, true, require_binary);
 
-    /* This is a bit hacky: ConsensusTree requires TreeList, not TreeTopologyList.
-     * So we misuse instance.start_trees to temporarily store TreeList for consensus building. */
-    assert(instance.start_trees.empty());
-    for (const auto& t: bs_trees)
-    {
-      ref_tree.topology(t);
-      instance.start_trees.emplace_back(ref_tree);
-    }
-
-    ConsensusTree cons_tree(instance.start_trees, opts.consense_cutoff);
-    SupportTree bs_splits(ref_tree);
-    bs_splits.add_splits_from_support_tree(cons_tree);
+    /* build consesus tree */
+    ConsensusTree cons_tree(ref_tree, opts.consense_cutoff);
     cons_tree.compute_support();
     cons_tree.reset_brlens();
     cons_tree.reset_tip_ids(ref_tree.tip_ids());
-    draw_bootstrap_support(instance, cons_tree, bs_splits);
+
+    /* map support on the consesus tree */
+    draw_bootstrap_support(instance, cons_tree, ref_tree);
   }
 
 //  corax_utree_show_ascii(&ref_tree.pll_utree_root(), CORAX_UTREE_SHOW_LABEL);
