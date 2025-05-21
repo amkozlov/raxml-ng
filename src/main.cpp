@@ -2332,12 +2332,12 @@ bool check_bootstop(const RaxmlInstance& instance, const TreeTopologyList& bs_tr
   return converged;
 }
 
-TreeTopologyList read_newick_trees(SplitsTree& ref_tree, const std::string& fname,
-                                   const std::string& tree_kind,
-                                   bool extract_splits = false, bool require_binary = true)
+unsigned int read_newick_trees_custom(SplitsTree& ref_tree, const std::string& fname,
+                                      const std::string& tree_kind,
+                                      bool extract_splits, bool require_binary,
+                                      std::function<bool(const Tree&)> process_tree)
 {
   NameIdMap ref_tip_ids;
-  TreeTopologyList trees;
   unsigned int bs_num = 0;
 
   if (!sysutil_file_exists(fname))
@@ -2354,7 +2354,7 @@ TreeTopologyList read_newick_trees(SplitsTree& ref_tree, const std::string& fnam
     Tree tree;
     boots >> tree;
 
-    if (trees.empty())
+    if (!bs_num)
     {
       if (ref_tree.empty())
         ref_tree = SplitsTree(tree);
@@ -2393,7 +2393,7 @@ TreeTopologyList read_newick_trees(SplitsTree& ref_tree, const std::string& fnam
                           " has wrong number of tips: " + to_string(tree.num_tips()));
     }
 
-    trees.push_back(tree.topology());
+    process_tree(tree);
     if (extract_splits)
     {
       assert(!ref_tree.empty());
@@ -2402,10 +2402,36 @@ TreeTopologyList read_newick_trees(SplitsTree& ref_tree, const std::string& fnam
     bs_num++;
   }
 
-  LOG_INFO << "Loaded " << trees.size() << " trees with "
+  LOG_INFO << "Loaded " << bs_num << " trees with "
            << ref_tree.num_tips() << " taxa." << endl << endl;
 
+  return bs_num;
+}
+
+TreeTopologyList read_newick_trees(SplitsTree& ref_tree, const std::string& fname,
+                                   const std::string& tree_kind,
+                                   bool extract_splits = false, bool require_binary = true)
+{
+  TreeTopologyList trees;
+
+  auto add_topology_to_list = [&trees](const Tree& tree) -> bool
+      { trees.push_back(tree.topology()); return true; };
+
+  read_newick_trees_custom(ref_tree, fname, tree_kind, extract_splits, require_binary,
+                           add_topology_to_list);
+
   return trees;
+}
+
+unsigned int read_newick_trees_to_list(TreeList& tree_list, SplitsTree& ref_tree, const std::string& fname,
+                                   const std::string& tree_kind,
+                                   bool extract_splits = false, bool require_binary = true)
+{
+  auto add_tree_to_list = [&tree_list](const Tree& tree) -> bool
+      { tree_list.push_back(tree); return true; };
+
+  return read_newick_trees_custom(ref_tree, fname, tree_kind, extract_splits, require_binary,
+                                  add_tree_to_list);
 }
 
 TreeTopologyList read_bootstrap_trees(const RaxmlInstance& instance, SplitsTree& ref_tree,
@@ -2422,7 +2448,8 @@ TreeTopologyList read_bootstrap_trees(const RaxmlInstance& instance, SplitsTree&
   return bs_trees;
 }
 
-void read_multiple_tree_files(RaxmlInstance& instance)
+void read_multiple_tree_files(RaxmlInstance& instance,
+                              bool extract_splits = false, bool require_binary = true)
 {
   const auto& opts = instance.opts;
 
@@ -2435,12 +2462,8 @@ void read_multiple_tree_files(RaxmlInstance& instance)
   SplitsTree ref_tree;
   for (const auto& fname: fname_list)
   {
-    auto topos = read_newick_trees(ref_tree, fname, "input");
-    for (const auto& t: topos)
-    {
-      ref_tree.topology(t);
-      instance.start_trees.emplace_back(ref_tree);
-    }
+     read_newick_trees_to_list(instance.start_trees, ref_tree, fname, "input",
+                               extract_splits, require_binary);
   }
 }
 
@@ -2519,7 +2542,7 @@ void command_rfdist(RaxmlInstance& instance)
   else
   {
     /* load trees from Newick file(s) */
-    read_multiple_tree_files(instance);
+    read_multiple_tree_files(instance, false, false);
   }
 
   if (instance.start_trees.size() < 2)

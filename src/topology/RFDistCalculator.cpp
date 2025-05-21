@@ -9,22 +9,6 @@ RFDistCalculator::RFDistCalculator (const TreeList& trees, bool lowmem) :
 { 
   tree_list = &trees;
   recalculate_rf(lowmem);
-  /* if (trees.size() > 1)
-  { 
-    tree_list = &trees;
-    _num_trees = trees.size();
-    _num_tips = trees.at(0).num_tips();
-    if (lowmem)
-      calc_rfdist_lowmem(trees);
-    else
-      calc_rfdist(trees);
-  }
-  else
-    throw runtime_error("Need at least 2 trees to compute RF distances! "
-                        "Given: " + to_string(trees.size()));
-  
-  // create the mapping of trees into topologies
-  map_trees_into_topologies(); */
 }
 
 RFDistCalculator::~RFDistCalculator ()
