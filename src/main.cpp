@@ -22,6 +22,7 @@
 #include <chrono>
 #include <cstdint>
 
+#include <cstdlib>
 #include <memory>
 
 #include "version.h"
@@ -1636,7 +1637,12 @@ void balance_load(RaxmlInstance& instance)
       instance.load_balancer->get_all_assignments(part_sizes, ParallelContext::threads_per_group());
 
   const auto my_assignment = instance.proc_part_assign[ParallelContext::rank_id()];
-  assert(my_assignment.num_parts() == 1);
+#ifdef REPRODUCIBLE
+  if (my_assignment.num_parts() != 1) {
+      LOG_INFO << "Error: multiple partitions not supported in reproducible mode" << std::endl;
+      exit(EXIT_FAILURE);
+  }
+#endif
   
   LOG_INFO_TS << "Data distribution: " << PartitionAssignmentStats(instance.proc_part_assign) << endl;
   LOG_VERB << endl << instance.proc_part_assign;
@@ -3097,6 +3103,27 @@ int internal_main(int argc, char** argv, void* comm)
     LOG_INFO << "ERROR: " << e.message() << std::endl;
     return clean_exit(EXIT_FAILURE);
   }
+
+#ifdef REPRODUCIBLE
+  // Verify that optimizations that break reproducibility are turned off
+  if (opts.use_repeats) {
+      LOG_INFO << "ERROR: site repeats not supported in reproducible mode" << std::endl;
+      return clean_exit(EXIT_FAILURE);
+  } else if(opts.use_pattern_compression) {
+      LOG_INFO << "ERROR: pattern compression not supported in reproducible mode" << std::endl;
+      return clean_exit(EXIT_FAILURE);
+  } else if(opts.use_tip_inner) {
+      LOG_INFO << "ERROR: tip-inner optimization not supported in reproducible mode" << std::endl;
+      return clean_exit(EXIT_FAILURE);
+  } else if (opts.num_threads != 1) {
+      LOG_INFO << "ERROR: Multithreading not supported in reproducible mode. Use MPI parallelization instead." << std::endl;
+      return clean_exit(EXIT_FAILURE);
+  } else if (opts.num_workers != 1) {
+      LOG_INFO << "ERROR: Multiple workers not supported in reproducible mode." << std::endl;
+      return clean_exit(EXIT_FAILURE);
+  }
+
+#endif
 
   /* handle trivial commands first */
   switch (opts.command)

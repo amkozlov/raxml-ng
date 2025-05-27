@@ -347,6 +347,16 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   opts.tbe_naive = false;
 
+
+#ifdef REPRODUCIBLE
+  // Set default options required for reproducibility
+  opts.use_tip_inner = false;
+  opts.use_repeats = false;
+  opts.use_pattern_compression = false;
+  opts.num_threads = 1;
+  opts.num_workers = 1;
+#endif
+
   bool log_level_set = false;
 
   int option_index = 0;
