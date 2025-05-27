@@ -16,7 +16,7 @@ Under these circumstances, the core count can be varied freely and will not affe
 To ensure that the exact same machine code is executed, we recommend to run RAxML-NG inside a container. You can build a docker image from source as follows:
 
 ```console
-docker build -f Dockerfile -t reproraxmlng
+docker build -f Dockerfile -t reproraxmlng .
 ```
 
 Then either use mpirun inside the container:
