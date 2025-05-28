@@ -19,12 +19,20 @@ To ensure that the exact same machine code is executed, we recommend to run RAxM
 docker build -f Dockerfile -t reproraxmlng .
 ```
 
+or use a pre-built image:
+
+```console
+docker pull docker.io/cstelz/reproraxmlng:latest
+```
+
+
 Then either use mpirun inside the container:
 ```console
 docker run \
     --interactive --tty \
     --volume=/path/to/data:/data \
     --workdir=/data \
+    reproraxmlng
     mpirun -np $(nproc) \
     raxml-ng-mpi --msa /data/msa.fa --model DNA
 ```
