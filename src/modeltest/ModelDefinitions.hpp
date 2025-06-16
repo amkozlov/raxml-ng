@@ -20,7 +20,7 @@ public:
 };
 
 inline void check_supported_datatype(const DataType &datatype) {
-    if (!(datatype == DataType::dna || datatype == DataType::protein)) {
+    if (!(datatype == DataType::dna || datatype == DataType::protein || datatype == DataType::binary)) {
         throw unsupported_datatype_error();
     }
 }
@@ -247,7 +247,7 @@ inline std::string normalize_model_name(const std::string &model_name) {
     return model_name;
 }
 
-const std::vector<std::string> aa_model_names{
+const std::vector<std::string> aa_substitution_matrix_names{
     "DAYHOFF", //  0
     "LG", //  1
     "DCMUT", //  2

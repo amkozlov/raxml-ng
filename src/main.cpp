@@ -252,7 +252,8 @@ void init_part_info(RaxmlInstance &instance) {
   }
   else if (opts.command == Command::modeltest ||
            opts.model_file == "auto" || opts.model_file == "AUTO" ||
-           opts.model_file == "DNA"  || opts.model_file == "AA")
+           opts.model_file == "DNA"  || opts.model_file == "AA" ||
+           opts.model_file == "BIN")
   {
     // Use dummy model (will be overwritten by ModelTest)
     string dummy_model = "";
@@ -260,8 +261,10 @@ void init_part_info(RaxmlInstance &instance) {
       dummy_model = "GTR+G";
     else if (opts.data_type == DataType::protein || opts.model_file == "AA")
       dummy_model = "LG+G";
+    else if (opts.data_type == DataType::binary || opts.model_file == "BIN")
+      dummy_model = "BIN+G";
     else
-      throw runtime_error("Specify the datatype for modeltesting with --data-type [AA|DNA]");
+      throw runtime_error("Specify the datatype for modeltesting with --data-type [AA|DNA|BIN]");
     parted_msa.init_single_model(opts.data_type, dummy_model);
     opts.model_file = "auto";
   }

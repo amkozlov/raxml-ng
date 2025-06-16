@@ -21,18 +21,30 @@ ModelTest::ModelTest(const Options &original_options, const PartitionedMSA &msa,
     : options(modify_options(original_options)), optimizer(options), msa(msa), tree(tree),
                                             tip_msa_idmap(tip_msa_idmap), part_assign(part_assign) { }
 
+const vector<string> get_matrix_names(const DataType datatype) {
+    switch(datatype) {
+    case DataType::dna:
+        return dna_substitution_matrix_names;
+    case DataType::protein:
+        return aa_substitution_matrix_names;
+    case DataType::binary:
+        return vector<string>({"BIN"});
 
+    case DataType::autodetect:
+    case DataType::multistate:
+    case DataType::genotype10:
+        throw unsupported_datatype_error();
+    }
+}
 vector<candidate_model_t> ModelTest::generate_candidate_model_names(const DataType &dt) const {
     vector<candidate_model_t> candidate_models;
     check_supported_datatype(dt);
-
-    const auto &matrix_names = dt == DataType::dna ? dna_substitution_matrix_names : aa_model_names;
 
     const auto freerate_cmin = options.free_rate_min_categories;
     const auto freerate_cmax = options.free_rate_max_categories;
     const auto gamma_category_count = 4;
 
-    for (const auto &subst_model: matrix_names) {
+    for (const auto &subst_model: get_matrix_names(dt)) {
         for (const auto &frequency_type: default_frequency_type) {
             for (const auto &rate_heterogeneity: default_rate_heterogeneity) {
                 if (rate_heterogeneity == rate_heterogeneity_type::FREE_RATE) {
