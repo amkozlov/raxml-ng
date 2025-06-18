@@ -3613,7 +3613,6 @@ int internal_main(int argc, char **argv, void *comm) {
       case Command::bootstrap:
       case Command::all:
       case Command::ancestral:
-      case Command::modeltest:
       {
         master_main(instance, cm);
         printf("Model name: %s\n", instance.parted_msa->model(0).name().c_str());

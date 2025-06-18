@@ -130,7 +130,7 @@ private:
 
   void init(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
             const IDVector &tip_msa_idmap, const PartitionAssignment &part_assign,
-            const std::vector<uintVector> &site_weights, int single_partition_id, const Model &model);
+            const std::vector<uintVector> &site_weights);
 
   void init(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
             const IDVector &tip_msa_idmap, const PartitionAssignment &part_assign,

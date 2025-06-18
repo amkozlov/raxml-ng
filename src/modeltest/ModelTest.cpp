@@ -33,8 +33,11 @@ const vector<string> get_matrix_names(const DataType datatype) {
     case DataType::autodetect:
     case DataType::multistate:
     case DataType::genotype10:
+    case DataType::genotype16:
         throw unsupported_datatype_error();
     }
+
+    return {};
 }
 vector<candidate_model_t> ModelTest::generate_candidate_model_names(const DataType &dt) const {
     vector<candidate_model_t> candidate_models;
@@ -59,7 +62,7 @@ vector<candidate_model_t> ModelTest::generate_candidate_model_names(const DataTy
                 } else if (rate_heterogeneity == rate_heterogeneity_type::GAMMA || rate_heterogeneity ==
                            rate_heterogeneity_type::INVARIANT_GAMMA) {
                     candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity,
-                                                  freerate_cmin, freerate_cmax);
+                                                  gamma_category_count);
                 } else {
                     candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity);
                 }
@@ -104,6 +107,7 @@ public:
     void store_results(int partition_index, const candidate_model_t &candidate_model, PartitionModelEvaluation &result) {
         std::lock_guard<std::mutex> lock(mutex_results);
 
+        const double bic = result.ic_criteria.at(InformationCriterion::bic);
         results->at(partition_index).push_back(result);
 
 //        printf("thread: %u, model#: %s\n", ParallelContext::thread_id(), result.model.to_string().c_str());
@@ -235,46 +239,29 @@ vector<string> ModelTest::optimize_model() {
 
 
 
-    while (execution_status.get_next_model(partition_index, &candidate_model))
-    {
-        double last_score = std::numeric_limits<double>::infinity();
-        for (unsigned int num_rate_cats = candidate_model->rate_categories;
-             num_rate_cats <= candidate_model->max_rate_categories; ++num_rate_cats) {
-            const auto &model_descriptor = candidate_model->descriptor + (
-                                               candidate_model->rate_heterogeneity == rate_heterogeneity_t::FREE_RATE
-                                                   ? std::to_string(num_rate_cats)
-                                                   : "");
+    while (execution_status.get_next_model(partition_index, &candidate_model)) {
+        const auto &model_descriptor = candidate_model->descriptor();
 
-//            LOG_WORKER_TS(LogLevel::info) << "partition " << partition_index + 1 << "/" << msa.part_count()
-//                << " model " << normalize_model_name(model_descriptor) << endl;
+        //LOG_WORKER_TS(LogLevel::info) << "partition " << partition_index + 1 << "/" << msa.part_count()
+        //        << " model " << normalize_model_name(model_descriptor) << endl;
 
-            Model model(model_descriptor);
-            assign(model, msa.part_info(partition_index).stats());
-            TreeInfo treeinfo(options, tree, msa, tip_msa_idmap, part_assign, partition_index, model);
-            optimizer.optimize_model(treeinfo);
+        Model model(model_descriptor);
+        assign(model, msa.part_info(partition_index).stats());
+        TreeInfo treeinfo(options, tree, msa, tip_msa_idmap, part_assign, partition_index, model);
+        optimizer.optimize_model(treeinfo);
 
-            // Retrieve values from optimized partition
-            // partition id is always 0, since our treeinfo only contains a single partition
-            assign(model, treeinfo, 0); 
+        // Retrieve values from optimized partition
+        // partition id is always 0, since our treeinfo only contains a single partition
+        assign(model, treeinfo, 0); 
 
-            const double partition_loglh = treeinfo.pll_treeinfo().partition_loglh[0];
-            const size_t free_params = model.num_free_params() + treeinfo.tree().num_branches();
-            const size_t sample_size = msa.part_info(partition_index).stats().site_count;
-            ICScoreCalculator ic_score_calculator(free_params, sample_size);
+        const double partition_loglh = treeinfo.pll_treeinfo().partition_loglh[0];
+        const size_t free_params = model.num_free_params() + treeinfo.tree().num_branches();
+        const size_t sample_size = msa.part_info(partition_index).stats().site_count;
+        ICScoreCalculator ic_score_calculator(free_params, sample_size);
 
-            PartitionModelEvaluation partition_results { model, partition_loglh, ic_score_calculator.all(partition_loglh) };
+        PartitionModelEvaluation partition_results { model, partition_loglh, ic_score_calculator.all(partition_loglh) };
 
-            const double new_score = partition_results.ic_criteria.at(InformationCriterion::bic);
-            execution_status.store_results(partition_index, *candidate_model, partition_results);
-            execution_status.print_results(partition_index, partition_results);
-
-            if (candidate_model->rate_heterogeneity.type == rate_heterogeneity_type::FREE_RATE && enable_freerate_heuristic &&
-                new_score >= last_score) {
-                break; // Skip evaluating freerate
-            }
-
-            last_score = new_score;
-        }
+        execution_status.store_results(partition_index, *candidate_model, partition_results);
     }
 
     // sync ALL threads across ALL workers
