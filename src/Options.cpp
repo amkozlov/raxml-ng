@@ -41,7 +41,7 @@ num_threads(1), num_threads_max(1), num_ranks(1), num_workers(1), num_workers_ma
 simd_arch(CORAX_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(LoadBalancing::benoit),
 diff_pred_pars_trees(RAXML_CPYTHIA_TREES_NUM), nni_tolerance(1.0), nni_epsilon(10),
 num_sh_reps(RAXML_SH_ALRT_REPS), sh_epsilon(RAXML_SH_ALRT_EPSILON),
-free_rate_min_categories(0), free_rate_max_categories(0) 
+free_rate_min_categories(0), free_rate_max_categories(0), free_rate_opt_method(FreerateOptMethod::LBFGSB)
 {}
 
 unsigned int Options::max_num_replicates(const SupportMetricSet& mset) const
@@ -270,6 +270,18 @@ void Options::remove_tmp_files() const
   sysutil_file_remove(tmp_best_tree_file());
   sysutil_file_remove(tmp_ml_trees_file());
   sysutil_file_remove(tmp_bs_trees_file());
+}
+
+string Options::free_rate_opt_method_name() const
+{
+    switch(free_rate_opt_method) {
+    case FreerateOptMethod::EM:
+        return "Expectation-Maximization";
+    case FreerateOptMethod::LBFGSB:
+        return "L-BFGS-B";
+    default:
+        return "UNKNOWN";
+    }
 }
 
 string Options::simd_arch_name() const
@@ -634,6 +646,7 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       stream << "user-specified";
     stream << ")" << endl;
   }
+  stream << "  FreeRate Optimization Method: " << opts.free_rate_opt_method_name() << endl;
 
   stream << "  SIMD kernels: " << opts.simd_arch_name() << endl;
 

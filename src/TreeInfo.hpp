@@ -127,6 +127,7 @@ private:
   bool _use_spr_fastclv;
   double _lh_epsilon;
   doubleVector _partition_contributions;
+  FreerateOptMethod _freerate_opt;
 
   void init(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
             const IDVector &tip_msa_idmap, const PartitionAssignment &part_assign,

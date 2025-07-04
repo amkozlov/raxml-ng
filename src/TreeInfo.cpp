@@ -117,6 +117,7 @@ void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA 
   _use_old_constraint = opts.use_old_constraint;
   _use_spr_fastclv = opts.use_spr_fastclv;
   _lh_epsilon = opts.lh_epsilon;
+  _freerate_opt = opts.free_rate_opt_method;
 
   _partition_contributions.resize(parted_msa.part_count());
   double total_weight = 0;
@@ -402,13 +403,26 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon) {
   // TODO: co-optimization of PINV and ALPHA, mb with multiple starting points
   /* optimize FREE RATES and WEIGHTS */
   if (params_to_optimize & CORAX_OPT_PARAM_FREE_RATES) {
-    new_loglh = -1 * corax_algo_opt_rates_weights_treeinfo(_pll_treeinfo,
-                                                           RAXML_FREERATE_MIN,
-                                                           RAXML_FREERATE_MAX,
-                                                           _brlen_min,
-                                                           _brlen_max,
-                                                           RAXML_BFGS_FACTOR,
-                                                           RAXML_PARAM_EPSILON);
+    switch (_freerate_opt) {
+      case FreerateOptMethod::EM:
+        new_loglh = -1 * corax_algo_opt_rates_weights_em_treeinfo(_pll_treeinfo,
+                                                                  RAXML_FREERATE_MIN,
+                                                                  RAXML_FREERATE_MAX,
+                                                                  _brlen_min,
+                                                                  _brlen_max,
+                                                                  RAXML_BFGS_FACTOR,
+                                                                  RAXML_PARAM_EPSILON);
+        break;
+      case FreerateOptMethod::LBFGSB:
+        new_loglh = -1 * corax_algo_opt_rates_weights_treeinfo(_pll_treeinfo,
+                                                               RAXML_FREERATE_MIN,
+                                                               RAXML_FREERATE_MAX,
+                                                               _brlen_min,
+                                                               _brlen_max,
+                                                               RAXML_BFGS_FACTOR,
+                                                               RAXML_PARAM_EPSILON);
+        break;
+    }
 
     LOG_DEBUG << "\t - after freeR: logLH = " << new_loglh << endl;
     //    LOG_DEBUG << "\t - after freeR/crosscheck: logLH = " << loglh() << endl;

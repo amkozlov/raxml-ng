@@ -1,4 +1,7 @@
 #include "CommandLineParser.hpp"
+#include "Options.hpp"
+#include "corax/core/partition.h"
+#include "types.hpp"
 #include "version.h"
 
 #include <getopt.h>
@@ -98,6 +101,7 @@ static struct option long_options[] =
   {"fast",               no_argument,       0, 0 },  /*  71 */
   {"modeltest",          no_argument,       0, 0 },  /*  72 */
   {"modeltest-freerate-categories", optional_argument, 0, 0}, /*  73 */
+  {"freerate-opt", required_argument, 0, 0}, /* 74*/
 
   { 0, 0, 0, 0 }
 };
@@ -1395,6 +1399,20 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.free_rate_max_categories = max;
         break;
       }
+      case 74: /* freerate optimization method */
+        if (strcasecmp(optarg, "em") == 0) {
+          opts.free_rate_opt_method = FreerateOptMethod::EM;
+
+          if (!(opts.use_repeats == false && opts.use_tip_inner == false && opts.simd_arch == CORAX_ATTRIB_ARCH_AVX2 &&
+                opts.data_type == DataType::dna && opts.num_threads == 1)) {
+            throw InvalidOptionValueException(
+              "EM algorithm currently is only implemented for DNA and AVX2 with site repeats and tip inner disabled using a single thread and partition.");
+          }
+        } else if (strcasecmp(optarg, "lbfgsb") == 0) {
+          opts.free_rate_opt_method = FreerateOptMethod::LBFGSB;
+        } else
+          throw InvalidOptionValueException("Unknown FreeRate optimization method: " + string(optarg));
+        break;
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -1541,6 +1559,7 @@ void CommandLineParser::print_help()
             "  --opt-branches on | off                    ML optimization of all branch lengths (default: ON)\n"
             "  --prob-msa     on | off                    use probabilistic alignment (works with CATG and VCF)\n"
             "  --lh-epsilon   VALUE                       log-likelihood epsilon for optimization/tree search (default: 10)\n"
+            "  --freerate-opt em | lbfgsb                 Optimization method for freerate (default: lbfgsb)\n"
             "\n"
             "Modeltest options:\n"
             "  --modeltest-freerate-categories n[-m]      Test freerate models with n categories (optionally up to and including m)\n"
