@@ -1402,12 +1402,6 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 74: /* freerate optimization method */
         if (strcasecmp(optarg, "em") == 0) {
           opts.free_rate_opt_method = FreerateOptMethod::EM;
-
-          if (!(opts.use_repeats == false && opts.use_tip_inner == false && opts.simd_arch == CORAX_ATTRIB_ARCH_AVX2 &&
-                opts.data_type == DataType::dna && opts.num_threads == 1)) {
-            throw InvalidOptionValueException(
-              "EM algorithm currently is only implemented for DNA and AVX2 with site repeats and tip inner disabled using a single thread and partition.");
-          }
         } else if (strcasecmp(optarg, "lbfgsb") == 0) {
           opts.free_rate_opt_method = FreerateOptMethod::LBFGSB;
         } else
