@@ -3,5 +3,5 @@
 	url = https://github.com/amkozlov/terraphast-one
 [submodule "libs/coraxlib"]
 	path = libs/coraxlib
-	url = https://github.com/stelzch/coraxlib
+	url = git@github.com:stelzch/coraxlib
 	branch = dev
