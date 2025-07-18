@@ -155,10 +155,9 @@ public:
     const rate_heterogeneity_t rate_heterogeneity;
 
     candidate_model_t(DataType datatype, string matrix_name, const frequency_type_t frequency_type,
-                      const rate_heterogeneity_type rate_heterogeneity, const unsigned int rate_categories = 1)
+                      const rate_heterogeneity_type rate_heterogeneity, unsigned int rate_categories = 1)
         : datatype(datatype), substitution_model(matrix_name, frequency_type),
-          rate_heterogeneity(rate_heterogeneity, rate_categories) {
-    }
+          rate_heterogeneity(rate_heterogeneity, rate_categories) { }
 
     std::string descriptor() const {
         return substitution_model.matrix_name + frequency_type_label(datatype, substitution_model.base_frequency) + rate_heterogeneity.label();
