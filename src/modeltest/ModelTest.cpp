@@ -1,8 +1,10 @@
 
 #include "ModelTest.hpp"
 
+#include <iomanip>
 #include <memory>
 #include <mutex>
+#include <sstream>
 
 #if defined(__i386__) || defined(__x86_64__)
 #include <emmintrin.h>
@@ -16,6 +18,16 @@
 #include "../ICScoreCalculator.hpp"
 #include "RHASHeuristic.hpp"
 #include "corax/tree/treeinfo.h"
+
+static thread_local std::stringstream thread_log;
+#define LOG_THREAD_TS (thread_log << std::setprecision(19) << global_timer().elapsed_seconds() << " MT Thread " << ParallelContext::thread_id())
+
+
+void save_thread_log(const std::string &filename) {
+    std::ofstream of(filename);
+    of << thread_log.str();
+    of.close();
+}
 
 Options modify_options(const Options &other) {
 Options options(other);
@@ -173,6 +185,11 @@ void PartitionModelEvaluation::reduce(void *context, double *data, size_t size, 
   }
 }
 
+const size_t &PartitionModelEvaluation::proposed_thread_count() const
+{
+    return _proposed_thread_count;
+
+}
 ModelTest::ModelTest(const Options &original_options, const PartitionedMSA &msa, const Tree &tree, const IDVector &tip_msa_idmap,
                      const PartitionAssignment &part_assign)
     : options(modify_options(original_options)), optimizer(options), msa(msa), tree(tree),
@@ -245,10 +262,13 @@ public:
         partition_count = msa.part_count();
 
         /* Substitution model used for heuristics, e.g. use GTR to test RHAS feasibility */
-        const auto &reference_model = this->candidate_models.at(0).substitution_model;
+        reference_model.emplace(this->candidate_models.at(0).substitution_model);
 
         this->evaluations = std::make_unique<vector<PartitionModelEvaluation> >();
         evaluations->reserve(candidate_models.size() * partition_count);
+
+
+        std::vector<rate_heterogeneity_t> selected_rhas;
 
         for (unsigned int p = 0; p < partition_count; ++p) {
             const auto &pinfo = msa.part_info(p);
@@ -262,6 +282,10 @@ public:
                                                     ParallelContext::num_threads());
 
                 this->evaluations->emplace_back(candidate_model, p, priority, thread_count);
+
+                if (p == 0 && candidate_model.substitution_model == reference_model) {
+                    selected_rhas.push_back(candidate_model.rate_heterogeneity);
+                }
             }
         }
 
@@ -280,7 +304,7 @@ public:
         this->use_freerate_heuristic = use_freerate_heuristic;
 
         this->rhas_heuristic_per_part.clear();
-        this->rhas_heuristic_per_part.resize(partition_count, RHASHeuristic(reference_model));
+        this->rhas_heuristic_per_part.resize(partition_count, RHASHeuristic(*reference_model, selected_rhas));
 
         this->freerate_heuristic_per_part.clear();
         this->freerate_heuristic_per_part.resize(partition_count,
@@ -298,18 +322,24 @@ public:
         evaluation.store_result(std::move(result));
 
         const double bic = evaluation.get_result().ic_criteria.at(InformationCriterion::bic);
+        const auto p = evaluation.partition_index();
+
+        if (use_freerate_heuristic) {
+            this->freerate_heuristic_per_part.at(p).
+                    update(evaluation.candidate_model(), bic);
+        }
 
         if (use_rhas_heuristic) {
-            this->rhas_heuristic_per_part.at(evaluation.partition_index()).update(evaluation.candidate_model(), bic);
-
-            // TODO: fix this if models are not computed in sequence. Later models might finish earlier
-            if (evaluation.candidate_model().substitution_model != candidate_models.at(0).substitution_model) {
-                this->rhas_heuristic_per_part.at(evaluation.partition_index()).reference_complete();
-            }
+            this->rhas_heuristic_per_part.at(p).update(evaluation.candidate_model(), bic);
         }
-        if (use_freerate_heuristic) {
-            this->freerate_heuristic_per_part.at(evaluation.partition_index()).
-                    update(evaluation.candidate_model(), bic);
+
+        /* Notify RHAS heuristic if freerate heuristic has converged */
+        if (use_rhas_heuristic && use_freerate_heuristic) {
+                const auto optimal_category_count = this->freerate_heuristic_per_part.at(p).optimal_category_count(*reference_model);
+
+                if (optimal_category_count > 0) {
+                    this->rhas_heuristic_per_part.at(p).freerate_complete(optimal_category_count);
+                }
         }
     }
 
@@ -396,6 +426,7 @@ private:
     std::mutex mutex_log;
     Evaluations::iterator iterator;
     size_t partition_count;
+    std::optional<substitution_model_t> reference_model;
 
     bool use_rhas_heuristic;
     std::vector<RHASHeuristic> rhas_heuristic_per_part;
@@ -455,8 +486,12 @@ vector<string> ModelTest::optimize_model() {
 
 
     PartitionModelEvaluation *evaluation = nullptr;
+
+    const auto default_precision = std::cout.precision();
+    cout << std::setprecision(19);
+
     while ((evaluation = execution_status.get_next_model()) != nullptr) {
-        cout << global_timer().elapsed_seconds() << " MT Thread " << ParallelContext::thread_id() << " scheduled to work on " << evaluation->candidate_model().descriptor() << " as thread " << evaluation->thread_id() << endl;
+        LOG_THREAD_TS << " scheduled to work on " << evaluation->candidate_model().descriptor() << " as thread " << evaluation->thread_id() << " out of " << evaluation->proposed_thread_count() << endl;
 
         const auto scheduling_time = global_timer().elapsed_seconds();
         evaluation->wait();
@@ -467,7 +502,7 @@ vector<string> ModelTest::optimize_model() {
         if (evaluation->get_status() == EvaluationStatus::ABORTED)
             continue;
 
-        cout << global_timer().elapsed_seconds() << " MT Thread " << ParallelContext::thread_id() << " begins work after waiting for " << 1e3 * scheduling_overhead << " milliseconds." << endl;
+        LOG_THREAD_TS << " begins work after waiting for " << 1e3 * scheduling_overhead << " milliseconds." << endl;
 
 
         // TODO: * use proper PartitionAssignment to distribute sites among threads
@@ -498,7 +533,9 @@ vector<string> ModelTest::optimize_model() {
                 start_index = evaluation->thread_id() * fair_share;
             }
             assignment.assign_sites(0, start_index, assigned_sites, evaluation->candidate_model().rate_heterogeneity.category_count);
+            LOG_THREAD_TS << " assigned sites offset=" << start_index << " length=" << assigned_sites << " total_sites=" << n << endl;
         }
+
 
         //LOG_WORKER_TS(LogLevel::info) << "partition " << partition_index + 1 << "/" << msa.part_count()
         //        << " model " << normalize_model_name(model_descriptor) << endl;
@@ -527,7 +564,11 @@ vector<string> ModelTest::optimize_model() {
 
             execution_status.update_result(*evaluation, std::move(partition_results));
         }
+
+        LOG_THREAD_TS << " evaluation of " << evaluation->candidate_model().descriptor() << " concluded." << endl;
     }
+
+    cout << std::setprecision(default_precision);
 
     // sync ALL threads across ALL workers
     // TODO: MPI
@@ -570,6 +611,11 @@ vector<string> ModelTest::optimize_model() {
             best_model_per_part.emplace_back(best_model.model.to_string(false));
         }
     }
+
+    if (options.log_level == LogLevel::debug) {
+        save_thread_log(options.outfile_prefix + ".raxml.modeltest.thread" + std::to_string(ParallelContext::thread_id()) + ".log");
+    }
+
     return best_model_per_part;
 }
 

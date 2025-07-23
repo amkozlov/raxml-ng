@@ -1,12 +1,35 @@
 #include "RHASHeuristic.hpp"
 #include "ModelDefinitions.hpp"
 #include <algorithm>
+#include <cstdlib>
+#include <stdexcept>
 #include "../log.hpp"
 
 RHASHeuristic::RHASHeuristic(substitution_model_t reference_model,
+                             const std::vector<rate_heterogeneity_t> &selected_rhas,
                              double delta_bic)
     : reference_model{reference_model},
       delta_bic{delta_bic} {
+    for (const auto &rhas : selected_rhas) {
+        auto it = missing_model_counts.emplace(rhas.type, 0).first;
+
+        ++it->second;
+    }
+}
+
+void RHASHeuristic::drop_one(const rate_heterogeneity_t &rhas)
+{
+    const auto type = rhas.type;
+    auto it = missing_model_counts.find(type);
+    if (it == missing_model_counts.end() || it->second <= 0) {
+        throw std::logic_error("RHASHeuristic received unexpected result for '" + rhas.label() + "'");
+    }
+    assert(it != missing_model_counts.end());
+    assert(it->second > 0);
+    auto remaining_outstanding_scores = --it->second;
+
+    if (remaining_outstanding_scores == 0)
+        missing_model_counts.erase(it);
 }
 
 void RHASHeuristic::update(const candidate_model_t &candidate_model, double score) {
@@ -16,6 +39,11 @@ void RHASHeuristic::update(const candidate_model_t &candidate_model, double scor
 
     const auto rate_het = candidate_model.rate_heterogeneity;
     observed_bic_score[rate_het] = score;
+    drop_one(rate_het);
+    
+    if (skip.empty() && missing_model_counts.empty()) {
+        reference_complete();
+    }
 }
 
 void RHASHeuristic::reference_complete() {
@@ -30,12 +58,31 @@ void RHASHeuristic::reference_complete() {
     })->second;
 
     for (auto it = observed_bic_score.cbegin(); it != observed_bic_score.cend(); ++it) {
-        bool exceeding_bic_limit = it->second - bic_min > delta_bic;
+        const auto &rhas = it->first;
 
-        if (exceeding_bic_limit) {
-            LOG_DEBUG << "Skipping rate heterogeneity model '" << it->first.label() << "'\n";
+        const bool exceeding_bic_limit = it->second - bic_min > delta_bic;
+        skip[rhas] = exceeding_bic_limit;
+
+        if (rhas.type == rate_heterogeneity_type::FREE_RATE && freerate_optimal_category_count.has_value()) {
+            skip[rhas] |= (rhas.category_count != freerate_optimal_category_count);
         }
-        skip[it->first] = exceeding_bic_limit;
+
+        if (skip[rhas]) {
+            LOG_DEBUG << "Skipping rate heterogeneity model '" << rhas.label() << "'\n";
+        }
+    }
+}
+
+void RHASHeuristic::freerate_complete(unsigned int optimal_category_count) {
+    if (freerate_optimal_category_count.has_value()) {
+        return;
+    }
+
+    missing_model_counts.erase(rate_heterogeneity_type::FREE_RATE);
+    freerate_optimal_category_count = optimal_category_count;
+
+    if (skip.empty() && missing_model_counts.empty()) {
+        reference_complete();
     }
 }
 
@@ -49,9 +96,4 @@ bool RHASHeuristic::can_skip(const candidate_model_t &candidate) const {
     }
 
     return it->second;
-}
-
-void RHASHeuristic::clear() {
-    observed_bic_score.clear();
-    skip.clear();
 }

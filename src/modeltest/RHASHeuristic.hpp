@@ -1,6 +1,8 @@
 #pragma once
 
+#include <optional>
 #include <unordered_map>
+#include <unordered_set>
 #include "ModelDefinitions.hpp"
 
 /** Heuristically disable RHAS models based on performance of reference matrix.
@@ -20,7 +22,7 @@
  */
 class RHASHeuristic {
     public:
-    RHASHeuristic(substitution_model_t reference_model, double delta_bic = 10.0);
+    RHASHeuristic(substitution_model_t reference_model, const std::vector<rate_heterogeneity_t> &selected_rhas, double delta_bic = 10.0);
 
     /** Add model testing result that this heuristic should consider.
      *  If the model matrix does not coincide with the reference matrix specified
@@ -28,24 +30,30 @@ class RHASHeuristic {
      */
     void update(const candidate_model_t &candidate_model, double score);
 
-    /**
-     * Signals that all reference RHAS variants have been computed and that evaluation of heuristic can start now.
-     */
-    void reference_complete();
+    /** Signals that the FreerateHeuristic converged and that the optimal number of categories is now known. */
+    void freerate_complete(unsigned int optimal_category_count);
 
     /** Check whether a given candidate model can be skipped because of poor expectations of its RHAS model
      */
     bool can_skip(const candidate_model_t &candidate_model) const;
 
-    /** Reset previously recorded BIC scores */
-    void clear();
-
-
 private:
+    /** Signals that all reference RHAS variants have been computed and that evaluation of heuristic can start now. */
+    void reference_complete();
+
+    void drop_one(const rate_heterogeneity_t &rhas);
 
     substitution_model_t reference_model;
     double delta_bic;
 
     std::unordered_map<rate_heterogeneity_t, double> observed_bic_score;
+
     std::unordered_map<rate_heterogeneity_t, bool> skip;
+
+    /** Maps from a rate heterogeneity type to the number of outstanding
+     * results with that type. The latter is typically 1 (e.g. for +E, +I where
+     * we don't vary the category count) but for freerate it is the number of
+     * category counts to be tested (e.g. 5 if we consider +R2,...,+R6) */
+    std::unordered_map<rate_heterogeneity_type, unsigned int> missing_model_counts;
+    std::optional<unsigned int> freerate_optimal_category_count;
 };

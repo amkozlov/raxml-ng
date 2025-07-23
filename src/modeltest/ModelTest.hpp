@@ -65,6 +65,7 @@ public:
     const size_t &partition_index() const;
     const unsigned int &thread_id() const;
     const unsigned int volatile &assigned_threads() const;
+    const size_t &proposed_thread_count() const;
 
     const candidate_model_t &candidate_model() const;
 

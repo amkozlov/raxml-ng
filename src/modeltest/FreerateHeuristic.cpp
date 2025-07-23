@@ -1,5 +1,6 @@
 #include "FreerateHeuristic.hpp"
 #include "ModelDefinitions.hpp"
+#include <algorithm>
 #include <utility>
 
 FreerateHeuristic::FreerateHeuristic(unsigned int min_cats, unsigned int max_cats)
@@ -38,6 +39,16 @@ void FreerateHeuristic::update(const candidate_model_t &candidate_model, double 
             entry.skip_start_index = std::min(entry.skip_start_index, c + 2);
         }
     }
+
+    const bool observed_score_increase = entry.skip_start_index <= max_categories;
+    if (observed_score_increase) {
+        const bool all_previous_scores_present = std::all_of(
+                entry.scores.cbegin(),
+                entry.scores.cbegin() + index(entry.skip_start_index),
+                [](const auto &score ) { return score != NO_SCORE_PRESENT; });
+
+        entry.converged = all_previous_scores_present;
+    }
 }
 
 bool FreerateHeuristic::can_skip(const candidate_model_t &candidate_model) const {
@@ -51,29 +62,15 @@ bool FreerateHeuristic::can_skip(const candidate_model_t &candidate_model) const
         return false;
 
     return candidate_model.rate_heterogeneity.category_count >= it->second.skip_start_index;
+}
 
-    /*
-    const unsigned int i = index(candidate_model.rate_heterogeneity.category_count);
-    // Need at least two previous entries
-    if (i < 2) {
-        return false;
-    }
+int FreerateHeuristic::optimal_category_count(const substitution_model_t &substitution_model) const {
+    const auto it = score_map.find(substitution_model);
 
-    auto it = score_map.find(candidate_model.substitution_model);
-    if (it == score_map.end()) {
-        return false;
-    }
+    if (it == score_map.cend() || !it->second.converged)
+        return -1;
 
-    const double score1 = it->second.at(i - 2);
-    const double score2 = it->second.at(i - 1);
-
-    if (score1 == NO_SCORE_PRESENT || score2 == NO_SCORE_PRESENT) {
-        return false;
-    }
-
-    const bool score_previously_increased = score1 < score2;
-    return score_previously_increased;
-    */
+    return it->second.skip_start_index;
 }
 
 void FreerateHeuristic::clear() {
