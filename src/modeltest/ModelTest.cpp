@@ -46,11 +46,12 @@ bool PartitionModelEvaluation::join_team() {
 
     assert(_assigned_threads < _proposed_thread_count);
 
+    _thread_id = _assigned_threads++;
+
     if (_assigned_threads == _proposed_thread_count) {
         status = EvaluationStatus::RUNNING;
     }
 
-    _thread_id = _assigned_threads++;
 
     return true;
 }
@@ -76,16 +77,24 @@ void PartitionModelEvaluation::store_result(EvaluationResult &&result) {
     status = EvaluationStatus::FINISHED;
 }
 
-EvaluationStatus PartitionModelEvaluation::get_status() const {
+const volatile EvaluationStatus &PartitionModelEvaluation::get_status() const {
     return status;
 }
 
-size_t PartitionModelEvaluation::partition_index() const {
+const size_t &PartitionModelEvaluation::partition_index() const {
     return _partition_index;
 }
 
 const candidate_model_t &PartitionModelEvaluation::candidate_model() const {
     return _candidate_model;
+}
+
+const unsigned int &PartitionModelEvaluation::thread_id() const {
+    return _thread_id;
+}
+
+const unsigned int volatile &PartitionModelEvaluation::assigned_threads() const {
+    return _assigned_threads;
 }
 
 EvaluationPriority PartitionModelEvaluation::priority() const {
@@ -228,11 +237,11 @@ public:
     }
 
     template<typename F>
-    void initialize(std::vector<candidate_model_t> candidate_models, const PartitionedMSA &msa,
+    void initialize(std::vector<candidate_model_t> _candidate_models, const PartitionedMSA &msa,
                     const Options &options,
                     F resource_estimator,
                     bool use_rhas_heuristic = false, bool use_freerate_heuristic = false) {
-        this->candidate_models = std::move(candidate_models);
+        this->candidate_models = std::move(_candidate_models);
         partition_count = msa.part_count();
 
         /* Substitution model used for heuristics, e.g. use GTR to test RHAS feasibility */
@@ -249,13 +258,14 @@ public:
                         candidate_model.substitution_model == reference_model
                             ? EvaluationPriority::HIGH
                             : EvaluationPriority::NORMAL;
-                const auto thread_count = resource_estimator(options, pinfo, candidate_model, priority);
+                const auto thread_count = CORAX_MIN(resource_estimator(options, pinfo, candidate_model, priority),
+                                                    ParallelContext::num_threads());
 
                 this->evaluations->emplace_back(candidate_model, p, priority, thread_count);
             }
         }
 
-        /* TODO: sort by priority
+        /* TODO: sort by priority across partitions
         std::sort(evaluations->begin(), evaluations->end(),
                   [](const PartitionModelEvaluation &a, const PartitionModelEvaluation &b) {
                       // Sort by priority, high priority should come first
@@ -282,6 +292,7 @@ public:
 
 
     void update_result(PartitionModelEvaluation &evaluation, EvaluationResult &&result) {
+        LOG_DEBUG_TS << "Model evaluation of " << evaluation.candidate_model().descriptor() << " finished, BIC = " << result.ic_criteria.at(InformationCriterion::bic) << ", LogLH = " << result.partition_loglh << endl;
         std::lock_guard<std::mutex> lock(mutex_evaluation);
 
         evaluation.store_result(std::move(result));
@@ -345,6 +356,9 @@ public:
         // Skip candidates that either can be skipped because of heuristic assumptions or that do not need further threads
         while (is_iterator_valid() && (can_skip_heuristically() || iterator->get_status() !=
                                        EvaluationStatus::WAITING)) {
+            if (can_skip_heuristically() && iterator->get_status() == EvaluationStatus::WAITING) {
+                iterator->abort();
+            }
             ++iterator;
         }
 
@@ -442,7 +456,18 @@ vector<string> ModelTest::optimize_model() {
 
     PartitionModelEvaluation *evaluation = nullptr;
     while ((evaluation = execution_status.get_next_model()) != nullptr) {
+        cout << global_timer().elapsed_seconds() << " MT Thread " << ParallelContext::thread_id() << " scheduled to work on " << evaluation->candidate_model().descriptor() << " as thread " << evaluation->thread_id() << endl;
+
+        const auto scheduling_time = global_timer().elapsed_seconds();
         evaluation->wait();
+
+        const auto scheduling_overhead = global_timer().elapsed_seconds() - scheduling_time;
+
+        /* If a heuristic applies by now, just continue with the next candidate */
+        if (evaluation->get_status() == EvaluationStatus::ABORTED)
+            continue;
+
+        cout << global_timer().elapsed_seconds() << " MT Thread " << ParallelContext::thread_id() << " begins work after waiting for " << 1e3 * scheduling_overhead << " milliseconds." << endl;
 
 
         // TODO: * use proper PartitionAssignment to distribute sites among threads
@@ -452,27 +477,56 @@ vector<string> ModelTest::optimize_model() {
         //       * Test in prod
         const auto &model_descriptor = evaluation->candidate_model().descriptor();
 
+
+        PartitionAssignment assignment;
+
+        {
+            /* Assign a fair share of sites to all threads, with the higher thread ids taking care of the remainder */
+
+            assert(evaluation->thread_id() < evaluation->assigned_threads());
+            const auto n = msa.part_info(evaluation->partition_index()).length();
+            const auto fair_share = n / evaluation->assigned_threads();
+
+            const auto remainder_tid = evaluation->assigned_threads() - n % evaluation->assigned_threads();
+            const bool remainder_assigned = evaluation->thread_id() >= remainder_tid;
+            const auto assigned_sites = remainder_assigned ? fair_share + 1 : fair_share;
+
+            size_t start_index;
+            if (remainder_assigned) {
+                start_index = remainder_tid * fair_share + (evaluation->thread_id() - remainder_tid) * (fair_share + 1);
+            } else {
+                start_index = evaluation->thread_id() * fair_share;
+            }
+            assignment.assign_sites(0, start_index, assigned_sites, evaluation->candidate_model().rate_heterogeneity.category_count);
+        }
+
         //LOG_WORKER_TS(LogLevel::info) << "partition " << partition_index + 1 << "/" << msa.part_count()
         //        << " model " << normalize_model_name(model_descriptor) << endl;
 
         // TODO: proper synchronization
         Model model(model_descriptor);
         assign(model, msa.part_info(evaluation->partition_index()).stats());
-        TreeInfo treeinfo(options, tree, msa, tip_msa_idmap, part_assign, evaluation->partition_index(), model);
+        //msa.model(size_t index)
+        TreeInfo treeinfo(options, tree, msa, tip_msa_idmap, assignment, &model);
+
+        treeinfo.custom_reduce(evaluation, PartitionModelEvaluation::reduce);
         optimizer.optimize_model(treeinfo);
 
-        // Retrieve values from optimized partition.
-        // The partition id is always 0, since our treeinfo only contains a single partition
-        assign(model, treeinfo, 0); 
 
-        const double partition_loglh = treeinfo.pll_treeinfo().partition_loglh[0];
-        const size_t free_params = model.num_free_params() + treeinfo.tree().num_branches();
-        const size_t sample_size = msa.part_info(evaluation->partition_index()).stats().site_count;
-        ICScoreCalculator ic_score_calculator(free_params, sample_size);
+        if (evaluation->thread_id() == 0) {
+            // Retrieve values from optimized partition.
+            // The partition id is always 0, since our treeinfo only contains a single partition
+            assign(model, treeinfo, 0); 
 
-        EvaluationResult partition_results{model, partition_loglh, ic_score_calculator.all(partition_loglh)};
+            const double partition_loglh = treeinfo.pll_treeinfo().partition_loglh[0];
+            const size_t free_params = model.num_free_params() + treeinfo.tree().num_branches();
+            const size_t sample_size = msa.part_info(evaluation->partition_index()).stats().site_count;
+            ICScoreCalculator ic_score_calculator(free_params, sample_size);
 
-        execution_status.update_result(*evaluation, std::move(partition_results));
+            EvaluationResult partition_results{model, partition_loglh, ic_score_calculator.all(partition_loglh)};
+
+            execution_status.update_result(*evaluation, std::move(partition_results));
+        }
     }
 
     // sync ALL threads across ALL workers
@@ -559,7 +613,7 @@ void ModelTest::print_xml(ostream &os, const vector<PartitionModelEvaluation> &r
 
     for (const auto &evaluation: results) {
         os << "<model partition=\"" << evaluation.partition_index()
-                << "\"name=\"" << evaluation.candidate_model().descriptor()
+                << "\" name=\"" << evaluation.candidate_model().descriptor()
                 << "\" status=\"";
         switch (evaluation.get_status()) {
             case EvaluationStatus::WAITING:

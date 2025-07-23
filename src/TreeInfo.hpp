@@ -52,7 +52,8 @@ struct sh_support_params {
 class TreeInfo {
 public:
   TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
-            const IDVector& tip_msa_idmap, const PartitionAssignment& part_assign);
+            const IDVector& tip_msa_idmap, const PartitionAssignment& part_assign,
+            const Model *override_model = nullptr);
 
   /* with custom site weights, e.g. for bootstrapping */
   TreeInfo (const Options &opts, const Tree& tree, const PartitionedMSA& parted_msa,
@@ -112,6 +113,9 @@ public:
 
   void sh_support(const sh_support_params &params, doubleVector &support_values);
 
+
+  void custom_reduce(void *parallel_context, void (*parallel_reduce_cb)(void *, double *, size_t, int));
+
   // int savePartition(const char* filename, int partIndex);
 
   // corax_partition_t* loadPartition(const char* filename);
@@ -131,7 +135,7 @@ private:
 
   void init(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
             const IDVector &tip_msa_idmap, const PartitionAssignment &part_assign,
-            const std::vector<uintVector> &site_weights);
+            const std::vector<uintVector> &site_weights, const Model *override_model);
 
   void init(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
             const IDVector &tip_msa_idmap, const PartitionAssignment &part_assign,

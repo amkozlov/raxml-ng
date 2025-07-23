@@ -60,9 +60,11 @@ public:
 
     const EvaluationResult &get_result() const;
 
-    EvaluationStatus get_status() const;
+    const volatile EvaluationStatus &get_status() const;
 
-    size_t partition_index() const;
+    const size_t &partition_index() const;
+    const unsigned int &thread_id() const;
+    const unsigned int volatile &assigned_threads() const;
 
     const candidate_model_t &candidate_model() const;
 

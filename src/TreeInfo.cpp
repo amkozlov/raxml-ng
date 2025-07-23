@@ -2,20 +2,22 @@
 
 #include "TreeInfo.hpp"
 #include "ParallelContext.hpp"
+#include "corax/tree/treeinfo.h"
 
 using namespace std;
 
 TreeInfo::TreeInfo(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
                    const IDVector &tip_msa_idmap,
-                   const PartitionAssignment &part_assign) {
-  init(opts, tree, parted_msa, tip_msa_idmap, part_assign, std::vector<uintVector>());
+                   const PartitionAssignment &part_assign,
+                   const Model *override_model) {
+  init(opts, tree, parted_msa, tip_msa_idmap, part_assign, std::vector<uintVector>(), override_model);
 }
 
 TreeInfo::TreeInfo(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
                    const IDVector &tip_msa_idmap,
                    const PartitionAssignment &part_assign,
                    const std::vector<uintVector> &site_weights) {
-  init(opts, tree, parted_msa, tip_msa_idmap, part_assign, site_weights);
+  init(opts, tree, parted_msa, tip_msa_idmap, part_assign, site_weights, nullptr);
 }
 
 TreeInfo::TreeInfo(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
@@ -109,7 +111,8 @@ void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA 
 void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
                     const IDVector &tip_msa_idmap,
                     const PartitionAssignment &part_assign,
-                    const std::vector<uintVector> &site_weights) {
+                    const std::vector<uintVector> &site_weights,
+                    const Model *override_model) {
   _brlen_min = opts.brlen_min;
   _brlen_max = opts.brlen_max;
   _brlen_opt_method = opts.brlen_opt_method;
@@ -137,8 +140,9 @@ void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA 
 
   for (size_t p = 0; p < parted_msa.part_count(); ++p) {
     const PartitionInfo &pinfo = parted_msa.part_info(p);
+    const Model &model = override_model == nullptr ? pinfo.model() : *override_model;
     const auto &weights = site_weights.empty() ? pinfo.msa().weights() : site_weights.at(p);
-    int params_to_optimize = opts.optimize_model ? pinfo.model().params_to_optimize() : 0;
+    int params_to_optimize = opts.optimize_model ? model.params_to_optimize() : 0;
     params_to_optimize |= optimize_branches;
 
     _partition_contributions[p] = std::accumulate(weights.begin(), weights.end(), 0);
@@ -147,15 +151,15 @@ void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA 
     PartitionAssignment::const_iterator part_range = part_assign.find(p);
     if (part_range != part_assign.end()) {
       /* create and init PLL partition structure */
-      corax_partition_t *partition = create_pll_partition(opts, pinfo.msa(), pinfo.model(),
+      corax_partition_t *partition = create_pll_partition(opts, pinfo.msa(), model,
                                                           tip_msa_idmap, *part_range, weights);
 
       int retval = corax_treeinfo_init_partition(_pll_treeinfo, p, partition,
                                                  params_to_optimize,
-                                                 pinfo.model().gamma_mode(),
-                                                 pinfo.model().alpha(),
-                                                 pinfo.model().ratecat_submodels().data(),
-                                                 pinfo.model().submodel(0).rate_sym().data());
+                                                 model.gamma_mode(),
+                                                 model.alpha(),
+                                                 model.ratecat_submodels().data(),
+                                                 model.submodel(0).rate_sym().data());
 
       if (!retval) {
         assert(corax_errno);
@@ -165,7 +169,7 @@ void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA 
       // set per-partition branch lengths or scalers
       if (opts.brlen_linkage == CORAX_BRLEN_SCALED) {
         assert(_pll_treeinfo->brlen_scalers);
-        _pll_treeinfo->brlen_scalers[p] = pinfo.model().brlen_scaler();
+        _pll_treeinfo->brlen_scalers[p] = model.brlen_scaler();
       } else if (opts.brlen_linkage == CORAX_BRLEN_UNLINKED && !tree.partition_brlens().empty()) {
         assert(_pll_treeinfo->branch_lengths[p]);
         memcpy(_pll_treeinfo->branch_lengths[p], tree.partition_brlens(p).data(),
@@ -843,3 +847,8 @@ corax_partition_t* TreeInfo::loadPartition(const char* bin_fname){
   //cout << "Done inside" << endl;
   return _partition;
 } */
+
+void TreeInfo::custom_reduce(void *parallel_context, void (*parallel_reduce_cb)(void *, double *, size_t, int))
+{
+    corax_treeinfo_set_parallel_context(_pll_treeinfo, parallel_context, parallel_reduce_cb);
+}
