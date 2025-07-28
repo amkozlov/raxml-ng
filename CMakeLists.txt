@@ -44,6 +44,12 @@ set (CMAKE_CXX_FLAGS_RELEASE  "-O3"    CACHE INTERNAL "")
 set(CMAKE_C_FLAGS_DEBUG "-O0 -ggdb" CACHE INTERNAL "")
 set (CMAKE_C_FLAGS_RELEASE  "-O3"    CACHE INTERNAL "")
 
+option(ENABLE_SANITIZERS "Use UBSan and Thread Sanitizer" OFF)
+
+if (ENABLE_SANITIZERS)
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=undefined -fsanitize=thread" CACHE INTERNAL "")
+endif()
+
 project (raxml-ng C CXX)
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")

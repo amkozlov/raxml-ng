@@ -541,6 +541,7 @@ vector<string> ModelTest::optimize_model() {
         //        << " model " << normalize_model_name(model_descriptor) << endl;
 
         // TODO: proper synchronization
+        evaluation->barrier();
         Model model(model_descriptor);
         assign(model, msa.part_info(evaluation->partition_index()).stats());
         //msa.model(size_t index)
