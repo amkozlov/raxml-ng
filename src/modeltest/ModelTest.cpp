@@ -5,6 +5,7 @@
 #include <memory>
 #include <mutex>
 #include <sstream>
+#include <stdexcept>
 
 #if defined(__i386__) || defined(__x86_64__)
 #include <emmintrin.h>
@@ -32,6 +33,7 @@ void save_thread_log(const std::string &filename) {
 Options modify_options(const Options &other) {
 Options options(other);
 options.lh_epsilon = 0.01; // Use same LH-epsilon as ModelTest-NG
+options.brlen_linkage = CORAX_BRLEN_LINKED; // Partitions are computed in isolation, no need for scalers
 
 return options;
 }
@@ -120,6 +122,15 @@ const EvaluationResult &PartitionModelEvaluation::get_result() const {
 
 void PartitionModelEvaluation::barrier()
 {
+  if (status != EvaluationStatus::RUNNING)
+  {
+      throw logic_error("Barrier called but evaluation does not have status RUNNING");
+  }
+
+  if (_assigned_threads == 1) {
+      return;
+  }
+
   /* cf. ParallelContext::thread_barrier */
   static thread_local volatile int myCycle = 0;
 
@@ -127,7 +138,7 @@ void PartitionModelEvaluation::barrier()
 
   if(_thread_id == 0)
   {
-    while(_barrier_counter != _proposed_thread_count);
+    while(_barrier_counter != _assigned_threads);
     _barrier_counter = 0;
     _barrier_proceed = !_barrier_proceed;
   }
@@ -545,7 +556,7 @@ vector<string> ModelTest::optimize_model() {
         Model model(model_descriptor);
         assign(model, msa.part_info(evaluation->partition_index()).stats());
         //msa.model(size_t index)
-        TreeInfo treeinfo(options, tree, msa, tip_msa_idmap, assignment, &model);
+        TreeInfo treeinfo(options, tree, msa, tip_msa_idmap, assignment, evaluation->partition_index(), model);
 
         treeinfo.custom_reduce(evaluation, PartitionModelEvaluation::reduce);
         optimizer.optimize_model(treeinfo);

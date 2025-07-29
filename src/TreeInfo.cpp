@@ -35,15 +35,13 @@ void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA 
                     const std::vector<uintVector> &site_weights,
                     int single_partition_id, const Model &model)
 {
-   // might be used later for fine-grained parallelization
-   RAXML_UNUSED(part_assign);
-
   _brlen_min = opts.brlen_min;
   _brlen_max = opts.brlen_max;
   _brlen_opt_method = opts.brlen_opt_method;
   _check_lh_impr = opts.safety_checks.isset(SafetyCheck::model_lh_impr);
   _use_old_constraint = opts.use_old_constraint;
   _use_spr_fastclv = opts.use_spr_fastclv;
+  _freerate_opt = opts.free_rate_opt_method;
 
   size_t partition_count = 1;
 
@@ -57,11 +55,6 @@ void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA 
   libpll_check_error("ERROR creating treeinfo structure");
   assert(_pll_treeinfo);
 
-  if (false) {
-    corax_treeinfo_set_parallel_context(_pll_treeinfo, (void *) nullptr,
-                                        ParallelContext::parallel_reduce_cb);
-  }
-
   // init partitions
   int optimize_branches = opts.optimize_brlen ? CORAX_OPT_PARAM_BRANCHES_ITERATIVE : 0;
 
@@ -74,8 +67,8 @@ void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA 
   _partition_contributions[0] = std::accumulate(weights.begin(), weights.end(), 0);
   total_weight += _partition_contributions[0];
 
-  PartitionRange part_range(0, 0, parted_msa.part_info(single_partition_id).length(), model.clv_entry_size());
   /* create and init PLL partition structure */
+  const auto part_range = part_assign[0];
   corax_partition_t *partition = create_pll_partition(opts, pinfo.msa(), model, tip_msa_idmap,
                                                       part_range, weights);
 
@@ -101,7 +94,11 @@ void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA 
            tree.num_branches() * sizeof(double));
   }
 
-  _parts_master.insert(0);
+  if (part_range.master()) {
+    _parts_master.insert(0);
+  } else {
+      _pll_treeinfo->params_to_optimize[0] = params_to_optimize;
+  }
 
   // finalize partition contribution computation
   for (auto &c: _partition_contributions)
