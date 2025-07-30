@@ -40,6 +40,7 @@ return options;
 
 
 thread_local unsigned int PartitionModelEvaluation::_thread_id = 0;
+thread_local int PartitionModelEvaluation::_barrier_mycycle = 0;
 PartitionModelEvaluation::PartitionModelEvaluation(candidate_model_t &candidate_model,
                                                    size_t partition_index, EvaluationPriority priority,
                                                    const size_t proposed_thread_count)
@@ -61,6 +62,7 @@ bool PartitionModelEvaluation::join_team() {
     assert(_assigned_threads < _proposed_thread_count);
 
     _thread_id = _assigned_threads++;
+    _barrier_mycycle = 0;
 
     if (_assigned_threads == _proposed_thread_count) {
         status = EvaluationStatus::RUNNING;
@@ -120,19 +122,10 @@ const EvaluationResult &PartitionModelEvaluation::get_result() const {
     return _result;
 }
 
+/* cf. ParallelContext::thread_barrier */
 void PartitionModelEvaluation::barrier()
 {
-  if (status != EvaluationStatus::RUNNING)
-  {
-      throw logic_error("Barrier called but evaluation does not have status RUNNING");
-  }
-
-  if (_assigned_threads == 1) {
-      return;
-  }
-
-  /* cf. ParallelContext::thread_barrier */
-  static thread_local volatile int myCycle = 0;
+  assert(status != EvaluationStatus::WAITING);
 
   __sync_fetch_and_add( &_barrier_counter, 1);
 
@@ -144,8 +137,8 @@ void PartitionModelEvaluation::barrier()
   }
   else
   {
-    while(myCycle == _barrier_proceed);
-    myCycle = !myCycle;
+    while(_barrier_mycycle == _barrier_proceed);
+    _barrier_mycycle = !_barrier_mycycle;
   }
 }
 

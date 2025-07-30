@@ -74,7 +74,6 @@ public:
     void barrier();
      
     static void reduce(void *context, double *data, size_t size, int op);
-
 private:
     size_t _proposed_thread_count;
     candidate_model_t &_candidate_model;
@@ -85,6 +84,7 @@ private:
     volatile EvaluationStatus status;
     volatile unsigned int _barrier_counter;
     volatile int _barrier_proceed;
+    static thread_local int _barrier_mycycle;
 
     volatile unsigned int _assigned_threads;
     vector<double> _reduce_buffer;
