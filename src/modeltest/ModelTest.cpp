@@ -470,7 +470,7 @@ size_t estimate_cores(const Options &options, const PartitionInfo &pinfo, const 
     return CORAX_MAX(round(static_cast<double>(taxon_clv_size) / elems_per_core), 1.);
 }
 
-vector<string> ModelTest::optimize_model() {
+vector<Model> ModelTest::optimize_model() {
     const bool enable_rhas_heuristic = std::getenv("MODELTEST_RHAS_NOSKIP") == nullptr;
     const bool enable_freerate_heuristic = std::getenv("MODELTEST_FREERATE_NOSKIP") == nullptr;
 
@@ -579,7 +579,7 @@ vector<string> ModelTest::optimize_model() {
     // TODO: MPI
     ParallelContext::global_thread_barrier();
 
-    vector<string> best_model_per_part;
+    vector<Model> best_model_per_part;
     if (ParallelContext::master()) {
         auto xml_fname = options.output_fname("modeltest.xml");
         fstream xml_stream(xml_fname, std::ios::out);
@@ -613,7 +613,7 @@ vector<string> ModelTest::optimize_model() {
                 << " = " << msa.part_info(p).range_string() << endl;
 
 
-            best_model_per_part.emplace_back(best_model.model.to_string(false));
+            best_model_per_part.emplace_back(best_model.model);
         }
     }
 

@@ -104,7 +104,7 @@ public:
     vector<candidate_model_t> generate_candidate_model_names(const DataType &dt) const;
 
     /* Optimize the model and return model name per partition */
-    vector<string> optimize_model();
+    vector<Model> optimize_model();
 
 private:
     Options options;
