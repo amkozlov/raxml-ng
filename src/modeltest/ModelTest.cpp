@@ -7,10 +7,6 @@
 #include <sstream>
 #include <stdexcept>
 
-#if defined(__i386__) || defined(__x86_64__)
-#include <emmintrin.h>
-#endif
-
 #include <list>
 #include <optional>
 
@@ -20,15 +16,10 @@
 #include "RHASHeuristic.hpp"
 #include "corax/tree/treeinfo.h"
 
-static thread_local std::stringstream thread_log;
-#define LOG_THREAD_TS (thread_log << std::setprecision(19) << global_timer().elapsed_seconds() << " MT Thread " << ParallelContext::thread_id())
+static thread_local std::unique_ptr<std::ofstream> thread_log;
+#define LOG_THREAD_TS (*thread_log << std::setprecision(19) << global_timer().elapsed_seconds() << " MT Thread " << ParallelContext::thread_id())
 
 
-void save_thread_log(const std::string &filename) {
-    std::ofstream of(filename);
-    of << thread_log.str();
-    of.close();
-}
 
 Options modify_options(const Options &other) {
 Options options(other);
@@ -78,7 +69,6 @@ void PartitionModelEvaluation::abort() {
 
 EvaluationStatus PartitionModelEvaluation::wait() const {
     while (status == EvaluationStatus::WAITING) {
-        _mm_pause();
     }
 
     return status;
@@ -353,11 +343,13 @@ public:
 
         if (use_freerate_heuristic &&
             freerate_heuristic_per_part.at(iterator->partition_index()).can_skip(iterator->candidate_model())) {
+            LOG_THREAD_TS << " skipping " << iterator->candidate_model().descriptor() << " due to FreerateHeuristic" << endl;
             return true;
         }
 
         if (use_rhas_heuristic &&
             rhas_heuristic_per_part.at(iterator->partition_index()).can_skip(iterator->candidate_model())) {
+            LOG_THREAD_TS << " skipping " << iterator->candidate_model().descriptor() << " due to RHASHeuristic" << endl;
             return true;
         }
 
@@ -402,6 +394,11 @@ public:
         assert(iterator->get_status() == EvaluationStatus::WAITING);
         bool success = iterator->join_team();
         assert(success);
+
+        if (iterator->get_status() == EvaluationStatus::RUNNING) {
+            size_t model_index = iterator - evaluations->begin();
+            logger().logstream(LogLevel::progress, LogScope::thread) << RAXML_LOG_TIMESTAMP << "Evaluating model " << model_index << "/" << evaluations->size() << endl;
+        }
 
         return &(*iterator);
     }
@@ -471,6 +468,7 @@ size_t estimate_cores(const Options &options, const PartitionInfo &pinfo, const 
 }
 
 vector<Model> ModelTest::optimize_model() {
+    thread_log.reset(new std::ofstream(options.outfile_prefix + ".raxml.modeltest.thread" + std::to_string(ParallelContext::thread_id()) + ".log"));
     const bool enable_rhas_heuristic = std::getenv("MODELTEST_RHAS_NOSKIP") == nullptr;
     const bool enable_freerate_heuristic = std::getenv("MODELTEST_FREERATE_NOSKIP") == nullptr;
 
@@ -598,13 +596,11 @@ vector<Model> ModelTest::optimize_model() {
         LOG_INFO << endl << "Best model(s):" << endl;
         auto all_results = execution_status.get_results();
 
-        //decltype(all_results) finished_results(msa.part_count());
-
         const auto results = execution_status.collect_finished_results_by_partition();
         for (auto p = 0U; p < msa.part_count(); ++p) {
             auto bic_ranking = rank_by_score(results.at(p), InformationCriterion::bic);
             const auto &best_model = results.at(p).at(bic_ranking.at(0));
-            LOG_INFO << "Partition #" << p << ": " << best_model.model.to_string()
+            logger().logstream(LogLevel::result, LogScope::thread) << "Partition #" << p << ": " << best_model.model.to_string()
                      << " (LogLH = " << FMT_LH(best_model.partition_loglh)
                      << "  BIC = "  << FMT_LH(best_model.ic_criteria.at(InformationCriterion::bic))
                      << ")" << endl;
@@ -617,9 +613,7 @@ vector<Model> ModelTest::optimize_model() {
         }
     }
 
-    if (options.log_level == LogLevel::debug) {
-        save_thread_log(options.outfile_prefix + ".raxml.modeltest.thread" + std::to_string(ParallelContext::thread_id()) + ".log");
-    }
+    thread_log->close();
 
     return best_model_per_part;
 }
