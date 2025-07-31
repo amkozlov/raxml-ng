@@ -22,7 +22,10 @@ void RHASHeuristic::drop_one(const rate_heterogeneity_t &rhas)
     const auto type = rhas.type;
     auto it = missing_model_counts.find(type);
     if (it == missing_model_counts.end() || it->second <= 0) {
-        throw std::logic_error("RHASHeuristic received unexpected result for '" + rhas.label() + "'");
+        /* In some cases, freerate converges while a higher category count is
+         * still in-flight. In this case freerate will already be removed from
+         * the missing_model_counts and we do not need to worry about it. */
+        return;
     }
     assert(it != missing_model_counts.end());
     assert(it->second > 0);
