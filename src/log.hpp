@@ -29,6 +29,13 @@ enum class LogElement
   other
 };
 
+enum class LogScope
+{
+    main = 0,
+    worker,
+    thread
+};
+
 
 typedef std::map<LogElement, unsigned int> LogElementMap;
 
@@ -70,7 +77,7 @@ public:
   void log_level(LogLevel level);
   LogLevel log_level() const;
 
-  LogStream& logstream(LogLevel level, bool worker = false);
+  LogStream& logstream(LogLevel level, LogScope source = LogScope::main);
 
   void set_log_filename(const std::string& fname, std::ios_base::openmode mode = std::ios::out);
   void add_log_stream(std::ostream* stream);
@@ -98,7 +105,7 @@ private:
 Logging& logger();
 
 #define RAXML_LOG(level) logger().logstream(level)
-#define RAXML_LOG_WORKER(level) logger().logstream(level, true)
+#define RAXML_LOG_WORKER(level) logger().logstream(level, LogScope::worker)
 
 #define LOG_ERROR RAXML_LOG(LogLevel::error)
 #define LOG_WARN RAXML_LOG(LogLevel::warning)

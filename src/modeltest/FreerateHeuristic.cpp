@@ -28,7 +28,7 @@ void FreerateHeuristic::update(const candidate_model_t &candidate_model, double 
         double previous_score = entry.scores.at(i - 1);
 
         if (previous_score != NO_SCORE_PRESENT && !has_score_improved(previous_score, score)) {
-            entry.skip_start_index = std::min(entry.skip_start_index, c + 1);
+            entry.skip_start_index = std::min(entry.skip_start_index, c);
         }
     }
 
@@ -36,7 +36,7 @@ void FreerateHeuristic::update(const candidate_model_t &candidate_model, double 
         double next_score = entry.scores.at(i + 1);
 
         if (next_score != NO_SCORE_PRESENT && !has_score_improved(score, next_score)) {
-            entry.skip_start_index = std::min(entry.skip_start_index, c + 2);
+            entry.skip_start_index = std::min(entry.skip_start_index, c + 1);
         }
     }
 
@@ -70,7 +70,7 @@ int FreerateHeuristic::optimal_category_count(const substitution_model_t &substi
     if (it == score_map.cend() || !it->second.converged)
         return -1;
 
-    return it->second.skip_start_index;
+    return it->second.skip_start_index - 1;
 }
 
 void FreerateHeuristic::clear() {
