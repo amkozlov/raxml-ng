@@ -263,6 +263,7 @@ public:
                     F resource_estimator,
                     bool use_rhas_heuristic = false, bool use_freerate_heuristic = false) {
         this->candidate_models = std::move(_candidate_models);
+        evaluation_index = 0;
         partition_count = msa.part_count();
 
         /* Substitution model used for heuristics, e.g. use GTR to test RHAS feasibility */
@@ -301,8 +302,6 @@ public:
                   });
                   */
 
-
-        iterator = evaluations->begin();
 
         this->use_rhas_heuristic = use_rhas_heuristic;
         this->use_freerate_heuristic = use_freerate_heuristic;
@@ -347,17 +346,20 @@ public:
         }
     }
 
+    auto &get_current_evaluation() const {
+        return evaluations->at(evaluation_index);
+    }
+
     bool can_skip_heuristically() const {
-        if (iterator == evaluations->end())
-            return false;
+        const auto &evaluation = get_current_evaluation();
 
         if (use_freerate_heuristic &&
-            freerate_heuristic_per_part.at(iterator->partition_index()).can_skip(iterator->candidate_model())) {
+            freerate_heuristic_per_part.at(evaluation.partition_index()).can_skip(evaluation.candidate_model())) {
             return true;
         }
 
         if (use_rhas_heuristic &&
-            rhas_heuristic_per_part.at(iterator->partition_index()).can_skip(iterator->candidate_model())) {
+            rhas_heuristic_per_part.at(evaluation.partition_index()).can_skip(evaluation.candidate_model())) {
             return true;
         }
 
@@ -377,8 +379,9 @@ public:
     }
 
     bool is_iterator_valid() const {
-        return iterator != evaluations->end();
+        return evaluation_index < evaluations->size();
     }
+
 
     PartitionModelEvaluation *get_next_model() {
         if (evaluations->empty()) {
@@ -388,22 +391,23 @@ public:
         std::lock_guard<std::mutex> lock(mutex_evaluation);
 
         // Skip candidates that either can be skipped because of heuristic assumptions or that do not need further threads
-        while (is_iterator_valid() && (can_skip_heuristically() || iterator->get_status() !=
+        while (is_iterator_valid() && (can_skip_heuristically() || get_current_evaluation().get_status() !=
                                        EvaluationStatus::WAITING)) {
-            if (can_skip_heuristically() && iterator->get_status() == EvaluationStatus::WAITING) {
-                iterator->abort();
+            if (can_skip_heuristically() && get_current_evaluation().get_status() == EvaluationStatus::WAITING) {
+                get_current_evaluation().abort();
             }
-            ++iterator;
+            ++evaluation_index;
         }
 
         if (!is_iterator_valid())
             return nullptr;
 
-        assert(iterator->get_status() == EvaluationStatus::WAITING);
-        bool success = iterator->join_team();
+        auto &evaluation = get_current_evaluation();
+        assert(evaluation.get_status() == EvaluationStatus::WAITING);
+        bool success = evaluation.join_team();
         assert(success);
 
-        return &(*iterator);
+        return &evaluation;
     }
 
     vector<vector<EvaluationResult> > collect_finished_results_by_partition() const {
@@ -428,7 +432,7 @@ private:
     std::vector<candidate_model_t> candidate_models;
     std::mutex mutex_evaluation;
     std::mutex mutex_log;
-    Evaluations::iterator iterator;
+    size_t evaluation_index;
     size_t partition_count;
     std::optional<substitution_model_t> reference_model;
 
@@ -552,7 +556,7 @@ vector<Model> ModelTest::optimize_model() {
         TreeInfo treeinfo(options, tree, msa, tip_msa_idmap, assignment, evaluation->partition_index(), model);
 
         treeinfo.custom_reduce(evaluation, PartitionModelEvaluation::reduce);
-        optimizer.optimize_model(treeinfo);
+        double optimized_loglh = optimizer.optimize_model(treeinfo);
 
 
         if (evaluation->thread_id() == 0) {
