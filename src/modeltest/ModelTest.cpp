@@ -1,8 +1,10 @@
 
 #include "ModelTest.hpp"
 
+#include <cstdint>
 #include <iomanip>
 #include <memory>
+#include <mpi.h>
 #include <mutex>
 #include <sstream>
 #include <stdexcept>
@@ -18,6 +20,7 @@
 
 static thread_local std::unique_ptr<std::ofstream> thread_log;
 #define LOG_THREAD_TS (*thread_log << std::setprecision(19) << global_timer().elapsed_seconds() << " MT Thread " << ParallelContext::thread_id())
+#define LOG_THREAD (*thread_log)
 
 
 
@@ -115,68 +118,68 @@ const EvaluationResult &PartitionModelEvaluation::get_result() const {
 /* cf. ParallelContext::thread_barrier */
 void PartitionModelEvaluation::barrier()
 {
-  assert(status != EvaluationStatus::WAITING);
+assert(status != EvaluationStatus::WAITING);
 
-  __sync_fetch_and_add( &_barrier_counter, 1);
+__sync_fetch_and_add( &_barrier_counter, 1);
 
-  if(_thread_id == 0)
-  {
+if(_thread_id == 0)
+{
     while(_barrier_counter != _assigned_threads);
     _barrier_counter = 0;
     _barrier_proceed = !_barrier_proceed;
-  }
-  else
-  {
+}
+else
+{
     while(_barrier_mycycle == _barrier_proceed);
     _barrier_mycycle = !_barrier_mycycle;
-  }
+}
 }
 
 void PartitionModelEvaluation::reduce(void *context, double *data, size_t size, int op)
 {
-  PartitionModelEvaluation *c = static_cast<PartitionModelEvaluation *>(context);
+PartitionModelEvaluation *c = static_cast<PartitionModelEvaluation *>(context);
 
-  /* synchronize */
-  c->barrier();
+/* synchronize */
+c->barrier();
 
-  double *double_buf = (double*) c->_reduce_buffer.data();
+double *double_buf = (double*) c->_reduce_buffer.data();
 
-  /* collect data from threads */
-  size_t i, j;
-  for (i = 0; i < size; ++i)
+/* collect data from threads */
+size_t i, j;
+for (i = 0; i < size; ++i)
     double_buf[c->_thread_id * size + i] = data[i];
 
-  /* synchronize */
-  c->barrier();
+/* synchronize */
+c->barrier();
 
-  /* reduce */
-  for (i = 0; i < size; ++i)
-  {
+/* reduce */
+for (i = 0; i < size; ++i)
+{
     switch(op)
     {
-      case CORAX_REDUCE_SUM:
-      {
+    case CORAX_REDUCE_SUM:
+    {
         data[i] = 0.;
         for (j = 0; j < c->_assigned_threads; ++j)
-          data[i] += double_buf[j * size + i];
-      }
-      break;
-      case CORAX_REDUCE_MAX:
-      {
-        data[i] = double_buf[i];
-        for (j = 1; j < c->_assigned_threads; ++j)
-          data[i] = max(data[i], double_buf[j * size + i]);
-      }
-      break;
-      case CORAX_REDUCE_MIN:
-      {
-        data[i] = double_buf[i];
-        for (j = 1; j < c->_assigned_threads; ++j)
-          data[i] = min(data[i], double_buf[j * size + i]);
-      }
-      break;
+        data[i] += double_buf[j * size + i];
     }
-  }
+    break;
+    case CORAX_REDUCE_MAX:
+    {
+        data[i] = double_buf[i];
+        for (j = 1; j < c->_assigned_threads; ++j)
+        data[i] = max(data[i], double_buf[j * size + i]);
+    }
+    break;
+    case CORAX_REDUCE_MIN:
+    {
+        data[i] = double_buf[i];
+        for (j = 1; j < c->_assigned_threads; ++j)
+        data[i] = min(data[i], double_buf[j * size + i]);
+    }
+    break;
+    }
+}
 }
 
 const size_t &PartitionModelEvaluation::proposed_thread_count() const
@@ -185,7 +188,7 @@ const size_t &PartitionModelEvaluation::proposed_thread_count() const
 
 }
 ModelTest::ModelTest(const Options &original_options, const PartitionedMSA &msa, const Tree &tree, const IDVector &tip_msa_idmap,
-                     const PartitionAssignment &part_assign)
+                    const PartitionAssignment &part_assign)
     : options(modify_options(original_options)), optimizer(options), msa(msa), tree(tree),
                                             tip_msa_idmap(tip_msa_idmap), part_assign(part_assign) { }
 
@@ -228,9 +231,9 @@ vector<candidate_model_t> ModelTest::generate_candidate_model_names(const DataTy
                         candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity, c);
                     }
                 } else if (rate_heterogeneity == rate_heterogeneity_type::GAMMA || rate_heterogeneity ==
-                           rate_heterogeneity_type::INVARIANT_GAMMA) {
+                        rate_heterogeneity_type::INVARIANT_GAMMA) {
                     candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity,
-                                                  gamma_category_count);
+                                                gamma_category_count);
                 } else {
                     candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity);
                 }
@@ -242,19 +245,65 @@ vector<candidate_model_t> ModelTest::generate_candidate_model_names(const DataTy
 }
 
 
-class ExecutionStatus final {
-public:
-    ExecutionStatus() : use_rhas_heuristic(false), use_freerate_heuristic(false) {
-    }
 
-    template<typename F>
-    void initialize(std::vector<candidate_model_t> _candidate_models, const PartitionedMSA &msa,
+struct alignas(8) EvaluationIndexingMessage {
+    uint64_t evaluation_index;
+};
+
+struct alignas(8) EvaluationResultsMessage {
+    uint64_t evaluation_index;
+    double score;
+};
+
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const EvaluationResult& result)
+{
+    const auto &loglh = result.partition_loglh;
+    stream.write(std::addressof(loglh), sizeof(loglh));
+
+    const auto &s = result.model.to_string(true, 19);
+    const auto &length = s.size();
+    stream.write(std::addressof(length), sizeof(length));
+    stream.write(s.c_str(), s.size());
+
+    return stream;
+}
+
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, EvaluationResult& result)
+{
+    double loglh;
+    stream.read(std::addressof(loglh), sizeof(loglh));
+
+    size_t string_length;
+    stream.read(std::addressof(string_length), sizeof(string_length));
+
+    std::string model_string(string_length, 0);
+    stream.read(model_string.data(), string_length);
+
+    result.partition_loglh = loglh;
+
+    result.model = Model(DataType::autodetect, model_string);
+
+    // TODO: recompute IC criteria
+
+    return stream;
+}
+
+class ExecutionStatus final {
+    public:
+        ExecutionStatus() : use_rhas_heuristic(false), use_freerate_heuristic(false) {
+        }
+
+        template<typename F>
+        void initialize(std::vector<candidate_model_t> _candidate_models, const PartitionedMSA &msa,
                     const Options &options,
                     F resource_estimator,
                     bool use_rhas_heuristic = false, bool use_freerate_heuristic = false) {
         this->candidate_models = std::move(_candidate_models);
-        evaluation_index = 0;
+        evaluation_index = INITIAL_RESULTS_OFFSET;
+        local_results_offset = sizeof(uint64_t);
         partition_count = msa.part_count();
+        branch_count = BasicTree(msa.taxon_count()).num_branches();
+        this->msa = &msa;
 
         /* Substitution model used for heuristics, e.g. use GTR to test RHAS feasibility */
         reference_model.emplace(this->candidate_models.at(0).substitution_model);
@@ -303,37 +352,65 @@ public:
         this->freerate_heuristic_per_part.resize(partition_count,
                                                  FreerateHeuristic(options.free_rate_min_categories,
                                                                    options.free_rate_max_categories));
+
+#if _RAXML_MPI
+        void *baseptr;
+        MPI_Win_allocate(ParallelContext::master() ? sizeof(EvaluationIndexingMessage) : 0, 8, MPI_INFO_NULL, MPI_COMM_WORLD, &baseptr, &index_window);
+
+        size_t results_size = sizeof(uint64_t) + sizeof(EvaluationResultsMessage) * evaluations->size();
+        MPI_Win_allocate(ParallelContext::master() ? results_size : 0, 8, MPI_INFO_NULL, MPI_COMM_WORLD, baseptr, &results_window);
+
+        if (ParallelContext::master()) {
+            uint64_t results_displacement = INITIAL_RESULTS_OFFSET;
+            MPI_Put(&results_displacement, 1, MPI_UINT64_T, 0, 0, 1, MPI_UINT64_T, results_window);
+        }
+
+        MPI_Win_fence(0, results_window);
+#endif
     }
 
-    virtual ~ExecutionStatus() = default;
+
+    ~ExecutionStatus() {
+#if _RAXML_MPI
+        if (ParallelContext::group_master_thread()) {
+            MPI_Win_free(&index_window);
+            MPI_Win_free(&results_window);
+        }
+#endif
+    }
 
 
-    void update_result(PartitionModelEvaluation &evaluation, EvaluationResult &&result) {
-        LOG_DEBUG_TS << "Model evaluation of " << evaluation.candidate_model().descriptor() << " finished, BIC = " << result.ic_criteria.at(InformationCriterion::bic) << ", LogLH = " << result.partition_loglh << endl;
-        std::lock_guard<std::mutex> lock(mutex_evaluation);
-
-        evaluation.store_result(std::move(result));
-
-        const double bic = evaluation.get_result().ic_criteria.at(InformationCriterion::bic);
-        const auto p = evaluation.partition_index();
-
+    void update_heuristics(const PartitionModelEvaluation &evaluation, double score) {
         if (use_freerate_heuristic) {
-            this->freerate_heuristic_per_part.at(p).
-                    update(evaluation.candidate_model(), bic);
+            this->freerate_heuristic_per_part.at(evaluation.partition_index()).
+                    update(evaluation.candidate_model(), score);
         }
 
         if (use_rhas_heuristic) {
-            this->rhas_heuristic_per_part.at(p).update(evaluation.candidate_model(), bic);
+            this->rhas_heuristic_per_part.at(evaluation.partition_index()).update(evaluation.candidate_model(), score);
         }
 
         /* Notify RHAS heuristic if freerate heuristic has converged */
         if (use_rhas_heuristic && use_freerate_heuristic) {
-                const auto optimal_category_count = this->freerate_heuristic_per_part.at(p).optimal_category_count(*reference_model);
+                const auto optimal_category_count = this->freerate_heuristic_per_part.at(evaluation.partition_index()).optimal_category_count(*reference_model);
 
                 if (optimal_category_count > 0) {
-                    this->rhas_heuristic_per_part.at(p).freerate_complete(optimal_category_count);
+                    this->rhas_heuristic_per_part.at(evaluation.partition_index()).freerate_complete(optimal_category_count);
                 }
         }
+    }
+
+    void update_result(PartitionModelEvaluation &evaluation, EvaluationResult &result) {
+        LOG_DEBUG_TS << "Model evaluation of " << evaluation.candidate_model().descriptor() << " finished, BIC = " << result.ic_criteria.at(InformationCriterion::bic) << ", LogLH = " << result.partition_loglh << endl;
+        std::lock_guard<std::mutex> lock(mutex_evaluation);
+
+        evaluation.store_result(std::move(result));
+        const double bic = evaluation.get_result().ic_criteria.at(InformationCriterion::bic);
+        update_heuristics(evaluation, bic);
+
+        const uint64_t index = std::distance(evaluations->data(), std::addressof(evaluation));
+        assert(std::addressof(evaluation) == std::addressof(evaluations->at(index)));
+        store_global_evaluation_result({ index, evaluation.get_result().ic_criteria.at(InformationCriterion::bic) });
     }
 
     auto &get_current_evaluation() const {
@@ -382,6 +459,12 @@ public:
 
         std::lock_guard<std::mutex> lock(mutex_evaluation);
 
+#ifdef _RAXML_MPI
+        MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0, 0, index_window);
+
+        MPI_Get(&evaluation_index, 1, MPI_UINT64_T, 0, 0, 1, MPI_UINT64_T, index_window);
+#endif
+
         // Skip candidates that either can be skipped because of heuristic assumptions or that do not need further threads
         while (is_iterator_valid() && (can_skip_heuristically() || get_current_evaluation().get_status() !=
                                        EvaluationStatus::WAITING)) {
@@ -390,6 +473,11 @@ public:
             }
             ++evaluation_index;
         }
+
+#ifdef _RAXML_MPI
+        MPI_Put(&evaluation_index, 1, MPI_UINT64_T, 0, 0, 1, MPI_UINT64_T, index_window);
+        MPI_Win_unlock(0, index_window);
+#endif
 
         if (!is_iterator_valid())
             return nullptr;
@@ -405,7 +493,83 @@ public:
         return &evaluation;
     }
 
-    vector<vector<EvaluationResult> > collect_finished_results_by_partition() const {
+    void fetch_global_evaluation_results() {
+#ifdef _RAXML_MPI
+        const auto t_start = global_timer().elapsed_seconds();
+        std::lock_guard<std::mutex> lock(mutex_mpi);
+
+        MPI_Win_lock(MPI_LOCK_SHARED, 0, 0, results_window);
+
+        uint64_t global_results_offset;
+        MPI_Get(&global_results_offset, 1, MPI_UINT64_T, 0, 0, 1, MPI_UINT64_T, results_window);
+        
+        assert(global_results_offset >= local_results_offset);
+        const auto new_results_bytes = global_results_offset - local_results_offset;
+        LOG_THREAD_TS << " fetching new results (total of " << new_results_bytes << "B) new result(s) from rank 0: ";
+        serialization_buffer.resize(global_results_offset);
+        const auto displacement = local_results_offset;
+        MPI_Get(serialization_buffer.data(), new_results_bytes, MPI_BYTE, 0, local_results_offset, new_results_bytes, MPI_BYTE, results_window);
+
+        MPI_Win_unlock(0, results_window);
+
+        BinaryStream stream(serialization_buffer.data(), serialization_buffer.size());
+
+        while (stream.pos() < stream.size()) {
+            uint64_t evaluation_index;
+            stream.read(&evaluation_index, sizeof(evaluation_index));
+
+            auto &evaluation = evaluations->at(evaluation_index);
+
+            EvaluationResult result;
+            stream >> result;
+
+            const size_t free_params = result.model.num_free_params() + branch_count;
+            const size_t sample_size = msa->part_info(evaluation.partition_index()).stats().site_count;
+            result.recompute_ic_criteria(free_params, sample_size);
+
+            update_result(evaluation, result);
+        }
+        assert(stream.pos() == stream.size()); // No additional data
+
+        global_results_offset = local_results_offset;
+
+        const auto t_end = global_timer().elapsed_seconds();
+        LOG_THREAD << " in " << (t_end - t_start) << "s" << endl;
+#endif
+    }
+
+    void store_global_evaluation_result(const uint64_t &evaluation_index, EvaluationResult result) {
+        const size_t msg_size = sizeof(uint64_t) + BinaryStream::serialized_size(result);
+        serialization_buffer.resize(msg_size);
+
+        BinaryStream stream(serialization_buffer.data(), msg_size);
+        stream.write(std::addressof(evaluation_index), sizeof(evaluation_index));
+        stream << result;
+
+        const uint64_t num_result_bytes = stream.pos();
+
+
+#ifdef _RAXML_MPI
+        const auto t_start = global_timer().elapsed_seconds();
+        MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0, 0, results_window);
+
+        uint64_t results_offset;
+        MPI_Get(&results_offset, 1, MPI_UINT64_T, 0, 0, 1, MPI_UINT64_T, results_window);
+
+        MPI_Put(&result, num_result_bytes, MPI_BYTE, 0, results_offset, num_result_bytes, MPI_BYTE, results_window);
+
+        MPI_Accumulate(&num_result_bytes, 1, MPI_UINT64_T, 0, 0, 1, MPI_UINT16_T, MPI_SUM, results_window);
+        MPI_Win_unlock(0, results_window);
+        const auto t_end = global_timer().elapsed_seconds();
+
+        LOG_THREAD_TS << " wrote result " << evaluation_index << "=" << result.ic_criteria.at(InformationCriterion::bic) << " to result array at offset " << results_offset << " in " << (t_end - t_start) << " s" << endl;
+#else
+        RAXML_UNUSED(evauation_index);
+        RAXML_UNUSED(result);
+#endif
+    }
+
+    vector<vector<EvaluationResult>> collect_finished_results_by_partition() const {
         vector<vector<EvaluationResult> > results(partition_count);
 
         for (const auto &evaluation: *evaluations) {
@@ -427,8 +591,9 @@ private:
     std::vector<candidate_model_t> candidate_models;
     std::mutex mutex_evaluation;
     std::mutex mutex_log;
-    size_t evaluation_index;
-    size_t partition_count;
+    std::mutex mutex_mpi;
+    uint64_t evaluation_index;
+    size_t partition_count, branch_count;
     std::optional<substitution_model_t> reference_model;
 
     bool use_rhas_heuristic;
@@ -437,6 +602,15 @@ private:
     std::vector<FreerateHeuristic> freerate_heuristic_per_part;
 
     std::unique_ptr<Evaluations> evaluations;
+    const PartitionedMSA *msa;
+
+#if _RAXML_MPI
+    MPI_Win index_window, results_window;
+    vector<char> serialization_buffer;
+    uint64_t local_results_offset;
+    static constexpr uint64_t INITIAL_RESULTS_OFFSET = sizeof(uint64_t);
+#endif
+
 };
 
 ExecutionStatus execution_status; // shared across all threads.
@@ -477,7 +651,7 @@ vector<Model> ModelTest::optimize_model() {
     // TODO this destroyed timestamps -> use local formatting!
 //    LOG_INFO << std::setprecision(20) << std::setfill(' ') << std::left;
 
-    if (ParallelContext::master()) {
+    if (ParallelContext::group_master_thread()) {
         // TODO: support multiple partitions with mixed datatypes
         auto candidate_models = generate_candidate_model_names(msa.part_info(0).model().data_type());
         execution_status.initialize(candidate_models, msa, options, estimate_cores, enable_rhas_heuristic,
@@ -485,9 +659,7 @@ vector<Model> ModelTest::optimize_model() {
     }
 
     // sync ALL threads across ALL workers
-    // TODO: MPI
-    ParallelContext::global_thread_barrier();
-
+    ParallelContext::global_barrier();
 
     PartitionModelEvaluation *evaluation = nullptr;
 
@@ -508,14 +680,7 @@ vector<Model> ModelTest::optimize_model() {
 
         LOG_THREAD_TS << " begins work after waiting for " << 1e3 * scheduling_overhead << " milliseconds." << endl;
 
-
-        // TODO: * use proper PartitionAssignment to distribute sites among threads
-        //       * Set custom parallel_reduce_cb
-        //       * Write back results
-        //       * Run through valgrind, observe race conditions
-        //       * Test in prod
         const auto &model_descriptor = evaluation->candidate_model().descriptor();
-
 
         PartitionAssignment assignment;
 
@@ -552,7 +717,7 @@ vector<Model> ModelTest::optimize_model() {
         TreeInfo treeinfo(options, tree, msa, tip_msa_idmap, assignment, evaluation->partition_index(), model);
 
         treeinfo.custom_reduce(evaluation, PartitionModelEvaluation::reduce);
-        double optimized_loglh = optimizer.optimize_model(treeinfo);
+        optimizer.optimize_model(treeinfo);
 
 
         if (evaluation->thread_id() == 0) {
@@ -576,8 +741,7 @@ vector<Model> ModelTest::optimize_model() {
     cout << std::setprecision(default_precision);
 
     // sync ALL threads across ALL workers
-    // TODO: MPI
-    ParallelContext::global_thread_barrier();
+    ParallelContext::global_barrier();
 
     vector<Model> best_model_per_part;
     if (ParallelContext::master()) {
@@ -678,7 +842,7 @@ void ModelTest::print_xml(ostream &os, const vector<PartitionModelEvaluation> &r
         }
 
         if (evaluation.get_status() == EvaluationStatus::FINISHED) {
-            const auto result = evaluation.get_result();
+            const auto &result = evaluation.get_result();
             os << "\" lnL=\"" << result.partition_loglh
                     << "\" score-bic=\"" << result.ic_criteria.at(InformationCriterion::bic)
                     << "\" score-aic=\"" << result.ic_criteria.at(InformationCriterion::aic)

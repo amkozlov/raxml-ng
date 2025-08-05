@@ -1,10 +1,9 @@
 #ifndef MODELTEST_HPP_
 #define MODELTEST_HPP_
 #include <iosfwd>
-#include <optional>
 #include <vector>
 
-#include "../TreeInfo.hpp"
+#include "../ICScoreCalculator.hpp"
 #include "../Optimizer.hpp"
 #include "ModelDefinitions.hpp"
 
@@ -36,7 +35,18 @@ struct EvaluationResult {
 
         return *this;
     }
+
+    void recompute_ic_criteria(size_t free_params, size_t sample_size)
+    {
+        ICScoreCalculator calc(free_params, sample_size);
+
+        ic_criteria = calc.all(partition_loglh);
+    }
 };
+
+
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const EvaluationResult& result);
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, EvaluationResult& result);
 
 /** Describes the (possibly multi-threaded) evaluation of a given candidate_model_t on a partition.
  * All calls to non-const methods must be protected with a mutex!
