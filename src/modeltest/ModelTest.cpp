@@ -121,7 +121,11 @@ size_t estimate_cores(const Options &options, const PartitionInfo &pinfo, const 
 }
 
 vector<Model> ModelTest::optimize_model() {
-    thread_log.reset(new std::ofstream(options.outfile_prefix + ".raxml.modeltest.thread" + std::to_string(ParallelContext::thread_id()) + ".log"));
+    if (options.log_level == LogLevel::debug) {
+        thread_log.reset(new std::ofstream(options.outfile_prefix + ".raxml.modeltest.rank" + std::to_string(ParallelContext::rank_id()) + ".thread" + std::to_string(ParallelContext::thread_id()) + ".log"));
+    } else {
+        thread_log.reset(new std::ofstream("/dev/null"));
+    }
     const bool enable_rhas_heuristic = std::getenv("MODELTEST_RHAS_NOSKIP") == nullptr;
     const bool enable_freerate_heuristic = std::getenv("MODELTEST_FREERATE_NOSKIP") == nullptr;
 
@@ -141,7 +145,7 @@ vector<Model> ModelTest::optimize_model() {
     cout << std::setprecision(19);
 
     while ((evaluation = execution_status.get_next_model()) != nullptr) {
-        LOG_THREAD_TS << " scheduled to work on " << evaluation->candidate_model().descriptor() << " as thread " << evaluation->thread_id() << " out of " << evaluation->proposed_thread_count() << endl;
+        LOG_THREAD_TS << " scheduled to work on " << evaluation->candidate_model().descriptor() << " as thread " << evaluation->thread_id() + 1 << " out of " << evaluation->proposed_thread_count() << endl;
 
         const auto scheduling_time = global_timer().elapsed_seconds();
         evaluation->wait();
