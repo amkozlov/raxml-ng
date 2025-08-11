@@ -57,6 +57,11 @@ void ExecutionStatus::initialize(std::vector<candidate_model_t> _candidate_model
                 });
                 */
 }
+
+void ExecutionStatus::finalize() {
+    distributed_scheduling->finalize();
+}
+
 void ExecutionStatus::update_result(PartitionModelEvaluation &evaluation, EvaluationResult result) {
     LOG_DEBUG_TS << "Model evaluation of " << evaluation.candidate_model().descriptor() << " finished, BIC = " << result.ic_criteria.at(InformationCriterion::bic) << ", LogLH = " << result.partition_loglh << std::endl;
     std::lock_guard<std::mutex> lock(mutex_evaluation);

@@ -21,6 +21,7 @@ class DistributedScheduling
     virtual uint64_t next_evaluation_index() = 0;
     virtual void announce_result(const IndexedEvaluationResult &) = 0;
     virtual void fetch_results(std::function<void(IndexedEvaluationResult)> callback) = 0;
+    virtual void finalize() = 0;
 };
 
 #ifdef _RAXML_MPI
@@ -30,7 +31,7 @@ class DistributedSchedulingMPI final : public DistributedScheduling
 {
     public:
         DistributedSchedulingMPI(uint64_t evaluation_count);
-        virtual ~DistributedSchedulingMPI();
+        virtual void finalize() override;
 
         uint64_t next_evaluation_index() override;
         void announce_result(const IndexedEvaluationResult &result) override;
@@ -39,7 +40,6 @@ class DistributedSchedulingMPI final : public DistributedScheduling
         MPI_Win win_index, win_results;
         std::vector<char> serialization_buffer, deserialization_buffer;
         uint64_t local_results_offset;
-
 };
 
 using DistributedSchedulingImpl = DistributedSchedulingMPI;
@@ -48,7 +48,7 @@ class DistributedSchedulingDummy final : public DistributedScheduling
 {
     public:
         DistributedSchedulingDummy(uint64_t evaluation_count);
-        virtual ~DistributedSchedulingDummy();
+        virtual void finalize() override;
 
         uint64_t next_evaluation_index() override;
         void announce_result(const IndexedEvaluationResult &result) override;

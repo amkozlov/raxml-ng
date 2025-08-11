@@ -253,6 +253,11 @@ vector<Model> ModelTest::optimize_model() {
 
     thread_log->close();
 
+    if (ParallelContext::group_master_thread()) {
+        execution_status.finalize();
+    }
+
+
     return best_model_per_part;
 }
 

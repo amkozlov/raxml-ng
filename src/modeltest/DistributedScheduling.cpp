@@ -37,16 +37,23 @@ DistributedSchedulingMPI::DistributedSchedulingMPI(uint64_t evaluation_count)
 
     local_results_offset = sizeof(uint64_t);
     if (main_rank) {
+
+        MPI_Win_lock(MPI_LOCK_EXCLUSIVE, MAIN_SCHEDULING_RANK, 0, win_results);
+
         // Initialize results displacement to the first entry after the counter
         MPI_Put(&local_results_offset, 1, MPI_UINT64_T, 
                MAIN_SCHEDULING_RANK, 0, 1, MPI_UINT64_T, 
                win_results);
 
+        MPI_Win_unlock(0, win_results);
+
+        MPI_Win_lock(MPI_LOCK_EXCLUSIVE, MAIN_SCHEDULING_RANK, 0, win_index);
         // Initialize global evaluation index to zero
         const uint64_t zero = 0;
         MPI_Put(&zero, 1, MPI_UINT64_T, 
                MAIN_SCHEDULING_RANK, 0, 1, MPI_UINT64_T, 
                win_index);
+        MPI_Win_unlock(0, win_index);
     }
     
 
@@ -55,7 +62,7 @@ DistributedSchedulingMPI::DistributedSchedulingMPI(uint64_t evaluation_count)
 
 }
 
-DistributedSchedulingMPI::~DistributedSchedulingMPI() {
+void DistributedSchedulingMPI::finalize() {
     MPI_Win_free(&win_results);
     MPI_Win_free(&win_index);
 }
@@ -155,7 +162,7 @@ void DistributedSchedulingDummy::fetch_results(std::function<void(IndexedEvaluat
     RAXML_UNUSED(callback);
 }
 
-DistributedSchedulingDummy::~DistributedSchedulingDummy()
+void DistributedSchedulingDummy::finalize()
 {
 }
 

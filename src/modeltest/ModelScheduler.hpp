@@ -31,6 +31,7 @@ class ExecutionStatus final {
                     bool use_rhas_heuristic = false, bool use_freerate_heuristic = false);
 
 
+        void finalize();
         ~ExecutionStatus() = default; 
 
         void update_result(PartitionModelEvaluation &evaluation, EvaluationResult result);
