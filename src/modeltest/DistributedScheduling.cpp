@@ -1,0 +1,162 @@
+#include "DistributedScheduling.hpp"
+#include "Evaluation.hpp"
+#include <mpi.h>
+
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const IndexedEvaluationResult &result)
+{
+    stream.write(&result.index, sizeof(result.index));
+    stream << result.result;
+    return stream;
+}
+
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, IndexedEvaluationResult &result)
+{
+    stream.read(&result.index, sizeof(result.index));
+    stream >> result.result;
+    
+    return stream;
+}
+
+#ifdef _RAXML_MPI
+DistributedSchedulingMPI::DistributedSchedulingMPI(uint64_t evaluation_count)
+    : local_results_offset(sizeof(uint64_t))
+{
+    const bool main_rank = ParallelContext::rank_id() == MAIN_SCHEDULING_RANK;
+    void *baseptr;
+    const auto index_window_size = main_rank ? sizeof(uint64_t) : 0;
+
+    MPI_Win_allocate(index_window_size, sizeof(uint64_t),
+            MPI_INFO_NULL, MPI_COMM_WORLD,
+            &baseptr, &win_index);
+    
+    const auto results_window_size = main_rank ? evaluation_count * MAX_MODEL_STRING_LEN : 0;
+
+    MPI_Win_allocate(results_window_size, 1,
+            MPI_INFO_NULL, MPI_COMM_WORLD,
+            &baseptr, &win_results);
+
+    local_results_offset = sizeof(uint64_t);
+    if (main_rank) {
+        // Initialize results displacement to the first entry after the counter
+        MPI_Put(&local_results_offset, 1, MPI_UINT64_T, 
+               MAIN_SCHEDULING_RANK, 0, 1, MPI_UINT64_T, 
+               win_results);
+
+        // Initialize global evaluation index to zero
+        const uint64_t zero = 0;
+        MPI_Put(&zero, 1, MPI_UINT64_T, 
+               MAIN_SCHEDULING_RANK, 0, 1, MPI_UINT64_T, 
+               win_index);
+    }
+    
+
+    MPI_Win_fence(0, win_results);
+    MPI_Win_fence(0, win_index);
+
+}
+
+DistributedSchedulingMPI::~DistributedSchedulingMPI() {
+    MPI_Win_free(&win_results);
+    MPI_Win_free(&win_index);
+}
+
+uint64_t DistributedSchedulingMPI::next_evaluation_index() 
+{
+    const uint64_t one = 1;
+    uint64_t assigned_evaluation_index;
+
+    MPI_Win_lock(MPI_LOCK_SHARED, MAIN_SCHEDULING_RANK, 0, win_index);
+
+    MPI_Fetch_and_op(&one, &assigned_evaluation_index, MPI_UINT64_T, MAIN_SCHEDULING_RANK, 0, MPI_SUM, win_index);
+
+    MPI_Win_unlock(MAIN_SCHEDULING_RANK, win_index);
+
+    return assigned_evaluation_index;
+}
+
+void DistributedSchedulingMPI::announce_result(const IndexedEvaluationResult &result)
+{
+    const size_t result_size = BinaryStream::serialized_size(result);
+    serialization_buffer.resize(result_size);
+
+    BinaryStream stream(serialization_buffer.data(), serialization_buffer.size());
+    stream << result;
+
+    MPI_Win_lock(MPI_LOCK_EXCLUSIVE, MAIN_SCHEDULING_RANK, 0, win_results);
+    MPI_Request req;
+
+    uint64_t result_displacement;
+    MPI_Rget(&result_displacement, 1, MPI_UINT64_T,
+            MAIN_SCHEDULING_RANK, 0, 1, MPI_UINT64_T,
+            win_results, &req);
+    MPI_Wait(&req, MPI_STATUSES_IGNORE);
+
+    MPI_Put(serialization_buffer.data(), stream.size(), MPI_BYTE,
+            MAIN_SCHEDULING_RANK, result_displacement, stream.size(), MPI_BYTE,
+            win_results);
+
+    result_displacement += stream.size();
+    MPI_Put(&result_displacement, 1, MPI_UINT64_T,
+            MAIN_SCHEDULING_RANK, 0, 1, MPI_UINT64_T,
+            win_results);
+
+    MPI_Win_unlock(MAIN_SCHEDULING_RANK, win_results);
+}
+
+void DistributedSchedulingMPI::fetch_results(std::function<void(IndexedEvaluationResult)> callback)
+{
+    uint64_t new_offset;
+    MPI_Request req;
+    MPI_Win_lock(MPI_LOCK_SHARED, MAIN_SCHEDULING_RANK, 0, win_results);
+
+    MPI_Rget(&new_offset, 1, MPI_UINT64_T,
+            MAIN_SCHEDULING_RANK, 0, 1, MPI_UINT64_T,
+            win_results, &req);
+
+    MPI_Wait(&req, MPI_STATUS_IGNORE);
+
+    const auto fetch_size = new_offset - local_results_offset;
+    deserialization_buffer.resize(fetch_size);
+    MPI_Get(deserialization_buffer.data(), fetch_size, MPI_BYTE,
+            MAIN_SCHEDULING_RANK, local_results_offset, fetch_size, MPI_BYTE,
+            win_results);
+
+    MPI_Win_unlock(MAIN_SCHEDULING_RANK, win_results);
+
+    BinaryStream stream(deserialization_buffer.data(), deserialization_buffer.size());
+
+    std::vector<IndexedEvaluationResult> results;
+    while (stream.pos() < stream.size()) {
+        IndexedEvaluationResult r;
+        stream >> r;
+        results.push_back(std::move(r));
+        callback(std::move(r));
+    }
+}
+#else
+
+DistributedSchedulingDummy::DistributedSchedulingDummy(uint64_t evaluation_count)
+    : evaluation_index{0}
+{
+}
+
+uint64_t DistributedSchedulingDummy::next_evaluation_index()
+{
+    return evaluation_index++;
+}
+
+void DistributedSchedulingDummy::announce_result(const IndexedEvaluationResult &result)
+{
+    RAXML_UNUSED(result);
+}
+
+void DistributedSchedulingDummy::fetch_results(std::function<void(IndexedEvaluationResult)> callback)
+{
+    RAXML_UNUSED(callback);
+}
+
+DistributedSchedulingDummy::~DistributedSchedulingDummy()
+{
+}
+
+#endif
