@@ -253,13 +253,6 @@ void CommandLineParser::check_options(Options &opts)
     throw OptionException("Model testing currently does not work with parallel tree searches. "
         "Please use only a single worker.");
   }
-
-  if (opts.command == Command::modeltest || opts.model_file == "auto" || opts.model_file == "AUTO" ||
-      opts.model_file == "DNA"  || opts.model_file == "AA")
-  {
-    if (opts.num_ranks > 1)
-      throw OptionException("Model testing currently does not support MPI, sorry.");
-  }
 }
 
 void CommandLineParser::compute_num_searches(Options &opts)
