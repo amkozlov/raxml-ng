@@ -129,7 +129,7 @@ vector<Model> ModelTest::optimize_model() {
     const bool enable_rhas_heuristic = std::getenv("MODELTEST_RHAS_NOSKIP") == nullptr;
     const bool enable_freerate_heuristic = std::getenv("MODELTEST_FREERATE_NOSKIP") == nullptr;
 
-    if (ParallelContext::group_master_thread()) {
+    if (ParallelContext::local_group_id() == 0 && ParallelContext::group_master_thread()) {
         // TODO: support multiple partitions with mixed datatypes
         auto candidate_models = generate_candidate_model_names(msa.part_info(0).model().data_type());
         execution_status.initialize(candidate_models, msa, options, estimate_cores, enable_rhas_heuristic,
@@ -262,7 +262,7 @@ vector<Model> ModelTest::optimize_model() {
 
     thread_log->close();
 
-    if (ParallelContext::group_master_thread()) {
+    if (ParallelContext::local_group_id() == 0 && ParallelContext::group_master_thread()) {
         execution_status.finalize();
     }
 

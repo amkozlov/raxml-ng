@@ -4,6 +4,7 @@
 
 thread_local unsigned int PartitionModelEvaluation::_thread_id = 0;
 thread_local int PartitionModelEvaluation::_barrier_mycycle = 0;
+
 PartitionModelEvaluation::PartitionModelEvaluation(candidate_model_t *candidate_model,
                                                    size_t partition_index, EvaluationPriority priority,
                                                    const size_t proposed_thread_count)
