@@ -144,13 +144,19 @@ vector<Model> ModelTest::optimize_model() {
     const auto default_precision = std::cout.precision();
     cout << std::setprecision(19);
 
-    while ((evaluation = execution_status.get_next_model()) != nullptr) {
+    while (true) {
+        const auto t_start = global_timer().elapsed_seconds();
+        evaluation = execution_status.get_next_model();
+
+        if (evaluation == nullptr) {
+            break;
+        }
+
         LOG_THREAD_TS << " scheduled to work on " << evaluation->candidate_model().descriptor() << " as thread " << evaluation->thread_id() + 1 << " out of " << evaluation->proposed_thread_count() << endl;
 
-        const auto scheduling_time = global_timer().elapsed_seconds();
         evaluation->wait();
 
-        const auto scheduling_overhead = global_timer().elapsed_seconds() - scheduling_time;
+        const auto scheduling_overhead = global_timer().elapsed_seconds() - t_start;
 
         /* If a heuristic applies by now, just continue with the next candidate */
         if (evaluation->get_status() == EvaluationStatus::ABORTED)
@@ -184,14 +190,9 @@ vector<Model> ModelTest::optimize_model() {
         }
 
 
-        //LOG_WORKER_TS(LogLevel::info) << "partition " << partition_index + 1 << "/" << msa.part_count()
-        //        << " model " << normalize_model_name(model_descriptor) << endl;
-
-        // TODO: proper synchronization
         evaluation->barrier();
         Model model(model_descriptor);
         assign(model, msa.part_info(evaluation->partition_index()).stats());
-        //msa.model(size_t index)
         TreeInfo treeinfo(options, tree, msa, tip_msa_idmap, assignment, evaluation->partition_index(), model);
 
         treeinfo.custom_reduce(evaluation, PartitionModelEvaluation::reduce);
@@ -210,7 +211,11 @@ vector<Model> ModelTest::optimize_model() {
 
             EvaluationResult partition_results {model, partition_loglh, ic_score_calculator.all(partition_loglh)};
 
+            const auto t0 = global_timer().elapsed_seconds();
             execution_status.update_result(*evaluation, std::move(partition_results));
+            const auto t1 = global_timer().elapsed_seconds();
+
+            LOG_THREAD_TS << " announced results in " << 1e3 * (t1 - t0) << " milliseconds." << endl;
         }
 
         LOG_THREAD_TS << " evaluation of " << evaluation->candidate_model().descriptor() << " concluded." << endl;
