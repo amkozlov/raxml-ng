@@ -1,6 +1,7 @@
 #ifndef EVALUATION_HPP_
 #define EVALUATION_HPP_
 
+#include <optional>
 #include <vector>
 
 #include "ModelDefinitions.hpp"
@@ -23,14 +24,12 @@ enum class EvaluationStatus {
 };
 
 struct EvaluationResult {
-    Model model;
+    std::unique_ptr<Model> model;
     double partition_loglh;
     std::map<InformationCriterion, double> ic_criteria;
 
     EvaluationResult();
-    EvaluationResult(Model model, double partition_loglh, decltype(ic_criteria) ic_criteria);
-    EvaluationResult(const EvaluationResult &other);
-    EvaluationResult &operator=(EvaluationResult &other);
+    EvaluationResult(Model &&model, double partition_loglh, decltype(ic_criteria) ic_criteria);
     void recompute_ic_criteria(size_t free_params, size_t sample_size);
 };
 
@@ -43,8 +42,13 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, EvaluationResult& resul
  */
 class PartitionModelEvaluation {
 public:
-    PartitionModelEvaluation(candidate_model_t &candidate_model, size_t partition_index, EvaluationPriority priority,
+    PartitionModelEvaluation(candidate_model_t *candidate_model, size_t partition_index, EvaluationPriority priority,
                              size_t proposed_thread_count);
+
+    /*
+    PartitionModelEvaluation& operator=(PartitionModelEvaluation &rhs);
+    PartitionModelEvaluation(PartitionModelEvaluation &&other);
+    */
 
     /** Try to add calling thread with specified thread_id to the team */
     bool join_team();
@@ -52,13 +56,13 @@ public:
     void abort();
 
     /** Store results from a finished computation. */
-    void store_result(EvaluationResult result);
+    void store_result(EvaluationResult &&result);
 
     /** Block until the status changes from WAITING to either RUNNING or
      * ABORTED. May only be called by threads that are part of the team */
     EvaluationStatus wait() const;
 
-    const EvaluationResult &get_result() const;
+    const std::optional<EvaluationResult> &get_result() const;
 
     const volatile EvaluationStatus &get_status() const;
 
@@ -67,7 +71,7 @@ public:
     const unsigned int volatile &assigned_threads() const;
     const size_t &proposed_thread_count() const;
 
-    const candidate_model_t &candidate_model() const;
+    const candidate_model_t *candidate_model() const;
 
     EvaluationPriority priority() const;
 
@@ -76,7 +80,7 @@ public:
     static void reduce(void *context, double *data, size_t size, int op);
 private:
     size_t _proposed_thread_count;
-    candidate_model_t &_candidate_model;
+    candidate_model_t *_candidate_model;
     size_t _partition_index;
 
     EvaluationPriority _priority;
@@ -92,7 +96,7 @@ private:
     static thread_local unsigned int _thread_id;
 
     /* Only valid when status == FINISHED */
-    EvaluationResult _result;
+    std::optional<EvaluationResult> _result;
 };
 
 struct alignas(8) EvaluationIndexingMessage {

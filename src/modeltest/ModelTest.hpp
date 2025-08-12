@@ -29,7 +29,7 @@ private:
 
     /// map from model descriptor to per-partition evaluation results
     [[nodiscard]]
-    static vector<size_t> rank_by_score(const vector<EvaluationResult> &results,
+    static vector<size_t> rank_by_score(const vector<EvaluationResult const *> &results,
                                         InformationCriterion ic);
 
     static void print_xml(ostream &os, const vector<PartitionModelEvaluation> &results);

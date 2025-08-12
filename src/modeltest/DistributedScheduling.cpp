@@ -81,12 +81,13 @@ uint64_t DistributedSchedulingMPI::next_evaluation_index()
     return assigned_evaluation_index;
 }
 
-void DistributedSchedulingMPI::announce_result(const IndexedEvaluationResult &result)
+void DistributedSchedulingMPI::announce_result(uint64_t index, const EvaluationResult &result)
 {
-    const size_t result_size = BinaryStream::serialized_size(result);
+    const size_t result_size = sizeof(index) + BinaryStream::serialized_size(result);
     serialization_buffer.resize(result_size);
 
     BinaryStream stream(serialization_buffer.data(), serialization_buffer.size());
+    stream.write(&index, sizeof(index));
     stream << result;
 
     MPI_Win_lock(MPI_LOCK_EXCLUSIVE, MAIN_SCHEDULING_RANK, 0, win_results);
@@ -132,14 +133,13 @@ void DistributedSchedulingMPI::fetch_results(std::function<void(IndexedEvaluatio
 
     BinaryStream stream(deserialization_buffer.data(), deserialization_buffer.size());
 
-    std::vector<IndexedEvaluationResult> results;
     while (stream.pos() < stream.size()) {
         IndexedEvaluationResult r;
         stream >> r;
-        results.push_back(std::move(r));
         callback(std::move(r));
     }
 }
+
 #else
 
 DistributedSchedulingDummy::DistributedSchedulingDummy(uint64_t evaluation_count)
@@ -152,8 +152,9 @@ uint64_t DistributedSchedulingDummy::next_evaluation_index()
     return evaluation_index++;
 }
 
-void DistributedSchedulingDummy::announce_result(const IndexedEvaluationResult &result)
+void DistributedSchedulingDummy::announce_result(uint64_t index, const EvaluationResult &result)
 {
+    RAXML_UNUSED(index);
     RAXML_UNUSED(result);
 }
 

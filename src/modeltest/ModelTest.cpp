@@ -152,7 +152,7 @@ vector<Model> ModelTest::optimize_model() {
             break;
         }
 
-        LOG_THREAD_TS << " scheduled to work on " << evaluation->candidate_model().descriptor() << " as thread " << evaluation->thread_id() + 1 << " out of " << evaluation->proposed_thread_count() << endl;
+        LOG_THREAD_TS << " scheduled to work on " << evaluation->candidate_model()->descriptor() << " as thread " << evaluation->thread_id() + 1 << " out of " << evaluation->proposed_thread_count() << endl;
 
         evaluation->wait();
 
@@ -164,7 +164,7 @@ vector<Model> ModelTest::optimize_model() {
 
         LOG_THREAD_TS << " begins work after waiting for " << 1e3 * scheduling_overhead << " milliseconds." << endl;
 
-        const auto &model_descriptor = evaluation->candidate_model().descriptor();
+        const auto &model_descriptor = evaluation->candidate_model()->descriptor();
 
         PartitionAssignment assignment;
 
@@ -185,7 +185,7 @@ vector<Model> ModelTest::optimize_model() {
             } else {
                 start_index = evaluation->thread_id() * fair_share;
             }
-            assignment.assign_sites(0, start_index, assigned_sites, evaluation->candidate_model().rate_heterogeneity.category_count);
+            assignment.assign_sites(0, start_index, assigned_sites, evaluation->candidate_model()->rate_heterogeneity.category_count);
             LOG_THREAD_TS << " assigned sites offset=" << start_index << " length=" << assigned_sites << " total_sites=" << n << endl;
         }
 
@@ -209,7 +209,7 @@ vector<Model> ModelTest::optimize_model() {
             const size_t sample_size = msa.part_info(evaluation->partition_index()).stats().site_count;
             ICScoreCalculator ic_score_calculator(free_params, sample_size);
 
-            EvaluationResult partition_results {model, partition_loglh, ic_score_calculator.all(partition_loglh)};
+            EvaluationResult partition_results {std::move(model), partition_loglh, ic_score_calculator.all(partition_loglh)};
 
             const auto t0 = global_timer().elapsed_seconds();
             execution_status.update_result(*evaluation, std::move(partition_results));
@@ -218,7 +218,7 @@ vector<Model> ModelTest::optimize_model() {
             LOG_THREAD_TS << " announced results in " << 1e3 * (t1 - t0) << " milliseconds." << endl;
         }
 
-        LOG_THREAD_TS << " evaluation of " << evaluation->candidate_model().descriptor() << " concluded." << endl;
+        LOG_THREAD_TS << " evaluation of " << model_descriptor << " concluded." << endl;
     }
 
     cout << std::setprecision(default_precision);
@@ -247,16 +247,16 @@ vector<Model> ModelTest::optimize_model() {
         for (auto p = 0U; p < msa.part_count(); ++p) {
             auto bic_ranking = rank_by_score(results.at(p), InformationCriterion::bic);
             const auto &best_model = results.at(p).at(bic_ranking.at(0));
-            logger().logstream(LogLevel::result, LogScope::thread) << "Partition #" << p << ": " << best_model.model.to_string()
-                     << " (LogLH = " << FMT_LH(best_model.partition_loglh)
-                     << "  BIC = "  << FMT_LH(best_model.ic_criteria.at(InformationCriterion::bic))
+            logger().logstream(LogLevel::result, LogScope::thread) << "Partition #" << p << ": " << best_model->model->to_string()
+                     << " (LogLH = " << FMT_LH(best_model->partition_loglh)
+                     << "  BIC = "  << FMT_LH(best_model->ic_criteria.at(InformationCriterion::bic))
                      << ")" << endl;
 
-            bestmodel_stream << best_model.model.to_string(true, logger().precision(LogElement::model)) << ", " << msa.part_info(p).name() 
+            bestmodel_stream << best_model->model->to_string(true, logger().precision(LogElement::model)) << ", " << msa.part_info(p).name() 
                 << " = " << msa.part_info(p).range_string() << endl;
 
 
-            best_model_per_part.emplace_back(best_model.model);
+            best_model_per_part.emplace_back(*best_model->model);
         }
     }
 
@@ -270,15 +270,15 @@ vector<Model> ModelTest::optimize_model() {
     return best_model_per_part;
 }
 
-vector<size_t> ModelTest::rank_by_score(const vector<EvaluationResult> &results,
+vector<size_t> ModelTest::rank_by_score(const vector<EvaluationResult const *> &results,
                                         InformationCriterion ic) {
     std::vector<size_t> ranking(results.size(), 0);
     std::iota(ranking.begin(), ranking.end(), 0);
 
     std::sort(ranking.begin(), ranking.end(),
               [ic, &results](const size_t &a, const size_t &b) {
-                  return results.at(a).ic_criteria.at(ic) <
-                         results.at(b).ic_criteria.at(ic);
+                  return results.at(a)->ic_criteria.at(ic) <
+                         results.at(b)->ic_criteria.at(ic);
               });
 
     return ranking;
@@ -310,7 +310,7 @@ void ModelTest::print_xml(ostream &os, const vector<PartitionModelEvaluation> &r
 
     for (const auto &evaluation: results) {
         os << "<model partition=\"" << evaluation.partition_index()
-                << "\" name=\"" << evaluation.candidate_model().descriptor()
+                << "\" name=\"" << evaluation.candidate_model()->descriptor()
                 << "\" status=\"";
         switch (evaluation.get_status()) {
             case EvaluationStatus::WAITING:
@@ -328,12 +328,12 @@ void ModelTest::print_xml(ostream &os, const vector<PartitionModelEvaluation> &r
         }
 
         if (evaluation.get_status() == EvaluationStatus::FINISHED) {
-            const auto &result = evaluation.get_result();
+            const auto &result = evaluation.get_result().value();
             os << "\" lnL=\"" << result.partition_loglh
                     << "\" score-bic=\"" << result.ic_criteria.at(InformationCriterion::bic)
                     << "\" score-aic=\"" << result.ic_criteria.at(InformationCriterion::aic)
                     << "\" score-aicc=\"" << result.ic_criteria.at(InformationCriterion::aicc)
-                    << "\" free-params=\"" << result.model.num_free_params() << "\" />" << endl;
+                    << "\" free-params=\"" << result.model->num_free_params() << "\" />" << endl;
         } else {
             os << "\" />" << endl;
         }

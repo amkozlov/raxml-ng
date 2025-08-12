@@ -19,7 +19,7 @@ class DistributedScheduling
 {
     public:
     virtual uint64_t next_evaluation_index() = 0;
-    virtual void announce_result(const IndexedEvaluationResult &) = 0;
+    virtual void announce_result(uint64_t index, const EvaluationResult &) = 0;
     virtual void fetch_results(std::function<void(IndexedEvaluationResult)> callback) = 0;
     virtual void finalize() = 0;
 };
@@ -34,7 +34,7 @@ class DistributedSchedulingMPI final : public DistributedScheduling
         virtual void finalize() override;
 
         uint64_t next_evaluation_index() override;
-        void announce_result(const IndexedEvaluationResult &result) override;
+        void announce_result(uint64_t index, const EvaluationResult &result) override;
         void fetch_results(std::function<void(IndexedEvaluationResult)> callback) override;
     private:
         MPI_Win win_index, win_results;
@@ -51,7 +51,7 @@ class DistributedSchedulingDummy final : public DistributedScheduling
         virtual void finalize() override;
 
         uint64_t next_evaluation_index() override;
-        void announce_result(const IndexedEvaluationResult &result) override;
+        void announce_result(uint64_t index, const EvaluationResult &result) override;
         void fetch_results(std::function<void(IndexedEvaluationResult)> callback) override;
 
     private:

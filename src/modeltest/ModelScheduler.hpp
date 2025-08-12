@@ -37,7 +37,7 @@ class ExecutionStatus final {
         void update_result(PartitionModelEvaluation &evaluation, EvaluationResult result);
         void print_results(int partition_index, PartitionModelEvaluation &evaluation);
         PartitionModelEvaluation *get_next_model(); 
-        vector<vector<EvaluationResult>> collect_finished_results_by_partition() const;
+        vector<vector<EvaluationResult const *>> collect_finished_results_by_partition() const;
         const vector<PartitionModelEvaluation> &get_evaluations() const;
 
 private:
