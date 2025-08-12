@@ -121,7 +121,7 @@ size_t estimate_cores(const Options &options, const PartitionInfo &pinfo, const 
 }
 
 vector<Model> ModelTest::optimize_model() {
-    if (options.log_level == LogLevel::debug) {
+    if (options.log_level == LogLevel::debug && !options.outfile_prefix.empty()) {
         thread_log.reset(new std::ofstream(options.outfile_prefix + ".raxml.modeltest.rank" + std::to_string(ParallelContext::rank_id()) + ".thread" + std::to_string(ParallelContext::thread_id()) + ".log"));
     } else {
         thread_log.reset(new std::ofstream("/dev/null"));
