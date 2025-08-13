@@ -1,5 +1,8 @@
 #include "Evaluation.hpp"
 #include "../ICScoreCalculator.hpp"
+#include "../io/binary_io.hpp"
+#include "ModelDefinitions.hpp"
+#include <cmath>
 #include <memory>
 
 thread_local unsigned int PartitionModelEvaluation::_thread_id = 0;
@@ -11,12 +14,12 @@ PartitionModelEvaluation::PartitionModelEvaluation(candidate_model_t *candidate_
     : _proposed_thread_count{proposed_thread_count},
       _candidate_model{candidate_model},
       _partition_index{partition_index},
-      _priority{priority}, status{EvaluationStatus::WAITING},
+      _priority{priority}, _result(*_candidate_model),
+      status{EvaluationStatus::WAITING},
       _barrier_counter(0),
       _barrier_proceed(0),
       _assigned_threads(0),
-      _reduce_buffer(_proposed_thread_count * 2, 0.),
-      _result() {
+      _reduce_buffer(_proposed_thread_count * 2, 0.) {
 }
 
 bool PartitionModelEvaluation::join_team() {
@@ -47,12 +50,13 @@ EvaluationStatus PartitionModelEvaluation::wait() const {
     return status;
 }
 
-void PartitionModelEvaluation::store_result(EvaluationResult &&result) {
+void PartitionModelEvaluation::store_result(double loglh, double ic_score) {
     if (status != EvaluationStatus::RUNNING) {
         return;
     }
 
-    _result.emplace(std::move(result));
+    _result.loglh = loglh;
+    _result.ic_score = ic_score;
     status = EvaluationStatus::FINISHED;
 }
 
@@ -80,7 +84,11 @@ EvaluationPriority PartitionModelEvaluation::priority() const {
     return _priority;
 }
 
-const std::optional<EvaluationResult> &PartitionModelEvaluation::get_result() const {
+EvaluationResult &PartitionModelEvaluation::modify_result() {
+    return _result;
+}
+
+const EvaluationResult &PartitionModelEvaluation::get_result() const {
     return _result;
 }
 
@@ -160,44 +168,32 @@ const size_t &PartitionModelEvaluation::proposed_thread_count() const
 
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const EvaluationResult& result)
 {
-    const auto &loglh = result.partition_loglh;
-    stream.write(std::addressof(loglh), sizeof(loglh));
+    stream.write(std::addressof(result.loglh), sizeof(result.loglh));
+    stream.write(std::addressof(result.ic_score), sizeof(result.ic_score));
 
-    const auto &s = result.model->to_string(true, 19);
-    const auto &length = s.size();
-    stream.write(std::addressof(length), sizeof(length));
-    stream.write(s.c_str(), s.size());
+    stream << *result.model;
 
     return stream;
 }
 
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, EvaluationResult& result)
 {
-    double loglh;
-    stream.read(std::addressof(loglh), sizeof(loglh));
+    stream.read(std::addressof(result.loglh), sizeof(result.loglh));
+    stream.read(std::addressof(result.ic_score), sizeof(result.ic_score));
 
-    size_t string_length;
-    stream.read(std::addressof(string_length), sizeof(string_length));
-
-    std::string model_string(string_length, 0);
-    stream.read(model_string.data(), string_length);
-
-    result.partition_loglh = loglh;
-
-    result.model = std::make_unique<Model>(DataType::autodetect, model_string);
+    stream >> *result.model;
 
     return stream;
 }
 
-EvaluationResult::EvaluationResult() {}
+EvaluationResult::EvaluationResult(const candidate_model_t &candidate_model)
+ : model(std::make_unique<Model>(candidate_model.descriptor())), loglh(NAN), ic_score(NAN) {}
 
-EvaluationResult::EvaluationResult(Model &&model, double partition_loglh, decltype(ic_criteria) ic_criteria)
-    : model(std::make_unique<Model>(model)), partition_loglh(partition_loglh), ic_criteria(ic_criteria)
+/*
+EvaluationResult::EvaluationResult()
+ : loglh(NAN), ic_score(NAN) {}
+
+EvaluationResult::EvaluationResult(Model &&model, double partition_loglh, double ic_score)
+    : model(std::make_unique<Model>(model)), loglh(partition_loglh), ic_score(ic_score)
 { }
-
-void EvaluationResult::recompute_ic_criteria(size_t free_params, size_t sample_size)
-{
-    ICScoreCalculator calc(free_params, sample_size);
-
-    ic_criteria = calc.all(partition_loglh);
-}
+*/

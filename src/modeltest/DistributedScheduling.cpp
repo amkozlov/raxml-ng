@@ -18,8 +18,9 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, IndexedEvaluationResult
 }
 
 #ifdef _RAXML_MPI
-DistributedSchedulingMPI::DistributedSchedulingMPI(uint64_t evaluation_count)
-    : local_results_offset(sizeof(uint64_t))
+DistributedSchedulingMPI::DistributedSchedulingMPI(size_t results_capacity)
+    : local_results_offset(sizeof(uint64_t)),
+      results_capacity(results_capacity)
 {
     const bool main_rank = ParallelContext::rank_id() == MAIN_SCHEDULING_RANK;
     void *baseptr;
@@ -29,7 +30,7 @@ DistributedSchedulingMPI::DistributedSchedulingMPI(uint64_t evaluation_count)
             MPI_INFO_NULL, MPI_COMM_WORLD,
             &baseptr, &win_index);
     
-    const auto results_window_size = main_rank ? evaluation_count * MAX_MODEL_STRING_LEN : 0;
+    const auto results_window_size = main_rank ? results_capacity : 0;
 
     MPI_Win_allocate(results_window_size, 1,
             MPI_INFO_NULL, MPI_COMM_WORLD,
@@ -104,6 +105,7 @@ void DistributedSchedulingMPI::announce_result(uint64_t index, const EvaluationR
             win_results);
 
     result_displacement += stream.size();
+    assert(result_displacement <= results_capacity);
     MPI_Put(&result_displacement, 1, MPI_UINT64_T,
             MAIN_SCHEDULING_RANK, 0, 1, MPI_UINT64_T,
             win_results);
@@ -111,7 +113,7 @@ void DistributedSchedulingMPI::announce_result(uint64_t index, const EvaluationR
     MPI_Win_unlock(MAIN_SCHEDULING_RANK, win_results);
 }
 
-void DistributedSchedulingMPI::fetch_results(std::function<void(IndexedEvaluationResult)> callback)
+void DistributedSchedulingMPI::fetch_results(std::vector<PartitionModelEvaluation> &evaluations)
 {
     uint64_t new_offset;
     MPI_Request req;
@@ -134,9 +136,9 @@ void DistributedSchedulingMPI::fetch_results(std::function<void(IndexedEvaluatio
     BinaryStream stream(deserialization_buffer.data(), deserialization_buffer.size());
 
     while (stream.pos() < stream.size()) {
-        IndexedEvaluationResult r;
-        stream >> r;
-        callback(std::move(r));
+        uint64_t index;
+        stream.read(&index, sizeof(index));
+        stream >> evaluations.at(index).modify_result();
     }
 }
 
@@ -158,9 +160,9 @@ void DistributedSchedulingDummy::announce_result(uint64_t index, const Evaluatio
     RAXML_UNUSED(result);
 }
 
-void DistributedSchedulingDummy::fetch_results(std::function<void(IndexedEvaluationResult)> callback)
+void DistributedSchedulingDummy::fetch_results(std::vector<PartitionModelEvaluation> &evaluations)
 {
-    RAXML_UNUSED(callback);
+    RAXML_UNUSED(evaluations);
 }
 
 void DistributedSchedulingDummy::finalize()

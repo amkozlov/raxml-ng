@@ -20,7 +20,7 @@ class DistributedScheduling
     public:
     virtual uint64_t next_evaluation_index() = 0;
     virtual void announce_result(uint64_t index, const EvaluationResult &) = 0;
-    virtual void fetch_results(std::function<void(IndexedEvaluationResult)> callback) = 0;
+    virtual void fetch_results(std::vector<PartitionModelEvaluation> &evaluations) = 0;
     virtual void finalize() = 0;
 };
 
@@ -30,16 +30,18 @@ constexpr size_t MAX_MODEL_STRING_LEN = 256;
 class DistributedSchedulingMPI final : public DistributedScheduling
 {
     public:
-        DistributedSchedulingMPI(uint64_t evaluation_count);
+        DistributedSchedulingMPI(size_t results_capacity);
         virtual void finalize() override;
 
         uint64_t next_evaluation_index() override;
         void announce_result(uint64_t index, const EvaluationResult &result) override;
-        void fetch_results(std::function<void(IndexedEvaluationResult)> callback) override;
+        void fetch_results(std::vector<PartitionModelEvaluation> &evaluations) override;
     private:
         MPI_Win win_index, win_results;
         std::vector<char> serialization_buffer, deserialization_buffer;
         uint64_t local_results_offset;
+
+        const size_t results_capacity;
 };
 
 using DistributedSchedulingImpl = DistributedSchedulingMPI;
@@ -52,7 +54,7 @@ class DistributedSchedulingDummy final : public DistributedScheduling
 
         uint64_t next_evaluation_index() override;
         void announce_result(uint64_t index, const EvaluationResult &result) override;
-        void fetch_results(std::function<void(IndexedEvaluationResult)> callback) override;
+        void fetch_results(std::vector<PartitionModelEvaluation> &evaluations) override;
 
     private:
         uint64_t evaluation_index;

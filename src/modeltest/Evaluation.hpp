@@ -23,14 +23,14 @@ enum class EvaluationStatus {
     FINISHED
 };
 
-struct EvaluationResult {
+class EvaluationResult {
+    public:
     std::unique_ptr<Model> model;
-    double partition_loglh;
-    std::map<InformationCriterion, double> ic_criteria;
+    double loglh, ic_score;
 
-    EvaluationResult();
-    EvaluationResult(Model &&model, double partition_loglh, decltype(ic_criteria) ic_criteria);
-    void recompute_ic_criteria(size_t free_params, size_t sample_size);
+    EvaluationResult(const candidate_model_t &candidate_model);
+/*    EvaluationResult();
+    EvaluationResult(Model &&model, double partition_loglh, double ic_score);*/
 };
 
 
@@ -45,24 +45,20 @@ public:
     PartitionModelEvaluation(candidate_model_t *candidate_model, size_t partition_index, EvaluationPriority priority,
                              size_t proposed_thread_count);
 
-    /*
-    PartitionModelEvaluation& operator=(PartitionModelEvaluation &rhs);
-    PartitionModelEvaluation(PartitionModelEvaluation &&other);
-    */
-
     /** Try to add calling thread with specified thread_id to the team */
     bool join_team();
 
     void abort();
 
     /** Store results from a finished computation. */
-    void store_result(EvaluationResult &&result);
+    void store_result(double loglh, double ic_score);
 
     /** Block until the status changes from WAITING to either RUNNING or
      * ABORTED. May only be called by threads that are part of the team */
     EvaluationStatus wait() const;
 
-    const std::optional<EvaluationResult> &get_result() const;
+    EvaluationResult &modify_result();
+    const EvaluationResult &get_result() const;
 
     const volatile EvaluationStatus &get_status() const;
 
@@ -84,7 +80,9 @@ private:
     size_t _partition_index;
 
     EvaluationPriority _priority;
+    EvaluationResult _result;
 
+    /* Variables required for thread synchronization */
     volatile EvaluationStatus status;
     volatile unsigned int _barrier_counter;
     volatile int _barrier_proceed;
@@ -94,9 +92,6 @@ private:
     std::vector<double> _reduce_buffer;
 
     static thread_local unsigned int _thread_id;
-
-    /* Only valid when status == FINISHED */
-    std::optional<EvaluationResult> _result;
 };
 
 struct alignas(8) EvaluationIndexingMessage {

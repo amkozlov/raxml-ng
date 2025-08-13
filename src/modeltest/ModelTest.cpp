@@ -191,8 +191,7 @@ vector<Model> ModelTest::optimize_model() {
 
 
         evaluation->barrier();
-        Model model(model_descriptor);
-        assign(model, msa.part_info(evaluation->partition_index()).stats());
+        Model &model = *evaluation->modify_result().model;
         TreeInfo treeinfo(options, tree, msa, tip_msa_idmap, assignment, evaluation->partition_index(), model);
 
         treeinfo.custom_reduce(evaluation, PartitionModelEvaluation::reduce);
@@ -204,15 +203,13 @@ vector<Model> ModelTest::optimize_model() {
             // The partition id is always 0, since our treeinfo only contains a single partition
             assign(model, treeinfo, 0); 
 
-            const double partition_loglh = treeinfo.pll_treeinfo().partition_loglh[0];
+            const double loglh = treeinfo.pll_treeinfo().partition_loglh[0];
             const size_t free_params = model.num_free_params() + treeinfo.tree().num_branches();
             const size_t sample_size = msa.part_info(evaluation->partition_index()).stats().site_count;
             ICScoreCalculator ic_score_calculator(free_params, sample_size);
 
-            EvaluationResult partition_results {std::move(model), partition_loglh, ic_score_calculator.all(partition_loglh)};
-
             const auto t0 = global_timer().elapsed_seconds();
-            execution_status.update_result(*evaluation, std::move(partition_results));
+            execution_status.update_result(*evaluation, loglh, ic_score_calculator.bic(loglh));
             const auto t1 = global_timer().elapsed_seconds();
 
             LOG_THREAD_TS << " announced results in " << 1e3 * (t1 - t0) << " milliseconds." << endl;
@@ -245,11 +242,11 @@ vector<Model> ModelTest::optimize_model() {
         LOG_INFO << endl << "Best model(s):" << endl;
         const auto results = execution_status.collect_finished_results_by_partition();
         for (auto p = 0U; p < msa.part_count(); ++p) {
-            auto bic_ranking = rank_by_score(results.at(p), InformationCriterion::bic);
+            auto bic_ranking = rank_by_score(results.at(p));
             const auto &best_model = results.at(p).at(bic_ranking.at(0));
             logger().logstream(LogLevel::result, LogScope::thread) << "Partition #" << p << ": " << best_model->model->to_string()
-                     << " (LogLH = " << FMT_LH(best_model->partition_loglh)
-                     << "  BIC = "  << FMT_LH(best_model->ic_criteria.at(InformationCriterion::bic))
+                     << " (LogLH = " << FMT_LH(best_model->loglh)
+                     << "  BIC = "  << FMT_LH(best_model->ic_score)
                      << ")" << endl;
 
             bestmodel_stream << best_model->model->to_string(true, logger().precision(LogElement::model)) << ", " << msa.part_info(p).name() 
@@ -270,39 +267,18 @@ vector<Model> ModelTest::optimize_model() {
     return best_model_per_part;
 }
 
-vector<size_t> ModelTest::rank_by_score(const vector<EvaluationResult const *> &results,
-                                        InformationCriterion ic) {
+vector<size_t> ModelTest::rank_by_score(const vector<EvaluationResult const *> &results) {
     std::vector<size_t> ranking(results.size(), 0);
     std::iota(ranking.begin(), ranking.end(), 0);
 
     std::sort(ranking.begin(), ranking.end(),
-              [ic, &results](const size_t &a, const size_t &b) {
-                  return results.at(a)->ic_criteria.at(ic) <
-                         results.at(b)->ic_criteria.at(ic);
+              [&results](const size_t &a, const size_t &b) {
+                  return results.at(a)->ic_score <
+                         results.at(b)->ic_score;
               });
 
     return ranking;
 }
-
-
-vector<double> transform_delta_to_weight(const vector<double> &deltas) {
-    vector<double> weights(deltas.size());
-    weights.clear();
-
-    for (const double &delta: deltas) {
-        weights.push_back(std::exp(-delta / 2));
-    }
-
-    // normalize
-    const double fac = 1 / std::accumulate(weights.begin(), weights.end(), 0.0);
-
-    for (double &w: weights) {
-        w *= fac;
-    }
-
-    return weights;
-}
-
 
 void ModelTest::print_xml(ostream &os, const vector<PartitionModelEvaluation> &results) {
     os << setprecision(17);
@@ -328,11 +304,9 @@ void ModelTest::print_xml(ostream &os, const vector<PartitionModelEvaluation> &r
         }
 
         if (evaluation.get_status() == EvaluationStatus::FINISHED) {
-            const auto &result = evaluation.get_result().value();
-            os << "\" lnL=\"" << result.partition_loglh
-                    << "\" score-bic=\"" << result.ic_criteria.at(InformationCriterion::bic)
-                    << "\" score-aic=\"" << result.ic_criteria.at(InformationCriterion::aic)
-                    << "\" score-aicc=\"" << result.ic_criteria.at(InformationCriterion::aicc)
+            const auto &result = evaluation.get_result();
+            os << "\" lnL=\"" << result.loglh
+                    << "\" score-bic=\"" << result.ic_score
                     << "\" free-params=\"" << result.model->num_free_params() << "\" />" << endl;
         } else {
             os << "\" />" << endl;

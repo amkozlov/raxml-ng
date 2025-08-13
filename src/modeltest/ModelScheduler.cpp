@@ -8,6 +8,18 @@ ExecutionStatus::ExecutionStatus()
 {
 }
 
+size_t determine_binary_candidates_size(const std::vector<PartitionModelEvaluation> &evaluations)
+{
+    size_t size = sizeof(uint64_t);
+
+    for (auto &eval : evaluations)
+    {
+        size += sizeof(uint64_t) + BinaryStream::serialized_size(eval.get_result());
+    }
+
+    return size;
+}
+
 void ExecutionStatus::initialize(std::vector<candidate_model_t> _candidate_models, const PartitionedMSA &msa,
             const Options &options,
             ResourceEstimatorFunction resource_estimator,
@@ -29,14 +41,15 @@ void ExecutionStatus::initialize(std::vector<candidate_model_t> _candidate_model
         const auto &pinfo = msa.part_info(p);
         for (unsigned int i = 0; i < candidate_models.size(); ++i) {
             auto &candidate_model = candidate_models.at(i);
-            const auto priority =
+            const auto priority  =
                     candidate_model.substitution_model == reference_model
                         ? EvaluationPriority::HIGH
                         : EvaluationPriority::NORMAL;
             const auto thread_count = CORAX_MIN(resource_estimator(options, pinfo, candidate_model, priority),
                                                 ParallelContext::num_threads());
 
-            this->evaluations->emplace_back(&candidate_model, p, priority, thread_count);
+            evaluations->emplace_back(&candidate_model, p, priority, thread_count);
+            assign(*evaluations->back().modify_result().model, msa.part_info(p).stats());
 
             if (p == 0 && candidate_model.substitution_model == reference_model) {
                 selected_rhas.push_back(candidate_model.rate_heterogeneity);
@@ -47,7 +60,7 @@ void ExecutionStatus::initialize(std::vector<candidate_model_t> _candidate_model
     const auto heuristics_selection = (use_freerate_heuristic ? static_cast<unsigned int>(HeuristicSelection::FREERATE) : 0) |
                                       (use_rhas_heuristic ? static_cast<unsigned int>(HeuristicSelection::RHAS) : 0);
     heuristics = std::make_unique<Heuristics>(partition_count, heuristics_selection, selected_rhas, *reference_model, options);
-    distributed_scheduling = std::make_unique<DistributedSchedulingImpl>(evaluations->size());
+    distributed_scheduling = std::make_unique<DistributedSchedulingImpl>(determine_binary_candidates_size(*evaluations));
 
     std::sort(evaluations->begin(), evaluations->end(),
                 [](const PartitionModelEvaluation &a, const PartitionModelEvaluation &b) {
@@ -60,43 +73,32 @@ void ExecutionStatus::finalize() {
     distributed_scheduling->finalize();
 }
 
-void ExecutionStatus::update_result(PartitionModelEvaluation &evaluation, EvaluationResult result) {
-    LOG_DEBUG_TS << "Model evaluation of " << evaluation.candidate_model()->descriptor() << " finished, BIC = " << result.ic_criteria.at(InformationCriterion::bic) << ", LogLH = " << result.partition_loglh << ", aborted = " << (evaluation.get_status() == EvaluationStatus::ABORTED) << std::endl;
+void ExecutionStatus::update_result(PartitionModelEvaluation &evaluation, double loglh, double ic_score) {
+    LOG_DEBUG_TS << "Model evaluation of " << evaluation.candidate_model()->descriptor() << " finished, IC = " << ic_score << ", LogLH = " << loglh << ", aborted = " << (evaluation.get_status() == EvaluationStatus::ABORTED) << std::endl;
     std::lock_guard<std::mutex> lock(mutex_evaluation);
 
-    evaluation.store_result(std::move(result));
-    const double bic = evaluation.get_result()->ic_criteria.at(InformationCriterion::bic);
-    heuristics->update(evaluation.partition_index(), *evaluation.candidate_model(), bic);
+    evaluation.store_result(loglh, ic_score);
+    heuristics->update(evaluation.partition_index(), *evaluation.candidate_model(), ic_score);
 
     const uint64_t index = std::distance(evaluations->data(), std::addressof(evaluation));
     assert(std::addressof(evaluation) == std::addressof(evaluations->at(index)));
-    distributed_scheduling->announce_result(index, evaluation.get_result().value());
+    distributed_scheduling->announce_result(index, evaluation.modify_result());
 }
 
 void ExecutionStatus::print_results(int partition_index, PartitionModelEvaluation &evaluation) {
     std::lock_guard<std::mutex> lock(mutex_log);
 
-    const auto &result = evaluation.get_result();
-    const auto bic_score = result->ic_criteria.at(InformationCriterion::bic);
+    const auto &result = evaluation.modify_result();
     LOG_WORKER_TS(LogLevel::info) << "Partition #" << partition_index << ": model = "
-                                    << setfill(' ') << left << setw(20) << result->model->to_string()
-                                    << "  LogLH = " << std::right << setw(15) << FMT_LH(result->partition_loglh)
-    << "  BIC = " << right << setw(15) << FMT_LH(bic_score)
+                                    << setfill(' ') << left << setw(20) << result.model->to_string()
+                                    << "  LogLH = " << std::right << setw(15) << FMT_LH(result.loglh)
+    << "  BIC = " << right << setw(15) << FMT_LH(result.ic_score)
     << endl;
 }
 
 void ExecutionStatus::fetch_global_results()
 {
-    std::function<void(IndexedEvaluationResult)> callback = [this](IndexedEvaluationResult indexed_result) {
-        auto &evaluation = evaluations->at(indexed_result.index);
-
-        const auto free_params = indexed_result.result.model->num_free_params() + branch_count;
-        const auto sample_size = msa->part_info(evaluation.partition_index()).stats().site_count;
-        indexed_result.result.recompute_ic_criteria(free_params, sample_size);
-
-        evaluation.store_result(std::move(indexed_result.result));
-    };
-    distributed_scheduling->fetch_results(callback);
+    distributed_scheduling->fetch_results(*evaluations);
 }
 
 PartitionModelEvaluation *ExecutionStatus::get_next_model()
@@ -145,7 +147,7 @@ vector<vector<EvaluationResult const *>> ExecutionStatus::collect_finished_resul
 
     for (const auto &evaluation: *evaluations) {
         if (evaluation.get_status() == EvaluationStatus::FINISHED) {
-            results.at(evaluation.partition_index()).push_back(&evaluation.get_result().value());
+            results.at(evaluation.partition_index()).push_back(&evaluation.get_result());
         }
     }
 
