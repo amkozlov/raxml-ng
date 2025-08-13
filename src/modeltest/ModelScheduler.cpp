@@ -74,7 +74,6 @@ void ExecutionStatus::finalize() {
 }
 
 void ExecutionStatus::update_result(PartitionModelEvaluation &evaluation, double loglh, double ic_score) {
-    LOG_DEBUG_TS << "Model evaluation of " << evaluation.candidate_model()->descriptor() << " finished, IC = " << ic_score << ", LogLH = " << loglh << ", aborted = " << (evaluation.get_status() == EvaluationStatus::ABORTED) << std::endl;
     std::lock_guard<std::mutex> lock(mutex_evaluation);
 
     evaluation.store_result(loglh, ic_score);

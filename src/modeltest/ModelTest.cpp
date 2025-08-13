@@ -212,6 +212,7 @@ vector<Model> ModelTest::optimize_model() {
             execution_status.update_result(*evaluation, loglh, ic_score_calculator.bic(loglh));
             const auto t1 = global_timer().elapsed_seconds();
 
+            LOG_THREAD_TS << " evaluation of " << evaluation->candidate_model()->descriptor() << " finished, IC = " << evaluation->get_result().ic_score << ", LogLH = " << evaluation->get_result().loglh << ", aborted = " << (evaluation->get_status() == EvaluationStatus::ABORTED) << std::endl;
             LOG_THREAD_TS << " announced results in " << 1e3 * (t1 - t0) << " milliseconds." << endl;
         }
 
