@@ -4,6 +4,7 @@
 #include "ModelEvaluator.hpp"
 #include "Heuristics.hpp"
 #include <functional>
+#include <mutex>
 #include <unistd.h>
 
 ModelScheduler::ModelScheduler()
@@ -129,6 +130,12 @@ void ModelScheduler::print_results(int partition_index, ModelEvaluation &result)
 
 void ModelScheduler::fetch_global_results()
 {
+    std::lock_guard<std::mutex> lock(mutex_evaluation);
+    _fetch_global_results();
+}
+
+void ModelScheduler::_fetch_global_results()
+{
     ModelUpdateCallback callback = [this](uint64_t i, const ModelEvaluation &m) {
         _update_result(evaluators->at(i), m, false, true);
     };
@@ -146,7 +153,7 @@ ModelEvaluator *ModelScheduler::get_next_model()
     while (evaluation_index < evaluators->size() &&
            evaluators->at(evaluation_index).get_status() != EvaluationStatus::WAITING)
     {
-        fetch_global_results(); // TODO: determine whether to pull this out of the loop
+        _fetch_global_results(); // TODO: determine whether to pull this out of the loop
 
         evaluation_index = distributed_scheduling->next_evaluation_index();
         if (evaluation_index >= evaluators->size()) {

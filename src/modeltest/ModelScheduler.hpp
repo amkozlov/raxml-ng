@@ -41,7 +41,8 @@ class ModelScheduler final {
         void print_results(int partition_index, ModelEvaluation &result);
         ModelEvaluator *get_next_model(); 
         vector<vector<ModelEvaluation const *>> collect_finished_results_by_partition() const;
-        const vector<ModelEvaluator> &get_evaluations() const;
+        void fetch_global_results();
+        const vector<ModelEvaluator> &get_evaluations() const; // TODO: replace with something more sane
 
 private:
     std::mutex mutex_evaluation;
@@ -61,7 +62,7 @@ private:
     const PartitionedMSA *msa;
     CheckpointManager *checkpoint_manager;
 
-    void fetch_global_results();
+    void _fetch_global_results();
     void _update_result(ModelEvaluator &evaluation, ModelEvaluation result, bool announce = true, bool checkpoint = true);
 };
 

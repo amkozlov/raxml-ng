@@ -200,7 +200,7 @@ vector<Model> ModelTest::optimize_model() {
         if (evaluator->thread_id() == 0) {
             // Retrieve values from optimized partition.
             // The partition id is always 0, since our treeinfo only contains a single partition
-            Model optimized_model;
+            Model optimized_model(model.to_string());
             assign(optimized_model, treeinfo, 0); 
 
             const double loglh = treeinfo.pll_treeinfo().partition_loglh[0];
@@ -223,6 +223,10 @@ vector<Model> ModelTest::optimize_model() {
 
     // sync ALL threads across ALL workers
     ParallelContext::global_barrier();
+
+    if (ParallelContext::local_group_id() == 0 && ParallelContext::group_master_thread()) {
+        model_scheduler.fetch_global_results();
+    }
 
     vector<Model> best_model_per_part;
     if (ParallelContext::master()) {
