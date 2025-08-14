@@ -103,7 +103,7 @@ void DistributedSchedulingMPI::announce_result(uint64_t index, const ModelEvalua
     MPI_Win_unlock(MAIN_SCHEDULING_RANK, win_results);
 }
 
-void DistributedSchedulingMPI::fetch_results(std::vector<ModelEvaluator> &evaluations, ModelUpdateCallback callback)
+void DistributedSchedulingMPI::fetch_results(ModelUpdateCallback callback)
 {
     uint64_t new_offset;
     MPI_Request req;
@@ -154,9 +154,8 @@ void DistributedSchedulingDummy::announce_result(uint64_t index, const ModelEval
     RAXML_UNUSED(result);
 }
 
-void DistributedSchedulingDummy::fetch_results(std::vector<ModelEvaluator> &evaluations, ModelUpdateCallback callback)
+void DistributedSchedulingDummy::fetch_results(ModelUpdateCallback callback)
 {
-    RAXML_UNUSED(evaluations);
     RAXML_UNUSED(callback);
 }
 

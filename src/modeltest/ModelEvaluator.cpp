@@ -52,14 +52,10 @@ EvaluationStatus ModelEvaluator::wait() const {
 }
 
 void ModelEvaluator::store_result(ModelEvaluation result) {
-    _result = result;
     if (status == EvaluationStatus::FINISHED)
-    {
-        logger().logstream(LogLevel::debug, LogScope::thread) << RAXML_LOG_TIMESTAMP
-            << " Warning: overwriting result for partition " << partition_index() << ", model " << candidate_model()->descriptor() 
-            << " on rank " << ParallelContext::rank_id() << " thread " << ParallelContext::local_thread_id();
-    } 
+        return;
 
+    _result = result;
     status = EvaluationStatus::FINISHED;
 }
 

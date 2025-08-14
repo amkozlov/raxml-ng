@@ -13,7 +13,7 @@ class DistributedScheduling
     public:
     virtual uint64_t next_evaluation_index() = 0;
     virtual void announce_result(uint64_t index, const ModelEvaluation &) = 0;
-    virtual void fetch_results(std::vector<ModelEvaluator> &evaluations, ModelUpdateCallback callback) = 0;
+    virtual void fetch_results(ModelUpdateCallback callback) = 0;
     virtual void finalize() = 0;
 };
 
@@ -29,7 +29,7 @@ class DistributedSchedulingMPI final : public DistributedScheduling
         uint64_t next_evaluation_index() override;
         void announce_result(uint64_t index, const ModelEvaluation &result) override;
         /* TODO: prettify call interface */
-        void fetch_results(std::vector<ModelEvaluator> &evaluations, ModelUpdateCallback callback) override;
+        void fetch_results(ModelUpdateCallback callback) override;
     private:
         MPI_Win win_index, win_results;
         std::vector<char> serialization_buffer, deserialization_buffer;
@@ -48,7 +48,7 @@ class DistributedSchedulingDummy final : public DistributedScheduling
 
         uint64_t next_evaluation_index() override;
         void announce_result(uint64_t index, const ModelEvaluation &result) override;
-        void fetch_results(std::vector<ModelEvaluator> &evaluations, ModelUpdateCallback callback) override;
+        void fetch_results(ModelUpdateCallback callback) override;
 
     private:
         uint64_t evaluation_index;

@@ -4,6 +4,7 @@
 #include <functional>
 #include <iostream>
 #include <vector>
+#include <mutex>
 #include "DistributedScheduling.hpp"
 #include "ModelEvaluator.hpp"
 #include "../PartitionedMSA.hpp"
@@ -61,6 +62,7 @@ private:
     CheckpointManager *checkpoint_manager;
 
     void fetch_global_results();
+    void _update_result(ModelEvaluator &evaluation, ModelEvaluation result, bool announce = true, bool checkpoint = true);
 };
 
 #endif

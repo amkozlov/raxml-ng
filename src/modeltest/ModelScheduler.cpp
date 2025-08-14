@@ -4,6 +4,7 @@
 #include "ModelEvaluator.hpp"
 #include "Heuristics.hpp"
 #include <functional>
+#include <unistd.h>
 
 ModelScheduler::ModelScheduler()
 {
@@ -70,11 +71,9 @@ void ModelScheduler::initialize(std::vector<candidate_model_t> _candidate_models
                     return a.priority() > b.priority();
                 });
 
-    if (ParallelContext::master_rank()) {
-        for (const auto &[index, model_evaluation] : checkpoint_manager.get_model_candidates())
-        {
-            update_result(evaluators->at(index), model_evaluation, true, false);
-        }
+    for (const auto &[index, model_evaluation] : checkpoint_manager.get_model_candidates())
+    {
+        update_result(evaluators->at(index), model_evaluation, false, false);
     }
 
     while (true) {
@@ -100,7 +99,10 @@ void ModelScheduler::finalize() {
 
 void ModelScheduler::update_result(ModelEvaluator &evaluator, ModelEvaluation result, bool announce, bool write_checkpoint) {
     std::lock_guard<std::mutex> lock(mutex_evaluation);
+    _update_result(evaluator, result, announce, write_checkpoint);
+}
 
+void ModelScheduler::_update_result(ModelEvaluator &evaluator, ModelEvaluation result, bool announce, bool write_checkpoint) {
     evaluator.store_result(std::move(result));
     heuristics->update(evaluator.partition_index(), *evaluator.candidate_model(), evaluator.get_result().ic_score);
 
@@ -128,9 +130,9 @@ void ModelScheduler::print_results(int partition_index, ModelEvaluation &result)
 void ModelScheduler::fetch_global_results()
 {
     ModelUpdateCallback callback = [this](uint64_t i, const ModelEvaluation &m) {
-        update_result(evaluators->at(i), m, false, true);
+        _update_result(evaluators->at(i), m, false, true);
     };
-    distributed_scheduling->fetch_results(*evaluators, callback);
+    distributed_scheduling->fetch_results(callback);
 }
 
 ModelEvaluator *ModelScheduler::get_next_model()
