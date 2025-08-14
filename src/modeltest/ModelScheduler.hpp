@@ -5,9 +5,10 @@
 #include <iostream>
 #include <vector>
 #include "DistributedScheduling.hpp"
-#include "Evaluation.hpp"
+#include "ModelEvaluator.hpp"
 #include "../PartitionedMSA.hpp"
 #include "../Tree.hpp"
+#include "../Checkpoint.hpp"
 #include "../Options.hpp"
 #include "../log.hpp"
 #include "../common.h"
@@ -21,24 +22,25 @@ using namespace std;
 
 using ResourceEstimatorFunction = std::function<size_t(const Options &, const PartitionInfo&, const candidate_model_t&,EvaluationPriority)>;
 
-class ExecutionStatus final {
+class ModelScheduler final {
     public:
-        ExecutionStatus();
+        ModelScheduler();
 
         void initialize(std::vector<candidate_model_t> _candidate_models, const PartitionedMSA &msa,
                     const Options &options,
+                    CheckpointManager &checkpoint_manager,
                     ResourceEstimatorFunction resource_estimator,
                     bool use_rhas_heuristic = false, bool use_freerate_heuristic = false);
 
 
         void finalize();
-        ~ExecutionStatus() = default; 
+        ~ModelScheduler() = default; 
 
-        void update_result(PartitionModelEvaluation &evaluation, double loglh, double ic_score);
-        void print_results(int partition_index, PartitionModelEvaluation &evaluation);
-        PartitionModelEvaluation *get_next_model(); 
-        vector<vector<EvaluationResult const *>> collect_finished_results_by_partition() const;
-        const vector<PartitionModelEvaluation> &get_evaluations() const;
+        void update_result(ModelEvaluator &evaluation, ModelEvaluation result, bool announce = true, bool checkpoint = true);
+        void print_results(int partition_index, ModelEvaluation &result);
+        ModelEvaluator *get_next_model(); 
+        vector<vector<ModelEvaluation const *>> collect_finished_results_by_partition() const;
+        const vector<ModelEvaluator> &get_evaluations() const;
 
 private:
     std::mutex mutex_evaluation;
@@ -50,12 +52,13 @@ private:
     std::optional<substitution_model_t> reference_model;
     std::vector<rate_heterogeneity_t> selected_rhas;
 
-    std::unique_ptr<vector<PartitionModelEvaluation>> evaluations;
+    std::unique_ptr<vector<ModelEvaluator>> evaluators;
     uint64_t evaluation_index;
     std::unique_ptr<Heuristics> heuristics;
     std::unique_ptr<DistributedSchedulingImpl> distributed_scheduling;
 
     const PartitionedMSA *msa;
+    CheckpointManager *checkpoint_manager;
 
     void fetch_global_results();
 };

@@ -158,6 +158,9 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, Model& m);
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::tuple<Model&, ModelBinaryFmt> bm);
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, ModelMap& m);
 
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const ModelEvaluation& m);
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, ModelEvaluation& m);
+
 /**
  * Partition I/O
  */

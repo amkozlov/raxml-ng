@@ -2,16 +2,9 @@
 #define DISTRIBUTED_SCHEDULING_HPP_
 
 #include <cstdint>
-#include "Evaluation.hpp"
+#include "ModelEvaluator.hpp"
 
-struct IndexedEvaluationResult
-{
-    uint64_t index;
-    EvaluationResult result;
-};
-BasicBinaryStream& operator<<(BasicBinaryStream& stream, const IndexedEvaluationResult &result);
-BasicBinaryStream& operator>>(BasicBinaryStream& stream, IndexedEvaluationResult &result);
-
+typedef std::function<void (uint64_t index, const ModelEvaluation &m)> ModelUpdateCallback;
 /** Contains methods required to coordinate scheduling and communicate results on distributed-memory machines.
  * This class is not thread-safe and all calls must be protected with a mutex.
  */
@@ -19,8 +12,8 @@ class DistributedScheduling
 {
     public:
     virtual uint64_t next_evaluation_index() = 0;
-    virtual void announce_result(uint64_t index, const EvaluationResult &) = 0;
-    virtual void fetch_results(std::vector<PartitionModelEvaluation> &evaluations) = 0;
+    virtual void announce_result(uint64_t index, const ModelEvaluation &) = 0;
+    virtual void fetch_results(std::vector<ModelEvaluator> &evaluations, ModelUpdateCallback callback) = 0;
     virtual void finalize() = 0;
 };
 
@@ -34,8 +27,9 @@ class DistributedSchedulingMPI final : public DistributedScheduling
         virtual void finalize() override;
 
         uint64_t next_evaluation_index() override;
-        void announce_result(uint64_t index, const EvaluationResult &result) override;
-        void fetch_results(std::vector<PartitionModelEvaluation> &evaluations) override;
+        void announce_result(uint64_t index, const ModelEvaluation &result) override;
+        /* TODO: prettify call interface */
+        void fetch_results(std::vector<ModelEvaluator> &evaluations, ModelUpdateCallback callback) override;
     private:
         MPI_Win win_index, win_results;
         std::vector<char> serialization_buffer, deserialization_buffer;
@@ -53,8 +47,8 @@ class DistributedSchedulingDummy final : public DistributedScheduling
         virtual void finalize() override;
 
         uint64_t next_evaluation_index() override;
-        void announce_result(uint64_t index, const EvaluationResult &result) override;
-        void fetch_results(std::vector<PartitionModelEvaluation> &evaluations) override;
+        void announce_result(uint64_t index, const ModelEvaluation &result) override;
+        void fetch_results(std::vector<ModelEvaluator> &evaluations, ModelUpdateCallback callback) override;
 
     private:
         uint64_t evaluation_index;

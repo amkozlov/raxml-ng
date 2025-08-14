@@ -250,6 +250,37 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, ModelMap& m)
   return stream;
 }
 
+BasicBinaryStream& operator<<(BasicBinaryStream& stream, const ModelEvaluation& m)
+{
+    stream.write(std::addressof(m.loglh), sizeof(m.loglh));
+    stream.write(std::addressof(m.ic_score), sizeof(m.ic_score));
+
+    stream << m.model.to_string();
+    stream << m.model;
+
+    return stream;
+}
+
+BasicBinaryStream& operator>>(BasicBinaryStream& stream, ModelEvaluation& m)
+{
+    stream.read(std::addressof(m.loglh), sizeof(m.loglh));
+    stream.read(std::addressof(m.ic_score), sizeof(m.ic_score));
+
+    /** To restore a model, we need to know the number of rate categories
+     * beforehand.  Modeltesting initializes the candidate models way after the
+     * checkpoint is read.  To mitigate this problem, we also store the model
+     * name and construct a new model instead of just assigning the new
+     * parameters.
+     */
+    std::string model_name;
+    stream >> model_name;
+
+    m.model = Model(model_name);
+    stream >> m.model;
+
+    return stream;
+}
+
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const TreeTopology& t)
 {
   stream << t.vroot_node_id;

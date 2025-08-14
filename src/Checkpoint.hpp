@@ -7,7 +7,7 @@
 #include "io/binary_io.hpp"
 #include "adaptive/DifficultyPredictor.hpp"
 
-constexpr int RAXML_CKP_VERSION = 7;
+constexpr int RAXML_CKP_VERSION = 8;
 constexpr int RAXML_CKP_MIN_SUPPORTED_VERSION = 7;
 
 struct MLTree
@@ -81,6 +81,7 @@ struct CheckpointFile
   std::vector<Checkpoint> checkp_list;
 
   ModelMap best_models;         /* model parameters for the best-scoring ML tree */
+  ModelEvaluationMap model_candidates;    /* model parameters for model testing */
   ScoredTopologyMap ml_trees;   /* ML trees from all individual searches*/
   ScoredTopologyMap bs_trees;   /* bootstrap replicate trees */
 
@@ -109,8 +110,13 @@ public:
 
   double pythia_score() const { return _checkp_file.pythia_score; }
   void pythia_score(double score) { _checkp_file.pythia_score = score; }
+
   void set_epsilon(double _epsilon) { checkpoint().lh_epsilon = _epsilon; }
   double get_epsilon() const { return checkpoint().lh_epsilon; }
+
+  const ModelEvaluationMap &get_model_candidates() const {
+      return _checkp_file.model_candidates;
+  }
 
   void init_checkpoints(const Tree& tree, const ModelCRefMap& models);
 
@@ -124,6 +130,7 @@ public:
   void disable() { _active = false; }
 
   void update_and_write(const TreeInfo& treeinfo);
+  void update_and_write(uint64_t index, const ModelEvaluation& model);
 
   void save_ml_tree();
   void save_bs_tree();

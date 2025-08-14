@@ -1,28 +1,29 @@
-#include "Evaluation.hpp"
+#include "ModelEvaluator.hpp"
 #include "../ICScoreCalculator.hpp"
 #include "../io/binary_io.hpp"
 #include "ModelDefinitions.hpp"
 #include <cmath>
 #include <memory>
 
-thread_local unsigned int PartitionModelEvaluation::_thread_id = 0;
-thread_local int PartitionModelEvaluation::_barrier_mycycle = 0;
+thread_local unsigned int ModelEvaluator::_thread_id = 0;
+thread_local int ModelEvaluator::_barrier_mycycle = 0;
 
-PartitionModelEvaluation::PartitionModelEvaluation(candidate_model_t *candidate_model,
+ModelEvaluator::ModelEvaluator(candidate_model_t *candidate_model, const PartitionStats &stats,
                                                    size_t partition_index, EvaluationPriority priority,
                                                    const size_t proposed_thread_count)
     : _proposed_thread_count{proposed_thread_count},
       _candidate_model{candidate_model},
       _partition_index{partition_index},
-      _priority{priority}, _result(*_candidate_model),
+      _priority{priority}, _result{Model(_candidate_model->descriptor()), NAN, NAN},
       status{EvaluationStatus::WAITING},
       _barrier_counter(0),
       _barrier_proceed(0),
       _assigned_threads(0),
       _reduce_buffer(_proposed_thread_count * 2, 0.) {
+    assign(_result.model, stats);
 }
 
-bool PartitionModelEvaluation::join_team() {
+bool ModelEvaluator::join_team() {
     if (status != EvaluationStatus::WAITING)
         return false;
 
@@ -39,61 +40,59 @@ bool PartitionModelEvaluation::join_team() {
     return true;
 }
 
-void PartitionModelEvaluation::abort() {
+void ModelEvaluator::abort() {
     status = EvaluationStatus::ABORTED;
 }
 
-EvaluationStatus PartitionModelEvaluation::wait() const {
+EvaluationStatus ModelEvaluator::wait() const {
     while (status == EvaluationStatus::WAITING) {
     }
 
     return status;
 }
 
-void PartitionModelEvaluation::store_result(double loglh, double ic_score) {
-    if (status != EvaluationStatus::RUNNING) {
-        return;
-    }
+void ModelEvaluator::store_result(ModelEvaluation result) {
+    _result = result;
+    if (status == EvaluationStatus::FINISHED)
+    {
+        logger().logstream(LogLevel::debug, LogScope::thread) << RAXML_LOG_TIMESTAMP
+            << " Warning: overwriting result for partition " << partition_index() << ", model " << candidate_model()->descriptor() 
+            << " on rank " << ParallelContext::rank_id() << " thread " << ParallelContext::local_thread_id();
+    } 
 
-    _result.loglh = loglh;
-    _result.ic_score = ic_score;
     status = EvaluationStatus::FINISHED;
 }
 
-const volatile EvaluationStatus &PartitionModelEvaluation::get_status() const {
+const volatile EvaluationStatus &ModelEvaluator::get_status() const {
     return status;
 }
 
-const size_t &PartitionModelEvaluation::partition_index() const {
+const size_t &ModelEvaluator::partition_index() const {
     return _partition_index;
 }
 
-const candidate_model_t *PartitionModelEvaluation::candidate_model() const {
+const candidate_model_t *ModelEvaluator::candidate_model() const {
     return _candidate_model;
-}
+} 
 
-const unsigned int &PartitionModelEvaluation::thread_id() const {
+const unsigned int &ModelEvaluator::thread_id() const {
     return _thread_id;
 }
 
-const unsigned int volatile &PartitionModelEvaluation::assigned_threads() const {
+const unsigned int volatile &ModelEvaluator::assigned_threads() const {
     return _assigned_threads;
 }
 
-EvaluationPriority PartitionModelEvaluation::priority() const {
+EvaluationPriority ModelEvaluator::priority() const {
     return _priority;
 }
 
-EvaluationResult &PartitionModelEvaluation::modify_result() {
-    return _result;
-}
-
-const EvaluationResult &PartitionModelEvaluation::get_result() const {
+const ModelEvaluation &ModelEvaluator::get_result() const {
     return _result;
 }
 
 /* cf. ParallelContext::thread_barrier */
-void PartitionModelEvaluation::barrier()
+void ModelEvaluator::barrier()
 {
     assert(status != EvaluationStatus::WAITING);
 
@@ -112,9 +111,9 @@ void PartitionModelEvaluation::barrier()
     }
 }
 
-void PartitionModelEvaluation::reduce(void *context, double *data, size_t size, int op)
+void ModelEvaluator::reduce(void *context, double *data, size_t size, int op)
 {
-    PartitionModelEvaluation *c = static_cast<PartitionModelEvaluation *>(context);
+    ModelEvaluator *c = static_cast<ModelEvaluator *>(context);
 
     /* synchronize */
     c->barrier();
@@ -159,41 +158,8 @@ void PartitionModelEvaluation::reduce(void *context, double *data, size_t size, 
     }
 }
 
-const size_t &PartitionModelEvaluation::proposed_thread_count() const
+const size_t &ModelEvaluator::proposed_thread_count() const
 {
     return _proposed_thread_count;
 
 }
-
-
-BasicBinaryStream& operator<<(BasicBinaryStream& stream, const EvaluationResult& result)
-{
-    stream.write(std::addressof(result.loglh), sizeof(result.loglh));
-    stream.write(std::addressof(result.ic_score), sizeof(result.ic_score));
-
-    stream << *result.model;
-
-    return stream;
-}
-
-BasicBinaryStream& operator>>(BasicBinaryStream& stream, EvaluationResult& result)
-{
-    stream.read(std::addressof(result.loglh), sizeof(result.loglh));
-    stream.read(std::addressof(result.ic_score), sizeof(result.ic_score));
-
-    stream >> *result.model;
-
-    return stream;
-}
-
-EvaluationResult::EvaluationResult(const candidate_model_t &candidate_model)
- : model(std::make_unique<Model>(candidate_model.descriptor())), loglh(NAN), ic_score(NAN) {}
-
-/*
-EvaluationResult::EvaluationResult()
- : loglh(NAN), ic_score(NAN) {}
-
-EvaluationResult::EvaluationResult(Model &&model, double partition_loglh, double ic_score)
-    : model(std::make_unique<Model>(model)), loglh(partition_loglh), ic_score(ic_score)
-{ }
-*/

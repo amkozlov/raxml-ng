@@ -3259,7 +3259,7 @@ void thread_infer_model(RaxmlInstance& instance, CheckpointManager& cm)
     // part_assign currently not used, since partitions assigned to threads dynamically in ModelTest
     auto const &part_assign = instance.proc_part_assign.at(ParallelContext::local_proc_id());
 
-    ModelTest modeltest(instance.opts, master_msa, tree, instance.tip_msa_idmap, part_assign);
+    ModelTest modeltest(instance.opts, master_msa, tree, instance.tip_msa_idmap, part_assign, cm);
 
     const auto optimal_models = modeltest.optimize_model();
 

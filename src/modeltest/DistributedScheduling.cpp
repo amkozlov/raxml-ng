@@ -1,21 +1,7 @@
 #include "DistributedScheduling.hpp"
-#include "Evaluation.hpp"
+#include "ModelEvaluator.hpp"
+#include "../io/binary_io.hpp"
 #include <mpi.h>
-
-BasicBinaryStream& operator<<(BasicBinaryStream& stream, const IndexedEvaluationResult &result)
-{
-    stream.write(&result.index, sizeof(result.index));
-    stream << result.result;
-    return stream;
-}
-
-BasicBinaryStream& operator>>(BasicBinaryStream& stream, IndexedEvaluationResult &result)
-{
-    stream.read(&result.index, sizeof(result.index));
-    stream >> result.result;
-    
-    return stream;
-}
 
 #ifdef _RAXML_MPI
 DistributedSchedulingMPI::DistributedSchedulingMPI(size_t results_capacity)
@@ -82,7 +68,7 @@ uint64_t DistributedSchedulingMPI::next_evaluation_index()
     return assigned_evaluation_index;
 }
 
-void DistributedSchedulingMPI::announce_result(uint64_t index, const EvaluationResult &result)
+void DistributedSchedulingMPI::announce_result(uint64_t index, const ModelEvaluation &result)
 {
     const size_t result_size = sizeof(index) + BinaryStream::serialized_size(result);
     serialization_buffer.resize(result_size);
@@ -104,6 +90,10 @@ void DistributedSchedulingMPI::announce_result(uint64_t index, const EvaluationR
             MAIN_SCHEDULING_RANK, result_displacement, stream.size(), MPI_BYTE,
             win_results);
 
+    if (local_results_offset == result_displacement) {
+        local_results_offset += stream.size();
+    }
+
     result_displacement += stream.size();
     assert(result_displacement <= results_capacity);
     MPI_Put(&result_displacement, 1, MPI_UINT64_T,
@@ -113,7 +103,7 @@ void DistributedSchedulingMPI::announce_result(uint64_t index, const EvaluationR
     MPI_Win_unlock(MAIN_SCHEDULING_RANK, win_results);
 }
 
-void DistributedSchedulingMPI::fetch_results(std::vector<PartitionModelEvaluation> &evaluations)
+void DistributedSchedulingMPI::fetch_results(std::vector<ModelEvaluator> &evaluations, ModelUpdateCallback callback)
 {
     uint64_t new_offset;
     MPI_Request req;
@@ -126,10 +116,12 @@ void DistributedSchedulingMPI::fetch_results(std::vector<PartitionModelEvaluatio
     MPI_Wait(&req, MPI_STATUS_IGNORE);
 
     const auto fetch_size = new_offset - local_results_offset;
-    deserialization_buffer.resize(fetch_size);
-    MPI_Get(deserialization_buffer.data(), fetch_size, MPI_BYTE,
-            MAIN_SCHEDULING_RANK, local_results_offset, fetch_size, MPI_BYTE,
-            win_results);
+    if (fetch_size > 0) {
+        deserialization_buffer.resize(fetch_size);
+        MPI_Get(deserialization_buffer.data(), fetch_size, MPI_BYTE,
+                MAIN_SCHEDULING_RANK, local_results_offset, fetch_size, MPI_BYTE,
+                win_results);
+    }
 
     MPI_Win_unlock(MAIN_SCHEDULING_RANK, win_results);
 
@@ -138,7 +130,9 @@ void DistributedSchedulingMPI::fetch_results(std::vector<PartitionModelEvaluatio
     while (stream.pos() < stream.size()) {
         uint64_t index;
         stream.read(&index, sizeof(index));
-        stream >> evaluations.at(index).modify_result();
+        ModelEvaluation result;
+        stream >> result;
+        callback(index, result);
     }
 }
 
@@ -154,15 +148,16 @@ uint64_t DistributedSchedulingDummy::next_evaluation_index()
     return evaluation_index++;
 }
 
-void DistributedSchedulingDummy::announce_result(uint64_t index, const EvaluationResult &result)
+void DistributedSchedulingDummy::announce_result(uint64_t index, const ModelEvaluation &result)
 {
     RAXML_UNUSED(index);
     RAXML_UNUSED(result);
 }
 
-void DistributedSchedulingDummy::fetch_results(std::vector<PartitionModelEvaluation> &evaluations)
+void DistributedSchedulingDummy::fetch_results(std::vector<ModelEvaluator> &evaluations, ModelUpdateCallback callback)
 {
     RAXML_UNUSED(evaluations);
+    RAXML_UNUSED(callback);
 }
 
 void DistributedSchedulingDummy::finalize()

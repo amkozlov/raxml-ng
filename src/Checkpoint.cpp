@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include "Checkpoint.hpp"
+#include "ParallelContext.hpp"
 #include "io/binary_io.hpp"
 #include "io/file_io.hpp"
 #include "util/EnergyMonitor.hpp"
@@ -286,6 +287,18 @@ void CheckpointManager::update_and_write(const TreeInfo& treeinfo)
   }
 }
 
+void CheckpointManager::update_and_write(uint64_t index, const ModelEvaluation &model)
+{
+  _checkp_file.model_candidates[index] = model;
+
+  /* The method could be called by any thread on the master rank. */
+  if (ParallelContext::master_rank() && _active)
+  {
+    ParallelContext::UniqueLock lock;
+    write();
+  }
+}
+
 void CheckpointManager::gather_model_params()
 {
   /* send callback -> worker ranks */
@@ -433,6 +446,8 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const CheckpointFile& c
 
   stream << ckpfile.best_models;
 
+  stream << ckpfile.model_candidates;
+
   stream << ckpfile.ml_trees;
 
   stream << ckpfile.bs_trees;
@@ -483,6 +498,11 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, CheckpointFile& ckpfile
   }
 
   stream >> ckpfile.best_models;
+
+  if (ckpfile.version > 7)
+  {
+      stream >> ckpfile.model_candidates;
+  }
 
   stream >> ckpfile.ml_trees;
 

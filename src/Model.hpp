@@ -205,7 +205,15 @@ private:
   void set_user_freqs(doubleVector& freqs);
 };
 
+struct ModelEvaluation
+{
+    Model model;
+    double loglh;
+    double ic_score;
+};
+
 typedef std::unordered_map<size_t, Model> ModelMap;
+typedef std::unordered_map<size_t, ModelEvaluation> ModelEvaluationMap;
 typedef std::unordered_map<size_t, Model&> ModelRefMap;
 typedef std::unordered_map<size_t, const Model&> ModelCRefMap;
 
