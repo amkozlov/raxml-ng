@@ -25,6 +25,8 @@ class Heuristics
         bool can_skip(unsigned int partition, const candidate_model_t &candidate_model) const;
         ~Heuristics() = default;
 
+        bool evaluation_essential(unsigned int partition, const candidate_model_t &candidate_model) const;
+
     private:
         bool enabled(const HeuristicSelection & heuristic) const;
 

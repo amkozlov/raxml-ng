@@ -4,7 +4,10 @@
 #include <utility>
 
 FreerateHeuristic::FreerateHeuristic(unsigned int min_cats, unsigned int max_cats)
-    : min_categories{min_cats}, max_categories{max_cats} {}
+    : min_categories{min_cats}, max_categories{max_cats} {
+        assert(min_categories <= max_categories);
+
+}
 
 void FreerateHeuristic::update(const candidate_model_t &candidate_model, double score) {
     if (candidate_model.rate_heterogeneity.type != rate_heterogeneity_type::FREE_RATE) {

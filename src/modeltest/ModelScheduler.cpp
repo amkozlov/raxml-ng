@@ -101,6 +101,9 @@ void ModelScheduler::finalize() {
 void ModelScheduler::update_result(ModelEvaluator &evaluator, ModelEvaluation result, bool announce, bool write_checkpoint) {
     std::lock_guard<std::mutex> lock(mutex_evaluation);
     _update_result(evaluator, result, announce, write_checkpoint);
+
+    const uint64_t evaluation_index = std::distance(&evaluators->at(0), &evaluator);
+    logger().logstream(LogLevel::progress, LogScope::thread) << RAXML_LOG_TIMESTAMP << "Evaluated model " << (evaluation_index + 1) << "/" << evaluators->size() << ": " << evaluator.candidate_model()->descriptor() << "\n";
 }
 
 void ModelScheduler::_update_result(ModelEvaluator &evaluator, ModelEvaluation result, bool announce, bool write_checkpoint) {
@@ -177,9 +180,6 @@ ModelEvaluator *ModelScheduler::get_next_model()
     bool success = evaluation.join_team();
     assert(success);
 
-    if (evaluation.get_status() == EvaluationStatus::RUNNING) {
-        logger().logstream(LogLevel::progress, LogScope::thread) << RAXML_LOG_TIMESTAMP << "Evaluating model " << evaluation_index << "/" << evaluators->size() << std::endl;
-    }
     return &evaluation;
 }
 
@@ -197,4 +197,43 @@ vector<vector<ModelEvaluation const *>> ModelScheduler::collect_finished_results
 
 const vector<ModelEvaluator> &ModelScheduler::get_evaluations() const {
     return *evaluators;
+}
+
+void ModelScheduler::print_xml(ostream &os) const {
+    os << setprecision(17);
+    os << "<modeltestresults>" << endl;
+
+    for (const auto &evaluator: *evaluators) {
+        os << "<model partition=\"" << evaluator.partition_index()
+                << "\" name=\"" << evaluator.candidate_model()->descriptor()
+                << "\" status=\"";
+        switch (evaluator.get_status()) {
+            case EvaluationStatus::WAITING:
+                os << "WAITING";
+                break;
+            case EvaluationStatus::RUNNING:
+                os << "RUNNING";
+                break;
+            case EvaluationStatus::ABORTED:
+                os << "ABORTED";
+                break;
+            case EvaluationStatus::FINISHED:
+                os << "FINISHED";
+                break;
+        }
+
+        if (evaluator.get_status() == EvaluationStatus::FINISHED) {
+            const auto &result = evaluator.get_result();
+            const bool essential = heuristics->evaluation_essential(evaluator.partition_index(), *evaluator.candidate_model());
+
+            os << "\" lnL=\"" << result.loglh
+                    << "\" essential=\"" << (essential ? "1" : "0")
+                    << "\" score-bic=\"" << result.ic_score
+                    << "\" free-params=\"" << result.model.num_free_params() << "\" />" << endl;
+        } else {
+            os << "\" />" << endl;
+        }
+    }
+
+    os << "</modeltestresults>" << endl;
 }

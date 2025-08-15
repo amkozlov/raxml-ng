@@ -232,8 +232,7 @@ vector<Model> ModelTest::optimize_model() {
     if (ParallelContext::master()) {
         auto xml_fname = options.output_fname("modeltest.xml");
         fstream xml_stream(xml_fname, std::ios::out);
-
-        print_xml(xml_stream, model_scheduler.get_evaluations());
+        model_scheduler.print_xml(xml_stream);
         xml_stream.close();
 
         LOG_DEBUG << "XML model selection file written to " << xml_fname << endl;
@@ -285,38 +284,3 @@ vector<size_t> ModelTest::rank_by_score(const vector<ModelEvaluation const *> &r
     return ranking;
 }
 
-void ModelTest::print_xml(ostream &os, const vector<ModelEvaluator> &results) {
-    os << setprecision(17);
-    os << "<modeltestresults>" << endl;
-
-    for (const auto &evaluation: results) {
-        os << "<model partition=\"" << evaluation.partition_index()
-                << "\" name=\"" << evaluation.candidate_model()->descriptor()
-                << "\" status=\"";
-        switch (evaluation.get_status()) {
-            case EvaluationStatus::WAITING:
-                os << "WAITING";
-                break;
-            case EvaluationStatus::RUNNING:
-                os << "RUNNING";
-                break;
-            case EvaluationStatus::ABORTED:
-                os << "ABORTED";
-                break;
-            case EvaluationStatus::FINISHED:
-                os << "FINISHED";
-                break;
-        }
-
-        if (evaluation.get_status() == EvaluationStatus::FINISHED) {
-            const auto &result = evaluation.get_result();
-            os << "\" lnL=\"" << result.loglh
-                    << "\" score-bic=\"" << result.ic_score
-                    << "\" free-params=\"" << result.model.num_free_params() << "\" />" << endl;
-        } else {
-            os << "\" />" << endl;
-        }
-    }
-
-    os << "</modeltestresults>" << endl;
-}

@@ -54,3 +54,27 @@ bool Heuristics::can_skip(unsigned int partition, const candidate_model_t &candi
 bool Heuristics::enabled(const HeuristicSelection &heuristic) const {
     return selection & static_cast<unsigned int>(heuristic);
 }
+
+bool Heuristics::evaluation_essential(unsigned int partition, const candidate_model_t &c) const {
+    bool essential = false;
+
+    // Need to compute all RHAS variants of the reference substition matrix
+    essential |= (c.substitution_model == reference_model && c.rate_heterogeneity.type != rate_heterogeneity_type::FREE_RATE);
+
+    // For freerate, only the categories up until the score worsens again are required
+    essential |= (c.substitution_model == reference_model && \
+                            c.rate_heterogeneity.type == rate_heterogeneity_type::FREE_RATE && \
+                            (!enabled(HeuristicSelection::FREERATE) || \
+                             static_cast<int>(c.rate_heterogeneity.category_count) <= freerate_heuristics.at(partition).optimal_category_count(c.substitution_model) + 1));
+
+    // For all other models, one of the enabled heuristics must deem the candidate "unskippable"
+    essential |= (c.substitution_model != reference_model) && \
+                  ((enabled(HeuristicSelection::FREERATE) && enabled(HeuristicSelection::RHAS) && \
+                    (!freerate_heuristics.at(partition).can_skip(c) || !rhas_heuristics.at(partition).can_skip(c))) || \
+                  (enabled(HeuristicSelection::FREERATE) && !freerate_heuristics.at(partition).can_skip(c) ) || \
+                  (enabled(HeuristicSelection::RHAS) && !rhas_heuristics.at(partition).can_skip(c)));
+
+
+    return essential;
+
+}
