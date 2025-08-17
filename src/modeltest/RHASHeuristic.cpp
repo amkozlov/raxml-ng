@@ -71,7 +71,7 @@ void RHASHeuristic::reference_complete() {
         }
 
         if (skip[rhas]) {
-            LOG_DEBUG << "Skipping rate heterogeneity model '" << rhas.label() << "'\n";
+            logger().logstream(LogLevel::debug, LogScope::thread) << RAXML_LOG_TIMESTAMP << " Skipping rate heterogeneity model '" << rhas.label() << "'\n";
         }
     }
 }

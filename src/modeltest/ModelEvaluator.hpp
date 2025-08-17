@@ -1,7 +1,7 @@
 #ifndef EVALUATION_HPP_
 #define EVALUATION_HPP_
 
-#include <optional>
+#include <functional>
 #include <vector>
 
 #include "ModelDefinitions.hpp"
@@ -20,28 +20,30 @@ enum class EvaluationPriority {
 enum class EvaluationStatus {
     WAITING,
     RUNNING,
-    ABORTED,
+    SKIPPED,
     FINISHED
 };
 
-/** Describes the (possibly multi-threaded) evaluation of a given candidate_model_t on a partition.
+/** Captures the run-time state of a possibly multi-threaded evaluation of a given candidate_model_t on a partition.
  * All calls to non-const methods must be protected with a mutex!
  */
 class ModelEvaluator {
 public:
-    ModelEvaluator(candidate_model_t *candidate_model, const PartitionStats &stats, size_t partition_index, EvaluationPriority priority,
-                             size_t proposed_thread_count);
+    ModelEvaluator(const candidate_model_t &candidate_model,
+                   const PartitionStats &stats,
+                   size_t partition_index, EvaluationPriority priority, size_t proposed_thread_count);
 
     /** Try to add calling thread with specified thread_id to the team */
     bool join_team();
 
-    void abort();
+    /** Mark this particular evaluation exempted. */
+    void skip();
 
     /** Store results from a finished computation. */
     void store_result(ModelEvaluation evaluation);
 
     /** Block until the status changes from WAITING to either RUNNING or
-     * ABORTED. May only be called by threads that are part of the team */
+     * SKIPPED. May only be called by threads that are part of the team */
     EvaluationStatus wait() const;
 
     const ModelEvaluation &get_result() const;
@@ -53,16 +55,19 @@ public:
     const unsigned int volatile &assigned_threads() const;
     const size_t &proposed_thread_count() const;
 
-    const candidate_model_t *candidate_model() const;
+    const candidate_model_t &candidate_model() const;
 
     EvaluationPriority priority() const;
 
     void barrier();
      
+    /** Custom reduction callback for synchronization between threads belonging to a given Evaluator/team.
+     * @param context a pointer to the Evaluator
+     */
     static void reduce(void *context, double *data, size_t size, int op);
 private:
     size_t _proposed_thread_count;
-    candidate_model_t *_candidate_model;
+    const candidate_model_t *_candidate_model;
     size_t _partition_index;
 
     EvaluationPriority _priority;

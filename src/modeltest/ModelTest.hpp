@@ -8,29 +8,30 @@
 #include "../Optimizer.hpp"
 #include "ModelDefinitions.hpp"
 #include "ModelEvaluator.hpp"
+#include "ModelScheduler.hpp"
 
 class ModelTest {
 public:
     ModelTest(const Options &options, const PartitionedMSA &msa, const Tree &tree, const IDVector &tip_msa_idmap,
-              const PartitionAssignment &part_assign, CheckpointManager &checkpoint_manager);
+              CheckpointManager &checkpoint_manager);
 
     /* Optimize the model and return model name per partition */
     vector<Model> optimize_model();
 
 private:
-    Options options;
+    const Options options;
     Optimizer optimizer;
-    CheckpointManager checkpoint_manager;
+    CheckpointManager &checkpoint_manager;
     const PartitionedMSA &msa;
     const Tree &tree;
     const IDVector &tip_msa_idmap;
-    const PartitionAssignment &part_assign;
+
+    ModelScheduler model_scheduler;
 
     /// map from model descriptor to per-partition evaluation results
     [[nodiscard]]
     static vector<size_t> rank_by_score(const vector<ModelEvaluation const *> &results);
     vector<candidate_model_t> generate_candidate_model_names(const DataType &dt) const;
-
 };
 
 

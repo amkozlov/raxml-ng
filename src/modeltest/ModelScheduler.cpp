@@ -1,15 +1,12 @@
 #include "ModelScheduler.hpp"
 #include "../ParallelContext.hpp"
 #include "DistributedScheduling.hpp"
+#include "ModelDefinitions.hpp"
 #include "ModelEvaluator.hpp"
 #include "Heuristics.hpp"
 #include <functional>
 #include <mutex>
 #include <unistd.h>
-
-ModelScheduler::ModelScheduler()
-{
-}
 
 size_t determine_binary_candidates_size(const std::vector<ModelEvaluator> &evaluations)
 {
@@ -23,28 +20,21 @@ size_t determine_binary_candidates_size(const std::vector<ModelEvaluator> &evalu
     return size;
 }
 
-void ModelScheduler::initialize(std::vector<candidate_model_t> _candidate_models, const PartitionedMSA &msa,
-            const Options &options,
-            CheckpointManager &checkpoint_manager,
-            ResourceEstimatorFunction resource_estimator,
-            bool use_rhas_heuristic, bool use_freerate_heuristic) {
-    candidate_models = std::move(_candidate_models);
-    partition_count = msa.part_count();
-    branch_count = BasicTree(msa.taxon_count()).num_branches();
-    this->msa = &msa;
-    this->checkpoint_manager = &checkpoint_manager;
 
-    /* Substitution model used for heuristics, e.g. use GTR to test RHAS feasibility */
-    reference_model.emplace(this->candidate_models.at(0).substitution_model);
+vector<ModelEvaluator> build_evaluators(const PartitionedMSA &msa,
+                                        const Options &options,
+                                        const substitution_model_t &reference_model,
+                                        ResourceEstimatorFunction resource_estimator,
+                                        const std::vector<candidate_model_t> &candidate_models,
+                                        unsigned int partition_count)
+{
+    vector<ModelEvaluator> evaluators;
+    evaluators.reserve(candidate_models.size() * partition_count);
 
-
-    this->evaluators = std::make_unique<std::vector<ModelEvaluator>>();
-    evaluators->reserve(candidate_models.size() * partition_count);
-    selected_rhas.clear();
     for (unsigned int p = 0; p < partition_count; ++p) {
         const auto &pinfo = msa.part_info(p);
         for (unsigned int i = 0; i < candidate_models.size(); ++i) {
-            auto &candidate_model = candidate_models.at(i);
+            const auto &candidate_model = candidate_models.at(i);
             const auto priority  =
                     candidate_model.substitution_model == reference_model
                         ? EvaluationPriority::HIGH
@@ -52,39 +42,79 @@ void ModelScheduler::initialize(std::vector<candidate_model_t> _candidate_models
             const auto thread_count = CORAX_MIN(resource_estimator(options, pinfo, candidate_model, priority),
                                                 ParallelContext::num_threads());
 
-            evaluators->emplace_back(&candidate_model, pinfo.stats(), p, priority, thread_count);
-
-            if (p == 0 && candidate_model.substitution_model == reference_model) {
-                selected_rhas.push_back(candidate_model.rate_heterogeneity);
-            }
+            evaluators.emplace_back(candidate_model, pinfo.stats(), p, priority, thread_count);
         }
     }
 
+    return evaluators;
+}
+std::vector<rate_heterogeneity_t> get_selected_rhas(const std::vector<candidate_model_t> &candidate_models,
+                                                    const substitution_model_t &reference_model)
+{
+    std::vector<rate_heterogeneity_t> selected_rhas;
 
-    const auto heuristics_selection = (use_freerate_heuristic ? static_cast<unsigned int>(HeuristicSelection::FREERATE) : 0) |
-                                      (use_rhas_heuristic ? static_cast<unsigned int>(HeuristicSelection::RHAS) : 0);
-    heuristics = std::make_unique<Heuristics>(partition_count, heuristics_selection, selected_rhas, *reference_model, options);
-    distributed_scheduling = std::make_unique<DistributedSchedulingImpl>(determine_binary_candidates_size(*evaluators));
+    for (const auto &candidate : candidate_models) {
+        if (candidate.substitution_model == reference_model) {
+            selected_rhas.push_back(candidate.rate_heterogeneity);
+        }
+    }
 
-    std::sort(evaluators->begin(), evaluators->end(),
+    return selected_rhas;
+}
+
+std::vector<size_t> sort_evaluators(const std::vector<ModelEvaluator> &evaluators)
+{
+    std::vector<size_t> v(evaluators.size());
+    std::iota(v.begin(), v.end(), 0);
+
+
+    return v;
+}
+
+
+ModelScheduler::ModelScheduler(
+            std::vector<candidate_model_t> _candidate_models,
+            const PartitionedMSA &msa,
+            const Options &options,
+            CheckpointManager &checkpoint_manager,
+            ResourceEstimatorFunction resource_estimator,
+            HeuristicSelection heuristics_selection)
+ : mutex_evaluation{},
+   mutex_log{},
+   mutex_mpi{},
+   msa{msa},
+   checkpoint_manager{checkpoint_manager},
+   partition_count{msa.part_count()},
+   branch_count{BasicTree(msa.taxon_count()).num_branches()},
+   candidate_models{_candidate_models},
+   reference_model{candidate_models.at(0).substitution_model},
+   evaluation_index{0},
+   evaluators{build_evaluators(msa, options, reference_model, resource_estimator, candidate_models, partition_count)},
+   heuristics{partition_count, heuristics_selection, get_selected_rhas(candidate_models, reference_model), reference_model, options},
+   distributed_scheduling{determine_binary_candidates_size(evaluators)} {
+
+    std::sort(evaluators.begin(), evaluators.end(),
                 [](const ModelEvaluator &a, const ModelEvaluator &b) {
                     // Sort by priority, high priority should come first
                     return a.priority() > b.priority();
                 });
 
+
+    /* Read results from checkpoint */
     for (const auto &[index, model_evaluation] : checkpoint_manager.get_model_candidates())
     {
-        update_result(evaluators->at(index), model_evaluation, false, false);
+        update_result(evaluators.at(index), model_evaluation, false, false);
     }
 
+    /* Initialize evaluation_index in light of checkpointed results and in accordance with other MPI ranks */
     while (true) {
-        evaluation_index = distributed_scheduling->next_evaluation_index();
+        evaluation_index = distributed_scheduling.next_evaluation_index();
 
-        if (evaluation_index >= evaluators->size())
+        if (evaluation_index >= evaluators.size())
             break;
 
-        const bool result_already_present = evaluators->at(evaluation_index).get_status() != EvaluationStatus::WAITING;
-        const bool can_skip_heuristically = heuristics->can_skip(evaluators->at(evaluation_index).partition_index(), *evaluators->at(evaluation_index).candidate_model());
+        const bool result_already_present = evaluators.at(evaluation_index).get_status() != EvaluationStatus::WAITING;
+        const bool can_skip_heuristically = heuristics.can_skip(evaluators.at(evaluation_index).partition_index(), evaluators.at(evaluation_index).candidate_model());
 
         if (result_already_present || can_skip_heuristically) {
             continue;
@@ -94,30 +124,28 @@ void ModelScheduler::initialize(std::vector<candidate_model_t> _candidate_models
     }
 }
 
-void ModelScheduler::finalize() {
-    distributed_scheduling->finalize();
-}
 
 void ModelScheduler::update_result(ModelEvaluator &evaluator, ModelEvaluation result, bool announce, bool write_checkpoint) {
     std::lock_guard<std::mutex> lock(mutex_evaluation);
     _update_result(evaluator, result, announce, write_checkpoint);
 
-    const uint64_t evaluation_index = std::distance(&evaluators->at(0), &evaluator);
-    logger().logstream(LogLevel::progress, LogScope::thread) << RAXML_LOG_TIMESTAMP << "Evaluated model " << (evaluation_index + 1) << "/" << evaluators->size() << ": " << evaluator.candidate_model()->descriptor() << "\n";
+    const uint64_t evaluation_index = std::distance(&evaluators.at(0), &evaluator);
+    logger().logstream(LogLevel::progress, LogScope::thread) << RAXML_LOG_TIMESTAMP << "Evaluated model " << (evaluation_index + 1) << "/" << evaluators.size() << ": " << evaluator.candidate_model().descriptor() << "\n";
 }
 
 void ModelScheduler::_update_result(ModelEvaluator &evaluator, ModelEvaluation result, bool announce, bool write_checkpoint) {
     evaluator.store_result(std::move(result));
-    heuristics->update(evaluator.partition_index(), *evaluator.candidate_model(), evaluator.get_result().ic_score);
+    heuristics.update(evaluator.partition_index(), evaluator.candidate_model(), evaluator.get_result().ic_score);
 
-    const uint64_t index = std::distance(evaluators->data(), std::addressof(evaluator));
+    // TODO: replace calls to `std::distance` with `index` field inside ModelEvaluator
+    const uint64_t index = std::distance(evaluators.data(), std::addressof(evaluator));
 
     if (announce) {
-        distributed_scheduling->announce_result(index, evaluator.get_result());
+        distributed_scheduling.announce_result(index, evaluator.get_result());
     }
 
     if (write_checkpoint && ParallelContext::master_rank()) {
-        checkpoint_manager->update_and_write(index, evaluator.get_result());
+        checkpoint_manager.update_and_write(index, evaluator.get_result());
     }
 }
 
@@ -140,42 +168,42 @@ void ModelScheduler::fetch_global_results()
 void ModelScheduler::_fetch_global_results()
 {
     ModelUpdateCallback callback = [this](uint64_t i, const ModelEvaluation &m) {
-        _update_result(evaluators->at(i), m, false, true);
+        _update_result(evaluators.at(i), m, false, true);
     };
-    distributed_scheduling->fetch_results(callback);
+    distributed_scheduling.fetch_results(callback);
 }
 
 ModelEvaluator *ModelScheduler::get_next_model()
 {
-    if (evaluators->empty()) {
+    if (evaluators.empty()) {
         throw std::logic_error("attempted to get next model before initialization");
     }
 
     std::lock_guard<std::mutex> lock(mutex_evaluation);
 
-    while (evaluation_index < evaluators->size() &&
-           evaluators->at(evaluation_index).get_status() != EvaluationStatus::WAITING)
+    while (evaluation_index < evaluators.size() &&
+           evaluators.at(evaluation_index).get_status() != EvaluationStatus::WAITING)
     {
         _fetch_global_results(); // TODO: determine whether to pull this out of the loop
 
-        evaluation_index = distributed_scheduling->next_evaluation_index();
-        if (evaluation_index >= evaluators->size()) {
+        evaluation_index = distributed_scheduling.next_evaluation_index();
+        if (evaluation_index >= evaluators.size()) {
             break;
         }
 
-        auto &evaluation = evaluators->at(evaluation_index);
+        auto &evaluation = evaluators.at(evaluation_index);
         
         /* Skip candidates heuristically */
-        if (heuristics->can_skip(evaluation.partition_index(), *evaluation.candidate_model())) {
-            evaluation.abort();
+        if (heuristics.can_skip(evaluation.partition_index(), evaluation.candidate_model())) {
+            evaluation.skip();
             continue;
         }
     }
 
-    if (evaluation_index >= evaluators->size())
+    if (evaluation_index >= evaluators.size())
         return nullptr;
 
-    auto &evaluation = evaluators->at(evaluation_index);
+    auto &evaluation = evaluators.at(evaluation_index);
     assert(evaluation.get_status() == EvaluationStatus::WAITING);
     bool success = evaluation.join_team();
     assert(success);
@@ -186,7 +214,7 @@ ModelEvaluator *ModelScheduler::get_next_model()
 vector<vector<ModelEvaluation const *>> ModelScheduler::collect_finished_results_by_partition() const {
     vector<vector<ModelEvaluation const *>> results(partition_count);
 
-    for (const auto &evaluation: *evaluators) {
+    for (const auto &evaluation: evaluators) {
         if (evaluation.get_status() == EvaluationStatus::FINISHED) {
             results.at(evaluation.partition_index()).push_back(&evaluation.get_result());
         }
@@ -195,17 +223,13 @@ vector<vector<ModelEvaluation const *>> ModelScheduler::collect_finished_results
     return results;
 }
 
-const vector<ModelEvaluator> &ModelScheduler::get_evaluations() const {
-    return *evaluators;
-}
-
 void ModelScheduler::print_xml(ostream &os) const {
     os << setprecision(17);
     os << "<modeltestresults>" << endl;
 
-    for (const auto &evaluator: *evaluators) {
+    for (const auto &evaluator: evaluators) {
         os << "<model partition=\"" << evaluator.partition_index()
-                << "\" name=\"" << evaluator.candidate_model()->descriptor()
+                << "\" name=\"" << evaluator.candidate_model().descriptor()
                 << "\" status=\"";
         switch (evaluator.get_status()) {
             case EvaluationStatus::WAITING:
@@ -214,7 +238,7 @@ void ModelScheduler::print_xml(ostream &os) const {
             case EvaluationStatus::RUNNING:
                 os << "RUNNING";
                 break;
-            case EvaluationStatus::ABORTED:
+            case EvaluationStatus::SKIPPED:
                 os << "ABORTED";
                 break;
             case EvaluationStatus::FINISHED:
@@ -224,7 +248,7 @@ void ModelScheduler::print_xml(ostream &os) const {
 
         if (evaluator.get_status() == EvaluationStatus::FINISHED) {
             const auto &result = evaluator.get_result();
-            const bool essential = heuristics->evaluation_essential(evaluator.partition_index(), *evaluator.candidate_model());
+            const bool essential = heuristics.evaluation_essential(evaluator.partition_index(), evaluator.candidate_model());
 
             os << "\" lnL=\"" << result.loglh
                     << "\" essential=\"" << (essential ? "1" : "0")

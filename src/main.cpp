@@ -25,6 +25,8 @@
 #include <memory>
 
 #include <corax/corax.h>
+#include "Checkpoint.hpp"
+#include "PartitionedMSA.hpp"
 #include "difficulty.h"
 
 #include "types.hpp"
@@ -136,6 +138,8 @@ struct RaxmlInstance {
 
   shared_ptr<DifficultyPredictor> msa_diff_predictor;
   shared_ptr<StoppingCriterion> stop_criterion;
+
+  unique_ptr<ModelTest> model_test;
 
   vector<RaxmlWorker> workers;
   RaxmlWorker &get_worker() { return workers.at(ParallelContext::local_group_id()); }
@@ -250,18 +254,15 @@ void init_part_info(RaxmlInstance &instance) {
       throw runtime_error("Failed to read partition file:\n" + string(e.what()));
     }
   }
-  else if (opts.command == Command::modeltest ||
-           opts.model_file == "auto" || opts.model_file == "AUTO" ||
-           opts.model_file == "DNA"  || opts.model_file == "AA" ||
-           opts.model_file == "BIN")
+  else if (opts.auto_model())
   {
     // Use dummy model (will be overwritten by ModelTest)
     string dummy_model = "";
-    if (opts.data_type == DataType::dna || opts.model_file == "DNA")
+    if (opts.data_type == DataType::dna || (0 == strcasecmp(opts.model_file.c_str(), "DNA")))
       dummy_model = "GTR+G";
-    else if (opts.data_type == DataType::protein || opts.model_file == "AA")
+    else if (opts.data_type == DataType::protein || (0 == strcasecmp(opts.model_file.c_str(), "AA")))
       dummy_model = "LG+G";
-    else if (opts.data_type == DataType::binary || opts.model_file == "BIN")
+    else if (opts.data_type == DataType::binary || (0 == strcasecmp(opts.model_file.c_str(), "BIN")))
       dummy_model = "BIN+G";
     else
       throw runtime_error("Specify the datatype for modeltesting with --data-type [AA|DNA|BIN]");
@@ -1961,6 +1962,27 @@ void init_stop_criterion(RaxmlInstance& instance)
   }
 }
 
+void init_modeltest(RaxmlInstance& instance, CheckpointManager &cm)
+{
+  const auto& opts = instance.opts;
+  if (!opts.auto_model())
+      return;
+
+  if (instance.start_trees.empty() && instance.pars_trees.empty()) {
+    LOG_ERROR << "Please specify a tree to use for model testing" << endl;
+  }
+    // for now, use parsimony tree unless user tree is explicitly provided
+    bool user_tree = instance.opts.start_trees.count(StartingTree::user) || instance.pars_trees.empty();
+    const auto &tree = user_tree ? instance.start_trees.at(0) : instance.pars_trees.at(0);
+
+    const PartitionedMSA &msa = *instance.parted_msa.get();
+
+    instance.model_test = std::make_unique<ModelTest>(opts, msa, tree, instance.tip_msa_idmap, cm);
+
+    LOG_INFO << "\nStarting ModelTest with " << (user_tree ? "user" : "parsimony") <<
+        " starting tree" << endl << endl;
+}
+
 
 void reroot_tree_with_outgroup(const Options& opts, Tree& tree, bool add_root_node)
 {
@@ -3241,27 +3263,7 @@ void thread_infer_bootstrap(RaxmlInstance &instance, CheckpointManager &cm) {
 
 void thread_infer_model(RaxmlInstance& instance, CheckpointManager& cm)
 {
-//  LOG_INFO << "Starting model test, #starting trees = " << instance.start_trees.size()
-//           << ", worker start trees = " << instance.get_worker().start_trees.size() << endl;
-
-  if (instance.start_trees.empty() && instance.pars_trees.empty()) {
-    LOG_ERROR << "Please specify a tree to use for model testing" << endl;
-  } else {
-    auto &master_msa = *instance.parted_msa;
-    bool user_tree = instance.opts.start_trees.count(StartingTree::user) || instance.pars_trees.empty();
-
-    LOG_INFO << "\nStarting ModelTest with " << (user_tree ? "user" : "parsimony") <<
-        " starting tree" << endl << endl;
-
-    // for now, use parsimony tree unless user tree is explicitly provided
-    auto tree = user_tree ? instance.start_trees.at(0) : instance.pars_trees.at(0);
-
-    // part_assign currently not used, since partitions assigned to threads dynamically in ModelTest
-    auto const &part_assign = instance.proc_part_assign.at(ParallelContext::local_proc_id());
-
-    ModelTest modeltest(instance.opts, master_msa, tree, instance.tip_msa_idmap, part_assign, cm);
-
-    const auto optimal_models = modeltest.optimize_model();
+    const auto optimal_models = instance.model_test->optimize_model();
 
     if (ParallelContext::master())
     {
@@ -3269,18 +3271,17 @@ void thread_infer_model(RaxmlInstance& instance, CheckpointManager& cm)
           if (instance.opts.command == Command::modeltest) {
               // In standalone model test, assign optimized model such that
               // .raxml.bestModel file contains the optimized parameters
-              master_msa.model(p, optimal_models.at(p));
+              instance.parted_msa->model(p, optimal_models.at(p));
           } else {
               // If modeltest is run as part of another command (e.g. tree
               // search), only set model type but not the exact paramters to
               // reduce bias when tree search uses a different starting tree
-              master_msa.model(p, Model(optimal_models.at(p).to_string(false)));
+              instance.parted_msa->model(p, Model(optimal_models.at(p).to_string(false)));
           }
       }
 
       cm.update_models(instance.parted_msa->models());
     }
-  }
 }
 
 void thread_main(RaxmlInstance &instance, CheckpointManager &cm) {
@@ -3291,7 +3292,7 @@ void thread_main(RaxmlInstance &instance, CheckpointManager &cm) {
   auto const &opts = instance.opts;
   check_oversubscribe(instance);
 
-  if (opts.model_file == "auto" || opts.command == Command::modeltest)
+  if (opts.auto_model())
   {
     thread_infer_model(instance, cm);
     ParallelContext::global_barrier();
@@ -3456,6 +3457,8 @@ void master_main(RaxmlInstance &instance, CheckpointManager &cm) {
   init_persite_loglh(instance);
 
   init_stop_criterion(instance);
+
+  init_modeltest(instance, cm);
 
   if (ParallelContext::master_rank())
     instance.opts.remove_result_files();

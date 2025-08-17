@@ -49,7 +49,7 @@ DistributedSchedulingMPI::DistributedSchedulingMPI(size_t results_capacity)
 
 }
 
-void DistributedSchedulingMPI::finalize() {
+DistributedSchedulingMPI::~DistributedSchedulingMPI() {
     MPI_Win_free(&win_results);
     MPI_Win_free(&win_index);
 }

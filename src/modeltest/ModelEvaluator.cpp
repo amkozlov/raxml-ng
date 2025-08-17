@@ -1,18 +1,15 @@
 #include "ModelEvaluator.hpp"
-#include "../ICScoreCalculator.hpp"
-#include "../io/binary_io.hpp"
 #include "ModelDefinitions.hpp"
 #include <cmath>
-#include <memory>
 
 thread_local unsigned int ModelEvaluator::_thread_id = 0;
 thread_local int ModelEvaluator::_barrier_mycycle = 0;
 
-ModelEvaluator::ModelEvaluator(candidate_model_t *candidate_model, const PartitionStats &stats,
+ModelEvaluator::ModelEvaluator(const candidate_model_t &candidate_model, const PartitionStats &stats,
                                                    size_t partition_index, EvaluationPriority priority,
                                                    const size_t proposed_thread_count)
     : _proposed_thread_count{proposed_thread_count},
-      _candidate_model{candidate_model},
+      _candidate_model{&candidate_model},
       _partition_index{partition_index},
       _priority{priority}, _result{Model(_candidate_model->descriptor()), NAN, NAN},
       status{EvaluationStatus::WAITING},
@@ -40,8 +37,8 @@ bool ModelEvaluator::join_team() {
     return true;
 }
 
-void ModelEvaluator::abort() {
-    status = EvaluationStatus::ABORTED;
+void ModelEvaluator::skip() {
+    status = EvaluationStatus::SKIPPED;
 }
 
 EvaluationStatus ModelEvaluator::wait() const {
@@ -67,8 +64,8 @@ const size_t &ModelEvaluator::partition_index() const {
     return _partition_index;
 }
 
-const candidate_model_t *ModelEvaluator::candidate_model() const {
-    return _candidate_model;
+const candidate_model_t &ModelEvaluator::candidate_model() const {
+    return *_candidate_model;
 } 
 
 const unsigned int &ModelEvaluator::thread_id() const {

@@ -14,7 +14,6 @@ class DistributedScheduling
     virtual uint64_t next_evaluation_index() = 0;
     virtual void announce_result(uint64_t index, const ModelEvaluation &) = 0;
     virtual void fetch_results(ModelUpdateCallback callback) = 0;
-    virtual void finalize() = 0;
 };
 
 #ifdef _RAXML_MPI
@@ -24,7 +23,7 @@ class DistributedSchedulingMPI final : public DistributedScheduling
 {
     public:
         DistributedSchedulingMPI(size_t results_capacity);
-        virtual void finalize() override;
+        ~DistributedSchedulingMPI();
 
         uint64_t next_evaluation_index() override;
         void announce_result(uint64_t index, const ModelEvaluation &result) override;
@@ -44,7 +43,6 @@ class DistributedSchedulingDummy final : public DistributedScheduling
 {
     public:
         DistributedSchedulingDummy(uint64_t evaluation_count);
-        virtual void finalize() override;
 
         uint64_t next_evaluation_index() override;
         void announce_result(uint64_t index, const ModelEvaluation &result) override;

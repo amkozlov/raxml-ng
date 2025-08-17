@@ -1,16 +1,10 @@
 #include "ModelTest.hpp"
 
-#include <cstdint>
 #include <iomanip>
 #include <memory>
 #include <mpi.h>
-#include <mutex>
-#include <sstream>
-#include <stdexcept>
 
-#include <list>
-#include <optional>
-
+#include "Heuristics.hpp"
 #include "ModelScheduler.hpp"
 #include "ModelDefinitions.hpp"
 #include "../ICScoreCalculator.hpp"
@@ -83,23 +77,13 @@ vector<candidate_model_t> ModelTest::generate_candidate_model_names(const DataTy
     return candidate_models;
 }
 
-
-ModelTest::ModelTest(const Options &original_options, const PartitionedMSA &msa, const Tree &tree, const IDVector &tip_msa_idmap,
-                    const PartitionAssignment &part_assign, CheckpointManager &checkpoint_manager)
-    : options(modify_options(original_options)), optimizer(options), checkpoint_manager(checkpoint_manager), msa(msa),
-                                            tree(tree), tip_msa_idmap(tip_msa_idmap), part_assign(part_assign) { }
-
-
-ModelScheduler model_scheduler; // shared across all threads.
-
-
-/** Estimate the ideal number of threads to optimize a given partition.
+/** Estimate the number of threads to optimize a given partition.
  *
  * We cannot reuse the existing ResourceEstimator, because it estimates the
  * number of cores across _all_ partitions, whereas we need the estimated
  * number of cores _per_ partition.
  */
-size_t estimate_cores(const Options &options, const PartitionInfo &pinfo, const candidate_model_t &candidate_model,
+size_t modeltest_estimate_cores(const Options &options, const PartitionInfo &pinfo, const candidate_model_t &candidate_model,
                       EvaluationPriority priority) {
     RAXML_UNUSED(options);
 
@@ -120,20 +104,30 @@ size_t estimate_cores(const Options &options, const PartitionInfo &pinfo, const 
     return CORAX_MAX(round(static_cast<double>(taxon_clv_size) / elems_per_core), 1.);
 }
 
+HeuristicSelection enabled_heuristics_from_env()
+{
+    HeuristicSelection selection;
+    if (std::getenv("MODELTEST_RHAS_NOSKIP") == nullptr)
+        selection.insert(HeuristicType::RHAS);
+
+    if (std::getenv("MODELTEST_FREERATE_NOSKIP") == nullptr)
+        selection.insert(HeuristicType::FREERATE);
+
+    return selection;
+}
+
+ModelTest::ModelTest(const Options &original_options, const PartitionedMSA &msa, const Tree &tree, const IDVector &tip_msa_idmap,
+                    CheckpointManager &checkpoint_manager)
+    : options(modify_options(original_options)), optimizer(options), checkpoint_manager(checkpoint_manager), msa(msa),
+                tree(tree), tip_msa_idmap(tip_msa_idmap),
+      model_scheduler(generate_candidate_model_names(msa.part_info(0).model().data_type()),
+                      msa, options, checkpoint_manager, modeltest_estimate_cores, enabled_heuristics_from_env()){ }
+
 vector<Model> ModelTest::optimize_model() {
     if (options.log_level == LogLevel::debug && !options.outfile_prefix.empty()) {
         thread_log.reset(new std::ofstream(options.outfile_prefix + ".raxml.modeltest.rank" + std::to_string(ParallelContext::rank_id()) + ".thread" + std::to_string(ParallelContext::thread_id()) + ".log"));
     } else {
         thread_log.reset(new std::ofstream("/dev/null"));
-    }
-    const bool enable_rhas_heuristic = std::getenv("MODELTEST_RHAS_NOSKIP") == nullptr;
-    const bool enable_freerate_heuristic = std::getenv("MODELTEST_FREERATE_NOSKIP") == nullptr;
-
-    if (ParallelContext::local_group_id() == 0 && ParallelContext::group_master_thread()) {
-        // TODO: support multiple partitions with mixed datatypes
-        auto candidate_models = generate_candidate_model_names(msa.part_info(0).model().data_type());
-        model_scheduler.initialize(candidate_models, msa, options, checkpoint_manager, estimate_cores, enable_rhas_heuristic,
-                                    enable_freerate_heuristic);
     }
 
     // sync ALL threads across ALL workers
@@ -151,19 +145,19 @@ vector<Model> ModelTest::optimize_model() {
             break;
         }
 
-        LOG_THREAD_TS << " scheduled to work on " << evaluator->candidate_model()->descriptor() << " as thread " << evaluator->thread_id() + 1 << " out of " << evaluator->proposed_thread_count() << endl;
+        LOG_THREAD_TS << " scheduled to work on " << evaluator->candidate_model().descriptor() << " as thread " << evaluator->thread_id() + 1 << " out of " << evaluator->proposed_thread_count() << endl;
 
         evaluator->wait();
 
         const auto scheduling_overhead = global_timer().elapsed_seconds() - t_start;
 
         /* If a heuristic applies by now, just continue with the next candidate */
-        if (evaluator->get_status() == EvaluationStatus::ABORTED)
+        if (evaluator->get_status() == EvaluationStatus::SKIPPED)
             continue;
 
         LOG_THREAD_TS << " begins work after waiting for " << 1e3 * scheduling_overhead << " milliseconds." << endl;
 
-        const auto &model_descriptor = evaluator->candidate_model()->descriptor();
+        const auto &model_descriptor = evaluator->candidate_model().descriptor();
 
         PartitionAssignment assignment;
 
@@ -184,7 +178,7 @@ vector<Model> ModelTest::optimize_model() {
             } else {
                 start_index = evaluator->thread_id() * fair_share;
             }
-            assignment.assign_sites(0, start_index, assigned_sites, evaluator->candidate_model()->rate_heterogeneity.category_count);
+            assignment.assign_sites(0, start_index, assigned_sites, evaluator->candidate_model().rate_heterogeneity.category_count);
             LOG_THREAD_TS << " assigned sites offset=" << start_index << " length=" << assigned_sites << " total_sites=" << n << endl;
         }
 
@@ -233,7 +227,10 @@ vector<Model> ModelTest::optimize_model() {
     cout << std::setprecision(default_precision);
 
     // sync ALL threads across ALL workers
+    const auto t0 = global_timer().elapsed_seconds();
     ParallelContext::global_barrier();
+    const auto t1 = global_timer().elapsed_seconds();
+    LOG_THREAD_TS << " final synchronization took " << 1e3 * (t1 - t0) << " milliseconds." << endl;
 
     if (ParallelContext::local_group_id() == 0 && ParallelContext::group_master_thread()) {
         model_scheduler.fetch_global_results();
@@ -273,11 +270,6 @@ vector<Model> ModelTest::optimize_model() {
     }
 
     thread_log->close();
-
-    if (ParallelContext::local_group_id() == 0 && ParallelContext::group_master_thread()) {
-        model_scheduler.finalize();
-    }
-
 
     return best_model_per_part;
 }
