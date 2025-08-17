@@ -9,7 +9,8 @@ RHASHeuristic::RHASHeuristic(substitution_model_t reference_model,
                              const std::vector<rate_heterogeneity_t> &selected_rhas,
                              double delta_bic)
     : reference_model{reference_model},
-      delta_bic{delta_bic} {
+      delta_bic{delta_bic},
+      freerate_optimal_category_count{-1}{
     for (const auto &rhas : selected_rhas) {
         auto it = missing_model_counts.emplace(rhas.type, 0).first;
 
@@ -66,8 +67,8 @@ void RHASHeuristic::reference_complete() {
         const bool exceeding_bic_limit = it->second - bic_min > delta_bic;
         skip[rhas] = exceeding_bic_limit;
 
-        if (rhas.type == rate_heterogeneity_type::FREE_RATE && freerate_optimal_category_count.has_value()) {
-            skip[rhas] |= (rhas.category_count != freerate_optimal_category_count);
+        if (rhas.type == rate_heterogeneity_type::FREE_RATE && freerate_optimal_category_count > -1) {
+            skip[rhas] |= (rhas.category_count != static_cast<unsigned int>(freerate_optimal_category_count));
         }
 
         if (skip[rhas]) {
@@ -76,8 +77,8 @@ void RHASHeuristic::reference_complete() {
     }
 }
 
-void RHASHeuristic::freerate_complete(unsigned int optimal_category_count) {
-    if (freerate_optimal_category_count.has_value()) {
+void RHASHeuristic::freerate_complete(int optimal_category_count) {
+    if (freerate_optimal_category_count > -1) {
         return;
     }
 

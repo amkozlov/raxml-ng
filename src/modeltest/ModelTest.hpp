@@ -1,13 +1,8 @@
 #ifndef MODELTEST_HPP_
 #define MODELTEST_HPP_
-#include <iosfwd>
-#include <optional>
-#include <vector>
 
-#include "../TreeInfo.hpp"
 #include "../Optimizer.hpp"
 #include "ModelDefinitions.hpp"
-#include "ModelEvaluator.hpp"
 #include "ModelScheduler.hpp"
 
 class ModelTest {

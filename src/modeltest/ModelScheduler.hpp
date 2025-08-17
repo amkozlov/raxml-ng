@@ -8,15 +8,10 @@
 #include "DistributedScheduling.hpp"
 #include "ModelEvaluator.hpp"
 #include "../PartitionedMSA.hpp"
-#include "../Tree.hpp"
 #include "../Checkpoint.hpp"
 #include "../Options.hpp"
-#include "../log.hpp"
-#include "../common.h"
-#include "FreerateHeuristic.hpp"
 #include "Heuristics.hpp"
 #include "ModelDefinitions.hpp"
-#include "RHASHeuristic.hpp"
 
 using std::vector;
 using namespace std;

@@ -1,8 +1,6 @@
 #pragma once
 
-#include <optional>
 #include <unordered_map>
-#include <unordered_set>
 #include "ModelDefinitions.hpp"
 
 /** Heuristically disable RHAS models based on performance of reference matrix.
@@ -31,7 +29,7 @@ class RHASHeuristic {
     void update(const candidate_model_t &candidate_model, double score);
 
     /** Signals that the FreerateHeuristic converged and that the optimal number of categories is now known. */
-    void freerate_complete(unsigned int optimal_category_count);
+    void freerate_complete(int optimal_category_count);
 
     /** Check whether a given candidate model can be skipped because of poor expectations of its RHAS model
      */
@@ -55,5 +53,5 @@ private:
      * we don't vary the category count) but for freerate it is the number of
      * category counts to be tested (e.g. 5 if we consider +R2,...,+R6) */
     std::unordered_map<rate_heterogeneity_type, unsigned int> missing_model_counts;
-    std::optional<unsigned int> freerate_optimal_category_count;
+    int freerate_optimal_category_count;
 };

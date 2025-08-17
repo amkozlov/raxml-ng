@@ -1,7 +1,6 @@
 #ifndef EVALUATION_HPP_
 #define EVALUATION_HPP_
 
-#include <functional>
 #include <vector>
 
 #include "ModelDefinitions.hpp"
@@ -25,7 +24,7 @@ enum class EvaluationStatus {
 };
 
 /** Captures the run-time state of a possibly multi-threaded evaluation of a given candidate_model_t on a partition.
- * All calls to non-const methods must be protected with a mutex!
+ * All calls to non-const methods must be protected with an external mutex!
  */
 class ModelEvaluator {
 public:
@@ -67,7 +66,9 @@ public:
     static void reduce(void *context, double *data, size_t size, int op);
 private:
     size_t _proposed_thread_count;
-    const candidate_model_t *_candidate_model;
+
+    /* Pointer instead of reference to permit move operations when sorting evaluators*/
+    candidate_model_t *_candidate_model; 
     size_t _partition_index;
 
     EvaluationPriority _priority;
