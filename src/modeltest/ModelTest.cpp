@@ -208,11 +208,22 @@ vector<Model> ModelTest::optimize_model() {
             const size_t sample_size = msa.part_info(evaluator->partition_index()).stats().site_count;
             ICScoreCalculator ic_score_calculator(free_params, sample_size);
 
+            double ic_score;
+            switch (options.model_selection_criterion)
+            {
+                case InformationCriterion::aic:
+                    ic_score = ic_score_calculator.aic(loglh); break;
+                case InformationCriterion::aicc:
+                    ic_score = ic_score_calculator.aicc(loglh); break;
+                case InformationCriterion::bic:
+                    ic_score = ic_score_calculator.bic(loglh); break;
+            }
+
             const auto t0 = global_timer().elapsed_seconds();
-            model_scheduler.update_result(*evaluator, ModelEvaluation {std::move(optimized_model), loglh, ic_score_calculator.bic(loglh)});
+            model_scheduler.update_result(*evaluator, ModelEvaluation {std::move(optimized_model), loglh, ic_score});
             const auto t1 = global_timer().elapsed_seconds();
 
-            LOG_THREAD_TS << " evaluation of " << evaluator->candidate_model()->descriptor() << " finished, IC = " << evaluator->get_result().ic_score << ", LogLH = " << evaluator->get_result().loglh << ", aborted = " << (evaluator->get_status() == EvaluationStatus::ABORTED) << std::endl;
+            LOG_THREAD_TS << " evaluation of " << evaluator->candidate_model().descriptor() << " finished, IC = " << evaluator->get_result().ic_score << ", LogLH = " << evaluator->get_result().loglh << ", aborted = " << (evaluator->get_status() == EvaluationStatus::SKIPPED) << std::endl;
             LOG_THREAD_TS << " announced results in " << 1e3 * (t1 - t0) << " milliseconds." << endl;
         }
 

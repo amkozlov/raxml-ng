@@ -1,4 +1,5 @@
 #include "Options.hpp"
+#include "types.hpp"
 //#include <stdlib.h>
 #include <climits>
 
@@ -41,7 +42,8 @@ num_threads(1), num_threads_max(1), num_ranks(1), num_workers(1), num_workers_ma
 simd_arch(CORAX_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(LoadBalancing::benoit),
 diff_pred_pars_trees(RAXML_CPYTHIA_TREES_NUM), nni_tolerance(1.0), nni_epsilon(10),
 num_sh_reps(RAXML_SH_ALRT_REPS), sh_epsilon(RAXML_SH_ALRT_EPSILON),
-free_rate_min_categories(0), free_rate_max_categories(0), free_rate_opt_method(FreerateOptMethod::LBFGSB)
+free_rate_min_categories(0), free_rate_max_categories(0), free_rate_opt_method(FreerateOptMethod::LBFGSB),
+model_selection_criterion(InformationCriterion::bic)
 {}
 
 unsigned int Options::max_num_replicates(const SupportMetricSet& mset) const

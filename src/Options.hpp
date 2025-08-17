@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "PartitionedMSA.hpp"
+#include "types.hpp"
 #include "util/SafetyCheck.hpp"
 
 constexpr int RAXML_OPT_VERSION = 5;
@@ -155,8 +156,16 @@ public:
   unsigned int free_rate_min_categories;
   unsigned int free_rate_max_categories;
   FreerateOptMethod free_rate_opt_method;
+  InformationCriterion model_selection_criterion;
 
   bool coarse() const { return num_workers > 1; };
+  bool auto_model() const {
+      return command == Command::modeltest || \
+            (strcasecmp(model_file.c_str(), "auto") == 0) || \
+            (strcasecmp(model_file.c_str(), "dna") == 0) || \
+            (strcasecmp(model_file.c_str(), "aa") == 0) || \
+            (strcasecmp(model_file.c_str(), "bin") == 0);
+  }
 
   unsigned int num_bootstrap_ml_trees() const;
   unsigned int num_bootstrap_pars_trees() const;

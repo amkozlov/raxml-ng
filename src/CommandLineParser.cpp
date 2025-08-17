@@ -102,6 +102,7 @@ static struct option long_options[] =
   {"modeltest",          no_argument,       0, 0 },  /*  72 */
   {"modeltest-freerate-categories", optional_argument, 0, 0}, /*  73 */
   {"freerate-opt", required_argument, 0, 0}, /* 74*/
+  {"modeltest-criterion", optional_argument, 0, 0}, /* 75 */
 
   { 0, 0, 0, 0 }
 };
@@ -1400,6 +1401,16 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         } else
           throw InvalidOptionValueException("Unknown FreeRate optimization method: " + string(optarg));
         break;
+      case 75: /* modeltest information criterion */
+        if (strcasecmp(optarg, "aic") == 0) {
+            opts.model_selection_criterion = InformationCriterion::aic;
+        } else if (strcasecmp(optarg, "aicc") == 0) {
+            opts.model_selection_criterion = InformationCriterion::aicc;
+        } else if (strcasecmp(optarg, "bic") == 0) {
+            opts.model_selection_criterion = InformationCriterion::bic;
+        } else
+            throw InvalidOptionValueException("Unknown information criterion: " + string(optarg));
+        break;
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -1550,6 +1561,7 @@ void CommandLineParser::print_help()
             "\n"
             "Modeltest options:\n"
             "  --modeltest-freerate-categories n[-m]      Test freerate models with n categories (optionally up to and including m)\n"
+            "  --modeltest-criterion [ AIC | AICc | BIC ] Information criterion to use for model selection (default: BIC)\n"
             "\n"
             "Topology search options:\n"
             "  --opt-topology        classic | adaptive   topology optimization method (default: adaptive)\n"
