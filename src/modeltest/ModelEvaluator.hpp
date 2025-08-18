@@ -68,7 +68,7 @@ private:
     size_t _proposed_thread_count;
 
     /* Pointer instead of reference to permit move operations when sorting evaluators*/
-    candidate_model_t *_candidate_model; 
+    const candidate_model_t * _candidate_model; 
     size_t _partition_index;
 
     EvaluationPriority _priority;

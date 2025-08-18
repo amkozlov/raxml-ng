@@ -1977,7 +1977,7 @@ void init_modeltest(RaxmlInstance& instance, CheckpointManager &cm)
 
     const PartitionedMSA &msa = *instance.parted_msa.get();
 
-    instance.model_test = std::make_unique<ModelTest>(opts, msa, tree, instance.tip_msa_idmap, cm);
+    instance.model_test.reset(new ModelTest(opts, msa, tree, instance.tip_msa_idmap, cm));
 
     LOG_INFO << "\nStarting ModelTest with " << (user_tree ? "user" : "parsimony") <<
         " starting tree" << endl << endl;

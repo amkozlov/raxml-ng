@@ -3,8 +3,10 @@
 #include <algorithm>
 #include <utility>
 
+constexpr double FreerateHeuristic::NO_SCORE_PRESENT; /* Required in C++14, remove when upgrading to C++17 */
+
 FreerateHeuristic::FreerateHeuristic(unsigned int min_cats, unsigned int max_cats)
-    : min_categories{min_cats}, max_categories{max_cats} {
+    : min_categories{min_cats}, max_categories{max_cats}, score_map{} {
         assert(min_categories <= max_categories);
 
 }
@@ -48,7 +50,7 @@ void FreerateHeuristic::update(const candidate_model_t &candidate_model, double 
         const bool all_previous_scores_present = std::all_of(
                 entry.scores.cbegin(),
                 entry.scores.cbegin() + index(entry.skip_start_index),
-                [](const auto &score ) { return score != NO_SCORE_PRESENT; });
+                [](const double &score ) { return score != NO_SCORE_PRESENT; });
 
         entry.converged = all_previous_scores_present;
     }

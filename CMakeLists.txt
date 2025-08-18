@@ -35,7 +35,7 @@ else()
   set(ENABLE_GMP OFF)
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # set these flags globally for all subprojects (libpll etc.)
