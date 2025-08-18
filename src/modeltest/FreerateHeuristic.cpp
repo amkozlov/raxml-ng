@@ -66,7 +66,15 @@ bool FreerateHeuristic::can_skip(const candidate_model_t &candidate_model) const
     if (it == score_map.end())
         return false;
 
-    return candidate_model.rate_heterogeneity.category_count >= it->second.skip_start_index;
+    const auto &score_entry = it->second;
+
+    if (score_entry.converged)
+    {
+        const auto category_count_optimum = score_entry.skip_start_index - 1;
+        return candidate_model.rate_heterogeneity.category_count != category_count_optimum;
+    }
+
+    return candidate_model.rate_heterogeneity.category_count >= score_entry.skip_start_index;
 }
 
 int FreerateHeuristic::optimal_category_count(const substitution_model_t &substitution_model) const {

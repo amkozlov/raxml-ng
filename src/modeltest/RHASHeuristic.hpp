@@ -28,7 +28,8 @@ class RHASHeuristic {
      */
     void update(const candidate_model_t &candidate_model, double score);
 
-    /** Signals that the FreerateHeuristic converged and that the optimal number of categories is now known. */
+    /** Signals that the FreerateHeuristic converged and that the optimal number of categories is now known.
+     * This prevents RHASHeuristic from waiting on freerate candidates that will never be computed. */
     void freerate_complete(int optimal_category_count);
 
     /** Check whether a given candidate model can be skipped because of poor expectations of its RHAS model

@@ -23,7 +23,7 @@ using HeuristicSelection = std::unordered_set<HeuristicType>;
 class Heuristics
 {
     public:
-        Heuristics(size_t partition_count, HeuristicSelection selection, const std::vector<rate_heterogeneity_t> &selected_rhas, const substitution_model_t &reference_model, const Options &options);
+        Heuristics(size_t partition_count, HeuristicSelection selection, const std::vector<rate_heterogeneity_t> &selected_rhas, const substitution_model_t &reference_model, unsigned int min_freerate_categories, unsigned int max_freerate_categories);
         void update(unsigned int partition, const candidate_model_t &candidate_model, double score);
         bool can_skip(unsigned int partition, const candidate_model_t &candidate_model) const;
         ~Heuristics() = default;

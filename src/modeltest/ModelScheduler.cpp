@@ -90,7 +90,7 @@ ModelScheduler::ModelScheduler(
    reference_model{candidate_models.at(0).substitution_model},
    evaluation_index{0},
    evaluators{build_evaluators(msa, options, reference_model, resource_estimator, candidate_models, partition_count)},
-   heuristics{partition_count, heuristics_selection, get_selected_rhas(candidate_models, reference_model), reference_model, options},
+   heuristics{partition_count, heuristics_selection, get_selected_rhas(candidate_models, reference_model), reference_model, options.free_rate_min_categories, options.free_rate_max_categories},
    distributed_scheduling{determine_binary_candidates_size(evaluators)} {
 
     std::sort(evaluators.begin(), evaluators.end(),
@@ -101,9 +101,9 @@ ModelScheduler::ModelScheduler(
 
 
     /* Read results from checkpoint */
-    for (const auto &[index, model_evaluation] : checkpoint_manager.get_model_candidates())
+    for (const auto &checkpointed_candidate : checkpoint_manager.get_model_candidates())
     {
-        update_result(evaluators.at(index), model_evaluation, false, false);
+        update_result(evaluators.at(checkpointed_candidate.first), checkpointed_candidate.second, false, false);
     }
 
     /* Initialize evaluation_index in light of checkpointed results and in accordance with other MPI ranks */

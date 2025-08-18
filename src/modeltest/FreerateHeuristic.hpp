@@ -96,7 +96,7 @@ class FreerateHeuristic {
             return rate_categories - min_categories;
         }
 
-        inline bool has_score_improved(double &score1, double &score2) const {
+        inline bool has_score_improved(const double &score1, const double &score2) const {
             return score1 > score2;
         }
 };

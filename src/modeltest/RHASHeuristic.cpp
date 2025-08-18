@@ -1,21 +1,44 @@
 #include "RHASHeuristic.hpp"
 #include "ModelDefinitions.hpp"
 #include <algorithm>
-#include <cstdlib>
-#include <stdexcept>
+#include <unordered_map>
 #include "../log.hpp"
+
+std::unordered_map<rate_heterogeneity_t, bool> initialize_skip(const std::vector<rate_heterogeneity_t> &selected_rhas)
+{
+    std::unordered_map<rate_heterogeneity_t, bool>  skip;
+
+    for (const auto &rhas : selected_rhas) {
+        skip[rhas] = false;
+    }
+
+    return skip;
+}
+
+
+std::unordered_map<rate_heterogeneity_type, unsigned int> initialize_missing_model_counts(const std::vector<rate_heterogeneity_t> &selected_rhas)
+{
+    std::unordered_map<rate_heterogeneity_type, unsigned int> missing_model_counts;
+
+    for (const auto &rhas : selected_rhas) {
+        auto it = missing_model_counts.emplace(rhas.type, 0).first;
+
+        ++it->second;
+    }
+
+    return missing_model_counts;
+}
 
 RHASHeuristic::RHASHeuristic(substitution_model_t reference_model,
                              const std::vector<rate_heterogeneity_t> &selected_rhas,
                              double delta_bic)
     : reference_model{reference_model},
       delta_bic{delta_bic},
-      freerate_optimal_category_count{-1}{
-    for (const auto &rhas : selected_rhas) {
-        auto it = missing_model_counts.emplace(rhas.type, 0).first;
-
-        ++it->second;
-    }
+      observed_bic_score{},
+      skip{initialize_skip(selected_rhas)},
+      missing_model_counts{initialize_missing_model_counts(selected_rhas)},
+      freerate_optimal_category_count{-1}
+{
 }
 
 void RHASHeuristic::drop_one(const rate_heterogeneity_t &rhas)
@@ -45,16 +68,12 @@ void RHASHeuristic::update(const candidate_model_t &candidate_model, double scor
     observed_bic_score[rate_het] = score;
     drop_one(rate_het);
     
-    if (skip.empty() && missing_model_counts.empty()) {
+    if (missing_model_counts.empty()) {
         reference_complete();
     }
 }
 
 void RHASHeuristic::reference_complete() {
-    if (!skip.empty()) {
-        return;
-    }
-
     using map_type = decltype(observed_bic_score)::value_type;
     double bic_min = std::min_element(observed_bic_score.cbegin(), observed_bic_score.cend(),
             [](const map_type &a, const map_type &b) {
@@ -67,14 +86,26 @@ void RHASHeuristic::reference_complete() {
         const bool exceeding_bic_limit = it->second - bic_min > delta_bic;
         skip[rhas] = exceeding_bic_limit;
 
+        /** One could argue that the following check rather belongs into FreerateHeuristic, but by placing 
+         * it here we keep FreerateHeuristic free from assumption that the optimal category count holds
+         * across different model matrices.
+         */
         if (rhas.type == rate_heterogeneity_type::FREE_RATE && freerate_optimal_category_count > -1) {
             skip[rhas] |= (rhas.category_count != static_cast<unsigned int>(freerate_optimal_category_count));
         }
 
         if (skip[rhas]) {
-            logger().logstream(LogLevel::debug, LogScope::thread) << RAXML_LOG_TIMESTAMP << " Skipping rate heterogeneity model '" << rhas.label() << "'\n";
         }
     }
+
+    logger().logstream(LogLevel::debug, LogScope::thread)  << RAXML_LOG_TIMESTAMP << " Heuristically restricting to rate heterogeneity models ";
+    for (const auto &e : skip)
+    {
+        if (e.second == true) continue;
+
+        logger().logstream(LogLevel::debug, LogScope::thread) << "'" << e.first.label() << "' ";
+    }
+    logger().logstream(LogLevel::debug, LogScope::thread) << "\n";
 }
 
 void RHASHeuristic::freerate_complete(int optimal_category_count) {
@@ -85,7 +116,7 @@ void RHASHeuristic::freerate_complete(int optimal_category_count) {
     missing_model_counts.erase(rate_heterogeneity_type::FREE_RATE);
     freerate_optimal_category_count = optimal_category_count;
 
-    if (skip.empty() && missing_model_counts.empty()) {
+    if (missing_model_counts.empty()) {
         reference_complete();
     }
 }

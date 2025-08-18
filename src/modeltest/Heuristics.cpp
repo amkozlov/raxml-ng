@@ -3,13 +3,13 @@
 #include "ModelDefinitions.hpp"
 #include "RHASHeuristic.hpp"
 
-Heuristics::Heuristics(size_t partition_count, HeuristicSelection selection, const std::vector<rate_heterogeneity_t> &selected_rhas, const substitution_model_t &reference_model, const Options &options)
+Heuristics::Heuristics(size_t partition_count, HeuristicSelection selection, const std::vector<rate_heterogeneity_t> &selected_rhas, const substitution_model_t &reference_model, unsigned int min_freerate_categories, unsigned int max_freerate_categories)
     : selection{selection},
       reference_model{reference_model},
       rhas_heuristics{enabled(HeuristicType::RHAS) ? partition_count : 0 ,
                 RHASHeuristic(reference_model, selected_rhas)},
       freerate_heuristics{enabled(HeuristicType::FREERATE) ? partition_count : 0,
-                FreerateHeuristic(options.free_rate_min_categories, options.free_rate_max_categories)}
+                FreerateHeuristic(min_freerate_categories, max_freerate_categories)}
 { }
 
 void Heuristics::update(unsigned int partition, const candidate_model_t &candidate_model, double score)

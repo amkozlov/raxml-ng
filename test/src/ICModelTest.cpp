@@ -1,4 +1,5 @@
 #include "RaxmlTest.hpp"
+#include "src/modeltest/Heuristics.hpp"
 #include "src/types.hpp"
 #include <gmock/gmock.h>
 #include <src/modeltest/FreerateHeuristic.hpp>
@@ -157,4 +158,30 @@ TEST(ICModelTest, RHASFreerateHeuristicCombined) {
     EXPECT_FALSE(h.can_skip(C("JC+R4")));
     EXPECT_TRUE(h.can_skip(C("JC+R5")));
     EXPECT_TRUE(h.can_skip(C("HKY+F+R5")));
+}
+
+TEST(ICModelTest, RHASFreerateOptimum) {
+    Heuristics h(1, {HeuristicType::FREERATE, HeuristicType::RHAS}, {
+                    rate_heterogeneity_t(rate_heterogeneity_type::UNIFORM, 1),
+                    rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 4),
+                    rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 5),
+                    rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 6),
+                    },
+                    substitution_model_t("GTR", frequency_type_t::ESTIMATED), 4, 6);
+
+    h.update(0, C("GTR+F"), 430.0);
+
+    // All have ΔBIC < 10, but only the optimal one should be selected
+    h.update(0, C("GTR+F+R4"), 208.0);
+    h.update(0, C("GTR+F+R6"), 206.0);
+    h.update(0, C("GTR+F+R5"), 201.0);
+
+    EXPECT_FALSE(h.can_skip(0, C("JC+R5")));
+    EXPECT_TRUE(h.can_skip(0, C("JC+R4")));
+    EXPECT_TRUE(h.can_skip(0, C("JC+R6")));
+    EXPECT_TRUE(h.can_skip(0, C("JC+R6")));
+    EXPECT_TRUE(h.can_skip(0, C("JC")));
+
+
+
 }
