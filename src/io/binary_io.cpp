@@ -267,8 +267,7 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, ModelEvaluation& m)
     stream.read(std::addressof(m.ic_score), sizeof(m.ic_score));
 
     /** To restore a model, we need to know the number of rate categories
-     * beforehand.  Modeltesting initializes the candidate models way after the
-     * checkpoint is read.  To mitigate this problem, we also store the model
+     * beforehand. To mitigate this problem, we also store the model
      * name and construct a new model instead of just assigning the new
      * parameters.
      */
