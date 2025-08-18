@@ -3498,232 +3498,234 @@ int clean_exit(int retval) {
 int internal_main(int argc, char **argv, void *comm) {
   int retval = EXIT_SUCCESS;
 
-  RaxmlInstance instance;
-  auto &opts = instance.opts;
+  {
+    RaxmlInstance instance;
+    auto &opts = instance.opts;
 
-  ParallelContext::init_mpi(argc, argv, comm);
+    ParallelContext::init_mpi(argc, argv, comm);
 
-  opts.num_ranks = ParallelContext::num_ranks();
+    opts.num_ranks = ParallelContext::num_ranks();
 
-  logger().add_log_stream(&cout);
+    logger().add_log_stream(&cout);
 
-  CommandLineParser cmdline;
-  try {
-    cmdline.parse_options(argc, argv, opts);
-  } catch (OptionException &e) {
-    LOG_INFO << "ERROR: " << e.message() << std::endl;
-    return clean_exit(EXIT_FAILURE);
-  }
-
-  /* handle trivial commands first */
-  switch (opts.command) {
-    case Command::help:
-      print_banner();
-      cmdline.print_help();
-      return clean_exit(EXIT_SUCCESS);
-      break;
-    case Command::version:
-      print_banner();
-      return clean_exit(EXIT_SUCCESS);
-      break;
-    case Command::evaluate:
-    case Command::search:
-    case Command::bootstrap:
-    case Command::all:
-    case Command::support:
-    case Command::start:
-    case Command::terrace:
-    case Command::bsmsa:
-    case Command::rfdist:
-    case Command::consense:
-    case Command::sitelh:
-    case Command::ancestral:
-      if (!opts.redo_mode && opts.result_files_exist()) {
-        LOG_ERROR << endl << "ERROR: Result files for the run with prefix `" <<
-            (opts.outfile_prefix.empty() ? opts.msa_file : opts.outfile_prefix) <<
-            "` already exist!\n" <<
-            "Please either choose a new prefix, remove old files, or add "
-            "--redo command line switch to overwrite them." << endl << endl;
+    CommandLineParser cmdline;
+    try {
+        cmdline.parse_options(argc, argv, opts);
+    } catch (OptionException &e) {
+        LOG_INFO << "ERROR: " << e.message() << std::endl;
         return clean_exit(EXIT_FAILURE);
-      }
-      break;
-    case Command::bsconverge:
-    default:
-      break;
-  }
-
-  /* now get to the real stuff */
-  try {
-    // make sure all MPI ranks use the same random seed
-    ParallelContext::mpi_broadcast(&opts.random_seed, sizeof(long));
-    srand(opts.random_seed);
-
-    logger().log_level(instance.opts.log_level);
-    logger().precision(instance.opts.precision);
-
-    /* only master process writes the log file */
-    if (ParallelContext::master() && !instance.opts.log_file().empty()) {
-      auto mode = !instance.opts.redo_mode && sysutil_file_exists(instance.opts.checkp_file()) ? ios::app : ios::out;
-      logger().set_log_filename(opts.log_file(), mode);
     }
 
-    print_banner();
-    LOG_INFO << opts;
-
-    check_options_early(opts);
-
-    if (!opts.use_energy_monitor)
-      global_energy_monitor.disable();
-
-    if (opts.redo_mode) {
-      LOG_WARN << "WARNING: Running in REDO mode: existing checkpoints are ignored, "
-          "and all result files will be overwritten!" << endl << endl;
-
-      if (ParallelContext::master())
-        opts.remove_tmp_files();
+    /* handle trivial commands first */
+    switch (opts.command) {
+        case Command::help:
+        print_banner();
+        cmdline.print_help();
+        return clean_exit(EXIT_SUCCESS);
+        break;
+        case Command::version:
+        print_banner();
+        return clean_exit(EXIT_SUCCESS);
+        break;
+        case Command::evaluate:
+        case Command::search:
+        case Command::bootstrap:
+        case Command::all:
+        case Command::support:
+        case Command::start:
+        case Command::terrace:
+        case Command::bsmsa:
+        case Command::rfdist:
+        case Command::consense:
+        case Command::sitelh:
+        case Command::ancestral:
+        if (!opts.redo_mode && opts.result_files_exist()) {
+            LOG_ERROR << endl << "ERROR: Result files for the run with prefix `" <<
+                (opts.outfile_prefix.empty() ? opts.msa_file : opts.outfile_prefix) <<
+                "` already exist!\n" <<
+                "Please either choose a new prefix, remove old files, or add "
+                "--redo command line switch to overwrite them." << endl << endl;
+            return clean_exit(EXIT_FAILURE);
+        }
+        break;
+        case Command::bsconverge:
+        default:
+        break;
     }
 
-    if (opts.force_mode) {
-      LOG_WARN << "WARNING: Running in FORCE mode: "
-          << (opts.safety_checks.isnone() ? "all" : "some")
-          << " safety checks are disabled!"
-          << endl << endl;
-    }
+    /* now get to the real stuff */
+    try {
+        // make sure all MPI ranks use the same random seed
+        ParallelContext::mpi_broadcast(&opts.random_seed, sizeof(long));
+        srand(opts.random_seed);
 
-    /* init bootstopping */
-    switch (opts.bootstop_criterion) {
-      case BootstopCriterion::autoMRE:
-        instance.bootstop_checker.reset(new BootstopCheckMRE(opts.num_bootstraps,
-                                                             opts.bootstop_cutoff,
-                                                             opts.bootstop_permutations));
-        break;
-      case BootstopCriterion::none:
-        break;
-      default:
-        throw runtime_error("Only autoMRE bootstopping criterion is supported for now, sorry!");
-    }
+        logger().log_level(instance.opts.log_level);
+        logger().precision(instance.opts.precision);
 
-    CheckpointManager cm(opts);
+        /* only master process writes the log file */
+        if (ParallelContext::master() && !instance.opts.log_file().empty()) {
+        auto mode = !instance.opts.redo_mode && sysutil_file_exists(instance.opts.checkp_file()) ? ios::app : ios::out;
+        logger().set_log_filename(opts.log_file(), mode);
+        }
 
-    /* by default, use all available threads for parsimony tree inference */
-    instance.num_threads_parsimony = opts.num_threads ? opts.num_threads : opts.num_threads_max;
+        print_banner();
+        LOG_INFO << opts;
 
-    // Difficulty Predictor for adaptive RAxML-NG
-    // The Difficulty Predictor is one object shared by all threads (in any parallelization scheme)
-    if (opts.use_pythia)
-      instance.msa_diff_predictor = make_shared<DifficultyPredictor>();
+        check_options_early(opts);
 
-    switch (opts.command)
-    {
-      case Command::sitelh:
-        /* checkpointing not supported */
-        cm.disable();
-        /* fall through */
-      case Command::evaluate:
-      case Command::modeltest:
-      case Command::search:
-      case Command::bootstrap:
-      case Command::all:
-      case Command::ancestral:
-      {
-        master_main(instance, cm);
-        break;
-      }
-      case Command::support:
-        command_support(instance);
-        break;
-      case Command::bsconverge:
-        command_bootstop(instance);
-        break;
+        if (!opts.use_energy_monitor)
+        global_energy_monitor.disable();
+
+        if (opts.redo_mode) {
+        LOG_WARN << "WARNING: Running in REDO mode: existing checkpoints are ignored, "
+            "and all result files will be overwritten!" << endl << endl;
+
+        if (ParallelContext::master())
+            opts.remove_tmp_files();
+        }
+
+        if (opts.force_mode) {
+        LOG_WARN << "WARNING: Running in FORCE mode: "
+            << (opts.safety_checks.isnone() ? "all" : "some")
+            << " safety checks are disabled!"
+            << endl << endl;
+        }
+
+        /* init bootstopping */
+        switch (opts.bootstop_criterion) {
+        case BootstopCriterion::autoMRE:
+            instance.bootstop_checker.reset(new BootstopCheckMRE(opts.num_bootstraps,
+                                                                opts.bootstop_cutoff,
+                                                                opts.bootstop_permutations));
+            break;
+        case BootstopCriterion::none:
+            break;
+        default:
+            throw runtime_error("Only autoMRE bootstopping criterion is supported for now, sorry!");
+        }
+
+        CheckpointManager cm(opts);
+
+        /* by default, use all available threads for parsimony tree inference */
+        instance.num_threads_parsimony = opts.num_threads ? opts.num_threads : opts.num_threads_max;
+
+        // Difficulty Predictor for adaptive RAxML-NG
+        // The Difficulty Predictor is one object shared by all threads (in any parallelization scheme)
+        if (opts.use_pythia)
+        instance.msa_diff_predictor = make_shared<DifficultyPredictor>();
+
+        switch (opts.command)
+        {
+        case Command::sitelh:
+            /* checkpointing not supported */
+            cm.disable();
+            /* fall through */
+        case Command::evaluate:
+        case Command::modeltest:
+        case Command::search:
+        case Command::bootstrap:
+        case Command::all:
+        case Command::ancestral:
+        {
+            master_main(instance, cm);
+            break;
+        }
+        case Command::support:
+            command_support(instance);
+            break;
+        case Command::bsconverge:
+            command_bootstop(instance);
+            break;
 #ifdef _RAXML_TERRAPHAST
-      case Command::terrace:
-      {
-        load_parted_msa(instance);
-        assert(!opts.tree_file.empty());
-        LOG_INFO << "Loading tree from: " << opts.tree_file << endl << endl;
-        if (!sysutil_file_exists(opts.tree_file))
-          throw runtime_error("File not found: " + opts.tree_file);
-        instance.start_tree_stream.reset(new NewickStream(opts.tree_file, std::ios::in));
-        Tree tree = generate_tree(instance, StartingTree::user, 0);
-        check_terrace(instance, tree);
-        break;
-      }
+        case Command::terrace:
+        {
+            load_parted_msa(instance);
+            assert(!opts.tree_file.empty());
+            LOG_INFO << "Loading tree from: " << opts.tree_file << endl << endl;
+            if (!sysutil_file_exists(opts.tree_file))
+            throw runtime_error("File not found: " + opts.tree_file);
+            instance.start_tree_stream.reset(new NewickStream(opts.tree_file, std::ios::in));
+            Tree tree = generate_tree(instance, StartingTree::user, 0);
+            check_terrace(instance, tree);
+            break;
+        }
 #endif
-      case Command::check:
-        opts.use_pattern_compression = false;
-        opts.use_pythia = false;
-      /* fall through */
-      case Command::parse: {
-        if (ParallelContext::master_rank()) {
-          load_parted_msa(instance);
-          load_constraint(instance);
-          build_start_trees(instance);
+        case Command::check:
+            opts.use_pattern_compression = false;
+            opts.use_pythia = false;
+        /* fall through */
+        case Command::parse: {
+            if (ParallelContext::master_rank()) {
+            load_parted_msa(instance);
+            load_constraint(instance);
+            build_start_trees(instance);
 
-          LOG_INFO << endl;
+            LOG_INFO << endl;
 
-          if (opts.command == Command::parse)
-            print_resources(instance);
+            if (opts.command == Command::parse)
+                print_resources(instance);
 
-          LOG_INFO << "Alignment can be successfully read by RAxML-NG." << endl << endl;
+            LOG_INFO << "Alignment can be successfully read by RAxML-NG." << endl << endl;
 
-          if (!opts.tree_file.empty() && !instance.constraint_tree.empty()) {
-            LOG_INFO << "All starting trees (" << opts.num_searches
-                << ") are compatible with the topological constraint." << endl << endl;
-          }
+            if (!opts.tree_file.empty() && !instance.constraint_tree.empty()) {
+                LOG_INFO << "All starting trees (" << opts.num_searches
+                    << ") are compatible with the topological constraint." << endl << endl;
+            }
+            }
+
+            if (ParallelContext::num_nodes() > 1)
+            LOG_WARN << "WARNING: Running --parse on multiple nodes is wasting resources!" << endl << endl;
+
+            break;
+        }
+        case Command::pythia: {
+            load_parted_msa(instance);
+            break;
+        }
+        case Command::start: {
+            load_parted_msa(instance);
+            load_constraint(instance);
+            build_start_trees(instance);
+            if (!opts.start_tree_file().empty()) {
+            LOG_INFO << "\nAll starting trees saved to: " <<
+                sysutil_realpath(opts.start_tree_file()) << endl << endl;
+            } else {
+            LOG_INFO << "\nStarting trees have been successfully generated." << endl << endl;
+            }
+            break;
+        }
+        case Command::bsmsa: {
+            command_bsmsa(instance, cm.checkp_file());
+            break;
+        }
+        case Command::rfdist: {
+            command_rfdist(instance);
+            break;
+        }
+        case Command::consense: {
+            command_consense(instance);
+            break;
+        }
+        case Command::none:
+        default:
+            LOG_ERROR << "Unknown command!" << endl;
+            retval = EXIT_FAILURE;
         }
 
-        if (ParallelContext::num_nodes() > 1)
-          LOG_WARN << "WARNING: Running --parse on multiple nodes is wasting resources!" << endl << endl;
+        /* finalize */
+        finalize_energy(instance, cm.checkp_file());
+        if (ParallelContext::master_rank())
+        print_final_output(instance, cm.checkp_file());
 
-        break;
-      }
-      case Command::pythia: {
-        load_parted_msa(instance);
-        break;
-      }
-      case Command::start: {
-        load_parted_msa(instance);
-        load_constraint(instance);
-        build_start_trees(instance);
-        if (!opts.start_tree_file().empty()) {
-          LOG_INFO << "\nAll starting trees saved to: " <<
-              sysutil_realpath(opts.start_tree_file()) << endl << endl;
-        } else {
-          LOG_INFO << "\nStarting trees have been successfully generated." << endl << endl;
+        /* analysis finished successfully, remove checkpoint and temp files */
+        if (ParallelContext::group_master_rank()) {
+        cm.remove();
+        opts.remove_tmp_files();
         }
-        break;
-      }
-      case Command::bsmsa: {
-        command_bsmsa(instance, cm.checkp_file());
-        break;
-      }
-      case Command::rfdist: {
-        command_rfdist(instance);
-        break;
-      }
-      case Command::consense: {
-        command_consense(instance);
-        break;
-      }
-      case Command::none:
-      default:
-        LOG_ERROR << "Unknown command!" << endl;
+    } catch (exception &e) {
+        LOG_ERROR << endl << "ERROR: " << e.what() << endl << endl;
         retval = EXIT_FAILURE;
     }
-
-    /* finalize */
-    finalize_energy(instance, cm.checkp_file());
-    if (ParallelContext::master_rank())
-      print_final_output(instance, cm.checkp_file());
-
-    /* analysis finished successfully, remove checkpoint and temp files */
-    if (ParallelContext::group_master_rank()) {
-      cm.remove();
-      opts.remove_tmp_files();
-    }
-  } catch (exception &e) {
-    LOG_ERROR << endl << "ERROR: " << e.what() << endl << endl;
-    retval = EXIT_FAILURE;
   }
 
   return clean_exit(retval);
