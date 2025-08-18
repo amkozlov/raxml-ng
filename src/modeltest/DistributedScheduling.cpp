@@ -143,6 +143,8 @@ DistributedSchedulingDummy::DistributedSchedulingDummy(uint64_t evaluation_count
 {
 }
 
+DistributedSchedulingDummy::~DistributedSchedulingDummy() {}
+
 uint64_t DistributedSchedulingDummy::next_evaluation_index()
 {
     return evaluation_index++;
@@ -157,10 +159,6 @@ void DistributedSchedulingDummy::announce_result(uint64_t index, const ModelEval
 void DistributedSchedulingDummy::fetch_results(ModelUpdateCallback callback)
 {
     RAXML_UNUSED(callback);
-}
-
-void DistributedSchedulingDummy::finalize()
-{
 }
 
 #endif
