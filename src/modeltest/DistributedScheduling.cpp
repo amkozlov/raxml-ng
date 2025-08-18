@@ -1,9 +1,9 @@
 #include "DistributedScheduling.hpp"
 #include "ModelEvaluator.hpp"
 #include "../io/binary_io.hpp"
-#include <mpi.h>
 
 #ifdef _RAXML_MPI
+#include <mpi.h>
 DistributedSchedulingMPI::DistributedSchedulingMPI(size_t results_capacity)
     : local_results_offset(sizeof(uint64_t)),
       results_capacity(results_capacity)

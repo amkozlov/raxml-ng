@@ -98,7 +98,7 @@ void RHASHeuristic::reference_complete() {
         }
     }
 
-    logger().logstream(LogLevel::debug, LogScope::thread)  << RAXML_LOG_TIMESTAMP << " Heuristically restricting to rate heterogeneity models ";
+    logger().logstream(LogLevel::debug, LogScope::thread)  << RAXML_LOG_TIMESTAMP << "Heuristically restricting to rate heterogeneity models ";
     for (const auto &e : skip)
     {
         if (e.second == true) continue;

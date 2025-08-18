@@ -2,7 +2,6 @@
 
 #include <iomanip>
 #include <memory>
-#include <mpi.h>
 
 #include "Heuristics.hpp"
 #include "ModelScheduler.hpp"
