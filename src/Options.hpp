@@ -5,6 +5,7 @@
 #include "PartitionedMSA.hpp"
 #include "types.hpp"
 #include "util/SafetyCheck.hpp"
+#include "modeltest/ModelDefinitions.hpp"
 
 constexpr int RAXML_OPT_VERSION = 5;
 
@@ -157,6 +158,8 @@ public:
   unsigned int free_rate_max_categories;
   FreerateOptMethod free_rate_opt_method;
   InformationCriterion model_selection_criterion;
+  HeuristicSelection modeltest_heuristics;
+  double modeltest_significant_ic_delta;
 
   bool coarse() const { return num_workers > 1; };
   bool auto_model() const {

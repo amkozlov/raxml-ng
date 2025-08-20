@@ -24,8 +24,7 @@ class ModelScheduler final {
                        const PartitionedMSA &msa,
                        const Options &options,
                        CheckpointManager &checkpoint_manager,
-                       ResourceEstimatorFunction resource_estimator,
-                       HeuristicSelection heuristics_selection);
+                       ResourceEstimatorFunction resource_estimator);
 
 
         void finalize();
@@ -43,6 +42,7 @@ private:
     std::mutex mutex_log;
     std::mutex mutex_mpi;
 
+    const Options &options;
     const PartitionedMSA &msa;
     CheckpointManager &checkpoint_manager;
 
@@ -56,10 +56,13 @@ private:
     Heuristics heuristics;
     DistributedSchedulingImpl distributed_scheduling;
 
-
     void _fetch_global_results();
     void _update_result(ModelEvaluator &evaluation, ModelEvaluation result, bool announce = true, bool checkpoint = true);
     ModelEvaluator &_get_evaluator(size_t index);
+
+    using EvaluationStatusCounts = std::array<uint64_t, static_cast<uint64_t>(EvaluationStatus::FINISHED) + 1>;
+    EvaluationStatusCounts _collect_progress() const;
+    const std::string _ic_score_label() const;
 };
 
 #endif

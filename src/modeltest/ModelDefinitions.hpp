@@ -169,6 +169,15 @@ public:
     }
 };
 
+/** Used as flags to enable/disable certain heuristics. */
+enum class HeuristicType
+{
+    FREERATE = 1,
+    RHAS = 2,
+};
+
+using HeuristicSelection = std::unordered_set<HeuristicType>;
+
 // Names of DNA models.
 const std::vector<string> dna_substitution_matrix_names{
     "GTR",

@@ -103,24 +103,13 @@ size_t modeltest_estimate_cores(const Options &options, const PartitionInfo &pin
     return CORAX_MAX(round(static_cast<double>(taxon_clv_size) / elems_per_core), 1.);
 }
 
-HeuristicSelection enabled_heuristics_from_env()
-{
-    HeuristicSelection selection;
-    if (std::getenv("MODELTEST_RHAS_NOSKIP") == nullptr)
-        selection.insert(HeuristicType::RHAS);
-
-    if (std::getenv("MODELTEST_FREERATE_NOSKIP") == nullptr)
-        selection.insert(HeuristicType::FREERATE);
-
-    return selection;
-}
 
 ModelTest::ModelTest(const Options &original_options, const PartitionedMSA &msa, const Tree &tree, const IDVector &tip_msa_idmap,
                     CheckpointManager &checkpoint_manager)
     : options(modify_options(original_options)), optimizer(options), checkpoint_manager(checkpoint_manager), msa(msa),
                 tree(tree), tip_msa_idmap(tip_msa_idmap),
       model_scheduler(generate_candidate_model_names(msa.part_info(0).model().data_type()),
-                      msa, options, checkpoint_manager, modeltest_estimate_cores, enabled_heuristics_from_env()){ }
+                      msa, options, checkpoint_manager, modeltest_estimate_cores){ }
 
 vector<Model> ModelTest::optimize_model() {
     if (options.log_level == LogLevel::debug && !options.outfile_prefix.empty()) {

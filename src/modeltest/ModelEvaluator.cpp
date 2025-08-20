@@ -164,5 +164,4 @@ void ModelEvaluator::reduce(void *context, double *data, size_t size, int op)
 const size_t &ModelEvaluator::proposed_thread_count() const
 {
     return _proposed_thread_count;
-
 }

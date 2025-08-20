@@ -31,13 +31,15 @@ std::unordered_map<rate_heterogeneity_type, unsigned int> initialize_missing_mod
 
 RHASHeuristic::RHASHeuristic(substitution_model_t reference_model,
                              const std::vector<rate_heterogeneity_t> &selected_rhas,
-                             double delta_bic)
+                             double delta_bic,
+                             size_t partition_index)
     : reference_model{reference_model},
-      delta_bic{delta_bic},
-      observed_bic_score{},
+      delta_ic{delta_bic},
+      observed_ic_score{},
       skip{initialize_skip(selected_rhas)},
       missing_model_counts{initialize_missing_model_counts(selected_rhas)},
-      freerate_optimal_category_count{-1}
+      freerate_optimal_category_count{-1},
+      partition_index(partition_index)
 {
 }
 
@@ -65,7 +67,7 @@ void RHASHeuristic::update(const candidate_model_t &candidate_model, double scor
     }
 
     const auto rate_het = candidate_model.rate_heterogeneity;
-    observed_bic_score[rate_het] = score;
+    observed_ic_score[rate_het] = score;
     drop_one(rate_het);
     
     if (missing_model_counts.empty()) {
@@ -74,16 +76,16 @@ void RHASHeuristic::update(const candidate_model_t &candidate_model, double scor
 }
 
 void RHASHeuristic::reference_complete() {
-    using map_type = decltype(observed_bic_score)::value_type;
-    double bic_min = std::min_element(observed_bic_score.cbegin(), observed_bic_score.cend(),
+    using map_type = decltype(observed_ic_score)::value_type;
+    double bic_min = std::min_element(observed_ic_score.cbegin(), observed_ic_score.cend(),
             [](const map_type &a, const map_type &b) {
             return a.second < b.second;
     })->second;
 
-    for (auto it = observed_bic_score.cbegin(); it != observed_bic_score.cend(); ++it) {
+    for (auto it = observed_ic_score.cbegin(); it != observed_ic_score.cend(); ++it) {
         const auto &rhas = it->first;
 
-        const bool exceeding_bic_limit = it->second - bic_min > delta_bic;
+        const bool exceeding_bic_limit = it->second - bic_min > delta_ic;
         skip[rhas] = exceeding_bic_limit;
 
         /** One could argue that the following check rather belongs into FreerateHeuristic, but by placing 
@@ -98,7 +100,7 @@ void RHASHeuristic::reference_complete() {
         }
     }
 
-    logger().logstream(LogLevel::debug, LogScope::thread)  << RAXML_LOG_TIMESTAMP << "Heuristically restricting to rate heterogeneity models ";
+    logger().logstream(LogLevel::debug, LogScope::thread)  << RAXML_LOG_TIMESTAMP << "Heuristically restricting partition " << partition_index << " to rate heterogeneity models ";
     for (const auto &e : skip)
     {
         if (e.second == true) continue;
@@ -131,4 +133,9 @@ bool RHASHeuristic::can_skip(const candidate_model_t &candidate) const {
     }
 
     return it->second;
+}
+
+void RHASHeuristic::set_partition_index(size_t partition_index)
+{
+    this->partition_index = partition_index;
 }

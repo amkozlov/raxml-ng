@@ -8,14 +8,6 @@
 #include <unordered_set>
 
 
-/** Used as flags to enable/disable certain heuristics. */
-enum class HeuristicType
-{
-    FREERATE = 1,
-    RHAS = 2,
-};
-
-using HeuristicSelection = std::unordered_set<HeuristicType>;
 
 /** Since heuristics need to be kept per partition and might optionally be disabled,
  *  we use this class to simplify access.
@@ -23,7 +15,7 @@ using HeuristicSelection = std::unordered_set<HeuristicType>;
 class Heuristics
 {
     public:
-        Heuristics(size_t partition_count, HeuristicSelection selection, const std::vector<rate_heterogeneity_t> &selected_rhas, const substitution_model_t &reference_model, unsigned int min_freerate_categories, unsigned int max_freerate_categories);
+        Heuristics(size_t partition_count, HeuristicSelection selection, const std::vector<rate_heterogeneity_t> &selected_rhas, const substitution_model_t &reference_model, unsigned int min_freerate_categories, unsigned int max_freerate_categories, double significant_ic_difference);
         void update(unsigned int partition, const candidate_model_t &candidate_model, double score);
         bool can_skip(unsigned int partition, const candidate_model_t &candidate_model) const;
         ~Heuristics() = default;

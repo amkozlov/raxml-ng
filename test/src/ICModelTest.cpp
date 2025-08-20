@@ -167,7 +167,7 @@ TEST(ICModelTest, RHASFreerateOptimum) {
                     rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 5),
                     rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 6),
                     },
-                    substitution_model_t("GTR", frequency_type_t::ESTIMATED), 4, 6);
+                    substitution_model_t("GTR", frequency_type_t::ESTIMATED), 4, 6, 10.0);
 
     h.update(0, C("GTR+F"), 430.0);
 

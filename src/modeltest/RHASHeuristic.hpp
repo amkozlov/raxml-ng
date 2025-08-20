@@ -20,7 +20,7 @@
  */
 class RHASHeuristic {
     public:
-    RHASHeuristic(substitution_model_t reference_model, const std::vector<rate_heterogeneity_t> &selected_rhas, double delta_bic = 10.0);
+    RHASHeuristic(substitution_model_t reference_model, const std::vector<rate_heterogeneity_t> &selected_rhas, double delta_bic, size_t partition_index = 0);
 
     /** Add model testing result that this heuristic should consider.
      *  If the model matrix does not coincide with the reference matrix specified
@@ -36,6 +36,8 @@ class RHASHeuristic {
      */
     bool can_skip(const candidate_model_t &candidate_model) const;
 
+    void set_partition_index(size_t partition_index);
+
 private:
     /** Signals that all reference RHAS variants have been computed and that evaluation of heuristic can start now. */
     void reference_complete();
@@ -43,9 +45,9 @@ private:
     void drop_one(const rate_heterogeneity_t &rhas);
 
     substitution_model_t reference_model;
-    double delta_bic;
+    double delta_ic;
 
-    std::unordered_map<rate_heterogeneity_t, double> observed_bic_score;
+    std::unordered_map<rate_heterogeneity_t, double> observed_ic_score;
 
     std::unordered_map<rate_heterogeneity_t, bool> skip;
 
@@ -55,4 +57,5 @@ private:
      * category counts to be tested (e.g. 5 if we consider +R2,...,+R6) */
     std::unordered_map<rate_heterogeneity_type, unsigned int> missing_model_counts;
     int freerate_optimal_category_count;
+    size_t partition_index;
 };

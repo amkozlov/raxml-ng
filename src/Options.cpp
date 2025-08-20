@@ -1,4 +1,5 @@
 #include "Options.hpp"
+#include "modeltest/ModelDefinitions.hpp"
 #include "types.hpp"
 //#include <stdlib.h>
 #include <climits>
@@ -43,7 +44,7 @@ simd_arch(CORAX_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(Loa
 diff_pred_pars_trees(RAXML_CPYTHIA_TREES_NUM), nni_tolerance(1.0), nni_epsilon(10),
 num_sh_reps(RAXML_SH_ALRT_REPS), sh_epsilon(RAXML_SH_ALRT_EPSILON),
 free_rate_min_categories(0), free_rate_max_categories(0), free_rate_opt_method(FreerateOptMethod::LBFGSB),
-model_selection_criterion(InformationCriterion::bic)
+model_selection_criterion(InformationCriterion::bic), modeltest_heuristics({HeuristicType::FREERATE, HeuristicType::RHAS}), modeltest_significant_ic_delta(10.0)
 {}
 
 unsigned int Options::max_num_replicates(const SupportMetricSet& mset) const
@@ -649,6 +650,26 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     stream << ")" << endl;
   }
   stream << "  FreeRate Optimization Method: " << opts.free_rate_opt_method_name() << endl;
+  stream << "  Modeltest Heuristics: ";
+
+  for (const auto &heuristic : opts.modeltest_heuristics)
+  {
+      switch(heuristic)
+      {
+
+        case HeuristicType::FREERATE:
+          stream << "Freerate "; break;
+        case HeuristicType::RHAS:
+          stream << "RHAS(Δ=" << opts.modeltest_significant_ic_delta << ") "; break;
+        default:
+          break;
+      }
+  }
+  if (opts.modeltest_heuristics.empty())
+  {
+      stream << " none";
+  }
+  stream << endl;
 
   stream << "  SIMD kernels: " << opts.simd_arch_name() << endl;
 

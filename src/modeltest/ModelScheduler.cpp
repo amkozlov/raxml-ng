@@ -6,7 +6,9 @@
 #include "Heuristics.hpp"
 #include <functional>
 #include <mutex>
+#include <string>
 #include <unistd.h>
+
 
 size_t determine_binary_candidates_size(const std::vector<ModelEvaluator> &evaluations)
 {
@@ -86,11 +88,11 @@ ModelScheduler::ModelScheduler(
             const PartitionedMSA &msa,
             const Options &options,
             CheckpointManager &checkpoint_manager,
-            ResourceEstimatorFunction resource_estimator,
-            HeuristicSelection heuristics_selection)
+            ResourceEstimatorFunction resource_estimator)
  : mutex_evaluation{},
    mutex_log{},
    mutex_mpi{},
+   options{options},
    msa{msa},
    checkpoint_manager{checkpoint_manager},
    partition_count{msa.part_count()},
@@ -99,8 +101,9 @@ ModelScheduler::ModelScheduler(
    reference_model{candidate_models.at(0).substitution_model},
    evaluation_index{0},
    evaluators{build_evaluators(msa, options, reference_model, resource_estimator, candidate_models, partition_count)},
-   heuristics{partition_count, heuristics_selection, get_selected_rhas(candidate_models, reference_model), reference_model, options.free_rate_min_categories, options.free_rate_max_categories},
-   distributed_scheduling{determine_binary_candidates_size(evaluators)} {
+   heuristics{partition_count, options.modeltest_heuristics, get_selected_rhas(candidate_models, reference_model), reference_model, options.free_rate_min_categories, options.free_rate_max_categories, options.modeltest_significant_ic_delta},
+   distributed_scheduling{determine_binary_candidates_size(evaluators)}
+   {
 
     std::stable_sort(evaluators.begin(), evaluators.end(),
                 [](const ModelEvaluator &a, const ModelEvaluator &b) {
@@ -138,8 +141,16 @@ void ModelScheduler::update_result(ModelEvaluator &evaluator, ModelEvaluation re
     std::lock_guard<std::mutex> lock(mutex_evaluation);
     _update_result(evaluator, std::move(result), announce, write_checkpoint);
 
-    const uint64_t evaluation_index = std::distance(&evaluators.at(0), &evaluator);
-    logger().logstream(LogLevel::progress, LogScope::thread) << RAXML_LOG_TIMESTAMP << "Evaluated model " << (evaluation_index + 1) << "/" << evaluators.size() << ": " << evaluator.candidate_model().descriptor() << "\n";
+    const auto progress = _collect_progress();
+    const auto n_finished = progress.at(static_cast<uint64_t>(EvaluationStatus::FINISHED));
+    const auto n_waiting = progress.at(static_cast<uint64_t>(EvaluationStatus::WAITING));
+    const auto width = std::to_string(evaluators.size() + 1).size();
+
+    logger().logstream(LogLevel::progress, LogScope::thread) << RAXML_LOG_TIMESTAMP << std::setfill(' ') << "Evaluated model " 
+        << "(" << std::setw(width) << n_finished << "/" << std::setw(width) << (n_finished + n_waiting) << ") "
+        << evaluator.candidate_model().descriptor() << "\t"
+        << _ic_score_label() << " = " << FMT_LH(evaluator.get_result().ic_score)
+        << "\n";
 }
 
 void ModelScheduler::_update_result(ModelEvaluator &evaluator, ModelEvaluation result, bool announce, bool write_checkpoint) {
@@ -164,7 +175,7 @@ void ModelScheduler::print_results(int partition_index, ModelEvaluation &result)
     LOG_WORKER_TS(LogLevel::info) << "Partition #" << partition_index << ": model = "
                                     << setfill(' ') << left << setw(20) << result.model.to_string()
                                     << "  LogLH = " << std::right << setw(15) << FMT_LH(result.loglh)
-    << "  BIC = " << right << setw(15) << FMT_LH(result.ic_score)
+    << "  " << _ic_score_label() << " = " << right << setw(15) << FMT_LH(result.ic_score)
     << endl;
 }
 
@@ -234,7 +245,7 @@ vector<vector<ModelEvaluation const *>> ModelScheduler::collect_finished_results
 
 void ModelScheduler::print_xml(ostream &os) const {
     os << setprecision(17);
-    os << "<modeltestresults>" << endl;
+    os << "<modeltestresults criterion=\"" << _ic_score_label() << "\">" << endl;
 
     for (const auto &evaluator: evaluators) {
         os << "<model partition=\"" << evaluator.partition_index()
@@ -261,7 +272,7 @@ void ModelScheduler::print_xml(ostream &os) const {
 
             os << "\" lnL=\"" << result.loglh
                     << "\" essential=\"" << (essential ? "1" : "0")
-                    << "\" score-bic=\"" << result.ic_score
+                    << "\" score=\"" << result.ic_score
                     << "\" free-params=\"" << result.model.num_free_params() << "\" />" << endl;
         } else {
             os << "\" />" << endl;
@@ -269,4 +280,33 @@ void ModelScheduler::print_xml(ostream &os) const {
     }
 
     os << "</modeltestresults>" << endl;
+}
+
+ModelScheduler::EvaluationStatusCounts ModelScheduler::_collect_progress() const
+{
+    ModelScheduler::EvaluationStatusCounts counts;
+    counts.fill(0);
+
+    for (const auto &evaluator : evaluators)
+    {
+        const uint64_t status = static_cast<uint64_t>(evaluator.get_status());
+        ++counts.at(status);
+    }
+
+    return counts;
+}
+
+const std::string ModelScheduler::_ic_score_label() const
+{
+    switch (options.model_selection_criterion)
+    {
+        case InformationCriterion::aic:
+            return "AIC";
+        case InformationCriterion::aicc:
+            return "AICc";
+        case InformationCriterion::bic:
+            return "BIC";
+        default:
+            assert(0);
+    }
 }

@@ -1,6 +1,8 @@
 #include "CommandLineParser.hpp"
 #include "Options.hpp"
+#include "common.h"
 #include "corax/core/partition.h"
+#include "modeltest/ModelDefinitions.hpp"
 #include "types.hpp"
 #include "version.h"
 
@@ -100,9 +102,9 @@ static struct option long_options[] =
   {"ebg",                no_argument,       0, 0 },  /*  70 */
   {"fast",               no_argument,       0, 0 },  /*  71 */
   {"modeltest",          no_argument,       0, 0 },  /*  72 */
-  {"modeltest-freerate-categories", optional_argument, 0, 0}, /*  73 */
+  {"modeltest-freerate-categories", required_argument, 0, 0}, /*  73 */
   {"freerate-opt", required_argument, 0, 0}, /* 74*/
-  {"modeltest-criterion", optional_argument, 0, 0}, /* 75 */
+  {"modeltest-criterion", required_argument, 0, 0}, /* 75 */
 
   { 0, 0, 0, 0 }
 };
@@ -1016,6 +1018,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 46: /* extra options */
         {
           auto extra_opts = split_string(optarg, ',');
+          const std::string opt_modeltest_delta {"modeltest-ic-delta="};
+          const std::string opt_modeltest_heuristics {"modeltest-heuristics="};
+
           for (auto& eopt: extra_opts)
           {
             if (eopt == "lb-naive")
@@ -1068,6 +1073,33 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               if (!lh_epsilon_set)
                 opts.lh_epsilon = DEF_LH_EPSILON_V11;
               opts.lh_epsilon_brlen_triplet = DEF_LH_EPSILON_V11;
+            }
+            else if (eopt.substr(0, opt_modeltest_delta.size()) == opt_modeltest_delta && eopt.length() > opt_modeltest_delta.size())
+            {
+                opts.modeltest_significant_ic_delta = std::strtod(eopt.substr(opt_modeltest_delta.size()).c_str(), nullptr);
+            }
+            else if (eopt.substr(0, opt_modeltest_heuristics.size()) == opt_modeltest_heuristics)
+            {
+                const auto heuristics = split_string(eopt.substr(opt_modeltest_heuristics.size()), '+');
+
+                HeuristicSelection selection;
+
+                for (const auto &heuristic : heuristics)
+                {
+                    if (heuristic == std::string("rhas"))
+                    {
+                        selection.insert(HeuristicType::RHAS);
+                    } else if (heuristic == std::string("freerate"))
+                    {
+                        selection.insert(HeuristicType::FREERATE);
+                    } else
+                    {
+                        throw InvalidOptionValueException("Invalid modeltest heuristic: '" + heuristic + "'");
+                    }
+                }
+
+                opts.modeltest_heuristics = selection;
+
             }
             else
               throw InvalidOptionValueException("Unknown extra option: " + string(eopt));
