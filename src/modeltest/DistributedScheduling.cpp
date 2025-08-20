@@ -141,6 +141,7 @@ void DistributedSchedulingMPI::fetch_results(ModelUpdateCallback callback)
 DistributedSchedulingDummy::DistributedSchedulingDummy(uint64_t evaluation_count)
     : evaluation_index{0}
 {
+    RAXML_UNUSED(evaluation_count);
 }
 
 DistributedSchedulingDummy::~DistributedSchedulingDummy() {}

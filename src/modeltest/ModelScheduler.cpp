@@ -20,6 +20,18 @@ size_t determine_binary_candidates_size(const std::vector<ModelEvaluator> &evalu
     return size;
 }
 
+EvaluationPriority prioritize_candidate_model(const candidate_model_t &candidate_model, const substitution_model_t &reference_model)
+{
+    const bool is_reference = candidate_model.substitution_model == reference_model;
+    const bool is_rhas_likely = candidate_model.rate_heterogeneity.category_count <= 4;
+
+    if (is_reference) {
+        return is_rhas_likely ? EvaluationPriority::HIGHEST : EvaluationPriority::HIGH;
+    } else {
+        return is_rhas_likely ? EvaluationPriority::NORMAL : EvaluationPriority::LOW;
+    }
+    
+}
 
 vector<ModelEvaluator> build_evaluators(const PartitionedMSA &msa,
                                         const Options &options,
@@ -35,10 +47,7 @@ vector<ModelEvaluator> build_evaluators(const PartitionedMSA &msa,
         const auto &pinfo = msa.part_info(p);
         for (unsigned int i = 0; i < candidate_models.size(); ++i) {
             const auto &candidate_model = candidate_models.at(i);
-            const auto priority  =
-                    candidate_model.substitution_model == reference_model
-                        ? EvaluationPriority::HIGH
-                        : EvaluationPriority::NORMAL;
+            const auto priority = prioritize_candidate_model(candidate_model, reference_model);
             const auto thread_count = CORAX_MIN(resource_estimator(options, pinfo, candidate_model, priority),
                                                 ParallelContext::num_threads());
 
@@ -93,7 +102,7 @@ ModelScheduler::ModelScheduler(
    heuristics{partition_count, heuristics_selection, get_selected_rhas(candidate_models, reference_model), reference_model, options.free_rate_min_categories, options.free_rate_max_categories},
    distributed_scheduling{determine_binary_candidates_size(evaluators)} {
 
-    std::sort(evaluators.begin(), evaluators.end(),
+    std::stable_sort(evaluators.begin(), evaluators.end(),
                 [](const ModelEvaluator &a, const ModelEvaluator &b) {
                     // Sort by priority, high priority should come first
                     return a.priority() > b.priority();
@@ -136,7 +145,6 @@ void ModelScheduler::update_result(ModelEvaluator &evaluator, ModelEvaluation re
 void ModelScheduler::_update_result(ModelEvaluator &evaluator, ModelEvaluation result, bool announce, bool write_checkpoint) {
     // TODO: replace calls to `std::distance` with `index` field inside ModelEvaluator
     const uint64_t index = std::distance(evaluators.data(), std::addressof(evaluator));
-    printf("_update_result model index %zu by thread %zu\n", index, ParallelContext::proc_id());
 
     evaluator.store_result(std::move(result));
     heuristics.update(evaluator.partition_index(), evaluator.candidate_model(), evaluator.get_result().ic_score);

@@ -12,8 +12,10 @@
  * should be given priority to reduce the number of unnecessary computations.
  */
 enum class EvaluationPriority {
+    LOW = 0,
     NORMAL, /**< Default priority */
-    HIGH /**< Indicates that result should be computed as soon as possible */
+    HIGH, 
+    HIGHEST /**< Indicates that result should be computed as soon as possible */
 };
 
 enum class EvaluationStatus {

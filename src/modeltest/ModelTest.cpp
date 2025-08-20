@@ -92,7 +92,7 @@ size_t modeltest_estimate_cores(const Options &options, const PartitionInfo &pin
     /* cf. `StaticResourceEstimator::compute_estimates`
      * response for high priority tasks, throughput for all others
      */
-    size_t elems_per_core = priority == EvaluationPriority::HIGH ? 4000 : 80000;
+    size_t elems_per_core = priority > EvaluationPriority::NORMAL ? 4000 : 80000;
 
     const size_t naive_cores = CORAX_MAX(round(static_cast<double>(taxon_clv_size) / elems_per_core), 1.);
     if (naive_cores <= 8)
