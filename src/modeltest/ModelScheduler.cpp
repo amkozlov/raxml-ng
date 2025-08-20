@@ -127,18 +127,18 @@ ModelScheduler::ModelScheduler(
 
 void ModelScheduler::update_result(ModelEvaluator &evaluator, ModelEvaluation result, bool announce, bool write_checkpoint) {
     std::lock_guard<std::mutex> lock(mutex_evaluation);
-    _update_result(evaluator, result, announce, write_checkpoint);
+    _update_result(evaluator, std::move(result), announce, write_checkpoint);
 
     const uint64_t evaluation_index = std::distance(&evaluators.at(0), &evaluator);
     logger().logstream(LogLevel::progress, LogScope::thread) << RAXML_LOG_TIMESTAMP << "Evaluated model " << (evaluation_index + 1) << "/" << evaluators.size() << ": " << evaluator.candidate_model().descriptor() << "\n";
 }
 
 void ModelScheduler::_update_result(ModelEvaluator &evaluator, ModelEvaluation result, bool announce, bool write_checkpoint) {
-    evaluator.store_result(std::move(result));
-    heuristics.update(evaluator.partition_index(), evaluator.candidate_model(), evaluator.get_result().ic_score);
-
     // TODO: replace calls to `std::distance` with `index` field inside ModelEvaluator
     const uint64_t index = std::distance(evaluators.data(), std::addressof(evaluator));
+
+    evaluator.store_result(std::move(result));
+    heuristics.update(evaluator.partition_index(), evaluator.candidate_model(), evaluator.get_result().ic_score);
 
     if (announce) {
         distributed_scheduling.announce_result(index, evaluator.get_result());

@@ -43,7 +43,7 @@ public:
 
     /** Block until the status changes from WAITING to either RUNNING or
      * SKIPPED. May only be called by threads that are part of the team */
-    EvaluationStatus wait() const;
+    void wait() const;
 
     const ModelEvaluation &get_result() const;
 

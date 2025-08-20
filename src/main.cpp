@@ -3263,25 +3263,25 @@ void thread_infer_bootstrap(RaxmlInstance &instance, CheckpointManager &cm) {
 
 void thread_infer_model(RaxmlInstance& instance, CheckpointManager& cm)
 {
-    const auto optimal_models = instance.model_test->optimize_model();
+  ParallelContext::global_barrier();
+  const auto optimal_models = instance.model_test->optimize_model();
 
-    if (ParallelContext::master())
-    {
-      for (unsigned p = 0; p < optimal_models.size(); ++p) {
-          if (instance.opts.command == Command::modeltest) {
-              // In standalone model test, assign optimized model such that
-              // .raxml.bestModel file contains the optimized parameters
-              instance.parted_msa->model(p, optimal_models.at(p));
-          } else {
-              // If modeltest is run as part of another command (e.g. tree
-              // search), only set model type but not the exact paramters to
-              // reduce bias when tree search uses a different starting tree
-              instance.parted_msa->model(p, Model(optimal_models.at(p).to_string(false)));
-          }
+  if (ParallelContext::master()) {
+    for (unsigned p = 0; p < optimal_models.size(); ++p) {
+      if (instance.opts.command == Command::modeltest) {
+        // In standalone model test, assign optimized model such that
+        // .raxml.bestModel file contains the optimized parameters
+        instance.parted_msa->model(p, optimal_models.at(p));
+      } else {
+        // If modeltest is run as part of another command (e.g. tree
+        // search), only set model type but not the exact paramters to
+        // reduce bias when tree search uses a different starting tree
+        instance.parted_msa->model(p, Model(optimal_models.at(p).to_string(false)));
       }
-
-      cm.update_models(instance.parted_msa->models());
     }
+
+    cm.update_models(instance.parted_msa->models());
+  }
 }
 
 void thread_main(RaxmlInstance &instance, CheckpointManager &cm) {

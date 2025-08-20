@@ -22,8 +22,7 @@ TreeInfo::TreeInfo(const Options &opts, const Tree &tree, const PartitionedMSA &
 
 TreeInfo::TreeInfo(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
                    const IDVector &tip_msa_idmap, const PartitionAssignment &part_assign,
-                   int partition_id, const Model &model)
-{
+                   size_t partition_id, const Model &model) {
   init(opts, tree, parted_msa, tip_msa_idmap, part_assign, std::vector<uintVector>(), partition_id, model);
 }
 
@@ -33,8 +32,7 @@ void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA 
                     const IDVector &tip_msa_idmap,
                     const PartitionAssignment &part_assign,
                     const std::vector<uintVector> &site_weights,
-                    int single_partition_id, const Model &model)
-{
+                    size_t single_partition_id, const Model &model) {
   _brlen_min = opts.brlen_min;
   _brlen_max = opts.brlen_max;
   _brlen_opt_method = opts.brlen_opt_method;

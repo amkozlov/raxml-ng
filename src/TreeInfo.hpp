@@ -63,7 +63,7 @@ public:
   /* with single partition only, for modeltesting */
   TreeInfo(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
            const IDVector &tip_msa_idmap, const PartitionAssignment &part_assign,
-           int partition_id, const Model &model);
+           size_t partition_id, const Model &model);
 
   virtual
   ~TreeInfo ();
@@ -139,7 +139,7 @@ private:
 
   void init(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
             const IDVector &tip_msa_idmap, const PartitionAssignment &part_assign,
-            const std::vector<uintVector> &site_weights, int single_partition_id, const Model &model);
+            const std::vector<uintVector> &site_weights, size_t single_partition_id, const Model &model);
 
   void assert_lh_improvement(double old_lh, double new_lh, const std::string& where = "");
 };

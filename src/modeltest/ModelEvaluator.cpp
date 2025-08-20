@@ -1,6 +1,7 @@
 #include "ModelEvaluator.hpp"
 #include "ModelDefinitions.hpp"
 #include <cmath>
+#include <utility>
 
 thread_local unsigned int ModelEvaluator::_thread_id = 0;
 thread_local int ModelEvaluator::_barrier_mycycle = 0;
@@ -41,18 +42,16 @@ void ModelEvaluator::skip() {
     status = EvaluationStatus::SKIPPED;
 }
 
-EvaluationStatus ModelEvaluator::wait() const {
+void ModelEvaluator::wait() const {
     while (status == EvaluationStatus::WAITING) {
     }
-
-    return status;
 }
 
 void ModelEvaluator::store_result(ModelEvaluation result) {
     if (status == EvaluationStatus::FINISHED)
         return;
 
-    _result = result;
+    _result = std::move(result);
     status = EvaluationStatus::FINISHED;
 }
 

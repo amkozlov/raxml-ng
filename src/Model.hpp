@@ -95,6 +95,12 @@ private:
   intVector _freq_sym;
 };
 
+struct ModelEvaluation {
+  Model model;
+  double loglh;
+  double ic_score;
+};
+
 class Model
 {
 public:
@@ -115,7 +121,7 @@ public:
   const NameList& state_names() const;            // non-ambiguous states only, eg A C G T
   const StateNameMap& full_state_namemap() const; // + ambiguous states, eg A C G T M R W S Y K -
 
-  const SubstitutionModel submodel(size_t i) const { return _submodels.at(i); };
+  const SubstitutionModel &submodel(size_t i) const { return _submodels.at(i); };
 
   unsigned int ratehet_mode() const { return _rate_het; };
   unsigned int num_ratecats() const { return _num_ratecats; };
@@ -203,13 +209,6 @@ private:
   void init_state_names() const;
   void set_user_srates(doubleVector& srates, bool normalize = true);
   void set_user_freqs(doubleVector& freqs);
-};
-
-struct ModelEvaluation
-{
-    Model model;
-    double loglh;
-    double ic_score;
 };
 
 typedef std::unordered_map<size_t, Model> ModelMap;
