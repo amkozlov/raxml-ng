@@ -95,12 +95,6 @@ private:
   intVector _freq_sym;
 };
 
-struct ModelEvaluation {
-  Model model;
-  double loglh;
-  double ic_score;
-};
-
 class Model
 {
 public:
@@ -110,6 +104,9 @@ public:
   Model (const std::string &model_string) : Model(DataType::autodetect, model_string) {};
 
   Model(const Model&) = default;
+  Model(Model &&) = default;
+  Model &operator=(const Model &) = default;
+  Model &operator=(Model &&) = default;
 
   /* getters */
   DataType data_type() const { return _data_type; };
@@ -210,6 +207,13 @@ private:
   void set_user_srates(doubleVector& srates, bool normalize = true);
   void set_user_freqs(doubleVector& freqs);
 };
+
+struct ModelEvaluation {
+  Model model;
+  double loglh;
+  double ic_score;
+};
+
 
 typedef std::unordered_map<size_t, Model> ModelMap;
 typedef std::unordered_map<size_t, ModelEvaluation> ModelEvaluationMap;

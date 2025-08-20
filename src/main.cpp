@@ -27,6 +27,7 @@
 #include <corax/corax.h>
 #include "Checkpoint.hpp"
 #include "PartitionedMSA.hpp"
+#include "corax/optimize/opt_generic.h"
 #include "difficulty.h"
 
 #include "types.hpp"
@@ -2883,9 +2884,20 @@ void init_parallel_buffers(const RaxmlInstance &instance) {
   auto const &parted_msa = *instance.parted_msa;
   auto const &opts = instance.opts;
 
+  size_t total_freerate_category_count = 0;
+  if (instance.opts.free_rate_opt_method == FreerateOptMethod::EM)
+  {
+    for (const auto &part : parted_msa.part_list())
+    {
+        if (!part.model().param_estimated(CORAX_OPT_PARAM_FREE_RATES))
+            continue;
+        total_freerate_category_count += part.model().num_ratecats();
+    }
+  }
+
   // we need 2 doubles for each partition AND threads to perform parallel reduction,
   // so resize the buffer accordingly
-  const size_t reduce_buffer_size = std::max<size_t>(1024u, 2 * sizeof(double) *
+  const size_t reduce_buffer_size = std::max<size_t>(1024u, std::max(2UL, total_freerate_category_count) * sizeof(double) *
                                                             parted_msa.part_count() * ParallelContext::num_threads());
 
   size_t worker_buf_size = 0;

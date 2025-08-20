@@ -136,6 +136,7 @@ void ModelScheduler::update_result(ModelEvaluator &evaluator, ModelEvaluation re
 void ModelScheduler::_update_result(ModelEvaluator &evaluator, ModelEvaluation result, bool announce, bool write_checkpoint) {
     // TODO: replace calls to `std::distance` with `index` field inside ModelEvaluator
     const uint64_t index = std::distance(evaluators.data(), std::addressof(evaluator));
+    printf("_update_result model index %zu by thread %zu\n", index, ParallelContext::proc_id());
 
     evaluator.store_result(std::move(result));
     heuristics.update(evaluator.partition_index(), evaluator.candidate_model(), evaluator.get_result().ic_score);
@@ -239,7 +240,7 @@ void ModelScheduler::print_xml(ostream &os) const {
                 os << "RUNNING";
                 break;
             case EvaluationStatus::SKIPPED:
-                os << "ABORTED";
+                os << "SKIPPED";
                 break;
             case EvaluationStatus::FINISHED:
                 os << "FINISHED";

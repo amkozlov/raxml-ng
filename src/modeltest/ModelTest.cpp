@@ -188,6 +188,7 @@ vector<Model> ModelTest::optimize_model() {
 
         treeinfo.custom_reduce(evaluator, ModelEvaluator::reduce);
         optimizer.optimize_model(treeinfo);
+        evaluator->barrier();
 
 
         if (evaluator->thread_id() == 0) {
@@ -209,6 +210,7 @@ vector<Model> ModelTest::optimize_model() {
                 case InformationCriterion::aicc:
                     ic_score = ic_score_calculator.aicc(loglh); break;
                 case InformationCriterion::bic:
+                default:
                     ic_score = ic_score_calculator.bic(loglh); break;
             }
 

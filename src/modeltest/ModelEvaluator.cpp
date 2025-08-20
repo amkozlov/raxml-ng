@@ -6,6 +6,15 @@
 thread_local unsigned int ModelEvaluator::_thread_id = 0;
 thread_local int ModelEvaluator::_barrier_mycycle = 0;
 
+size_t max_reduction_cardinality(const rate_heterogeneity_t &rhas)
+{
+    if (rhas.type == rate_heterogeneity_type::FREE_RATE)
+    {
+        return std::max(2U, rhas.category_count);
+    }
+    return 2;
+}
+
 ModelEvaluator::ModelEvaluator(const candidate_model_t &candidate_model, const PartitionStats &stats,
                                                    size_t partition_index, EvaluationPriority priority,
                                                    const size_t proposed_thread_count)
@@ -17,7 +26,7 @@ ModelEvaluator::ModelEvaluator(const candidate_model_t &candidate_model, const P
       _barrier_counter(0),
       _barrier_proceed(0),
       _assigned_threads(0),
-      _reduce_buffer(_proposed_thread_count * 2, 0.) {
+      _reduce_buffer(_proposed_thread_count * max_reduction_cardinality(candidate_model.rate_heterogeneity), 0.) {
     assign(_result.model, stats);
 }
 
@@ -106,6 +115,8 @@ void ModelEvaluator::barrier()
 void ModelEvaluator::reduce(void *context, double *data, size_t size, int op)
 {
     ModelEvaluator *c = static_cast<ModelEvaluator *>(context);
+
+    assert(c->_reduce_buffer.size() >= size * c->_assigned_threads);
 
     /* synchronize */
     c->barrier();
