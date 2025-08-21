@@ -256,8 +256,8 @@ inline std::string normalize_model_name(const std::string &model_name) {
 }
 
 const std::vector<std::string> aa_substitution_matrix_names{
-    "DAYHOFF", //  0
     "LG", //  1
+    "DAYHOFF", //  0
     "DCMUT", //  2
     "JTT", //  3
     "MTREV", //  4
