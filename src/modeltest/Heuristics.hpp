@@ -27,7 +27,7 @@ class Heuristics
         bool enabled(const HeuristicType & heuristic) const;
 
         const HeuristicSelection selection;
-        const substitution_model_t reference_model;
+        const substitution_model_t reference_matrix;
         std::vector<RHASHeuristic> rhas_heuristics;
         std::vector<FreerateHeuristic> freerate_heuristics;
 };

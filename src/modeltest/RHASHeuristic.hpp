@@ -20,7 +20,7 @@
  */
 class RHASHeuristic {
     public:
-    RHASHeuristic(substitution_model_t reference_model, const std::vector<rate_heterogeneity_t> &selected_rhas, double delta_bic, size_t partition_index = 0);
+    RHASHeuristic(substitution_model_t reference_matrix, const std::vector<rate_heterogeneity_t> &selected_rhas, double delta_bic, size_t partition_index = 0);
 
     /** Add model testing result that this heuristic should consider.
      *  If the model matrix does not coincide with the reference matrix specified
@@ -44,7 +44,7 @@ private:
 
     void drop_one(const rate_heterogeneity_t &rhas);
 
-    substitution_model_t reference_model;
+    substitution_model_t reference_matrix;
     double delta_ic;
 
     std::unordered_map<rate_heterogeneity_t, double> observed_ic_score;

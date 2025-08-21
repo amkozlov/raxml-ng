@@ -3,11 +3,11 @@
 #include "ModelDefinitions.hpp"
 #include "RHASHeuristic.hpp"
 
-Heuristics::Heuristics(size_t partition_count, HeuristicSelection selection, const std::vector<rate_heterogeneity_t> &selected_rhas, const substitution_model_t &reference_model, unsigned int min_freerate_categories, unsigned int max_freerate_categories, double significant_ic_difference)
+Heuristics::Heuristics(size_t partition_count, HeuristicSelection selection, const std::vector<rate_heterogeneity_t> &selected_rhas, const substitution_model_t &reference_matrix, unsigned int min_freerate_categories, unsigned int max_freerate_categories, double significant_ic_difference)
     : selection{selection},
-      reference_model{reference_model},
+      reference_matrix{reference_matrix},
       rhas_heuristics{enabled(HeuristicType::RHAS) ? partition_count : 0 ,
-                RHASHeuristic(reference_model, selected_rhas, significant_ic_difference)},
+                RHASHeuristic(reference_matrix, selected_rhas, significant_ic_difference)},
       freerate_heuristics{enabled(HeuristicType::FREERATE) ? partition_count : 0,
                 FreerateHeuristic(min_freerate_categories, max_freerate_categories)}
 {
@@ -31,7 +31,7 @@ void Heuristics::update(unsigned int partition, const candidate_model_t &candida
 
     if (enabled(HeuristicType::FREERATE) && 
         enabled(HeuristicType::RHAS)) {
-        const int optimal_category_count = freerate_heuristics.at(partition).optimal_category_count(reference_model);
+        const int optimal_category_count = freerate_heuristics.at(partition).optimal_category_count(reference_matrix);
 
         if (optimal_category_count > 0) {
             rhas_heuristics.at(partition).freerate_complete(optimal_category_count);
@@ -62,16 +62,16 @@ bool Heuristics::evaluation_essential(unsigned int partition, const candidate_mo
     bool essential = false;
 
     // Need to compute all RHAS variants of the reference substition matrix
-    essential |= (c.substitution_model == reference_model && c.rate_heterogeneity.type != rate_heterogeneity_type::FREE_RATE);
+    essential |= (c.substitution_model == reference_matrix && c.rate_heterogeneity.type != rate_heterogeneity_type::FREE_RATE);
 
     // For freerate, only the categories up until the score worsens again are required
-    essential |= (c.substitution_model == reference_model && \
+    essential |= (c.substitution_model == reference_matrix && \
                             c.rate_heterogeneity.type == rate_heterogeneity_type::FREE_RATE && \
                             (!enabled(HeuristicType::FREERATE) || \
                              static_cast<int>(c.rate_heterogeneity.category_count) <= freerate_heuristics.at(partition).optimal_category_count(c.substitution_model) + 1));
 
     // For all other models, one of the enabled heuristics must deem the candidate "unskippable"
-    essential |= (c.substitution_model != reference_model) && \
+    essential |= (c.substitution_model != reference_matrix) && \
                   ((enabled(HeuristicType::FREERATE) && enabled(HeuristicType::RHAS) && \
                     (!freerate_heuristics.at(partition).can_skip(c) || !rhas_heuristics.at(partition).can_skip(c))) || \
                   (enabled(HeuristicType::FREERATE) && !freerate_heuristics.at(partition).can_skip(c) ) || \

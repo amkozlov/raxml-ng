@@ -29,11 +29,11 @@ std::unordered_map<rate_heterogeneity_type, unsigned int> initialize_missing_mod
     return missing_model_counts;
 }
 
-RHASHeuristic::RHASHeuristic(substitution_model_t reference_model,
+RHASHeuristic::RHASHeuristic(substitution_model_t reference_matrix,
                              const std::vector<rate_heterogeneity_t> &selected_rhas,
                              double delta_bic,
                              size_t partition_index)
-    : reference_model{reference_model},
+    : reference_matrix{reference_matrix},
       delta_ic{delta_bic},
       observed_ic_score{},
       skip{initialize_skip(selected_rhas)},
@@ -62,7 +62,7 @@ void RHASHeuristic::drop_one(const rate_heterogeneity_t &rhas)
 }
 
 void RHASHeuristic::update(const candidate_model_t &candidate_model, double score) {
-    if (candidate_model.substitution_model != reference_model) {
+    if (candidate_model.substitution_model != reference_matrix) {
         return;
     }
 
