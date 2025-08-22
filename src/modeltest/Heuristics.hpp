@@ -4,10 +4,6 @@
 #include "FreerateHeuristic.hpp"
 #include "ModelDefinitions.hpp"
 #include "RHASHeuristic.hpp"
-#include "../Options.hpp"
-#include <unordered_set>
-
-
 
 /** Since heuristics need to be kept per partition and might optionally be disabled,
  *  we use this class to simplify access.

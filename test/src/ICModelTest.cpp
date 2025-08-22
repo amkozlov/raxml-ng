@@ -9,8 +9,8 @@
 #include <src/modeltest/RHASHeuristic.hpp>
 #include <regex>
 
-candidate_model_t C(const std::string &s) {
-    const static std::regex exp(R"(^([^+]+)(\+F|)(|\+E|\+I|\+G|\+I\+G|\+R)(\d+|)$)");
+candidate_model_t C(const std::string &s, const DataType datatype = DataType::dna) {
+    const static std::regex exp(R"(^([^+]+)(\+FC?|)(|\+E|\+I|\+G|\+I\+G|\+R)(\d+|)$)");
     std::smatch m;
     assert(std::regex_match(s, m, exp));
 
@@ -34,8 +34,13 @@ candidate_model_t C(const std::string &s) {
 
     const unsigned int category_count = m[4] == "" ? 1 : std::stoi(m[4]);
 
-    return candidate_model_t(DataType::dna, matrix_name, freq, rhas_type, category_count);
+    return candidate_model_t(datatype, matrix_name, freq, rhas_type, category_count);
 }
+
+candidate_model_t Cp(const std::string &s) {
+    return C(s, DataType::protein);
+}
+
 
 TEST(ICModelTest, StringParser) {
     EXPECT_EQ(C("TIM2+I"), candidate_model_t(DataType::dna, "TIM2", frequency_type_t::FIXED, rate_heterogeneity_type::INVARIANT));
@@ -181,7 +186,45 @@ TEST(ICModelTest, RHASFreerateOptimum) {
     EXPECT_TRUE(h.can_skip(0, C("JC+R6")));
     EXPECT_TRUE(h.can_skip(0, C("JC+R6")));
     EXPECT_TRUE(h.can_skip(0, C("JC")));
+}
 
+const std::vector<rate_heterogeneity_t> selected_rhas(bool uniform, bool invariant, bool gamma, bool invariant_gamma, unsigned int freerate_min_cat = 0, unsigned int freerate_max_cat = 0)
+{
+    std::vector<rate_heterogeneity_t>  result;
+    if (uniform) result.emplace_back(rate_heterogeneity_type::UNIFORM, 1);
+    if (invariant) result.emplace_back(rate_heterogeneity_type::INVARIANT, 1);
+    if (gamma) result.emplace_back(rate_heterogeneity_type::GAMMA, 1);
+    if (invariant_gamma) result.emplace_back(rate_heterogeneity_type::INVARIANT_GAMMA, 1);
 
+    if (freerate_max_cat >= freerate_min_cat && freerate_min_cat > 0)
+        for (auto c = freerate_min_cat; c <= freerate_max_cat; ++c)
+            result.emplace_back(rate_heterogeneity_type::FREE_RATE, c);
 
+    return result;
+}
+
+TEST(ICModelTest, HeuristicsII)
+{
+    Heuristics h{1, 
+    {HeuristicType::FREERATE, HeuristicType::RHAS},
+    selected_rhas(true, true, true, true, 2, 9), 
+    substitution_model_t("DAYHOFF", frequency_type_t::ESTIMATED), 
+    2, 9, 10.0};
+
+    h.update(0, Cp("DAYHOFF+FC+R2"), 6240.672506897783);    // <- 4.
+    h.update(0, Cp("DAYHOFF+FC+R3"), 6235.7333918985969);   // <- 3.
+    h.update(0, Cp("DAYHOFF+FC+R4"), 6242.2205774062613);   // <- 5.
+    h.update(0, Cp("DAYHOFF+FC"), 6341.6649461173183);      // <- 7.
+    h.update(0, Cp("DAYHOFF+FC+I"), 6296.4370656226893);    // <- 6.
+    h.update(0, Cp("DAYHOFF+FC+G4"), 6226.4904756415253);   // <- 2. *
+    h.update(0, Cp("DAYHOFF+FC+I+G4"), 6224.7664659972925); // <- 1. *
+
+    EXPECT_TRUE(h.can_skip(0, Cp("DAYHOFF+FC+R5")));
+    EXPECT_TRUE(h.can_skip(0, Cp("DAYHOFF+FC+R9")));
+    EXPECT_TRUE(h.can_skip(0, Cp("FLU+R7")));
+    EXPECT_TRUE(h.can_skip(0, Cp("FLU+R5")));
+    EXPECT_TRUE(h.can_skip(0, Cp("BLOSUM62")));
+    EXPECT_TRUE(h.can_skip(0, Cp("MTREV+FC+I")));
+    EXPECT_FALSE(h.can_skip(0, Cp("DCMUT+FC+G4")));
+    EXPECT_FALSE(h.can_skip(0, Cp("DAYHOFF+FC+I+G4")));
 }

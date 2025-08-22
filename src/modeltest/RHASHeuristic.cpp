@@ -95,8 +95,17 @@ void RHASHeuristic::reference_complete() {
         if (rhas.type == rate_heterogeneity_type::FREE_RATE && freerate_optimal_category_count > -1) {
             skip[rhas] |= (rhas.category_count != static_cast<unsigned int>(freerate_optimal_category_count));
         }
+    }
 
-        if (skip[rhas]) {
+    if (freerate_optimal_category_count > -1)
+    {
+        for (auto &skip_entry : skip)
+        {
+            const auto &rhas = skip_entry.first;
+            if (rhas.type != rate_heterogeneity_type::FREE_RATE) continue;
+
+            const bool non_optimal_category_count = rhas.category_count != static_cast<unsigned int>(freerate_optimal_category_count);
+            skip_entry.second = non_optimal_category_count;
         }
     }
 
