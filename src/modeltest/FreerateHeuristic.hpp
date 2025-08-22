@@ -71,12 +71,12 @@ class FreerateHeuristic {
         constexpr static double NO_SCORE_PRESENT = std::numeric_limits<double>::lowest();
 
         struct score_entry {
-            unsigned int skip_start_index;
+            unsigned int ncat_skip_threshold; //< Cateegory counts higher or equal to this threshold can be skipped
             std::vector<double> scores;
             bool converged;
 
             score_entry(unsigned int min_categories, unsigned int max_categories)
-                : skip_start_index(std::numeric_limits<unsigned int>::max()),
+                : ncat_skip_threshold(std::numeric_limits<unsigned int>::max()),
                 scores(std::max(0, static_cast<int>(max_categories) - static_cast<int>(min_categories) + 1), NO_SCORE_PRESENT),
                 converged(false)
             {}

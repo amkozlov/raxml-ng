@@ -273,7 +273,9 @@ void ModelScheduler::print_xml(ostream &os) const {
             os << "\" lnL=\"" << result.loglh
                     << "\" essential=\"" << (essential ? "1" : "0")
                     << "\" score=\"" << result.ic_score
-                    << "\" free-params=\"" << result.model.num_free_params() << "\" />" << endl;
+                    << "\" free-params=\"" << result.model.num_free_params() 
+                    << "\" params=\"" << result.model.to_string(true, 19)
+                    << "\" />" << endl;
         } else {
             os << "\" />" << endl;
         }

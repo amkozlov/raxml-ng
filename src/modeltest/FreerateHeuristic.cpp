@@ -33,7 +33,7 @@ void FreerateHeuristic::update(const candidate_model_t &candidate_model, double 
         double previous_score = entry.scores.at(i - 1);
 
         if (previous_score != NO_SCORE_PRESENT && !has_score_improved(previous_score, score)) {
-            entry.skip_start_index = std::min(entry.skip_start_index, c);
+            entry.ncat_skip_threshold = std::min(entry.ncat_skip_threshold, c);
         }
     }
 
@@ -41,15 +41,15 @@ void FreerateHeuristic::update(const candidate_model_t &candidate_model, double 
         double next_score = entry.scores.at(i + 1);
 
         if (next_score != NO_SCORE_PRESENT && !has_score_improved(score, next_score)) {
-            entry.skip_start_index = std::min(entry.skip_start_index, c + 1);
+            entry.ncat_skip_threshold = std::min(entry.ncat_skip_threshold, c + 1);
         }
     }
 
-    const bool observed_score_increase = entry.skip_start_index <= max_categories;
+    const bool observed_score_increase = entry.ncat_skip_threshold <= max_categories;
     if (observed_score_increase) {
         const bool all_previous_scores_present = std::all_of(
                 entry.scores.cbegin(),
-                entry.scores.cbegin() + index(entry.skip_start_index),
+                entry.scores.cbegin() + index(entry.ncat_skip_threshold),
                 [](const double &score ) { return score != NO_SCORE_PRESENT; });
 
         entry.converged = all_previous_scores_present;
@@ -70,11 +70,11 @@ bool FreerateHeuristic::can_skip(const candidate_model_t &candidate_model) const
 
     if (score_entry.converged)
     {
-        const auto category_count_optimum = score_entry.skip_start_index - 1;
+        const auto category_count_optimum = score_entry.ncat_skip_threshold - 1;
         return candidate_model.rate_heterogeneity.category_count != category_count_optimum;
     }
 
-    return candidate_model.rate_heterogeneity.category_count >= score_entry.skip_start_index;
+    return candidate_model.rate_heterogeneity.category_count >= score_entry.ncat_skip_threshold;
 }
 
 int FreerateHeuristic::optimal_category_count(const substitution_model_t &substitution_model) const {
@@ -83,7 +83,7 @@ int FreerateHeuristic::optimal_category_count(const substitution_model_t &substi
     if (it == score_map.cend() || !it->second.converged)
         return -1;
 
-    return it->second.skip_start_index - 1;
+    return it->second.ncat_skip_threshold - 1;
 }
 
 void FreerateHeuristic::clear() {
