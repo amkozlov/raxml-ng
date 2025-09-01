@@ -59,7 +59,7 @@ vector<candidate_model_t> ModelTest::generate_candidate_model_names(const DataTy
                         continue;
                     }
 
-                    for (unsigned int c = freerate_cmin; c < freerate_cmax; ++c) {
+                    for (unsigned int c = freerate_cmin; c <= freerate_cmax; ++c) {
                         candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity, c);
                     }
                 } else if (rate_heterogeneity == rate_heterogeneity_type::GAMMA || rate_heterogeneity ==
