@@ -274,7 +274,20 @@ const std::vector<std::string> aa_substitution_matrix_names{
     "HIVW", // 15
     "JTT-DCMUT", // 16
     "FLU", // 17
-    //"STMTREV", // 18
+    "FLAVI",
+    "mtMET",
+    "mtINV",
+    "mtVER",
+    "DEN",
+    "STMTREV",
+    "Q.PFAM",
+    "Q.PFAM_GB",
+    "Q.LG",
+    "Q.BIRD",
+    "Q.INSECT",
+    "Q.MAMMAL",
+    "Q.PLANT",
+    "Q.YEAST",
     /* additional mixture matrices
     "LG4M",      // 19
     "LG4X",      // 20
