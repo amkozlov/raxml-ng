@@ -50,9 +50,11 @@ vector<candidate_model_t> ModelTest::generate_candidate_model_names(const DataTy
     const auto freerate_cmax = options.free_rate_max_categories;
     const auto gamma_category_count = 4;
 
-    for (const auto &subst_model: get_matrix_names(dt)) {
+    const auto subst_models = options.modeltest_subst_models.empty() ? get_matrix_names(dt) : options.modeltest_subst_models;
+
+    for (const auto &subst_model: subst_models) {
         for (const auto &frequency_type: default_frequency_type) {
-            for (const auto &rate_heterogeneity: default_rate_heterogeneity) {
+            for (const auto &rate_heterogeneity : options.modeltest_rhas) {
                 if (rate_heterogeneity == rate_heterogeneity_type::FREE_RATE) {
                     // If category range is not positive, skip freerate models
                     if (freerate_cmin == 0 && freerate_cmax == 0) {

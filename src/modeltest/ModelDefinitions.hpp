@@ -54,23 +54,30 @@ inline std::string frequency_type_label(const DataType &datatype, const frequenc
 
 
 enum class rate_heterogeneity_type {
+    // Compute free-rate first, to resolve among-category-count dependency quickly
+    FREE_RATE,
+    INVARIANT_FREE_RATE,
+
     UNIFORM,
     INVARIANT,
     GAMMA,
-    INVARIANT_GAMMA,
-    FREE_RATE
+    INVARIANT_GAMMA
 };
 
-const array<rate_heterogeneity_type, 5> default_rate_heterogeneity{
-    rate_heterogeneity_type::FREE_RATE, // Compute free-rate first, to resolve among-category-count dependency quickly
+const std::array<std::string, 6> rate_heterogeneity_label{
+    "R", "I+R", "", "I", "G", "I+G",
+};
+
+using RateHeterogeneitySelection = std::set<rate_heterogeneity_type>;
+
+const RateHeterogeneitySelection default_rate_heterogeneity_selection{
+    rate_heterogeneity_type::FREE_RATE, 
     rate_heterogeneity_type::UNIFORM,
     rate_heterogeneity_type::INVARIANT,
     rate_heterogeneity_type::GAMMA,
     rate_heterogeneity_type::INVARIANT_GAMMA,
 };
 
-const unordered_map<rate_heterogeneity_type, string> rate_heterogeneity_label{
-};
 
 class rate_heterogeneity_t {
 public:
@@ -84,18 +91,18 @@ public:
     const unsigned int category_count;
 
     std::string label() const {
-        const std::string cat = std::to_string(category_count);
+        const size_t lookup_index = static_cast<size_t>(type);
+
         switch (type) {
             case rate_heterogeneity_type::UNIFORM:
-                return "";
+                return rate_heterogeneity_label.at(lookup_index);
             case rate_heterogeneity_type::INVARIANT:
-                return "+I";
+                return "+" + rate_heterogeneity_label.at(lookup_index);
             case rate_heterogeneity_type::GAMMA:
-                return "+G" + cat;
             case rate_heterogeneity_type::INVARIANT_GAMMA:
-                return "+I+G" + cat;
             case rate_heterogeneity_type::FREE_RATE:
-                return "+R" + cat;
+            case rate_heterogeneity_type::INVARIANT_FREE_RATE:
+                return "+" + rate_heterogeneity_label.at(lookup_index) + std::to_string(category_count);
             default:
                 assert(0);
         }

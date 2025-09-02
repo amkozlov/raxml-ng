@@ -1020,6 +1020,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           auto extra_opts = split_string(optarg, ',');
           const std::string opt_modeltest_delta {"modeltest-ic-delta="};
           const std::string opt_modeltest_heuristics {"modeltest-heuristics="};
+          const std::string opt_modeltest_rhas{"modeltest-rhas="};
+          const std::string opt_modeltest_subst_models{"modeltest-substitution-models="};
 
           for (auto& eopt: extra_opts)
           {
@@ -1074,11 +1076,11 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
                 opts.lh_epsilon = DEF_LH_EPSILON_V11;
               opts.lh_epsilon_brlen_triplet = DEF_LH_EPSILON_V11;
             }
-            else if (eopt.substr(0, opt_modeltest_delta.size()) == opt_modeltest_delta && eopt.length() > opt_modeltest_delta.size())
+            else if (eopt.substr(0, std::min(eopt.size(), opt_modeltest_delta.size())) == opt_modeltest_delta && eopt.length() > opt_modeltest_delta.size())
             {
                 opts.modeltest_significant_ic_delta = std::strtod(eopt.substr(opt_modeltest_delta.size()).c_str(), nullptr);
             }
-            else if (eopt.substr(0, opt_modeltest_heuristics.size()) == opt_modeltest_heuristics)
+            else if (eopt.substr(0, std::min(eopt.size(), opt_modeltest_heuristics.size())) == opt_modeltest_heuristics)
             {
                 const auto heuristics = split_string(eopt.substr(opt_modeltest_heuristics.size()), '+');
 
@@ -1100,6 +1102,23 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
                 opts.modeltest_heuristics = selection;
 
+            }
+            else if (eopt.substr(0, std::min(eopt.size(), opt_modeltest_rhas.size())) == opt_modeltest_rhas)
+            {
+                RateHeterogeneitySelection selection;
+                for (const auto &rhas : split_string(eopt.substr(opt_modeltest_rhas.size()), ' '))
+                {
+                    const auto &effective_rhas_name = (rhas == "E" ? "" : rhas);
+                    const auto &it = std::find(rate_heterogeneity_label.cbegin(), rate_heterogeneity_label.cend(), effective_rhas_name);
+                    if (it == rate_heterogeneity_label.cend())
+                        throw InvalidOptionValueException("Invalid modeltest rate-heterogeneity model: '" + rhas + "'");
+                    selection.insert(static_cast<rate_heterogeneity_type>(std::distance(rate_heterogeneity_label.cbegin(), it)));
+                }
+
+                opts.modeltest_rhas = selection;
+            } else if (eopt.substr(0, std::min(eopt.size(), opt_modeltest_subst_models.size())) == opt_modeltest_subst_models)
+            {
+                opts.modeltest_subst_models = split_string(eopt.substr(opt_modeltest_subst_models.size()), ' ');
             }
             else
               throw InvalidOptionValueException("Unknown extra option: " + string(eopt));

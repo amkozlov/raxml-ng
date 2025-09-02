@@ -154,6 +154,12 @@ namespace ConsenseCutoff
   };
 };
 
+enum class FreerateOptMethod
+{
+    EM,
+    LBFGSB
+};
+
 const std::string ParamValueNames[] = {"undefined", "equal", "user", "model", "empirical", "ML"};
 
 typedef std::vector<double> doubleVector;

@@ -44,12 +44,6 @@ struct OutputFileNames
   std::string tmp_bs_trees;
 };
 
-enum class FreerateOptMethod
-{
-    EM,
-    LBFGSB
-};
-
 class Options
 {
 public:
@@ -160,6 +154,9 @@ public:
   InformationCriterion model_selection_criterion;
   HeuristicSelection modeltest_heuristics;
   double modeltest_significant_ic_delta;
+  RateHeterogeneitySelection modeltest_rhas;
+  std::vector<std::string> modeltest_subst_models;
+
 
   bool coarse() const { return num_workers > 1; };
   bool auto_model() const {

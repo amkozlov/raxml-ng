@@ -44,7 +44,7 @@ simd_arch(CORAX_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(Loa
 diff_pred_pars_trees(RAXML_CPYTHIA_TREES_NUM), nni_tolerance(1.0), nni_epsilon(10),
 num_sh_reps(RAXML_SH_ALRT_REPS), sh_epsilon(RAXML_SH_ALRT_EPSILON),
 free_rate_min_categories(0), free_rate_max_categories(0), free_rate_opt_method(FreerateOptMethod::LBFGSB),
-model_selection_criterion(InformationCriterion::bic), modeltest_heuristics({HeuristicType::FREERATE, HeuristicType::RHAS}), modeltest_significant_ic_delta(10.0)
+model_selection_criterion(InformationCriterion::bic), modeltest_heuristics({HeuristicType::FREERATE, HeuristicType::RHAS}), modeltest_significant_ic_delta(10.0), modeltest_rhas(default_rate_heterogeneity_selection)
 {}
 
 unsigned int Options::max_num_replicates(const SupportMetricSet& mset) const
@@ -668,6 +668,24 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   if (opts.modeltest_heuristics.empty())
   {
       stream << " none";
+  }
+  stream << endl;
+
+  if (!opts.modeltest_subst_models.empty())
+  {
+    stream << "  Modeltest Substitution Models: ";
+    for (const auto &m : opts.modeltest_subst_models)
+    {
+        stream << m << " ";
+    }
+    stream << endl;
+  }
+
+  stream << "  Modeltest RHAS: ";
+  for (const auto &r : opts.modeltest_rhas)
+  {
+      const auto &label = rate_heterogeneity_label.at(static_cast<size_t>(r));
+      stream << (label.empty() ? "E" : label) << " ";
   }
   stream << endl;
 
