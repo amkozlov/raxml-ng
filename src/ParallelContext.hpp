@@ -60,6 +60,7 @@ public:
   static void init_pthreads_custom(const Options& opts, const std::function<void()>& thread_main,
                                    unsigned int num_threads, unsigned int num_workers);
   static void resize_buffers(size_t reduce_buf_size, size_t worker_buf_size = 0);
+  static size_t calculate_workers_per_rank(unsigned int num_workers);
 
   static void finalize_threads(bool force = false);
   static void finalize_mpi(bool force = false);

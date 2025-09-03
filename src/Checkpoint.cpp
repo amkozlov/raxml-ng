@@ -95,10 +95,10 @@ Checkpoint& CheckpointManager::checkpoint(size_t ckp_id)
   return _checkp_file.checkp_list.at(ckp_id);
 }
 
-void CheckpointManager::init_checkpoints(const Tree& tree, const ModelCRefMap& models)
+void CheckpointManager::init_checkpoints(const Tree& tree, const ModelCRefMap& models, size_t num_local_groups)
 {
   /* create one checkpoint per *local* worker */
-  for (size_t i = 0; i < ParallelContext::num_local_groups(); ++i)
+  for (size_t i = 0; i < num_local_groups; ++i)
     _checkp_file.checkp_list.emplace_back();
 
   for (auto& ckp: _checkp_file.checkp_list)

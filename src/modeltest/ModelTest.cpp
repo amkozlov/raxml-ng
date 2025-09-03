@@ -279,3 +279,7 @@ vector<size_t> ModelTest::rank_by_score(const vector<ModelEvaluation const *> &r
     return ranking;
 }
 
+unsigned int ModelTest::recommended_thread_count() const
+{
+    return model_scheduler.recommended_thread_count();
+}

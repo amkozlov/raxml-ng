@@ -118,7 +118,7 @@ public:
       return _checkp_file.model_candidates;
   }
 
-  void init_checkpoints(const Tree& tree, const ModelCRefMap& models);
+  void init_checkpoints(const Tree& tree, const ModelCRefMap& models, size_t num_local_groups);
 
   /* Allow reinitialization of models after modeltesting routine has completed.
      Necessary because the partition models might be different from the ones

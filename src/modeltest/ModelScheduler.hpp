@@ -26,7 +26,7 @@ class ModelScheduler final {
                        CheckpointManager &checkpoint_manager,
                        ResourceEstimatorFunction resource_estimator);
 
-
+        unsigned int recommended_thread_count() const;
         void finalize();
         ~ModelScheduler() = default; 
 

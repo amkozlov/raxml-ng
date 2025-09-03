@@ -141,12 +141,13 @@ struct RaxmlInstance {
   shared_ptr<StoppingCriterion> stop_criterion;
 
   unique_ptr<ModelTest> model_test;
+  unsigned int num_threads_modeltest;
 
   vector<RaxmlWorker> workers;
   RaxmlWorker &get_worker() { return workers.at(ParallelContext::local_group_id()); }
 
   RaxmlInstance() : num_threads_parsimony(0), bs_converged(false),
-                    run_phase(RaxmlRunPhase::start), used_wh(0) {
+                    run_phase(RaxmlRunPhase::start), used_wh(0), num_threads_modeltest(0) {
   }
 };
 
@@ -826,6 +827,7 @@ void check_options_early(Options &opts) {
   opts.use_rba_partload &= (opts.command == Command::search ||                    // currently doesn't work with bootstrap
                             opts.command == Command::evaluate ||
                             opts.command == Command::ancestral);
+  opts.use_rba_partload &= !opts.auto_model();                                    // currently does not work with modeltesting
 
   LOG_DEBUG << "RBA partial loading: " << (opts.use_rba_partload ? "ON" : "OFF") << endl;
 
@@ -1310,95 +1312,107 @@ void load_start_trees(RaxmlInstance &instance) {
 }
 
 void load_checkpoint(RaxmlInstance &instance, CheckpointManager &cm) {
-  /* init checkpoint and set to the manager */
-  cm.init_checkpoints(instance.random_tree, instance.parted_msa->models());
 
-  auto &ckpfile = cm.checkp_file();
+  /* init checkpoint and set to the manager */
+  cm.init_checkpoints(instance.random_tree, instance.parted_msa->models(), 
+          ParallelContext::calculate_workers_per_rank(instance.opts.num_workers));
 
   /* store Pythia MSA difficulty score in the checkpoint */
   cm.pythia_score(instance.parted_msa->difficulty_score());
 
-  if (!instance.opts.redo_mode) {
-    if (cm.read()) {
-      LOG_DEBUG << "NOTE: Loaded checkpoint file: " << instance.opts.checkp_file() << endl;
-    }
+  if (instance.opts.redo_mode) return;
 
-    /* collect all trees inferred so far at master rank */
-    cm.gather_ml_trees();
-    cm.gather_bs_trees();
-
-    // NB: consider BS trees from the previous run when performing bootstopping test
-    if (instance.bootstop_checker) {
-      auto bs_tree = instance.random_tree;
-      for (auto &it: ckpfile.bs_trees) {
-        bs_tree.topology(it.second.second);
-
-        instance.bootstop_checker->add_bootstrap_tree(bs_tree);
-      }
-    }
-
-    /* determine if we are in ML tree search or in bootstrapping phase */
-    instance.run_phase = (ckpfile.ml_trees.size() >= instance.opts.num_searches)
-                           ? RaxmlRunPhase::bootstrap
-                           : RaxmlRunPhase::mlsearch;
-
-    ParallelContext::mpi_broadcast(instance.run_phase);
-
-    /* gather in-progress tree ids */
-    auto &in_work_trees = instance.run_phase == RaxmlRunPhase::bootstrap
-                            ? instance.done_bs_trees
-                            : instance.done_ml_trees;
-    for (auto &c: ckpfile.checkp_list) {
-      if (c.tree_index > 0)
-        in_work_trees.insert(c.tree_index);
-    }
-
-    /* in coarse+MPI mode, collect in-progress tree ids from all ranks */
-    if (instance.opts.coarse() && ParallelContext::num_ranks() > 1) {
-      auto worker_cb = [&in_work_trees](void *buf, size_t buf_size) -> size_t {
-        return BinaryStream::serialize((char *) buf, buf_size, in_work_trees);
-      };
-
-      /* receive callback -> master rank */
-      auto master_cb = [&in_work_trees](void *buf, size_t buf_size, size_t /* rank */) {
-        BinaryStream bs((char *) buf, buf_size);
-
-        IDSet recv_trees;
-        bs >> recv_trees;
-        in_work_trees.insert(recv_trees.cbegin(), recv_trees.cend());
-      };
-
-      ParallelContext::mpi_gather_custom(worker_cb, master_cb);
-    }
-
-    /* add in-progress tree ids to the "done" list, to exclude them from coarse load balancing */
-    if (ParallelContext::master()) {
-      for (const auto &p: ckpfile.ml_trees)
-        instance.done_ml_trees.insert(p.first);
-
-      for (const auto &p: ckpfile.bs_trees)
-        instance.done_bs_trees.insert(p.first);
-    }
-
-    if (ParallelContext::num_ranks() > 1) {
-      ParallelContext::global_mpi_barrier();
-
-      // broadcast done_start_trees + done_bs_trees
-      ParallelContext::mpi_broadcast(instance.done_ml_trees);
-      ParallelContext::mpi_broadcast(instance.done_bs_trees);
-    }
-
-    if (!instance.done_ml_trees.empty() || !instance.done_bs_trees.empty()) {
-      LOG_INFO_TS << "NOTE: Resuming execution from checkpoint " <<
-          "(logLH: " << cm.checkpoint().loglh() <<
-          ", ML trees: " << ckpfile.ml_trees.size() <<
-          ", bootstraps: " << ckpfile.bs_trees.size() <<
-          ")"
-          << endl;
-    }
-
-    //    printf("DONE: %lu %lu\n", ParallelContext::rank_id(), instance.done_ml_trees.size());
+  if (cm.read()) {
+    LOG_DEBUG << "NOTE: Loaded checkpoint file: " << instance.opts.checkp_file() << endl;
   }
+}
+
+/** Distribute information from the loaded checkpoint across workers.
+ *
+ *  Happens separate from load_checkpoint because we need to load the
+ *  checkpoint before modeltesting, but dissemination requires a different
+ *  ParallelContext. */
+void disseminate_checkpoint(RaxmlInstance &instance, CheckpointManager &cm) {
+  if (instance.opts.redo_mode) return;
+
+  auto &ckpfile = cm.checkp_file();
+
+  /* collect all trees inferred so far at master rank */
+  cm.gather_ml_trees();
+  cm.gather_bs_trees();
+
+  // NB: consider BS trees from the previous run when performing bootstopping test
+  if (instance.bootstop_checker) {
+    auto bs_tree = instance.random_tree;
+    for (auto &it: ckpfile.bs_trees) {
+      bs_tree.topology(it.second.second);
+
+      instance.bootstop_checker->add_bootstrap_tree(bs_tree);
+    }
+  }
+
+  /* determine if we are in ML tree search or in bootstrapping phase */
+  instance.run_phase = (ckpfile.ml_trees.size() >= instance.opts.num_searches)
+                         ? RaxmlRunPhase::bootstrap
+                         : RaxmlRunPhase::mlsearch;
+
+  ParallelContext::mpi_broadcast(instance.run_phase);
+
+  /* gather in-progress tree ids */
+  auto &in_work_trees = instance.run_phase == RaxmlRunPhase::bootstrap
+                          ? instance.done_bs_trees
+                          : instance.done_ml_trees;
+  for (auto &c: ckpfile.checkp_list) {
+    if (c.tree_index > 0)
+      in_work_trees.insert(c.tree_index);
+  }
+
+  /* in coarse+MPI mode, collect in-progress tree ids from all ranks */
+  if (instance.opts.coarse() && ParallelContext::num_ranks() > 1) {
+    auto worker_cb = [&in_work_trees](void *buf, size_t buf_size) -> size_t {
+      return BinaryStream::serialize((char *) buf, buf_size, in_work_trees);
+    };
+
+    /* receive callback -> master rank */
+    auto master_cb = [&in_work_trees](void *buf, size_t buf_size, size_t /* rank */) {
+      BinaryStream bs((char *) buf, buf_size);
+
+      IDSet recv_trees;
+      bs >> recv_trees;
+      in_work_trees.insert(recv_trees.cbegin(), recv_trees.cend());
+    };
+
+    ParallelContext::mpi_gather_custom(worker_cb, master_cb);
+  }
+
+  /* add in-progress tree ids to the "done" list, to exclude them from coarse load balancing */
+  if (ParallelContext::master()) {
+    for (const auto &p: ckpfile.ml_trees)
+      instance.done_ml_trees.insert(p.first);
+
+    for (const auto &p: ckpfile.bs_trees)
+      instance.done_bs_trees.insert(p.first);
+  }
+
+  if (ParallelContext::num_ranks() > 1) {
+    ParallelContext::global_mpi_barrier();
+
+    // broadcast done_start_trees + done_bs_trees
+    ParallelContext::mpi_broadcast(instance.done_ml_trees);
+    ParallelContext::mpi_broadcast(instance.done_bs_trees);
+  }
+
+  if (!instance.done_ml_trees.empty() || !instance.done_bs_trees.empty()) {
+    LOG_INFO_TS << "NOTE: Resuming execution from checkpoint " <<
+        "(logLH: " << cm.checkpoint().loglh() <<
+        ", ML trees: " << ckpfile.ml_trees.size() <<
+        ", bootstraps: " << ckpfile.bs_trees.size() <<
+        ")"
+        << endl;
+  }
+
+  //    printf("DONE: %lu %lu\n", ParallelContext::rank_id(), instance.done_ml_trees.size());
+  
 }
 
 void load_constraint(RaxmlInstance &instance) {
@@ -1969,6 +1983,7 @@ void init_modeltest(RaxmlInstance& instance, CheckpointManager &cm)
   if (!opts.auto_model())
       return;
 
+
   if (instance.start_trees.empty() && instance.pars_trees.empty()) {
     LOG_ERROR << "Please specify a tree to use for model testing" << endl;
   }
@@ -1980,8 +1995,12 @@ void init_modeltest(RaxmlInstance& instance, CheckpointManager &cm)
 
     instance.model_test.reset(new ModelTest(opts, msa, tree, instance.tip_msa_idmap, cm));
 
+    instance.num_threads_modeltest = std::min(opts.num_threads_max, instance.model_test->recommended_thread_count());
+    instance.num_threads_modeltest = opts.num_threads ? opts.num_threads : instance.num_threads_modeltest;
+    assert(instance.num_threads_modeltest > 0);
+
     LOG_INFO << "\nStarting ModelTest with " << (user_tree ? "user" : "parsimony") <<
-        " starting tree" << endl << endl;
+        " starting tree using " << instance.num_threads_modeltest << " threads" << endl << endl;
 }
 
 
@@ -3294,6 +3313,7 @@ void thread_infer_model(RaxmlInstance& instance, CheckpointManager& cm)
 
     cm.update_models(instance.parted_msa->models());
   }
+  ParallelContext::global_barrier();
 }
 
 void thread_main(RaxmlInstance &instance, CheckpointManager &cm) {
@@ -3303,12 +3323,6 @@ void thread_main(RaxmlInstance &instance, CheckpointManager &cm) {
 
   auto const &opts = instance.opts;
   check_oversubscribe(instance);
-
-  if (opts.auto_model())
-  {
-    thread_infer_model(instance, cm);
-    ParallelContext::global_barrier();
-  }
 
   if ((opts.command == Command::search || opts.command == Command::all ||
        opts.command == Command::evaluate || opts.command == Command::sitelh ||
@@ -3416,6 +3430,19 @@ void master_main(RaxmlInstance &instance, CheckpointManager &cm) {
   /* generate bootstrap replicates */
   generate_bootstraps(instance, cm.checkp_file());
 
+  /* load checkpoint */
+  load_checkpoint(instance, cm);
+
+  /* initalize and perform modeltesting */
+  init_modeltest(instance, cm);
+  if (instance.opts.auto_model())
+  {
+      auto modeltest_thread_main = std::bind(thread_infer_model, std::ref(instance), std::ref(cm));
+      ParallelContext::init_pthreads_custom(instance.opts, modeltest_thread_main, instance.num_threads_modeltest, instance.num_threads_modeltest);
+      modeltest_thread_main();
+      ParallelContext::finalize_threads();
+  }
+
   ParallelContext::init_pthreads(opts, std::bind(thread_main,
                                                  std::ref(instance),
                                                  std::ref(cm)));
@@ -3431,8 +3458,7 @@ void master_main(RaxmlInstance &instance, CheckpointManager &cm) {
 
   init_parallel_buffers(instance);
 
-  /* load checkpoint */
-  load_checkpoint(instance, cm);
+  disseminate_checkpoint(instance, cm);
 
   LOG_VERB << endl << "Initial model parameters:" << endl;
   for (size_t p = 0; p < parted_msa.part_count(); ++p) {
@@ -3470,7 +3496,6 @@ void master_main(RaxmlInstance &instance, CheckpointManager &cm) {
 
   init_stop_criterion(instance);
 
-  init_modeltest(instance, cm);
 
   if (ParallelContext::master_rank())
     instance.opts.remove_result_files();

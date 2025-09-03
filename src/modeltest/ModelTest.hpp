@@ -13,6 +13,8 @@ public:
     /* Optimize the model and return model name per partition */
     vector<Model> optimize_model();
 
+    unsigned int recommended_thread_count() const;
+
 private:
     const Options options;
     Optimizer optimizer;

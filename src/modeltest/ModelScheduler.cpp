@@ -136,6 +136,20 @@ ModelScheduler::ModelScheduler(
     }
 }
 
+/** Get the number of threads recommended to perform model selection. */
+unsigned int ModelScheduler::recommended_thread_count() const
+{
+    unsigned int thread_count = 0;
+
+    for (const auto &evaluator : evaluators)
+    {
+        if (evaluator.priority() != EvaluationPriority::HIGHEST) break;
+
+        thread_count += evaluator.proposed_thread_count();
+    }
+
+    return std::max(1U, thread_count);
+}
 
 void ModelScheduler::update_result(ModelEvaluator &evaluator, ModelEvaluation result, bool announce, bool write_checkpoint) {
     std::lock_guard<std::mutex> lock(mutex_evaluation);
