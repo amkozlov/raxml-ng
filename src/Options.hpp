@@ -172,6 +172,7 @@ public:
   unsigned int num_pars_trees() const;
   unsigned int num_bootstrap_msa_reps() const;
 
+  std::string ic_name() const;
   std::string free_rate_opt_method_name() const;
   std::string simd_arch_name() const;
   std::string consense_type_name() const;

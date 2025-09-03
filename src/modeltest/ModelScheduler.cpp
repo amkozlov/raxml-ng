@@ -163,7 +163,7 @@ void ModelScheduler::update_result(ModelEvaluator &evaluator, ModelEvaluation re
     logger().logstream(LogLevel::progress, LogScope::thread) << RAXML_LOG_TIMESTAMP << std::setfill(' ') << "Evaluated model " 
         << "(" << std::setw(width) << n_finished << "/" << std::setw(width) << (n_finished + n_waiting) << ") "
         << evaluator.candidate_model().descriptor() << "\t"
-        << _ic_score_label() << " = " << FMT_LH(evaluator.get_result().ic_score)
+        << options.ic_name() << " = " << FMT_LH(evaluator.get_result().ic_score)
         << "\n";
 }
 
@@ -189,7 +189,7 @@ void ModelScheduler::print_results(int partition_index, ModelEvaluation &result)
     LOG_WORKER_TS(LogLevel::info) << "Partition #" << partition_index << ": model = "
                                     << setfill(' ') << left << setw(20) << result.model.to_string()
                                     << "  LogLH = " << std::right << setw(15) << FMT_LH(result.loglh)
-    << "  " << _ic_score_label() << " = " << right << setw(15) << FMT_LH(result.ic_score)
+    << "  " << options.ic_name() << " = " << right << setw(15) << FMT_LH(result.ic_score)
     << endl;
 }
 
@@ -259,7 +259,7 @@ vector<vector<ModelEvaluation const *>> ModelScheduler::collect_finished_results
 
 void ModelScheduler::print_xml(ostream &os) const {
     os << setprecision(17);
-    os << "<modeltestresults criterion=\"" << _ic_score_label() << "\">" << endl;
+    os << "<modeltestresults criterion=\"" << options.ic_name() << "\">" << endl;
 
     for (const auto &evaluator: evaluators) {
         os << "<model partition=\"" << evaluator.partition_index()
@@ -312,17 +312,3 @@ ModelScheduler::EvaluationStatusCounts ModelScheduler::_collect_progress() const
     return counts;
 }
 
-const std::string ModelScheduler::_ic_score_label() const
-{
-    switch (options.model_selection_criterion)
-    {
-        case InformationCriterion::aic:
-            return "AIC";
-        case InformationCriterion::aicc:
-            return "AICc";
-        case InformationCriterion::bic:
-            return "BIC";
-        default:
-            assert(0);
-    }
-}

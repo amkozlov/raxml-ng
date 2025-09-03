@@ -287,6 +287,21 @@ string Options::free_rate_opt_method_name() const
     }
 }
 
+std::string Options::ic_name() const
+{
+    switch (model_selection_criterion)
+    {
+        case InformationCriterion::aic:
+            return "AIC";
+        case InformationCriterion::aicc:
+            return "AICc";
+        case InformationCriterion::bic:
+            return "BIC";
+        default:
+            assert(0);
+    }
+}
+
 string Options::simd_arch_name() const
 {
   switch(simd_arch)
@@ -650,6 +665,7 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     stream << ")" << endl;
   }
   stream << "  FreeRate Optimization Method: " << opts.free_rate_opt_method_name() << endl;
+  stream << "  Modeltest Information Criterion: " << opts.ic_name() << endl;
   stream << "  Modeltest Heuristics: ";
 
   for (const auto &heuristic : opts.modeltest_heuristics)
