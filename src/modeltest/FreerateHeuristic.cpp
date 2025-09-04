@@ -5,14 +5,14 @@
 
 constexpr double FreerateHeuristic::NO_SCORE_PRESENT; /* Required in C++14, remove when upgrading to C++17 */
 
-FreerateHeuristic::FreerateHeuristic(unsigned int min_cats, unsigned int max_cats)
-    : min_categories{min_cats}, max_categories{max_cats}, score_map{} {
+FreerateHeuristic::FreerateHeuristic(unsigned int min_cats, unsigned int max_cats, rate_heterogeneity_type type)
+    : type{type}, min_categories{min_cats}, max_categories{max_cats}, score_map{}  {
         assert(min_categories <= max_categories);
 
 }
 
 void FreerateHeuristic::update(const candidate_model_t &candidate_model, double score) {
-    if (candidate_model.rate_heterogeneity.type != rate_heterogeneity_type::FREE_RATE) {
+    if (candidate_model.rate_heterogeneity.type != type) {
         return;
     }
 
@@ -56,25 +56,28 @@ void FreerateHeuristic::update(const candidate_model_t &candidate_model, double 
     }
 }
 
+bool FreerateHeuristic::can_skip(const score_entry &entry, unsigned int c) const
+{
+    if (entry.converged)
+    {
+        const auto category_count_optimum = entry.ncat_skip_threshold - 1;
+        return c != category_count_optimum;
+    }
+
+    return c >= entry.ncat_skip_threshold;
+}
+
 bool FreerateHeuristic::can_skip(const candidate_model_t &candidate_model) const {
-    if (candidate_model.rate_heterogeneity.type != rate_heterogeneity_type::FREE_RATE) {
+    if (candidate_model.rate_heterogeneity.type != type) {
         return false;
     }
+
+    const auto c = candidate_model.rate_heterogeneity.category_count;
 
     auto it = score_map.find(candidate_model.substitution_model);
+    if (it != score_map.cend() && can_skip(it->second, c)) return true;
 
-    if (it == score_map.end())
-        return false;
-
-    const auto &score_entry = it->second;
-
-    if (score_entry.converged)
-    {
-        const auto category_count_optimum = score_entry.ncat_skip_threshold - 1;
-        return candidate_model.rate_heterogeneity.category_count != category_count_optimum;
-    }
-
-    return candidate_model.rate_heterogeneity.category_count >= score_entry.ncat_skip_threshold;
+    return false;
 }
 
 int FreerateHeuristic::optimal_category_count(const substitution_model_t &substitution_model) const {

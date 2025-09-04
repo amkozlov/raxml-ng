@@ -3,13 +3,18 @@
 #include "ModelDefinitions.hpp"
 #include "RHASHeuristic.hpp"
 
-Heuristics::Heuristics(size_t partition_count, HeuristicSelection selection, const std::vector<rate_heterogeneity_t> &selected_rhas, const substitution_model_t &reference_matrix, unsigned int min_freerate_categories, unsigned int max_freerate_categories, double significant_ic_difference)
+
+
+Heuristics::Heuristics(size_t partition_count, HeuristicSelection selection, const std::vector<rate_heterogeneity_t> selected_rhas, const substitution_model_t &reference_matrix, unsigned int min_freerate_categories, unsigned int max_freerate_categories, double significant_ic_difference, RHASHeuristicMode rhas_mode)
     : selection{selection},
       reference_matrix{reference_matrix},
+      selected_rhas{selected_rhas},
       rhas_heuristics{enabled(HeuristicType::RHAS) ? partition_count : 0 ,
-                RHASHeuristic(reference_matrix, selected_rhas, significant_ic_difference)},
+                RHASHeuristic(reference_matrix, this->selected_rhas, significant_ic_difference, rhas_mode)},
       freerate_heuristics{enabled(HeuristicType::FREERATE) ? partition_count : 0,
-                FreerateHeuristic(min_freerate_categories, max_freerate_categories)}
+                FreerateHeuristic(min_freerate_categories, max_freerate_categories)},
+      invariant_freerate_heuristics{enabled(HeuristicType::FREERATE) ? partition_count : 0,
+                FreerateHeuristic(min_freerate_categories, max_freerate_categories, rate_heterogeneity_type::INVARIANT_FREE_RATE)}
 {
 
     for (auto p = 0UL; p < rhas_heuristics.size(); ++p)
@@ -23,6 +28,7 @@ void Heuristics::update(unsigned int partition, const candidate_model_t &candida
 {
     if (enabled(HeuristicType::FREERATE)) {
         freerate_heuristics.at(partition).update(candidate_model, score);
+        invariant_freerate_heuristics.at(partition).update(candidate_model, score);
     }
 
     if (enabled(HeuristicType::RHAS)) {
@@ -31,10 +37,17 @@ void Heuristics::update(unsigned int partition, const candidate_model_t &candida
 
     if (enabled(HeuristicType::FREERATE) && 
         enabled(HeuristicType::RHAS)) {
-        const int optimal_category_count = freerate_heuristics.at(partition).optimal_category_count(reference_matrix);
+        // Need to notify RHASHeuristic when FreerateHeuristic converges
+        const int freerate_optimal_category_count = freerate_heuristics.at(partition).optimal_category_count(reference_matrix);
+        if (freerate_optimal_category_count > 0) {
+            rhas_heuristics.at(partition).set_optimal_category_count(rate_heterogeneity_type::FREE_RATE, 
+                    freerate_optimal_category_count);
+        }
 
-        if (optimal_category_count > 0) {
-            rhas_heuristics.at(partition).freerate_complete(optimal_category_count);
+        const int inv_freerate_optimal_category_count = invariant_freerate_heuristics.at(partition).optimal_category_count(reference_matrix);
+        if (inv_freerate_optimal_category_count > 0) {
+            rhas_heuristics.at(partition).set_optimal_category_count(rate_heterogeneity_type::INVARIANT_FREE_RATE, 
+                    inv_freerate_optimal_category_count);
         }
     }
 }

@@ -3,6 +3,7 @@
 #include "common.h"
 #include "corax/core/partition.h"
 #include "modeltest/ModelDefinitions.hpp"
+#include "modeltest/RHASHeuristic.hpp"
 #include "types.hpp"
 #include "version.h"
 
@@ -1022,6 +1023,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           const std::string opt_modeltest_heuristics {"modeltest-heuristics="};
           const std::string opt_modeltest_rhas{"modeltest-rhas="};
           const std::string opt_modeltest_subst_models{"modeltest-substitution-models="};
+          const std::string opt_modeltest_rhas_opt_catcount_only{"modeltest-rhas-optimal-category-count-only"};
 
           for (auto& eopt: extra_opts)
           {
@@ -1119,6 +1121,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
             } else if (eopt.substr(0, std::min(eopt.size(), opt_modeltest_subst_models.size())) == opt_modeltest_subst_models)
             {
                 opts.modeltest_subst_models = split_string(eopt.substr(opt_modeltest_subst_models.size()), ' ');
+            } else if (eopt == opt_modeltest_rhas_opt_catcount_only)
+            {
+                opts.modeltest_rhas_heuristic_mode = RHASHeuristicMode::OnlyOptimalCategoryCount;
             }
             else
               throw InvalidOptionValueException("Unknown extra option: " + string(eopt));

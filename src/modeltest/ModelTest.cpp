@@ -55,21 +55,27 @@ vector<candidate_model_t> ModelTest::generate_candidate_model_names(const DataTy
     for (const auto &subst_model: subst_models) {
         for (const auto &frequency_type: default_frequency_type) {
             for (const auto &rate_heterogeneity : options.modeltest_rhas) {
-                if (rate_heterogeneity == rate_heterogeneity_type::FREE_RATE) {
-                    // If category range is not positive, skip freerate models
-                    if (freerate_cmin == 0 && freerate_cmax == 0) {
-                        continue;
-                    }
+                switch (rate_heterogeneity)
+                {
+                    case rate_heterogeneity_type::FREE_RATE:
+                    case rate_heterogeneity_type::INVARIANT_FREE_RATE:
+                        // If category range is not positive, skip freerate models
+                        if (freerate_cmin == 0 && freerate_cmax == 0) {
+                            continue;
+                        }
 
-                    for (unsigned int c = freerate_cmin; c <= freerate_cmax; ++c) {
-                        candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity, c);
-                    }
-                } else if (rate_heterogeneity == rate_heterogeneity_type::GAMMA || rate_heterogeneity ==
-                        rate_heterogeneity_type::INVARIANT_GAMMA) {
-                    candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity,
-                                                gamma_category_count);
-                } else {
-                    candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity);
+                        for (unsigned int c = freerate_cmin; c <= freerate_cmax; ++c) {
+                            candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity, c);
+                        }
+                        break;
+                    case rate_heterogeneity_type::GAMMA:
+                    case rate_heterogeneity_type::INVARIANT_GAMMA:
+                        candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity,
+                                                    gamma_category_count);
+                        break;
+                    default:
+                        candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity);
+                        break;
                 }
             }
         }

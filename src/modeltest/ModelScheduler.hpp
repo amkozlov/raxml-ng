@@ -63,6 +63,8 @@ private:
     using EvaluationStatusCounts = std::array<uint64_t, static_cast<uint64_t>(EvaluationStatus::FINISHED) + 1>;
     EvaluationStatusCounts _collect_progress() const;
     const std::string _ic_score_label() const;
+
+    unsigned int candidate_model_descriptor_width;
 };
 
 #endif

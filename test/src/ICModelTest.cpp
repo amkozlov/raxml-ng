@@ -10,7 +10,7 @@
 #include <regex>
 
 candidate_model_t C(const std::string &s, const DataType datatype = DataType::dna) {
-    const static std::regex exp(R"(^([^+]+)(\+FC?|)(|\+E|\+I|\+G|\+I\+G|\+R)(\d+|)$)");
+    const static std::regex exp(R"(^([^+]+)(\+FC?|\+FO|)(|\+E|\+I|\+G|\+I\+G|\+R|\+I\+R)(\d+|)$)");
     std::smatch m;
     assert(std::regex_match(s, m, exp));
 
@@ -28,6 +28,8 @@ candidate_model_t C(const std::string &s, const DataType datatype = DataType::dn
         rhas_type = rate_heterogeneity_type::GAMMA;
     } else if (m[3] == "+R") {
         rhas_type = rate_heterogeneity_type::FREE_RATE;
+    } else if (m[3] == "+I+R") {
+        rhas_type = rate_heterogeneity_type::INVARIANT_FREE_RATE;
     } else {
         assert(0);
     }
@@ -39,6 +41,19 @@ candidate_model_t C(const std::string &s, const DataType datatype = DataType::dn
 
 candidate_model_t Cp(const std::string &s) {
     return C(s, DataType::protein);
+}
+
+void EXPECT_SKIP(Heuristics &h, unsigned int partition,
+                      std::vector<candidate_model_t> can_skip,
+                      std::vector<candidate_model_t> no_skip_possible)
+{
+    for (const auto &c : can_skip) {
+        EXPECT_TRUE(h.can_skip(partition, c)) << "Expected to skip " << c.descriptor() << endl;
+    }
+
+    for (const auto &c : no_skip_possible) {
+        EXPECT_FALSE(h.can_skip(partition, c)) << "Unexpected skip for " << c.descriptor() << endl;
+    }
 }
 
 
@@ -66,7 +81,7 @@ TEST(ICModelTest, RHASHeuristic) {
                     rate_heterogeneity_t(rate_heterogeneity_type::GAMMA, 4),
                     rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 4),
                     rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 5)
-                    }, 10.0);
+                    }, 10.0, RHASHeuristicMode::AllSignficantCategoryCounts);
 
     h.update(C("GTR+F"), 130.0);
     h.update(C("GTR+F+I"), 125.0);
@@ -87,6 +102,7 @@ TEST(ICModelTest, RHASHeuristic) {
 }
 
 TEST(ICModelTest, FreerateHeuristic) {
+    const auto reference= C("GTR+F");
     FreerateHeuristic h(4, 8);
 
     EXPECT_FALSE(h.can_skip(C("GTR+F+R4")));
@@ -132,9 +148,31 @@ TEST(ICModelTest, FreerateHeuristic) {
     EXPECT_TRUE(h.can_skip(C("GTR+F+R8")));
 }
 
+TEST(ICModelTest, InvariantFreerateHeuristic) {
+    FreerateHeuristic h(10, 13, rate_heterogeneity_type::INVARIANT_FREE_RATE);
+
+    // Should ignore all non-invariant freerate models
+    h.update(C("GTR+F+R10"), 832.2);
+    h.update(C("GTR+F+R11"), 837.2);
+    h.update(C("GTR+F+R12"), 833.2);
+    EXPECT_FALSE(h.can_skip(C("GTR+F+R11")));
+    EXPECT_FALSE(h.can_skip(C("GTR+F+R12")));
+    EXPECT_FALSE(h.can_skip(C("GTR+F+R13")));
+
+    h.update(C("JC+F+I+R11"), 890.2);
+    h.update(C("JC+F+I+R10"), 880.9);
+    EXPECT_TRUE(h.can_skip(C("JC+F+I+R12")));
+
+    h.update(C("GTR+F+I+R10"), 832.2);
+    h.update(C("GTR+F+I+R11"), 830.1); // score improved
+    EXPECT_FALSE(h.can_skip(C("GTR+F+I+R12")));
+
+    h.update(C("GTR+F+I+R12"), 830.1002); // score worsened marginally
+    EXPECT_TRUE(h.can_skip(C("GTR+F+I+R13")));
+}
+
 TEST(ICModelTest, RHASFreerateHeuristicCombined) {
-    RHASHeuristic h(substitution_model_t("GTR", frequency_type_t::ESTIMATED),
-                    {
+    std::vector<rate_heterogeneity_t> selected_rhas {
                     rate_heterogeneity_t(rate_heterogeneity_type::UNIFORM, 1),
                     rate_heterogeneity_t(rate_heterogeneity_type::INVARIANT, 1),
                     rate_heterogeneity_t(rate_heterogeneity_type::GAMMA, 4),
@@ -143,7 +181,9 @@ TEST(ICModelTest, RHASFreerateHeuristicCombined) {
                     rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 5),
                     rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 6),
                     rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 7)
-                    }, 10.0);
+                    };
+    RHASHeuristic h(substitution_model_t("GTR", frequency_type_t::ESTIMATED),
+                    selected_rhas, 10.0, RHASHeuristicMode::AllSignficantCategoryCounts);
 
     h.update(C("GTR+F"), 130.0);
     h.update(C("GTR+F+I"), 125.0);
@@ -155,7 +195,7 @@ TEST(ICModelTest, RHASFreerateHeuristicCombined) {
     EXPECT_FALSE(h.can_skip(C("GTR+F+R5")));
 
     h.update(C("GTR+F+R5"), 110.2); // score increased
-    h.freerate_complete(4);
+    h.set_optimal_category_count(rate_heterogeneity_type::FREE_RATE, 4);
     EXPECT_TRUE(h.can_skip(C("JC")));
     EXPECT_TRUE(h.can_skip(C("JC+I")));
     EXPECT_FALSE(h.can_skip(C("JC+G4")));
@@ -172,7 +212,7 @@ TEST(ICModelTest, RHASFreerateOptimum) {
                     rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 5),
                     rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 6),
                     },
-                    substitution_model_t("GTR", frequency_type_t::ESTIMATED), 4, 6, 10.0);
+                    substitution_model_t("GTR", frequency_type_t::ESTIMATED), 4, 6, 10.0, RHASHeuristicMode::OnlyOptimalCategoryCount);
 
     h.update(0, C("GTR+F"), 430.0);
 
@@ -187,6 +227,50 @@ TEST(ICModelTest, RHASFreerateOptimum) {
     EXPECT_TRUE(h.can_skip(0, C("JC+R6")));
     EXPECT_TRUE(h.can_skip(0, C("JC")));
 }
+
+
+TEST(ICModelTest, ScenarioI) {
+    auto f = [](RHASHeuristicMode mode) {
+        Heuristics h(1, {HeuristicType::FREERATE, HeuristicType::RHAS}, {
+                        rate_heterogeneity_t(rate_heterogeneity_type::UNIFORM, 1),
+                        rate_heterogeneity_t(rate_heterogeneity_type::INVARIANT, 1),
+                        rate_heterogeneity_t(rate_heterogeneity_type::GAMMA, 4),
+                        rate_heterogeneity_t(rate_heterogeneity_type::INVARIANT_GAMMA, 4),
+                        rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 2),
+                        rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 3),
+                        rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 4),
+                        rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 5),
+                        rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 6),
+                        rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 7),
+                        rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 8),
+                        },
+                        substitution_model_t("GTR", frequency_type_t::ESTIMATED), 2, 8, 55.0, mode);
+
+        // * marks BIC difference less than 55
+        h.update(0, C("GTR+FO+R2"), 108235.701256);
+        h.update(0, C("GTR+FO+R3"), 106452.031796);
+        h.update(0, C("GTR+FO+R4"), 106076.144608);    // *
+        h.update(0, C("GTR+FO"), 113728.701996);
+        h.update(0, C("GTR+FO+I"), 111260.685201);
+        h.update(0, C("GTR+FO+G4"), 106089.096135);    // *
+        h.update(0, C("GTR+FO+I+G4"), 106050.785099);  // *
+        h.update(0, C("GTR+FO+R5"), 106105.199021);    // *
+
+        return h;
+    };
+
+    auto h1 = f(RHASHeuristicMode::AllSignficantCategoryCounts);
+    EXPECT_SKIP(h1, 0, 
+                    {C("HKY+FO+R2"), C("HKY+FO+R3"), C("HKY+FO"), C("HKY+FO+I"), C("HKY+FO+R6"), C("HKY+FO+R7")},
+                    {C("HKY+FO+R4"), C("HKY+FO+R5"), C("HKY+FO+G4"), C("HKY+FO+I+G4")});
+
+    auto h2 = f(RHASHeuristicMode::OnlyOptimalCategoryCount);
+    EXPECT_SKIP(h2, 0, 
+                    {C("HKY+FO+R2"), C("HKY+FO+R3"), C("HKY+FO+R5"), C("HKY+FO+R7"), C("HKY+FO"), C("HKY+FO+I")},
+                    {C("HKY+FO+R4"), C("HKY+FO+G4"), C("HKY+FO+I+G4")});
+}
+
+
 
 const std::vector<rate_heterogeneity_t> selected_rhas(bool uniform, bool invariant, bool gamma, bool invariant_gamma, unsigned int freerate_min_cat = 0, unsigned int freerate_max_cat = 0)
 {
@@ -209,7 +293,7 @@ TEST(ICModelTest, HeuristicsII)
     {HeuristicType::FREERATE, HeuristicType::RHAS},
     selected_rhas(true, true, true, true, 2, 9), 
     substitution_model_t("DAYHOFF", frequency_type_t::ESTIMATED), 
-    2, 9, 10.0};
+    2, 9, 10.0, RHASHeuristicMode::AllSignficantCategoryCounts};
 
     h.update(0, Cp("DAYHOFF+FC+R2"), 6240.672506897783);    // <- 4.
     h.update(0, Cp("DAYHOFF+FC+R3"), 6235.7333918985969);   // <- 3.

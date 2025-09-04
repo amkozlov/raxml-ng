@@ -53,7 +53,7 @@
  */
 class FreerateHeuristic {
     public:
-        FreerateHeuristic(unsigned int min_cats, unsigned int max_cats);
+        FreerateHeuristic(unsigned int min_cats, unsigned int max_cats, rate_heterogeneity_type type = rate_heterogeneity_type::FREE_RATE);
 
         void update(const candidate_model_t &candidate_model, double score);
 
@@ -82,6 +82,7 @@ class FreerateHeuristic {
             {}
         };
 
+        rate_heterogeneity_type type;
         unsigned int min_categories;
         unsigned int max_categories;
         std::unordered_map<substitution_model_t, score_entry> score_map;
@@ -99,4 +100,5 @@ class FreerateHeuristic {
         inline bool has_score_improved(const double &score1, const double &score2) const {
             return score1 > score2;
         }
+        bool can_skip(const score_entry &entry, unsigned int c) const;
 };

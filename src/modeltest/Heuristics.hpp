@@ -11,7 +11,7 @@
 class Heuristics
 {
     public:
-        Heuristics(size_t partition_count, HeuristicSelection selection, const std::vector<rate_heterogeneity_t> &selected_rhas, const substitution_model_t &reference_model, unsigned int min_freerate_categories, unsigned int max_freerate_categories, double significant_ic_difference);
+        Heuristics(size_t partition_count, HeuristicSelection selection, const std::vector<rate_heterogeneity_t> selected_rhas, const substitution_model_t &reference_model, unsigned int min_freerate_categories, unsigned int max_freerate_categories, double significant_ic_difference, RHASHeuristicMode rhas_mode);
         void update(unsigned int partition, const candidate_model_t &candidate_model, double score);
         bool can_skip(unsigned int partition, const candidate_model_t &candidate_model) const;
         ~Heuristics() = default;
@@ -24,8 +24,11 @@ class Heuristics
 
         const HeuristicSelection selection;
         const substitution_model_t reference_matrix;
+        bool invariant_freerate_enabled;
+        std::vector<rate_heterogeneity_t> selected_rhas;
         std::vector<RHASHeuristic> rhas_heuristics;
         std::vector<FreerateHeuristic> freerate_heuristics;
+        std::vector<FreerateHeuristic> invariant_freerate_heuristics;
 };
 
 #endif

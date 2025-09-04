@@ -3,6 +3,13 @@
 #include <unordered_map>
 #include "ModelDefinitions.hpp"
 
+
+enum class RHASHeuristicMode
+{
+    OnlyOptimalCategoryCount,
+    AllSignficantCategoryCounts
+};
+
 /** Heuristically disable RHAS models based on performance of reference matrix.
  * All RHAS models that yield a BIC score worse than a specified delta (default value 10) from the best observed value on the reference matrix are skipped.
  *
@@ -20,7 +27,8 @@
  */
 class RHASHeuristic {
     public:
-    RHASHeuristic(substitution_model_t reference_matrix, const std::vector<rate_heterogeneity_t> &selected_rhas, double delta_bic, size_t partition_index = 0);
+    RHASHeuristic(substitution_model_t reference_matrix, const std::vector<rate_heterogeneity_t> &selected_rhas, double delta_bic, RHASHeuristicMode mode, size_t partition_index = 0);
+    RHASHeuristic(const RHASHeuristic&) =default;
 
     /** Add model testing result that this heuristic should consider.
      *  If the model matrix does not coincide with the reference matrix specified
@@ -28,9 +36,9 @@ class RHASHeuristic {
      */
     void update(const candidate_model_t &candidate_model, double score);
 
-    /** Signals that the FreerateHeuristic converged and that the optimal number of categories is now known.
+    /** Signals the optimal category count for a certain RHAS type.
      * This prevents RHASHeuristic from waiting on freerate candidates that will never be computed. */
-    void freerate_complete(int optimal_category_count);
+    void set_optimal_category_count(rate_heterogeneity_type rhas_type, unsigned int optimal_category_count);
 
     /** Check whether a given candidate model can be skipped because of poor expectations of its RHAS model
      */
@@ -39,6 +47,8 @@ class RHASHeuristic {
     void set_partition_index(size_t partition_index);
 
 private:
+    RHASHeuristicMode mode;
+
     /** Signals that all reference RHAS variants have been computed and that evaluation of heuristic can start now. */
     void reference_complete();
 
@@ -56,6 +66,7 @@ private:
      * we don't vary the category count) but for freerate it is the number of
      * category counts to be tested (e.g. 5 if we consider +R2,...,+R6) */
     std::unordered_map<rate_heterogeneity_type, unsigned int> missing_model_counts;
-    int freerate_optimal_category_count;
+
+    const std::vector<rate_heterogeneity_t> &selected_rhas;
     size_t partition_index;
 };

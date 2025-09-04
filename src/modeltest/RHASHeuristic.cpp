@@ -32,13 +32,15 @@ std::unordered_map<rate_heterogeneity_type, unsigned int> initialize_missing_mod
 RHASHeuristic::RHASHeuristic(substitution_model_t reference_matrix,
                              const std::vector<rate_heterogeneity_t> &selected_rhas,
                              double delta_bic,
+                             RHASHeuristicMode mode,
                              size_t partition_index)
-    : reference_matrix{reference_matrix},
+    : mode{mode},
+      reference_matrix{reference_matrix},
       delta_ic{delta_bic},
       observed_ic_score{},
       skip{initialize_skip(selected_rhas)},
       missing_model_counts{initialize_missing_model_counts(selected_rhas)},
-      freerate_optimal_category_count{-1},
+      selected_rhas{selected_rhas},
       partition_index(partition_index)
 {
 }
@@ -87,26 +89,6 @@ void RHASHeuristic::reference_complete() {
 
         const bool exceeding_bic_limit = it->second - bic_min > delta_ic;
         skip[rhas] = exceeding_bic_limit;
-
-        /** One could argue that the following check rather belongs into FreerateHeuristic, but by placing 
-         * it here we keep FreerateHeuristic free from assumption that the optimal category count holds
-         * across different model matrices.
-         */
-        if (rhas.type == rate_heterogeneity_type::FREE_RATE && freerate_optimal_category_count > -1) {
-            skip[rhas] |= (rhas.category_count != static_cast<unsigned int>(freerate_optimal_category_count));
-        }
-    }
-
-    if (freerate_optimal_category_count > -1)
-    {
-        for (auto &skip_entry : skip)
-        {
-            const auto &rhas = skip_entry.first;
-            if (rhas.type != rate_heterogeneity_type::FREE_RATE) continue;
-
-            const bool non_optimal_category_count = rhas.category_count != static_cast<unsigned int>(freerate_optimal_category_count);
-            skip_entry.second = non_optimal_category_count;
-        }
     }
 
     logger().logstream(LogLevel::debug, LogScope::thread)  << RAXML_LOG_TIMESTAMP << "Heuristically restricting partition " << partition_index << " to rate heterogeneity models ";
@@ -119,16 +101,33 @@ void RHASHeuristic::reference_complete() {
     logger().logstream(LogLevel::debug, LogScope::thread) << "\n";
 }
 
-void RHASHeuristic::freerate_complete(int optimal_category_count) {
-    if (freerate_optimal_category_count > -1) {
-        return;
-    }
-
-    missing_model_counts.erase(rate_heterogeneity_type::FREE_RATE);
-    freerate_optimal_category_count = optimal_category_count;
+void RHASHeuristic::set_optimal_category_count(rate_heterogeneity_type type, unsigned int c) {
+    missing_model_counts.erase(type);
 
     if (missing_model_counts.empty()) {
         reference_complete();
+    }
+    
+    // Skip all unobserved models with same RHAS type, since optimal category
+    // count has been discovered the FreerateHeuristic must have converged.
+    for (const auto &rhas : selected_rhas)
+    {
+        if (rhas.type != type) continue;
+
+        const bool category_count_unobserved = observed_ic_score.find(rhas) == observed_ic_score.cend();
+
+        if (category_count_unobserved)
+        {
+            skip[rhas] = true;
+        }
+    }
+
+    if (mode == RHASHeuristicMode::OnlyOptimalCategoryCount) {
+        for (auto &e : skip) {
+            if (e.first.type != type) continue;
+
+            e.second |= (e.first.category_count != c);
+        }
     }
 }
 
@@ -138,7 +137,7 @@ bool RHASHeuristic::can_skip(const candidate_model_t &candidate) const {
 
     const auto it = skip.find(candidate.rate_heterogeneity);
     if (it == skip.end()) {
-        return true;
+        return false;
     }
 
     return it->second;

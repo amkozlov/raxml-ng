@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "PartitionedMSA.hpp"
+#include "modeltest/RHASHeuristic.hpp"
 #include "types.hpp"
 #include "util/SafetyCheck.hpp"
 #include "modeltest/ModelDefinitions.hpp"
@@ -155,6 +156,7 @@ public:
   HeuristicSelection modeltest_heuristics;
   double modeltest_significant_ic_delta;
   RateHeterogeneitySelection modeltest_rhas;
+  RHASHeuristicMode modeltest_rhas_heuristic_mode;
   std::vector<std::string> modeltest_subst_models;
 
 

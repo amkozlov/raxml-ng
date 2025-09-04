@@ -82,6 +82,19 @@ std::vector<size_t> sort_evaluators(const std::vector<ModelEvaluator> &evaluator
     return v;
 }
 
+template<typename Iterator>
+unsigned int max_descriptor_width(Iterator begin, Iterator end)
+{
+    auto it = begin;
+    size_t w = 0;
+    while(it != end)
+    {
+        w = std::max(w, it->descriptor().size());
+        ++it;
+    }
+
+    return w;
+}
 
 ModelScheduler::ModelScheduler(
             std::vector<candidate_model_t> _candidate_models,
@@ -101,8 +114,9 @@ ModelScheduler::ModelScheduler(
    reference_model{candidate_models.at(0).substitution_model},
    evaluation_index{0},
    evaluators{build_evaluators(msa, options, reference_model, resource_estimator, candidate_models, partition_count)},
-   heuristics{partition_count, options.modeltest_heuristics, get_selected_rhas(candidate_models, reference_model), reference_model, options.free_rate_min_categories, options.free_rate_max_categories, options.modeltest_significant_ic_delta},
-   distributed_scheduling{determine_binary_candidates_size(evaluators)}
+   heuristics{partition_count, options.modeltest_heuristics, get_selected_rhas(candidate_models, reference_model), reference_model, options.free_rate_min_categories, options.free_rate_max_categories, options.modeltest_significant_ic_delta, options.modeltest_rhas_heuristic_mode},
+   distributed_scheduling{determine_binary_candidates_size(evaluators)},
+   candidate_model_descriptor_width(max_descriptor_width(candidate_models.cbegin(), candidate_models.cend()))
    {
 
     std::stable_sort(evaluators.begin(), evaluators.end(),
@@ -162,7 +176,7 @@ void ModelScheduler::update_result(ModelEvaluator &evaluator, ModelEvaluation re
 
     logger().logstream(LogLevel::progress, LogScope::thread) << RAXML_LOG_TIMESTAMP << std::setfill(' ') << "Evaluated model " 
         << "(" << std::setw(width) << n_finished << "/" << std::setw(width) << (n_finished + n_waiting) << ") "
-        << evaluator.candidate_model().descriptor() << "\t"
+        << std::setw(candidate_model_descriptor_width) << std::left << evaluator.candidate_model().descriptor() << " " << right
         << options.ic_name() << " = " << FMT_LH(evaluator.get_result().ic_score)
         << "\n";
 }

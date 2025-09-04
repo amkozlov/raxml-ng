@@ -1,5 +1,6 @@
 #include "Options.hpp"
 #include "modeltest/ModelDefinitions.hpp"
+#include "modeltest/RHASHeuristic.hpp"
 #include "types.hpp"
 //#include <stdlib.h>
 #include <climits>
@@ -44,7 +45,7 @@ simd_arch(CORAX_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(Loa
 diff_pred_pars_trees(RAXML_CPYTHIA_TREES_NUM), nni_tolerance(1.0), nni_epsilon(10),
 num_sh_reps(RAXML_SH_ALRT_REPS), sh_epsilon(RAXML_SH_ALRT_EPSILON),
 free_rate_min_categories(0), free_rate_max_categories(0), free_rate_opt_method(FreerateOptMethod::LBFGSB),
-model_selection_criterion(InformationCriterion::bic), modeltest_heuristics({HeuristicType::FREERATE, HeuristicType::RHAS}), modeltest_significant_ic_delta(10.0), modeltest_rhas(default_rate_heterogeneity_selection)
+model_selection_criterion(InformationCriterion::bic), modeltest_heuristics({HeuristicType::FREERATE, HeuristicType::RHAS}), modeltest_significant_ic_delta(10.0), modeltest_rhas(default_rate_heterogeneity_selection), modeltest_rhas_heuristic_mode(RHASHeuristicMode::AllSignficantCategoryCounts)
 {}
 
 unsigned int Options::max_num_replicates(const SupportMetricSet& mset) const
@@ -676,7 +677,10 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
         case HeuristicType::FREERATE:
           stream << "Freerate "; break;
         case HeuristicType::RHAS:
-          stream << "RHAS(Δ=" << opts.modeltest_significant_ic_delta << ") "; break;
+          stream << "RHAS(Δ=" << opts.modeltest_significant_ic_delta 
+              << ", mode=" << (opts.modeltest_rhas_heuristic_mode == RHASHeuristicMode::AllSignficantCategoryCounts ? "all significant" : "only optimal")
+              << ") ";
+          break;
         default:
           break;
       }

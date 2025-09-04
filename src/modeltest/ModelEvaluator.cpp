@@ -8,7 +8,7 @@ thread_local int ModelEvaluator::_barrier_mycycle = 0;
 
 size_t max_reduction_cardinality(const rate_heterogeneity_t &rhas)
 {
-    if (rhas.type == rate_heterogeneity_type::FREE_RATE)
+    if (rhas.type == rate_heterogeneity_type::FREE_RATE || rhas.type == rate_heterogeneity_type::INVARIANT_FREE_RATE)
     {
         return std::max(2U, rhas.category_count);
     }
