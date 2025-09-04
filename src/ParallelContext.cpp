@@ -4,6 +4,8 @@
 
 #include "util/EnergyMonitor.hpp"
 
+#include <malloc.h>
+
 using namespace std;
 
 // This is just a default size; the buffer will be resized later according to #part and #threads
@@ -259,6 +261,9 @@ void ParallelContext::finalize_threads(bool force)
   }
   _thread_groups.clear();
   _threads.clear();
+
+//  /* IMPORTANT: ensure that no memory is blocked by dead threads */
+  malloc_trim(0);
 #else
   RAXML_UNUSED(force);
 #endif
