@@ -102,6 +102,10 @@ void RHASHeuristic::reference_complete() {
 }
 
 void RHASHeuristic::set_optimal_category_count(rate_heterogeneity_type type, unsigned int c) {
+    auto it = optimal_category_count.find(type);
+    if (it != optimal_category_count.cend()) return;
+
+    optimal_category_count[type] = c;
     missing_model_counts.erase(type);
 
     if (missing_model_counts.empty()) {

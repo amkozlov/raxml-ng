@@ -67,6 +67,9 @@ private:
      * category counts to be tested (e.g. 5 if we consider +R2,...,+R6) */
     std::unordered_map<rate_heterogeneity_type, unsigned int> missing_model_counts;
 
+
+    std::unordered_map<rate_heterogeneity_type, unsigned int> optimal_category_count;
+
     const std::vector<rate_heterogeneity_t> &selected_rhas;
     size_t partition_index;
 };
