@@ -87,8 +87,8 @@ public:
 
     rate_heterogeneity_t(const rate_heterogeneity_t &other) = default;
 
-    const rate_heterogeneity_type type;
-    const unsigned int category_count;
+    rate_heterogeneity_type type;
+    unsigned int category_count;
 
     std::string label() const {
         const size_t lookup_index = static_cast<size_t>(type);
@@ -115,7 +115,7 @@ public:
 
 template<>
 struct std::hash<rate_heterogeneity_t> {
-    std::size_t operator()(const rate_heterogeneity_t &r) const {
+    std::size_t operator()(const rate_heterogeneity_t &r) const noexcept {
         return (static_cast<unsigned int>(r.type) << 16) ^ r.category_count;
     }
 };
@@ -144,7 +144,7 @@ class substitution_model_t {
 
 template<>
 struct std::hash<substitution_model_t> {
-    std::size_t operator()(const substitution_model_t &m) const {
+    std::size_t operator()(const substitution_model_t &m) const noexcept {
         return (static_cast<unsigned int>(m.base_frequency) << 24) ^ std::hash<std::string>{}(m.matrix_name);
     }
 };
@@ -157,9 +157,9 @@ static_assert(std::is_copy_constructible<substitution_model_t>(), "necessary for
  */
 class candidate_model_t {
 public:
-    const DataType datatype;
-    const substitution_model_t substitution_model;
-    const rate_heterogeneity_t rate_heterogeneity;
+    DataType datatype;
+    substitution_model_t substitution_model;
+    rate_heterogeneity_t rate_heterogeneity;
 
     candidate_model_t(DataType datatype, string matrix_name, const frequency_type_t frequency_type,
                       const rate_heterogeneity_type rate_heterogeneity, unsigned int rate_categories = 1)
@@ -175,6 +175,33 @@ public:
                rate_heterogeneity == other.rate_heterogeneity;
     }
 };
+
+template<>
+struct std::hash<candidate_model_t> {
+    std::size_t operator()(const candidate_model_t &m) const noexcept {
+        return (std::hash<substitution_model_t>()(m.substitution_model) << 32) ^ (std::hash<rate_heterogeneity_t>()(m.rate_heterogeneity));
+    }
+};
+
+
+struct PartitionCandidateModel
+{
+    size_t partition;
+    candidate_model_t candidate_model;
+
+    bool operator==(const PartitionCandidateModel &other) const {
+        return partition == other.partition && candidate_model == other.candidate_model;
+    }
+};
+
+
+template<>
+struct std::hash<PartitionCandidateModel> {
+    std::size_t operator()(const PartitionCandidateModel &m) const noexcept {
+        return std::hash<size_t>()(m.partition) ^ (std::hash<candidate_model_t>()(m.candidate_model) << 1);
+    }
+};
+
 
 /** Used as flags to enable/disable certain heuristics. */
 enum class HeuristicType

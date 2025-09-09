@@ -199,17 +199,7 @@ vector<Model> ModelTest::optimize_model() {
             const size_t sample_size = msa.part_info(evaluator->partition_index()).stats().site_count;
             ICScoreCalculator ic_score_calculator(free_params, sample_size);
 
-            double ic_score;
-            switch (options.model_selection_criterion)
-            {
-                case InformationCriterion::aic:
-                    ic_score = ic_score_calculator.aic(loglh); break;
-                case InformationCriterion::aicc:
-                    ic_score = ic_score_calculator.aicc(loglh); break;
-                case InformationCriterion::bic:
-                default:
-                    ic_score = ic_score_calculator.bic(loglh); break;
-            }
+            double ic_score = ic_score_calculator.compute(options.model_selection_criterion, loglh);
 
             const auto t0 = global_timer().elapsed_seconds();
             model_scheduler.update_result(*evaluator, ModelEvaluation {std::move(optimized_model), loglh, ic_score});

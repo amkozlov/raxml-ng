@@ -1,9 +1,11 @@
+#include <chrono>
 #include <stdio.h>
 
 #include "Checkpoint.hpp"
 #include "ParallelContext.hpp"
 #include "io/binary_io.hpp"
 #include "io/file_io.hpp"
+#include "modeltest/ModelDefinitions.hpp"
 #include "util/EnergyMonitor.hpp"
 
 using namespace std;
@@ -80,7 +82,7 @@ void CheckpointFile::write_tmp_bs_tree(const Tree& tree) const
 }
 
 CheckpointManager::CheckpointManager(const Options& opts) :
-    _active(opts.nofiles_mode ? false : true), _ckp_fname(opts.checkp_file())
+    _active(opts.nofiles_mode ? false : true), _ckp_fname(opts.checkp_file()), timestamp_last_checkpoint{}
 {
   _checkp_file.opts = opts;
 }
@@ -139,6 +141,8 @@ void CheckpointManager::write(const std::string& ckp_fname) const
     fs << _checkp_file;
 
     remove_backup();
+
+    timestamp_last_checkpoint = std::chrono::steady_clock::now();
   }
 }
 
@@ -287,12 +291,12 @@ void CheckpointManager::update_and_write(const TreeInfo& treeinfo)
   }
 }
 
-void CheckpointManager::update_and_write(uint64_t index, const ModelEvaluation &model)
+void CheckpointManager::update_and_write(const PartitionCandidateModel &candidate_model, const ModelEvaluation &model)
 {
-  _checkp_file.model_candidates[index] = model;
+  _checkp_file.model_evaluations[candidate_model] = model;
 
   /* The method could be called by any thread on the master rank. */
-  if (ParallelContext::master_rank() && _active)
+  if (ParallelContext::master_rank() && _active && minimum_time_exceeded())
   {
     ParallelContext::UniqueLock lock;
     write();
@@ -446,7 +450,7 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const CheckpointFile& c
 
   stream << ckpfile.best_models;
 
-  stream << ckpfile.model_candidates;
+  stream << ckpfile.model_evaluations;
 
   stream << ckpfile.ml_trees;
 
@@ -501,7 +505,7 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, CheckpointFile& ckpfile
 
   if (ckpfile.version > 7)
   {
-      stream >> ckpfile.model_candidates;
+      stream >> ckpfile.model_evaluations;
   }
 
   stream >> ckpfile.ml_trees;

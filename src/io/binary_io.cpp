@@ -250,32 +250,75 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, ModelMap& m)
   return stream;
 }
 
-BasicBinaryStream& operator<<(BasicBinaryStream& stream, const ModelEvaluation& m)
+BasicBinaryStream& operator<<(BasicBinaryStream &stream,
+                              const candidate_model_t& candidate_model)
 {
-    stream.write(std::addressof(m.loglh), sizeof(m.loglh));
-    stream.write(std::addressof(m.ic_score), sizeof(m.ic_score));
-
-    stream << m.model.to_string();
-    stream << m.model;
+    stream << candidate_model.datatype;
+    stream << candidate_model.substitution_model.matrix_name;
+    stream << candidate_model.substitution_model.base_frequency;
+    stream << candidate_model.rate_heterogeneity.type;
+    stream << candidate_model.rate_heterogeneity.category_count;
 
     return stream;
 }
 
-BasicBinaryStream& operator>>(BasicBinaryStream& stream, ModelEvaluation& m)
+BasicBinaryStream& operator>>(BasicBinaryStream &stream,
+                              candidate_model_t& candidate_model)
 {
-    stream.read(std::addressof(m.loglh), sizeof(m.loglh));
-    stream.read(std::addressof(m.ic_score), sizeof(m.ic_score));
 
-    /** To restore a model, we need to know the number of rate categories
-     * beforehand. To mitigate this problem, we also store the model
-     * name and construct a new model instead of just assigning the new
-     * parameters.
-     */
-    std::string model_name;
-    stream >> model_name;
+    stream >> candidate_model.datatype;
+    stream >> candidate_model.substitution_model.matrix_name;
+    stream >> candidate_model.substitution_model.base_frequency;
+    stream >> candidate_model.rate_heterogeneity.type;
+    stream >> candidate_model.rate_heterogeneity.category_count;
 
-    m.model = Model(model_name);
-    stream >> m.model;
+    return stream;
+}
+
+BasicBinaryStream& operator<<(BasicBinaryStream &stream,
+                              const ModelEvaluationMap &model_evaluations)
+{
+
+    const size_t n = model_evaluations.size();
+    stream << n;
+
+    for (const auto &entry : model_evaluations)
+    {
+        stream << entry.first.partition;
+        stream << entry.first.candidate_model;
+
+        stream << entry.second.model;
+        stream << entry.second.loglh;
+    }
+    
+    return stream;
+}
+
+BasicBinaryStream& operator>>(BasicBinaryStream &stream,
+                              ModelEvaluationMap &model_evaluations)
+{
+    size_t n;
+    stream >> n;
+
+    for (size_t i = 0; i < n; ++i)
+    {
+        size_t partition_index;
+        candidate_model_t candidate_model(DataType::dna, "", frequency_type_t::FIXED, rate_heterogeneity_type::UNIFORM);
+
+        stream >> partition_index;
+        stream >> candidate_model;
+
+        Model m(candidate_model.descriptor());
+        stream >> m;
+
+        double loglh;
+        stream >> loglh;
+
+        PartitionCandidateModel key {0, candidate_model};
+        ModelEvaluation value { std::move(m), loglh, NAN };
+
+        model_evaluations[key] = value;
+    }
 
     return stream;
 }

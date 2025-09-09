@@ -4,6 +4,7 @@
 #include "BinaryStream.hpp"
 #include "../Model.hpp"
 #include "../Tree.hpp"
+#include "../modeltest/ModelDefinitions.hpp"
 
 enum class ModelBinaryFmt
 {
@@ -158,39 +159,45 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, Model& m);
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::tuple<Model&, ModelBinaryFmt> bm);
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, ModelMap& m);
 
-BasicBinaryStream& operator<<(BasicBinaryStream& stream, const ModelEvaluation& m);
-BasicBinaryStream& operator>>(BasicBinaryStream& stream, ModelEvaluation& m);
+BasicBinaryStream& operator<<(BasicBinaryStream &stream,
+                              const candidate_model_t& candidate_model);
+BasicBinaryStream& operator>>(BasicBinaryStream &stream,
+                              candidate_model_t& candidate_model);
+BasicBinaryStream& operator<<(BasicBinaryStream &stream,
+                              const ModelEvaluationMap& model_evaluations);
+BasicBinaryStream& operator>>(BasicBinaryStream &stream,
+                              ModelEvaluationMap &model_evaluations);
 
 /**
- * Partition I/O
- */
+* Partition I/O
+*/
 
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const PartitionStats& ps);
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, PartitionStats& ps);
 
 /**
- * MSA I/O
- */
+* MSA I/O
+*/
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const MSA& m);
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, MSA& m);
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, MSARange mr);
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, NullMSA);
 
 /**
- * TreeTopology I/O
- */
+* TreeTopology I/O
+*/
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const TreeTopology& t);
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, TreeTopology& t);
 
 /**
- * TreeCollection I/O
- */
+* TreeCollection I/O
+*/
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const ScoredTopologyMap& c);
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, ScoredTopologyMap& c);
 
 /**
- * Options I/O
- */
+* Options I/O
+*/
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Options& o);
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, Options& o);
 

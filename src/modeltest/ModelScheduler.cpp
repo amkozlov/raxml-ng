@@ -1,5 +1,6 @@
 #include "ModelScheduler.hpp"
 #include "../ParallelContext.hpp"
+#include "../ICScoreCalculator.hpp"
 #include "DistributedScheduling.hpp"
 #include "ModelDefinitions.hpp"
 #include "ModelEvaluator.hpp"
@@ -125,14 +126,48 @@ ModelScheduler::ModelScheduler(
                     return a.priority() > b.priority();
                 });
 
+    read_from_checkpoint(checkpoint_manager);
+    globally_init_evaluation_index();
+}
 
-    /* Read results from checkpoint */
-    for (const auto &checkpointed_candidate : checkpoint_manager.get_model_candidates())
+void ModelScheduler::read_from_checkpoint(CheckpointManager &checkpoint_manager)
+{
+    const auto t0 = global_timer().elapsed_seconds();
+
+    std::unordered_map<PartitionCandidateModel, size_t> evaluator_index;
+    for (size_t i = 0; i < evaluators.size(); ++i)
     {
-        update_result(evaluators.at(checkpointed_candidate.first), checkpointed_candidate.second, false, false);
+        PartitionCandidateModel key { evaluators.at(i).partition_index(), evaluators.at(i).candidate_model() };
+        evaluator_index[key] = i;
     }
 
-    /* Initialize evaluation_index in light of checkpointed results and in accordance with other MPI ranks */
+    for (auto &checkpointed_candidate : checkpoint_manager.get_model_candidates())
+    {
+        const PartitionCandidateModel &key = checkpointed_candidate.first;
+        ModelEvaluation evaluation = checkpointed_candidate.second;
+
+        auto it = evaluator_index.find(key);
+        if (it == evaluator_index.end()) {
+            // Set of candidate models changed because of user parameters, disregard model
+            continue;
+        }
+
+        // Recompute information criterion (selection criterion might have changed since last run)
+        const ICScoreCalculator ic_calc(evaluation.model.num_free_params(), msa.part_info(key.partition).stats().site_count);
+        evaluation.ic_score = ic_calc.compute(options.model_selection_criterion, evaluation.loglh);
+
+        update_result(evaluators.at(it->second), evaluation, false, false);
+    }
+
+    const auto t1 = global_timer().elapsed_seconds();
+
+    if (ParallelContext::master())
+        logger().logstream(LogLevel::debug, LogScope::thread) << "Restored " << checkpoint_manager.get_model_candidates().size() << " candidate models from checkpoint in " << (1e3 * (t1 - t0)) << "ms.\n";
+}
+
+/** Initialize evaluation_index in light of checkpointed results and in accordance with other MPI ranks */
+void ModelScheduler::globally_init_evaluation_index()
+{
     while (true) {
         evaluation_index = distributed_scheduling.next_evaluation_index();
 
@@ -148,6 +183,7 @@ ModelScheduler::ModelScheduler(
             break;
         }
     }
+
 }
 
 /** Get the number of threads recommended to perform model selection. */
@@ -169,16 +205,20 @@ void ModelScheduler::update_result(ModelEvaluator &evaluator, ModelEvaluation re
     std::lock_guard<std::mutex> lock(mutex_evaluation);
     _update_result(evaluator, std::move(result), announce, write_checkpoint);
 
-    const auto progress = _collect_progress();
-    const auto n_finished = progress.at(static_cast<uint64_t>(EvaluationStatus::FINISHED));
-    const auto n_waiting = progress.at(static_cast<uint64_t>(EvaluationStatus::WAITING));
-    const auto width = std::to_string(evaluators.size() + 1).size();
+    // Only show progress for new results
+    if (write_checkpoint)
+    {
+        const auto progress = _collect_progress();
+        const auto n_finished = progress.at(static_cast<uint64_t>(EvaluationStatus::FINISHED));
+        const auto n_waiting = progress.at(static_cast<uint64_t>(EvaluationStatus::WAITING));
+        const auto width = std::to_string(evaluators.size() + 1).size();
 
-    logger().logstream(LogLevel::progress, LogScope::thread) << RAXML_LOG_TIMESTAMP << std::setfill(' ') << "Evaluated model " 
-        << "(" << std::setw(width) << n_finished << "/" << std::setw(width) << (n_finished + n_waiting) << ") "
-        << std::setw(candidate_model_descriptor_width) << std::left << evaluator.candidate_model().descriptor() << " " << right
-        << options.ic_name() << " = " << FMT_LH(evaluator.get_result().ic_score)
-        << "\n";
+        logger().logstream(LogLevel::progress, LogScope::thread) << RAXML_LOG_TIMESTAMP << std::setfill(' ') << "Evaluated model " 
+            << "(" << std::setw(width) << n_finished << "/" << std::setw(width) << (n_finished + n_waiting) << ") "
+            << std::setw(candidate_model_descriptor_width) << std::left << evaluator.candidate_model().descriptor() << " " << right
+            << options.ic_name() << " = " << FMT_LH(evaluator.get_result().ic_score)
+            << "\n";
+    }
 }
 
 void ModelScheduler::_update_result(ModelEvaluator &evaluator, ModelEvaluation result, bool announce, bool write_checkpoint) {
@@ -193,7 +233,7 @@ void ModelScheduler::_update_result(ModelEvaluator &evaluator, ModelEvaluation r
     }
 
     if (write_checkpoint && ParallelContext::master_rank()) {
-        checkpoint_manager.update_and_write(index, evaluator.get_result());
+        checkpoint_manager.update_and_write(PartitionCandidateModel { evaluator.partition_index(), evaluator.candidate_model() }, evaluator.get_result());
     }
 }
 
@@ -317,6 +357,7 @@ ModelScheduler::EvaluationStatusCounts ModelScheduler::_collect_progress() const
     ModelScheduler::EvaluationStatusCounts counts;
     counts.fill(0);
 
+    // TODO: this is currently O(N^2)
     for (const auto &evaluator : evaluators)
     {
         const uint64_t status = static_cast<uint64_t>(evaluator.get_status());

@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include "common.h"
+#include "modeltest/ModelDefinitions.hpp"
 
 typedef std::unordered_map<corax_state_t,std::string> StateNameMap;
 
@@ -214,9 +215,8 @@ struct ModelEvaluation {
   double ic_score;
 };
 
-
 typedef std::unordered_map<size_t, Model> ModelMap;
-typedef std::unordered_map<size_t, ModelEvaluation> ModelEvaluationMap;
+typedef std::unordered_map<PartitionCandidateModel, ModelEvaluation, std::hash<PartitionCandidateModel>> ModelEvaluationMap;
 typedef std::unordered_map<size_t, Model&> ModelRefMap;
 typedef std::unordered_map<size_t, const Model&> ModelCRefMap;
 
