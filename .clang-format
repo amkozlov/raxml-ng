@@ -1,9 +1,10 @@
 ﻿---
-AlignConsecutiveMacros: 'true'
-BreakBeforeBraces: 'Mozilla'
-ColumnLimit: '120'
-IndentWidth: '2'
+AlignConsecutiveMacros: true
+BreakBeforeBraces: Mozilla
+ColumnLimit: 120
+IndentWidth: 2
 Standard: Cpp11
+SortIncludes: false
 UseTab: Never
 
 ...

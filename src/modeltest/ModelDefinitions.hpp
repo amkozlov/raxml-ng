@@ -1,17 +1,17 @@
 #pragma once
-#include <cassert>
-#include <stdexcept>
-#include <type_traits>
 #ifndef MODEL_DEFS_H
 #define MODEL_DEFS_H
 
-#include "../types.hpp"
-#include <corax/corax.h>
-
 #include <array>
+#include <cassert>
+#include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
+
+#include <corax/corax.h>
+#include "../types.hpp"
 
 class unsupported_datatype_error : public std::logic_error
 {
