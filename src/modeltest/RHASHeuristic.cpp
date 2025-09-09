@@ -4,9 +4,9 @@
 #include <unordered_map>
 #include "../log.hpp"
 
-std::unordered_map<rate_heterogeneity_t, bool> initialize_skip(const std::vector<rate_heterogeneity_t> &selected_rhas)
+std::unordered_map<RateHeterogeneityDescriptor, bool> initialize_skip(const std::vector<RateHeterogeneityDescriptor> &selected_rhas)
 {
-    std::unordered_map<rate_heterogeneity_t, bool>  skip;
+    std::unordered_map<RateHeterogeneityDescriptor, bool>  skip;
 
     for (const auto &rhas : selected_rhas) {
         skip[rhas] = false;
@@ -16,9 +16,9 @@ std::unordered_map<rate_heterogeneity_t, bool> initialize_skip(const std::vector
 }
 
 
-std::unordered_map<rate_heterogeneity_type, unsigned int> initialize_missing_model_counts(const std::vector<rate_heterogeneity_t> &selected_rhas)
+std::unordered_map<RateHeterogeneityType, unsigned int> initialize_missing_model_counts(const std::vector<RateHeterogeneityDescriptor> &selected_rhas)
 {
-    std::unordered_map<rate_heterogeneity_type, unsigned int> missing_model_counts;
+    std::unordered_map<RateHeterogeneityType, unsigned int> missing_model_counts;
 
     for (const auto &rhas : selected_rhas) {
         auto it = missing_model_counts.emplace(rhas.type, 0).first;
@@ -29,8 +29,8 @@ std::unordered_map<rate_heterogeneity_type, unsigned int> initialize_missing_mod
     return missing_model_counts;
 }
 
-RHASHeuristic::RHASHeuristic(substitution_model_t reference_matrix,
-                             const std::vector<rate_heterogeneity_t> &selected_rhas,
+RHASHeuristic::RHASHeuristic(SubstitutionModelDescriptor reference_matrix,
+                             const std::vector<RateHeterogeneityDescriptor> &selected_rhas,
                              double delta_bic,
                              RHASHeuristicMode mode,
                              size_t partition_index)
@@ -45,7 +45,7 @@ RHASHeuristic::RHASHeuristic(substitution_model_t reference_matrix,
 {
 }
 
-void RHASHeuristic::drop_one(const rate_heterogeneity_t &rhas)
+void RHASHeuristic::drop_one(const RateHeterogeneityDescriptor &rhas)
 {
     const auto type = rhas.type;
     auto it = missing_model_counts.find(type);
@@ -63,7 +63,7 @@ void RHASHeuristic::drop_one(const rate_heterogeneity_t &rhas)
         missing_model_counts.erase(it);
 }
 
-void RHASHeuristic::update(const candidate_model_t &candidate_model, double score) {
+void RHASHeuristic::update(const ModelDescriptor &candidate_model, double score) {
     if (candidate_model.substitution_model != reference_matrix) {
         return;
     }
@@ -101,7 +101,7 @@ void RHASHeuristic::reference_complete() {
     logger().logstream(LogLevel::debug, LogScope::thread) << "\n";
 }
 
-void RHASHeuristic::set_optimal_category_count(rate_heterogeneity_type type, unsigned int c) {
+void RHASHeuristic::set_optimal_category_count(RateHeterogeneityType type, unsigned int c) {
     auto it = optimal_category_count.find(type);
     if (it != optimal_category_count.cend()) return;
 
@@ -135,7 +135,7 @@ void RHASHeuristic::set_optimal_category_count(rate_heterogeneity_type type, uns
     }
 }
 
-bool RHASHeuristic::can_skip(const candidate_model_t &candidate) const {
+bool RHASHeuristic::can_skip(const ModelDescriptor &candidate) const {
     if (skip.empty())
         return false;
 

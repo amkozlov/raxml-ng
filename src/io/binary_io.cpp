@@ -251,7 +251,7 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, ModelMap& m)
 }
 
 BasicBinaryStream& operator<<(BasicBinaryStream &stream,
-                              const candidate_model_t& candidate_model)
+                              const ModelDescriptor& candidate_model)
 {
     stream << candidate_model.datatype;
     stream << candidate_model.substitution_model.matrix_name;
@@ -263,7 +263,7 @@ BasicBinaryStream& operator<<(BasicBinaryStream &stream,
 }
 
 BasicBinaryStream& operator>>(BasicBinaryStream &stream,
-                              candidate_model_t& candidate_model)
+                              ModelDescriptor& candidate_model)
 {
 
     stream >> candidate_model.datatype;
@@ -303,7 +303,7 @@ BasicBinaryStream& operator>>(BasicBinaryStream &stream,
     for (size_t i = 0; i < n; ++i)
     {
         size_t partition_index;
-        candidate_model_t candidate_model(DataType::dna, "", frequency_type_t::FIXED, rate_heterogeneity_type::UNIFORM);
+        ModelDescriptor candidate_model(DataType::dna, "", BaseFrequencyType::FIXED, RateHeterogeneityType::UNIFORM);
 
         stream >> partition_index;
         stream >> candidate_model;

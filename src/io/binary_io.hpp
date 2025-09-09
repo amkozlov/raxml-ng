@@ -160,9 +160,9 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::tuple<Model&, Mode
 BasicBinaryStream& operator>>(BasicBinaryStream& stream, ModelMap& m);
 
 BasicBinaryStream& operator<<(BasicBinaryStream &stream,
-                              const candidate_model_t& candidate_model);
+                              const ModelDescriptor& candidate_model);
 BasicBinaryStream& operator>>(BasicBinaryStream &stream,
-                              candidate_model_t& candidate_model);
+                              ModelDescriptor& candidate_model);
 BasicBinaryStream& operator<<(BasicBinaryStream &stream,
                               const ModelEvaluationMap& model_evaluations);
 BasicBinaryStream& operator>>(BasicBinaryStream &stream,

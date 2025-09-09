@@ -9,43 +9,43 @@
 #include <src/modeltest/RHASHeuristic.hpp>
 #include <regex>
 
-candidate_model_t C(const std::string &s, const DataType datatype = DataType::dna) {
+ModelDescriptor C(const std::string &s, const DataType datatype = DataType::dna) {
     const static std::regex exp(R"(^([^+]+)(\+FC?|\+FO|)(|\+E|\+I|\+G|\+I\+G|\+R|\+I\+R)(\d+|)$)");
     std::smatch m;
     assert(std::regex_match(s, m, exp));
 
     const std::string matrix_name = m[1];
-    const frequency_type_t freq = m[2].length() == 0 ? frequency_type_t::FIXED : frequency_type_t::ESTIMATED;
-    rate_heterogeneity_type rhas_type;
+    const BaseFrequencyType freq = m[2].length() == 0 ? BaseFrequencyType::FIXED : BaseFrequencyType::ESTIMATED;
+    RateHeterogeneityType rhas_type;
 
     if (m[3] == "" || m[3] == "+E") {
-        rhas_type = rate_heterogeneity_type::UNIFORM;
+        rhas_type = RateHeterogeneityType::UNIFORM;
     } else if (m[3] == "+I") {
-        rhas_type = rate_heterogeneity_type::INVARIANT;
+        rhas_type = RateHeterogeneityType::INVARIANT;
     } else if (m[3] == "+I+G") {
-        rhas_type = rate_heterogeneity_type::INVARIANT_GAMMA;
+        rhas_type = RateHeterogeneityType::INVARIANT_GAMMA;
     } else if (m[3] == "+G") {
-        rhas_type = rate_heterogeneity_type::GAMMA;
+        rhas_type = RateHeterogeneityType::GAMMA;
     } else if (m[3] == "+R") {
-        rhas_type = rate_heterogeneity_type::FREE_RATE;
+        rhas_type = RateHeterogeneityType::FREE_RATE;
     } else if (m[3] == "+I+R") {
-        rhas_type = rate_heterogeneity_type::INVARIANT_FREE_RATE;
+        rhas_type = RateHeterogeneityType::INVARIANT_FREE_RATE;
     } else {
         assert(0);
     }
 
     const unsigned int category_count = m[4] == "" ? 1 : std::stoi(m[4]);
 
-    return candidate_model_t(datatype, matrix_name, freq, rhas_type, category_count);
+    return ModelDescriptor(datatype, matrix_name, freq, rhas_type, category_count);
 }
 
-candidate_model_t Cp(const std::string &s) {
+ModelDescriptor Cp(const std::string &s) {
     return C(s, DataType::protein);
 }
 
 void EXPECT_SKIP(Heuristics &h, unsigned int partition,
-                      std::vector<candidate_model_t> can_skip,
-                      std::vector<candidate_model_t> no_skip_possible)
+                      std::vector<ModelDescriptor> can_skip,
+                      std::vector<ModelDescriptor> no_skip_possible)
 {
     for (const auto &c : can_skip) {
         EXPECT_TRUE(h.can_skip(partition, c)) << "Expected to skip " << c.descriptor() << endl;
@@ -58,8 +58,8 @@ void EXPECT_SKIP(Heuristics &h, unsigned int partition,
 
 
 TEST(ICModelTest, StringParser) {
-    EXPECT_EQ(C("TIM2+I"), candidate_model_t(DataType::dna, "TIM2", frequency_type_t::FIXED, rate_heterogeneity_type::INVARIANT));
-    EXPECT_EQ(C("GTR+F+I+G99"), candidate_model_t(DataType::dna, "GTR", frequency_type_t::ESTIMATED, rate_heterogeneity_type::INVARIANT_GAMMA, 99));
+    EXPECT_EQ(C("TIM2+I"), ModelDescriptor(DataType::dna, "TIM2", BaseFrequencyType::FIXED, RateHeterogeneityType::INVARIANT));
+    EXPECT_EQ(C("GTR+F+I+G99"), ModelDescriptor(DataType::dna, "GTR", BaseFrequencyType::ESTIMATED, RateHeterogeneityType::INVARIANT_GAMMA, 99));
 }
 
 TEST(ICModelTest, ModelNameNormalization) {
@@ -73,14 +73,14 @@ TEST(ICModelTest, ModelNameNormalization) {
 }
 
 TEST(ICModelTest, RHASHeuristic) {
-    RHASHeuristic h(substitution_model_t("GTR", frequency_type_t::ESTIMATED),
+    RHASHeuristic h(SubstitutionModelDescriptor("GTR", BaseFrequencyType::ESTIMATED),
                     {
-                    rate_heterogeneity_t(rate_heterogeneity_type::UNIFORM, 1),
-                    rate_heterogeneity_t(rate_heterogeneity_type::INVARIANT, 1),
-                    rate_heterogeneity_t(rate_heterogeneity_type::INVARIANT_GAMMA, 1),
-                    rate_heterogeneity_t(rate_heterogeneity_type::GAMMA, 4),
-                    rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 4),
-                    rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 5)
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::UNIFORM, 1),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::INVARIANT, 1),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::INVARIANT_GAMMA, 1),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::GAMMA, 4),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::FREE_RATE, 4),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::FREE_RATE, 5)
                     }, 10.0, RHASHeuristicMode::AllSignficantCategoryCounts);
 
     h.update(C("GTR+F"), 130.0);
@@ -149,7 +149,7 @@ TEST(ICModelTest, FreerateHeuristic) {
 }
 
 TEST(ICModelTest, InvariantFreerateHeuristic) {
-    FreerateHeuristic h(10, 13, rate_heterogeneity_type::INVARIANT_FREE_RATE);
+    FreerateHeuristic h(10, 13, RateHeterogeneityType::INVARIANT_FREE_RATE);
 
     // Should ignore all non-invariant freerate models
     h.update(C("GTR+F+R10"), 832.2);
@@ -172,17 +172,17 @@ TEST(ICModelTest, InvariantFreerateHeuristic) {
 }
 
 TEST(ICModelTest, RHASFreerateHeuristicCombined) {
-    std::vector<rate_heterogeneity_t> selected_rhas {
-                    rate_heterogeneity_t(rate_heterogeneity_type::UNIFORM, 1),
-                    rate_heterogeneity_t(rate_heterogeneity_type::INVARIANT, 1),
-                    rate_heterogeneity_t(rate_heterogeneity_type::GAMMA, 4),
-                    rate_heterogeneity_t(rate_heterogeneity_type::INVARIANT_GAMMA, 4),
-                    rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 4),
-                    rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 5),
-                    rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 6),
-                    rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 7)
+    std::vector<RateHeterogeneityDescriptor> selected_rhas {
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::UNIFORM, 1),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::INVARIANT, 1),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::GAMMA, 4),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::INVARIANT_GAMMA, 4),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::FREE_RATE, 4),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::FREE_RATE, 5),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::FREE_RATE, 6),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::FREE_RATE, 7)
                     };
-    RHASHeuristic h(substitution_model_t("GTR", frequency_type_t::ESTIMATED),
+    RHASHeuristic h(SubstitutionModelDescriptor("GTR", BaseFrequencyType::ESTIMATED),
                     selected_rhas, 10.0, RHASHeuristicMode::AllSignficantCategoryCounts);
 
     h.update(C("GTR+F"), 130.0);
@@ -195,7 +195,7 @@ TEST(ICModelTest, RHASFreerateHeuristicCombined) {
     EXPECT_FALSE(h.can_skip(C("GTR+F+R5")));
 
     h.update(C("GTR+F+R5"), 110.2); // score increased
-    h.set_optimal_category_count(rate_heterogeneity_type::FREE_RATE, 4);
+    h.set_optimal_category_count(RateHeterogeneityType::FREE_RATE, 4);
     EXPECT_TRUE(h.can_skip(C("JC")));
     EXPECT_TRUE(h.can_skip(C("JC+I")));
     EXPECT_FALSE(h.can_skip(C("JC+G4")));
@@ -207,12 +207,12 @@ TEST(ICModelTest, RHASFreerateHeuristicCombined) {
 
 TEST(ICModelTest, RHASFreerateOptimum) {
     Heuristics h(1, {HeuristicType::FREERATE, HeuristicType::RHAS}, {
-                    rate_heterogeneity_t(rate_heterogeneity_type::UNIFORM, 1),
-                    rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 4),
-                    rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 5),
-                    rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 6),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::UNIFORM, 1),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::FREE_RATE, 4),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::FREE_RATE, 5),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::FREE_RATE, 6),
                     },
-                    substitution_model_t("GTR", frequency_type_t::ESTIMATED), 4, 6, 10.0, RHASHeuristicMode::OnlyOptimalCategoryCount);
+                    SubstitutionModelDescriptor("GTR", BaseFrequencyType::ESTIMATED), 4, 6, 10.0, RHASHeuristicMode::OnlyOptimalCategoryCount);
 
     h.update(0, C("GTR+F"), 430.0);
 
@@ -232,19 +232,19 @@ TEST(ICModelTest, RHASFreerateOptimum) {
 TEST(ICModelTest, ScenarioI) {
     auto f = [](RHASHeuristicMode mode) {
         Heuristics h(1, {HeuristicType::FREERATE, HeuristicType::RHAS}, {
-                        rate_heterogeneity_t(rate_heterogeneity_type::UNIFORM, 1),
-                        rate_heterogeneity_t(rate_heterogeneity_type::INVARIANT, 1),
-                        rate_heterogeneity_t(rate_heterogeneity_type::GAMMA, 4),
-                        rate_heterogeneity_t(rate_heterogeneity_type::INVARIANT_GAMMA, 4),
-                        rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 2),
-                        rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 3),
-                        rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 4),
-                        rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 5),
-                        rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 6),
-                        rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 7),
-                        rate_heterogeneity_t(rate_heterogeneity_type::FREE_RATE, 8),
+                        RateHeterogeneityDescriptor(RateHeterogeneityType::UNIFORM, 1),
+                        RateHeterogeneityDescriptor(RateHeterogeneityType::INVARIANT, 1),
+                        RateHeterogeneityDescriptor(RateHeterogeneityType::GAMMA, 4),
+                        RateHeterogeneityDescriptor(RateHeterogeneityType::INVARIANT_GAMMA, 4),
+                        RateHeterogeneityDescriptor(RateHeterogeneityType::FREE_RATE, 2),
+                        RateHeterogeneityDescriptor(RateHeterogeneityType::FREE_RATE, 3),
+                        RateHeterogeneityDescriptor(RateHeterogeneityType::FREE_RATE, 4),
+                        RateHeterogeneityDescriptor(RateHeterogeneityType::FREE_RATE, 5),
+                        RateHeterogeneityDescriptor(RateHeterogeneityType::FREE_RATE, 6),
+                        RateHeterogeneityDescriptor(RateHeterogeneityType::FREE_RATE, 7),
+                        RateHeterogeneityDescriptor(RateHeterogeneityType::FREE_RATE, 8),
                         },
-                        substitution_model_t("GTR", frequency_type_t::ESTIMATED), 2, 8, 55.0, mode);
+                        SubstitutionModelDescriptor("GTR", BaseFrequencyType::ESTIMATED), 2, 8, 55.0, mode);
 
         // * marks BIC difference less than 55
         h.update(0, C("GTR+FO+R2"), 108235.701256);
@@ -272,17 +272,17 @@ TEST(ICModelTest, ScenarioI) {
 
 
 
-const std::vector<rate_heterogeneity_t> selected_rhas(bool uniform, bool invariant, bool gamma, bool invariant_gamma, unsigned int freerate_min_cat = 0, unsigned int freerate_max_cat = 0)
+const std::vector<RateHeterogeneityDescriptor> selected_rhas(bool uniform, bool invariant, bool gamma, bool invariant_gamma, unsigned int freerate_min_cat = 0, unsigned int freerate_max_cat = 0)
 {
-    std::vector<rate_heterogeneity_t>  result;
-    if (uniform) result.emplace_back(rate_heterogeneity_type::UNIFORM, 1);
-    if (invariant) result.emplace_back(rate_heterogeneity_type::INVARIANT, 1);
-    if (gamma) result.emplace_back(rate_heterogeneity_type::GAMMA, 1);
-    if (invariant_gamma) result.emplace_back(rate_heterogeneity_type::INVARIANT_GAMMA, 1);
+    std::vector<RateHeterogeneityDescriptor>  result;
+    if (uniform) result.emplace_back(RateHeterogeneityType::UNIFORM, 1);
+    if (invariant) result.emplace_back(RateHeterogeneityType::INVARIANT, 1);
+    if (gamma) result.emplace_back(RateHeterogeneityType::GAMMA, 1);
+    if (invariant_gamma) result.emplace_back(RateHeterogeneityType::INVARIANT_GAMMA, 1);
 
     if (freerate_max_cat >= freerate_min_cat && freerate_min_cat > 0)
         for (auto c = freerate_min_cat; c <= freerate_max_cat; ++c)
-            result.emplace_back(rate_heterogeneity_type::FREE_RATE, c);
+            result.emplace_back(RateHeterogeneityType::FREE_RATE, c);
 
     return result;
 }
@@ -292,7 +292,7 @@ TEST(ICModelTest, HeuristicsII)
     Heuristics h{1, 
     {HeuristicType::FREERATE, HeuristicType::RHAS},
     selected_rhas(true, true, true, true, 2, 9), 
-    substitution_model_t("DAYHOFF", frequency_type_t::ESTIMATED), 
+    SubstitutionModelDescriptor("DAYHOFF", BaseFrequencyType::ESTIMATED), 
     2, 9, 10.0, RHASHeuristicMode::AllSignficantCategoryCounts};
 
     h.update(0, Cp("DAYHOFF+FC+R2"), 6240.672506897783);    // <- 4.

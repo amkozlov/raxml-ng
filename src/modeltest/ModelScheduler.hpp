@@ -16,11 +16,11 @@
 using std::vector;
 using namespace std;
 
-using ResourceEstimatorFunction = std::function<size_t(const Options &, const PartitionInfo&, const candidate_model_t&,EvaluationPriority)>;
+using ResourceEstimatorFunction = std::function<size_t(const Options &, const PartitionInfo&, const ModelDescriptor&,EvaluationPriority)>;
 
 class ModelScheduler final {
     public:
-        ModelScheduler(std::vector<candidate_model_t> _candidate_models,
+        ModelScheduler(std::vector<ModelDescriptor> _candidate_models,
                        const PartitionedMSA &msa,
                        const Options &options,
                        CheckpointManager &checkpoint_manager,
@@ -48,8 +48,8 @@ private:
 
     const size_t partition_count, branch_count;
 
-    const std::vector<candidate_model_t> candidate_models;
-    const substitution_model_t &reference_model;
+    const std::vector<ModelDescriptor> candidate_models;
+    const SubstitutionModelDescriptor &reference_model;
 
     uint64_t evaluation_index;
     vector<ModelEvaluator> evaluators;

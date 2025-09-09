@@ -1,17 +1,17 @@
 #pragma once
 
-#include <unordered_map>
 #include "ModelDefinitions.hpp"
-
+#include <unordered_map>
 
 enum class RHASHeuristicMode
 {
-    OnlyOptimalCategoryCount,
-    AllSignficantCategoryCounts
+  OnlyOptimalCategoryCount,
+  AllSignficantCategoryCounts
 };
 
 /** Heuristically disable RHAS models based on performance of reference matrix.
- * All RHAS models that yield a BIC score worse than a specified delta (default value 10) from the best observed value on the reference matrix are skipped.
+ * All RHAS models that yield a BIC score worse than a specified delta (default value 10) from the best observed value
+ * on the reference matrix are skipped.
  *
  * For DNA data, our reference matrix typically would be GTR.
  * For example, we compute the BIC score with uniform RHAS, invariant sites,
@@ -25,51 +25,54 @@ enum class RHASHeuristicMode
  * Equivalent to IQTree's autodetection of rate heterogeneity:
  * https://github.com/iqtree/iqtree2/blob/a00094e03d1ae984e1497e16738f91514df8c366/main/phylotesting.cpp#L2648-L2649
  */
-class RHASHeuristic {
-    public:
-    RHASHeuristic(substitution_model_t reference_matrix, const std::vector<rate_heterogeneity_t> &selected_rhas, double delta_bic, RHASHeuristicMode mode, size_t partition_index = 0);
-    RHASHeuristic(const RHASHeuristic&) =default;
+class RHASHeuristic
+{
+public:
+  RHASHeuristic(SubstitutionModelDescriptor reference_matrix,
+                const std::vector<RateHeterogeneityDescriptor> &selected_rhas, double delta_bic, RHASHeuristicMode mode,
+                size_t partition_index = 0);
 
-    /** Add model testing result that this heuristic should consider.
-     *  If the model matrix does not coincide with the reference matrix specified
-     *  in the constructor, the new finding will be ignored
-     */
-    void update(const candidate_model_t &candidate_model, double score);
+  RHASHeuristic(const RHASHeuristic &) = default;
 
-    /** Signals the optimal category count for a certain RHAS type.
-     * This prevents RHASHeuristic from waiting on freerate candidates that will never be computed. */
-    void set_optimal_category_count(rate_heterogeneity_type rhas_type, unsigned int optimal_category_count);
+  /** Add model testing result that this heuristic should consider.
+   *  If the model matrix does not coincide with the reference matrix specified
+   *  in the constructor, the new finding will be ignored
+   */
+  void update(const ModelDescriptor &candidate_model, double score);
 
-    /** Check whether a given candidate model can be skipped because of poor expectations of its RHAS model
-     */
-    bool can_skip(const candidate_model_t &candidate_model) const;
+  /** Signals the optimal category count for a certain RHAS type.
+   * This prevents RHASHeuristic from waiting on freerate candidates that will never be computed. */
+  void set_optimal_category_count(RateHeterogeneityType rhas_type, unsigned int optimal_category_count);
 
-    void set_partition_index(size_t partition_index);
+  /** Check whether a given candidate model can be skipped because of poor expectations of its RHAS model
+   */
+  bool can_skip(const ModelDescriptor &candidate_model) const;
+
+  void set_partition_index(size_t partition_index);
 
 private:
-    RHASHeuristicMode mode;
+  RHASHeuristicMode mode;
 
-    /** Signals that all reference RHAS variants have been computed and that evaluation of heuristic can start now. */
-    void reference_complete();
+  /** Signals that all reference RHAS variants have been computed and that evaluation of heuristic can start now. */
+  void reference_complete();
 
-    void drop_one(const rate_heterogeneity_t &rhas);
+  void drop_one(const RateHeterogeneityDescriptor &rhas);
 
-    substitution_model_t reference_matrix;
-    double delta_ic;
+  SubstitutionModelDescriptor reference_matrix;
+  double delta_ic;
 
-    std::unordered_map<rate_heterogeneity_t, double> observed_ic_score;
+  std::unordered_map<RateHeterogeneityDescriptor, double> observed_ic_score;
 
-    std::unordered_map<rate_heterogeneity_t, bool> skip;
+  std::unordered_map<RateHeterogeneityDescriptor, bool> skip;
 
-    /** Maps from a rate heterogeneity type to the number of outstanding
-     * results with that type. The latter is typically 1 (e.g. for +E, +I where
-     * we don't vary the category count) but for freerate it is the number of
-     * category counts to be tested (e.g. 5 if we consider +R2,...,+R6) */
-    std::unordered_map<rate_heterogeneity_type, unsigned int> missing_model_counts;
+  /** Maps from a rate heterogeneity type to the number of outstanding
+   * results with that type. The latter is typically 1 (e.g. for +E, +I where
+   * we don't vary the category count) but for freerate it is the number of
+   * category counts to be tested (e.g. 5 if we consider +R2,...,+R6) */
+  std::unordered_map<RateHeterogeneityType, unsigned int> missing_model_counts;
 
+  std::unordered_map<RateHeterogeneityType, unsigned int> optimal_category_count;
 
-    std::unordered_map<rate_heterogeneity_type, unsigned int> optimal_category_count;
-
-    const std::vector<rate_heterogeneity_t> &selected_rhas;
-    size_t partition_index;
+  const std::vector<RateHeterogeneityDescriptor> &selected_rhas;
+  size_t partition_index;
 };

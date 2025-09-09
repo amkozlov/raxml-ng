@@ -1114,7 +1114,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
                     const auto &it = std::find(rate_heterogeneity_label.cbegin(), rate_heterogeneity_label.cend(), effective_rhas_name);
                     if (it == rate_heterogeneity_label.cend())
                         throw InvalidOptionValueException("Invalid modeltest rate-heterogeneity model: '" + rhas + "'");
-                    selection.insert(static_cast<rate_heterogeneity_type>(std::distance(rate_heterogeneity_label.cbegin(), it)));
+                    selection.insert(static_cast<RateHeterogeneityType>(std::distance(rate_heterogeneity_label.cbegin(), it)));
                 }
 
                 opts.modeltest_rhas = selection;

@@ -23,7 +23,7 @@ size_t determine_binary_candidates_size(const std::vector<ModelEvaluator> &evalu
     return size;
 }
 
-EvaluationPriority prioritize_candidate_model(const candidate_model_t &candidate_model, const substitution_model_t &reference_model)
+EvaluationPriority prioritize_candidate_model(const ModelDescriptor &candidate_model, const SubstitutionModelDescriptor &reference_model)
 {
     const bool is_reference = candidate_model.substitution_model == reference_model;
     const bool is_rhas_likely = candidate_model.rate_heterogeneity.category_count <= 4;
@@ -38,9 +38,9 @@ EvaluationPriority prioritize_candidate_model(const candidate_model_t &candidate
 
 vector<ModelEvaluator> build_evaluators(const PartitionedMSA &msa,
                                         const Options &options,
-                                        const substitution_model_t &reference_model,
+                                        const SubstitutionModelDescriptor &reference_model,
                                         ResourceEstimatorFunction resource_estimator,
-                                        const std::vector<candidate_model_t> &candidate_models,
+                                        const std::vector<ModelDescriptor> &candidate_models,
                                         unsigned int partition_count)
 {
     vector<ModelEvaluator> evaluators;
@@ -60,10 +60,10 @@ vector<ModelEvaluator> build_evaluators(const PartitionedMSA &msa,
 
     return evaluators;
 }
-std::vector<rate_heterogeneity_t> get_selected_rhas(const std::vector<candidate_model_t> &candidate_models,
-                                                    const substitution_model_t &reference_model)
+std::vector<RateHeterogeneityDescriptor> get_selected_rhas(const std::vector<ModelDescriptor> &candidate_models,
+                                                    const SubstitutionModelDescriptor &reference_model)
 {
-    std::vector<rate_heterogeneity_t> selected_rhas;
+    std::vector<RateHeterogeneityDescriptor> selected_rhas;
 
     for (const auto &candidate : candidate_models) {
         if (candidate.substitution_model == reference_model) {
@@ -98,7 +98,7 @@ unsigned int max_descriptor_width(Iterator begin, Iterator end)
 }
 
 ModelScheduler::ModelScheduler(
-            std::vector<candidate_model_t> _candidate_models,
+            std::vector<ModelDescriptor> _candidate_models,
             const PartitionedMSA &msa,
             const Options &options,
             CheckpointManager &checkpoint_manager,

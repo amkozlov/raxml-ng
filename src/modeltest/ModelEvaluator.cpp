@@ -6,16 +6,16 @@
 thread_local unsigned int ModelEvaluator::_thread_id = 0;
 thread_local int ModelEvaluator::_barrier_mycycle = 0;
 
-size_t max_reduction_cardinality(const rate_heterogeneity_t &rhas)
+size_t max_reduction_cardinality(const RateHeterogeneityDescriptor &rhas)
 {
-    if (rhas.type == rate_heterogeneity_type::FREE_RATE || rhas.type == rate_heterogeneity_type::INVARIANT_FREE_RATE)
+    if (rhas.type == RateHeterogeneityType::FREE_RATE || rhas.type == RateHeterogeneityType::INVARIANT_FREE_RATE)
     {
         return std::max(2U, rhas.category_count);
     }
     return 2;
 }
 
-ModelEvaluator::ModelEvaluator(const candidate_model_t &candidate_model, const PartitionStats &stats,
+ModelEvaluator::ModelEvaluator(const ModelDescriptor &candidate_model, const PartitionStats &stats,
                                                    size_t partition_index, EvaluationPriority priority,
                                                    const size_t proposed_thread_count)
     : _proposed_thread_count{proposed_thread_count},
@@ -72,7 +72,7 @@ const size_t &ModelEvaluator::partition_index() const {
     return _partition_index;
 }
 
-const candidate_model_t &ModelEvaluator::candidate_model() const {
+const ModelDescriptor &ModelEvaluator::candidate_model() const {
     return *_candidate_model;
 } 
 
