@@ -52,7 +52,7 @@ else()
 endif()
 
 if (PORTABLE_BUILD)
-    target_add_vnone_definitions(raxml_module)
+    target_add_avx2_definitions(raxml_module)
 else()
     target_add_vnative_definitions(raxml_module)
 endif()
