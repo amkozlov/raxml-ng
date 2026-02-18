@@ -94,6 +94,11 @@ if (BUILD_AS_LIBRARY AND NOT APPLE)
   target_link_libraries(raxml_module PUBLIC gcc_s gcc)
 endif()
 
+if (USE_JSON)
+  target_link_libraries(raxml_module PRIVATE nlohmann_json::nlohmann_json)
+  target_compile_definitions(raxml_module PRIVATE _RAXML_JSON)
+endif()
+
 if(GMP_FOUND)
   target_link_libraries(raxml_module PUBLIC ${GMP_LIBRARIES})
 endif()

@@ -58,7 +58,9 @@ if (ENABLE_SANITIZERS)
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=${SANITIZER}" CACHE INTERNAL "")
     set(CMAKE_C_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=${SANITIZER}" CACHE INTERNAL "")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=${SANITIZER}" CACHE INTERNAL "")
-endif()
+endif() 
+
+option(USE_JSON "Enable RAxML-NG JSON output" ON)
 
 project (raxml-ng C CXX)
 
@@ -128,6 +130,12 @@ endif()
 
 if(USE_VCF)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_RAXML_VCF")
+endif()
+
+if (USE_JSON)
+    include(FetchContent)
+    FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz DOWNLOAD_EXTRACT_TIMESTAMP true)
+    FetchContent_MakeAvailable(json)
 endif()
 
 message(STATUS "Using flags: ${CMAKE_CXX_FLAGS}")

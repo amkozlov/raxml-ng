@@ -4,11 +4,15 @@
 #include <memory>
 
 #include "../ICScoreCalculator.hpp"
-#include "Heuristics.hpp"
+#include "../version.h"
 #include "ModelDefinitions.hpp"
 #include "ModelEvaluator.hpp"
 #include "ModelScheduler.hpp"
 #include "corax/tree/treeinfo.h"
+
+#ifdef _RAXML_JSON
+#include <nlohmann/json.hpp>
+#endif
 
 static thread_local std::unique_ptr<std::ofstream> thread_log;
 #define LOG_THREAD_TS                                                                                                  \
@@ -267,14 +271,16 @@ const vector<Model>& ModelTest::optimize_model()
     best_model_per_part.clear();
 
     LOG_INFO << endl << "Best model(s):" << endl;
-    const auto results = model_scheduler.collect_finished_results_by_partition();
+    _results = model_scheduler.collect_finished_results_by_partition();
+
     for (auto p = 0U; p < msa.part_count(); ++p)
     {
-      auto bic_ranking = rank_by_score(results.at(p));
-      const auto &best_model = results.at(p).at(bic_ranking.at(0));
-      LOG_RESULT << "Partition #" << p << ": " << best_model->model.to_string()
-                 << " (LogLH = " << FMT_LH(best_model->loglh)
-                 << "  BIC = " << FMT_LH(best_model->ic_score) << ")" << endl;
+      sort_by_score(_results.at(p));
+      const auto &best_model = _results[p].at(0);
+      logger().logstream(LogLevel::result, LogScope::thread)
+          << "Partition #" << p << ": " << best_model->model.to_string()
+          << " (LogLH = " << FMT_LH(best_model->loglh)
+          << "  BIC = " << FMT_LH(best_model->ic_score) << ")" << endl;
 
       best_model_per_part.emplace_back(best_model->model);
     }
@@ -286,18 +292,104 @@ const vector<Model>& ModelTest::optimize_model()
   return best_model_per_part;
 }
 
-void ModelTest::print_results_to_file() const
+void ModelTest::sort_by_score(PartitionModelResults &results)
 {
-  auto xml_fname = options.modeltest_xml_file();
-  if (!xml_fname.empty())
-  {
-    fstream xml_stream(xml_fname, std::ios::out);
-    model_scheduler.print_xml(xml_stream);
-    xml_stream.close();
+  std::sort(results.begin(), results.end(),
+            [](const ModelEvaluation *a, const ModelEvaluation *b) {
+            return a->ic_score < b->ic_score;
+  });
+}
 
-    LOG_DEBUG << "XML model selection file written to " << xml_fname << endl;
+unsigned int ModelTest::recommended_thread_count() const { return model_scheduler.recommended_thread_count(); }
+
+#ifdef _RAXML_JSON
+nlohmann::json ModelTest::get_json() const
+{
+  if (_results.empty()) {
+    return {};
   }
 
+  const auto datatype = options.data_type;
+  const auto datatype_name = _results.at(0).at(0)->model.data_type_name();
+  const auto matrices = get_matrix_names(options.data_type);
+
+  vector<string> frequencies;
+  frequencies.reserve(default_frequency_type.size());
+  for (auto f : default_frequency_type) {
+    frequencies.push_back(frequency_type_label(datatype, f));
+  }
+
+  vector<string> rhas_labels;
+  rhas_labels.reserve(options.modeltest_rhas.size());
+  for (auto rhas : options.modeltest_rhas) {
+    rhas_labels.push_back(rate_heterogeneity_label[static_cast<size_t>(rhas)]);
+  }
+
+  json heuristics;
+  if (options.modeltest_heuristics.find(HeuristicType::RHAS) != options.modeltest_heuristics.cend()) {
+    heuristics["RHAS"] = {
+      {"ic_delta", options.modeltest_significant_ic_delta},
+      {"mode", options.modeltest_rhas_heuristic_mode == RHASHeuristicMode::AllSignficantCategoryCounts ? "all significant" : "only optimal"}
+    };
+  }
+  if (options.modeltest_heuristics.find(HeuristicType::FREERATE) != options.modeltest_heuristics.cend()) {
+    heuristics["freerate"] = {};
+  }
+
+  auto tree = BasicTree(msa.taxon_count());
+  auto num_branches = tree.num_branches();
+
+  auto best_fit = json::array();
+  auto evaluation_results = json::array();
+  for (auto p = 0U; p < _results.size(); ++p) {
+    const auto &best_model = _results[p][0]->model;
+
+    best_fit.push_back({
+      {"partition_name", msa.part_list().at(p).name()},
+      {"sites", msa.part_list().at(p).range_string()},
+      {"model", best_model.to_string()},
+      {"model_params", best_model.to_string(true, RAXML_DEFAULT_PRECISION)}
+    });
+
+    json evaluations;
+    for (auto result : _results[p]) {
+      const auto &model = result->model;
+      evaluations.push_back({
+        {"model", model.to_string()},
+        {"model_params", model.to_string(true, RAXML_DEFAULT_PRECISION)},
+        {"free_params", num_branches + model.num_free_params()},
+        {"ic_score", result->ic_score},
+        {"lnL", result->loglh}
+      });
+    }
+    evaluation_results.push_back(evaluations);
+    
+  }
+
+  return {
+    {"ic_criterion", options.ic_name()},
+    {"lh_epsilon", options.lh_epsilon},
+    {"candidate_selection", {
+      datatype_name, {
+        {"substitution_matrix", matrices},
+        {"frequency", frequencies},
+        {"rhas", {
+          {"type", rhas_labels},
+          {"min_freerate_categories", options.free_rate_min_categories},
+          {"max_freerate_categories", options.free_rate_max_categories},
+          {"gamma_categories", 4}
+        }}
+      }
+    }},
+    {"heuristics", heuristics},
+    {"best_fit", best_fit},
+    {"results", evaluation_results}
+  };
+}
+#endif
+
+void ModelTest::print_results_to_file() const
+{
   auto bestmodel_fname = options.modeltest_best_model_file();
 
   if (!bestmodel_fname.empty())
@@ -313,17 +405,3 @@ void ModelTest::print_results_to_file() const
     }
   }
 }
-
-
-vector<size_t> ModelTest::rank_by_score(const vector<ModelEvaluation const *> &results)
-{
-  std::vector<size_t> ranking(results.size(), 0);
-  std::iota(ranking.begin(), ranking.end(), 0);
-
-  std::sort(ranking.begin(), ranking.end(),
-            [&results](const size_t &a, const size_t &b) { return results.at(a)->ic_score < results.at(b)->ic_score; });
-
-  return ranking;
-}
-
-unsigned int ModelTest::recommended_thread_count() const { return model_scheduler.recommended_thread_count(); }

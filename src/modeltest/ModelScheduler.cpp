@@ -5,7 +5,6 @@
 #include "ModelDefinitions.hpp"
 #include "ModelEvaluator.hpp"
 #include "Heuristics.hpp"
-#include <functional>
 #include <mutex>
 #include <string>
 #include <utility>
@@ -348,51 +347,6 @@ vector<vector<ModelEvaluation const *>> ModelScheduler::collect_finished_results
   return results;
 }
 
-void ModelScheduler::print_xml(ostream &os) const
-{
-  os << setprecision(17);
-  os << "<modeltestresults criterion=\"" << options.ic_name() << "\">" << endl;
-
-  for (const auto &evaluator: evaluators)
-  {
-    os << "<model partition=\"" << evaluator.partition_index()
-            << "\" name=\"" << evaluator.candidate_model().descriptor()
-            << "\" status=\"";
-    switch (evaluator.get_status())
-    {
-      case EvaluationStatus::WAITING:
-          os << "WAITING";
-          break;
-      case EvaluationStatus::RUNNING:
-          os << "RUNNING";
-          break;
-      case EvaluationStatus::SKIPPED:
-          os << "SKIPPED";
-          break;
-      case EvaluationStatus::FINISHED:
-          os << "FINISHED";
-          break;
-    }
-
-    if (evaluator.get_status() == EvaluationStatus::FINISHED)
-    {
-      const auto &result = evaluator.get_result();
-      const bool essential = heuristics.evaluation_essential(evaluator.partition_index(), evaluator.candidate_model());
-
-      os << "\" lnL=\"" << result.loglh
-              << "\" essential=\"" << (essential ? "1" : "0")
-              << "\" score=\"" << result.ic_score
-              << "\" free-params=\"" << result.model.num_free_params()
-              << "\" params=\"" << result.model.to_string(true, 19)
-              << "\" />" << endl;
-    } else {
-      os << "\" />" << endl;
-    }
-  }
-
-  os << "</modeltestresults>" << endl;
-}
-
 ModelScheduler::EvaluationStatusCounts ModelScheduler::_collect_progress() const
 {
     ModelScheduler::EvaluationStatusCounts counts;
@@ -401,7 +355,7 @@ ModelScheduler::EvaluationStatusCounts ModelScheduler::_collect_progress() const
     // TODO: this is currently O(N^2)
     for (const auto &evaluator : evaluators)
     {
-      const uint64_t status = static_cast<uint64_t>(evaluator.get_status());
+      const auto status = static_cast<uint64_t>(evaluator.get_status());
       ++counts.at(status);
     }
 

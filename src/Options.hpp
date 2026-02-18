@@ -44,7 +44,7 @@ struct OutputFileNames
   std::string mut_map_tree;
   std::string mut_map_list;
   std::string modeltest_best_model;
-  std::string modeltest_xml;
+  std::string json_file;
   std::string tmp_best_tree;
   std::string tmp_ml_trees;
   std::string tmp_bs_trees;
@@ -189,6 +189,7 @@ public:
 
   std::string ic_name() const;
   std::string free_rate_opt_method_name() const;
+  std::string free_rate_opt_method_short_name() const;
   std::string simd_arch_name() const;
   std::string consense_type_name() const;
   std::string stopping_rule_name() const;
@@ -221,7 +222,7 @@ public:
   const std::string mut_maplist_file() const { return outfile_names.mut_map_list; }
 
   const std::string modeltest_best_model_file() const { return outfile_names.modeltest_best_model; }
-  const std::string modeltest_xml_file() const { return outfile_names.modeltest_xml; }
+  const std::string json_file() const { return outfile_names.json_file; }
 
   const std::string tmp_best_tree_file() const { return outfile_names.tmp_best_tree; }
   const std::string tmp_ml_trees_file() const { return outfile_names.tmp_ml_trees; }

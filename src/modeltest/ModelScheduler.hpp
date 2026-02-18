@@ -37,8 +37,6 @@ class ModelScheduler final {
         ModelEvaluator *get_by_descriptor(const PartitionCandidateModel &candidate_model);
         vector<vector<ModelEvaluation const *>> collect_finished_results_by_partition() const;
         void fetch_global_results();
-        void print_xml(std::ostream &os) const;
-
         const SubstitutionModelDescriptor &get_reference_model();
 
         static vector<size_t> determine_acceptable_thread_counts(size_t total_cores);

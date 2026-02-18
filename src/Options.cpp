@@ -131,10 +131,12 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.mut_map_list, "mutationMapList");
   set_default_outfile(outfile_names.site_loglh, "siteLH");
   set_default_outfile(outfile_names.modeltest_best_model, "moose.bestModel");
-  set_default_outfile(outfile_names.modeltest_xml, "moose.xml");
   set_default_outfile(outfile_names.tmp_best_tree, "lastTree.TMP");
   set_default_outfile(outfile_names.tmp_ml_trees, "mlTrees.TMP");
   set_default_outfile(outfile_names.tmp_bs_trees, "bootstraps.TMP");
+  #ifdef _RAXML_JSON
+    set_default_outfile(outfile_names.json_file, "json");
+  #endif
 }
 
 std::string Options::checkp_file() const
@@ -227,7 +229,7 @@ bool Options::result_files_exist() const
     case Command::sitelh:
       return sysutil_file_exists(sitelh_file());
     case Command::modeltest:
-      return sysutil_file_exists(modeltest_xml_file()) || sysutil_file_exists(modeltest_best_model_file());
+      return sysutil_file_exists(modeltest_best_model_file());
     default:
       return false;
   }
@@ -291,7 +293,7 @@ void Options::remove_result_files() const
 
   if (command == Command::modeltest)
   {
-    sysutil_file_remove(modeltest_xml_file());
+    sysutil_file_remove(json_file());
     sysutil_file_remove(modeltest_best_model_file());
   }
 }
@@ -315,6 +317,23 @@ string Options::free_rate_opt_method_name() const
         return "weights: Expectation-Maximization, rates: Brent";
     case FreerateOptMethod::LBFGSB:
         return "weights: L-BFGS-B, rates: L-BFGS-B";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+string Options::free_rate_opt_method_short_name() const
+{
+    switch(free_rate_opt_method)
+    {
+    case FreerateOptMethod::AUTO:
+        return "AUTO";
+    case FreerateOptMethod::EM_BFGS:
+        return "EM-BFGS";
+    case FreerateOptMethod::EM_BRENT:
+        return "EM-BRENT";
+    case FreerateOptMethod::LBFGSB:
+        return "BFGS-BFGS";
     default:
         return "UNKNOWN";
     }
