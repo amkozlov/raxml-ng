@@ -4370,7 +4370,7 @@ int internal_main(int argc, char** argv, void* comm)
       finalize_energy(instance, cm.checkp_file());
       if (ParallelContext::master_rank()) {
         #ifdef _RAXML_JSON
-        print_json(instance.opts, instance.parted_msa.get(), cm.checkp_file(), instance.model_test.get(), instance.used_wh);
+          print_json(instance.opts, instance.parted_msa.get(), cm.checkp_file(), instance.model_test.get(), instance.used_wh);
         #endif
 
         print_final_output(instance, cm.checkp_file());

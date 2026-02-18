@@ -5,6 +5,12 @@
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
+string format_loglh(const double v) {
+    std::ostringstream out;
+    out << std::fixed << FMT_LH(v);
+    return std::move(out).str();
+}
+
 json moose_json(const Options &options, const ModelTest *modeltest, const PartitionedMSA *msa) {
   auto results = modeltest->get_results();
   if (results.empty()) {
@@ -13,7 +19,6 @@ json moose_json(const Options &options, const ModelTest *modeltest, const Partit
 
   const auto datatype = options.data_type;
   const auto datatype_name = results.at(0).at(0)->model.data_type_name();
-  const auto matrices = moose_matrix_names(options.data_type);
 
   vector<string> frequencies;
   frequencies.reserve(default_frequency_type.size());
@@ -35,7 +40,7 @@ json moose_json(const Options &options, const ModelTest *modeltest, const Partit
     };
   }
   if (options.modeltest_heuristics.find(HeuristicType::FREERATE) != options.modeltest_heuristics.cend()) {
-    heuristics["freerate"] = {};
+    heuristics["freerate"] = json::object();
   }
 
   auto tree = BasicTree(msa->taxon_count());
@@ -52,7 +57,7 @@ json moose_json(const Options &options, const ModelTest *modeltest, const Partit
       {"partition_name", part.name()},
       {"sites", part.range_string()},
       {"model", best_model.to_string()},
-      {"model_params", best_model.to_string(true, RAXML_DEFAULT_PRECISION)}
+      {"model_params", best_model.to_string(true, logger().precision(LogElement::model))}
     });
 
     json evaluations;
@@ -60,30 +65,33 @@ json moose_json(const Options &options, const ModelTest *modeltest, const Partit
       const auto &model = result->model;
       evaluations.push_back({
         {"model", model.to_string()},
-        {"model_params", model.to_string(true, RAXML_DEFAULT_PRECISION)},
+        {"model_params", model.to_string(true, logger().precision(LogElement::model))},
         {"free_params", num_branches + model.num_free_params()},
-        {"ic_score", result->ic_score},
-        {"lnL", result->loglh}
+        {"ic_score", format_loglh(result->ic_score)},
+        {"lnL", format_loglh(result->loglh)}
       });
     }
     evaluation_results.push_back(evaluations);
   }
 
+  json candidate_selection;
+  const auto matrices = options.modeltest_subst_models.empty() ? moose_matrix_names(options.data_type)
+                                                                : options.modeltest_subst_models;
+  candidate_selection[datatype_name] = {
+      {"substitution_matrix", matrices},
+      {"frequency", frequencies},
+      {"rhas", {
+        {"type", rhas_labels},
+        {"min_freerate_categories", options.free_rate_min_categories},
+        {"max_freerate_categories", options.free_rate_max_categories},
+        {"gamma_categories", 4}
+      }}
+  };
+
   return {
     {"ic_criterion", options.ic_name()},
-    {"lh_epsilon", options.lh_epsilon},
-    {"candidate_selection", {
-      datatype_name, {
-        {"substitution_matrix", matrices},
-        {"frequency", frequencies},
-        {"rhas", {
-          {"type", rhas_labels},
-          {"min_freerate_categories", options.free_rate_min_categories},
-          {"max_freerate_categories", options.free_rate_max_categories},
-          {"gamma_categories", 4}
-        }}
-      }
-    }},
+    {"lh_epsilon", format_loglh(options.lh_epsilon)},
+    {"candidate_selection", candidate_selection},
     {"heuristics", heuristics},
     {"best_fit", best_fit},
     {"results", evaluation_results}
@@ -99,6 +107,7 @@ void print_json(const Options& opts, const PartitionedMSA *msa, const Checkpoint
 
   json j = {
     {"$schema",  "https://raxml.ng/schema/raxml-ng-schema-v1.json"},
+    {"$version", "1"},
     {"metadata", {
       {"elapsed_time", global_timer().elapsed_seconds()},
       {"elapsed_time_total", checkp.elapsed_seconds + global_timer().elapsed_seconds()},
@@ -132,6 +141,10 @@ void print_json(const Options& opts, const PartitionedMSA *msa, const Checkpoint
       {"patterns", msa->total_patterns()},
       {"num_partitions", msa->part_count()},
     };
+
+    if (msa->difficulty_score() >= 0) {
+      j["alignment"]["difficulty"] = msa->difficulty_score();
+    }
   }
 
   if (opts.auto_model() && modeltest != nullptr) {
@@ -142,7 +155,7 @@ void print_json(const Options& opts, const PartitionedMSA *msa, const Checkpoint
     for (const auto &tree : checkp.ml_trees) {
       const double lnL = tree.second.first;
       j["evaluate"].push_back({
-        {"lnL", lnL},
+        {"lnL", format_loglh(lnL)},
       });
     }
   }
