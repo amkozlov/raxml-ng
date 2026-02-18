@@ -94,8 +94,8 @@ if (BUILD_AS_LIBRARY AND NOT APPLE)
   target_link_libraries(raxml_module PUBLIC gcc_s gcc)
 endif()
 
+target_include_directories(raxml_module PRIVATE ../thirdparty)
 if (USE_JSON)
-  target_link_libraries(raxml_module PRIVATE nlohmann_json::nlohmann_json)
   target_compile_definitions(raxml_module PRIVATE _RAXML_JSON)
 endif()
 
