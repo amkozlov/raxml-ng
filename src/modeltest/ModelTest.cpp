@@ -10,10 +10,6 @@
 #include "ModelScheduler.hpp"
 #include "corax/tree/treeinfo.h"
 
-#ifdef _RAXML_JSON
-#include <nlohmann/json.hpp>
-#endif
-
 static thread_local std::unique_ptr<std::ofstream> thread_log;
 #define LOG_THREAD_TS                                                                                                  \
   (*thread_log << std::setprecision(19) << global_timer().elapsed_seconds() << " MT Thread "                           \
@@ -29,27 +25,6 @@ Options modify_options(const Options &other)
   return options;
 }
 
-const std::vector<string> get_matrix_names(const DataType datatype)
-{
-  switch (datatype)
-  {
-    case DataType::dna:
-      return dna_substitution_matrix_names;
-    case DataType::protein:
-      return aa_substitution_matrix_names;
-    case DataType::binary:
-      return std::vector<string>({"BIN"});
-
-    case DataType::autodetect:
-    case DataType::multistate:
-    case DataType::genotype10:
-    case DataType::genotype16:
-      throw unsupported_datatype_error();
-  }
-
-  return {};
-}
-
 vector<ModelDescriptor> ModelTest::generate_candidate_model_names(const DataType &dt) const
 {
   vector<ModelDescriptor> candidate_models;
@@ -60,7 +35,7 @@ vector<ModelDescriptor> ModelTest::generate_candidate_model_names(const DataType
   const auto gamma_category_count = 4;
 
   const auto subst_models =
-      options.modeltest_subst_models.empty() ? get_matrix_names(dt) : options.modeltest_subst_models;
+      options.modeltest_subst_models.empty() ? moose_matrix_names(dt) : options.modeltest_subst_models;
 
   for (const auto &subst_model : subst_models)
   {
@@ -302,92 +277,6 @@ void ModelTest::sort_by_score(PartitionModelResults &results)
 
 unsigned int ModelTest::recommended_thread_count() const { return model_scheduler.recommended_thread_count(); }
 
-#ifdef _RAXML_JSON
-nlohmann::json ModelTest::get_json() const
-{
-  if (_results.empty()) {
-    return {};
-  }
-
-  const auto datatype = options.data_type;
-  const auto datatype_name = _results.at(0).at(0)->model.data_type_name();
-  const auto matrices = get_matrix_names(options.data_type);
-
-  vector<string> frequencies;
-  frequencies.reserve(default_frequency_type.size());
-  for (auto f : default_frequency_type) {
-    frequencies.push_back(frequency_type_label(datatype, f));
-  }
-
-  vector<string> rhas_labels;
-  rhas_labels.reserve(options.modeltest_rhas.size());
-  for (auto rhas : options.modeltest_rhas) {
-    rhas_labels.push_back(rate_heterogeneity_label[static_cast<size_t>(rhas)]);
-  }
-
-  json heuristics;
-  if (options.modeltest_heuristics.find(HeuristicType::RHAS) != options.modeltest_heuristics.cend()) {
-    heuristics["RHAS"] = {
-      {"ic_delta", options.modeltest_significant_ic_delta},
-      {"mode", options.modeltest_rhas_heuristic_mode == RHASHeuristicMode::AllSignficantCategoryCounts ? "all significant" : "only optimal"}
-    };
-  }
-  if (options.modeltest_heuristics.find(HeuristicType::FREERATE) != options.modeltest_heuristics.cend()) {
-    heuristics["freerate"] = {};
-  }
-
-  auto tree = BasicTree(msa.taxon_count());
-  auto num_branches = tree.num_branches();
-
-  auto best_fit = json::array();
-  auto evaluation_results = json::array();
-  for (auto p = 0U; p < _results.size(); ++p) {
-    const auto &best_model = _results[p][0]->model;
-
-    best_fit.push_back({
-      {"partition_name", msa.part_list().at(p).name()},
-      {"sites", msa.part_list().at(p).range_string()},
-      {"model", best_model.to_string()},
-      {"model_params", best_model.to_string(true, RAXML_DEFAULT_PRECISION)}
-    });
-
-    json evaluations;
-    for (auto result : _results[p]) {
-      const auto &model = result->model;
-      evaluations.push_back({
-        {"model", model.to_string()},
-        {"model_params", model.to_string(true, RAXML_DEFAULT_PRECISION)},
-        {"free_params", num_branches + model.num_free_params()},
-        {"ic_score", result->ic_score},
-        {"lnL", result->loglh}
-      });
-    }
-    evaluation_results.push_back(evaluations);
-    
-  }
-
-  return {
-    {"ic_criterion", options.ic_name()},
-    {"lh_epsilon", options.lh_epsilon},
-    {"candidate_selection", {
-      datatype_name, {
-        {"substitution_matrix", matrices},
-        {"frequency", frequencies},
-        {"rhas", {
-          {"type", rhas_labels},
-          {"min_freerate_categories", options.free_rate_min_categories},
-          {"max_freerate_categories", options.free_rate_max_categories},
-          {"gamma_categories", 4}
-        }}
-      }
-    }},
-    {"heuristics", heuristics},
-    {"best_fit", best_fit},
-    {"results", evaluation_results}
-  };
-}
-#endif
-
 void ModelTest::print_results_to_file() const
 {
   auto bestmodel_fname = options.modeltest_best_model_file();
@@ -404,4 +293,8 @@ void ModelTest::print_results_to_file() const
                        << msa.part_info(p).name() << " = " << msa.part_info(p).range_string() << endl;
     }
   }
+}
+
+vector<vector<ModelEvaluation const *>> ModelTest::get_results() const {
+  return _results;
 }

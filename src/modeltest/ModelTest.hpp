@@ -5,11 +5,6 @@
 #include "ModelDefinitions.hpp"
 #include "ModelScheduler.hpp"
 
-#ifdef _RAXML_JSON
-#include <nlohmann/json_fwd.hpp>
-using json = nlohmann::json;
-#endif
-
 class ModelTest
 {
 public:
@@ -19,10 +14,7 @@ public:
   /* Optimize the model and return model name per partition */
   const vector<Model>& optimize_model();
   void print_results_to_file() const;
-
-  #ifdef _RAXML_JSON
-  json get_json() const;
-  #endif
+  vector<vector<ModelEvaluation const *>> get_results() const;
 
   unsigned int recommended_thread_count() const;
 
