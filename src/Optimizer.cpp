@@ -168,7 +168,7 @@ double Optimizer::optimize_topology_standard(TreeInfo& treeinfo, CheckpointManag
   const int radius_limit = min(22, (int) treeinfo.pll_treeinfo().tip_count - 3 );
   const int radius_step = 5;
 
-//  treeinfo->counter = 0;
+  //  treeinfo->counter = 0;
 
   if (_spr_radius > 0)
     best_fast_radius = _spr_radius;
@@ -363,11 +363,12 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
 
   if (_stop_criterion)
   {
-    persite_lnl = _stop_criterion->get_persite_lnl(ParallelContext::group_id(), ParallelContext::local_thread_id()); 
+    persite_lnl = _stop_criterion->get_persite_lnl(ParallelContext::local_group_id(), ParallelContext::local_proc_id()); 
     if (use_kh_test) 
-      persite_lnl_new = _stop_criterion->get_persite_lnl_new(ParallelContext::group_id(),  ParallelContext::local_thread_id()); 
+      persite_lnl_new = _stop_criterion->get_persite_lnl_new(ParallelContext::local_group_id(),  ParallelContext::local_proc_id()); 
+    
   }
-
+  
   CheckpointStep resume_step = search_state.step;
   
   /* Compute initial LH of the starting tree */
@@ -484,16 +485,16 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
       if(ParallelContext::group_master_thread()) 
         _stop_criterion->run_test();
         
-      ParallelContext::barrier();
+      ParallelContext::thread_barrier();
 
-      _lh_epsilon = _stop_criterion->get_epsilon(ParallelContext::group_id());
+      _lh_epsilon = _stop_criterion->get_epsilon(ParallelContext::local_group_id());
       //LOG_PROGRESS(loglh) << approach << " apporach. Epsilon = " << _lh_epsilon << endl;
       LOG_DEBUG << approach << " approach. Epsilon = " << _lh_epsilon << endl;
 
       if(ParallelContext::group_master_thread())
         cm.set_epsilon(_lh_epsilon);
       
-      ParallelContext::barrier();
+      ParallelContext::thread_barrier();
     }
   }
 
@@ -832,15 +833,20 @@ double Optimizer::evaluate(TreeInfo& treeinfo, CheckpointManager& cm)
   return loglh;
 }
 
-int Optimizer::adaptive_radius(double difficulty){
-  
+int Optimizer::adaptive_radius(double difficulty)
+{  
   assert (difficulty >= 0);
 
-  if (difficulty < 0.4) {
+  if (difficulty < 0.4)
+  {
     return (int) ( 12.5*difficulty + 5);
-  } else if (difficulty <= 0.6){
+  } 
+  else if (difficulty <= 0.6)
+  {
     return 10;
-  } else {
+  } 
+  else 
+  {
     return (int) ((-12.5)*difficulty + 17.5);
   }
 }
@@ -858,22 +864,22 @@ bool Optimizer::check_impr(TreeInfo& treeinfo, double loglh, double old_loglh, d
     if(_stop_criterion->multi_test_correction())
       _stop_criterion->set_increasing_moves((*increasing_moves));
 
-    if(ParallelContext::group_master_thread())
-      _stop_criterion->run_test();
-
-    ParallelContext::barrier();
-
+    _stop_criterion->run_test();
+    ParallelContext::thread_barrier();
+    
     if(increasing_moves)
     {
-      double p_value = _stop_criterion->get_pvalue(ParallelContext::group_id());
-      epsilon = _stop_criterion->get_epsilon(ParallelContext::group_id());
-      LOG_DEBUG << "KH multiple-testing epsilon = " << epsilon << endl;
+      double p_value = _stop_criterion->get_pvalue(ParallelContext::local_group_id());
+      epsilon = _stop_criterion->get_epsilon(ParallelContext::local_group_id());
+      // todo: have to change this to LOG_DEBUG, when I test it
+      LOG_PROGRESS(loglh) << "KH multiple-testing epsilon = " << epsilon << endl;
       impr = ((loglh - old_loglh_kh > epsilon) && (p_value < 1));
     }
     else
     {
-      epsilon = _stop_criterion->get_epsilon(ParallelContext::group_id());
-      LOG_DEBUG << "KH criterion epsilon = " << epsilon << endl;
+      epsilon = _stop_criterion->get_epsilon(ParallelContext::local_group_id());
+      // todo: have to change this to LOG_DEBUG, when I test it
+      LOG_PROGRESS(loglh) << "KH criterion epsilon = " << epsilon << endl;
       impr = (loglh - old_loglh_kh > epsilon);
     }
   } else {
