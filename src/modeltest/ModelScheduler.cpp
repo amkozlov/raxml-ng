@@ -303,11 +303,11 @@ ModelEvaluator *ModelScheduler::get_next_model()
 
   std::lock_guard<std::mutex> lock(mutex_evaluation);
 
+  _fetch_global_results();
+
   while (evaluation_index < evaluators.size() &&
          evaluators.at(evaluation_index).get_status() != EvaluationStatus::WAITING)
   {
-    _fetch_global_results(); // TODO: determine whether to pull this out of the loop
-
     evaluation_index = distributed_scheduling.next_evaluation_index();
     if (evaluation_index >= evaluators.size()) {
         break;
