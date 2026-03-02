@@ -249,7 +249,7 @@ void ModelScheduler::update_result(ModelEvaluator &evaluator, const ModelEvaluat
         << "(" << std::setw(width) << n_finished << "/" << std::setw(width) << n_total << ") "
         << std::setw(candidate_model_descriptor_width) << std::left << evaluator.candidate_model().descriptor() << " " << right
         << "LogLH = " << setw(15) << FMT_LH(evaluator.get_result().loglh) << "  "
-        << options.ic_name() << " = " << FMT_LH(evaluator.get_result().ic_score) << "\n";
+        << options.ic_name() << " = " << FMT_LH(evaluator.get_result().ic_score) << endl;
   }
 }
 

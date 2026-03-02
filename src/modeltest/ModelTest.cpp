@@ -308,8 +308,8 @@ void ModelTest::print_results_to_file() const
     for (auto p = 0U; p < best_model_per_part.size(); ++p)
     {
       const auto& best_model = best_model_per_part.at(p);
-      bestmodel_stream << best_model.to_string(true, logger().precision(LogElement::model)) << ", "
-                     << msa.part_info(p).name() << " = " << msa.part_info(p).range_string() << endl;
+      bestmodel_stream << best_model.to_string() << ", "
+                       << msa.part_info(p).name() << " = " << msa.part_info(p).range_string() << endl;
     }
   }
 }
