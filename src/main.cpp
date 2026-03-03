@@ -2342,7 +2342,6 @@ void autoselect_models(RaxmlInstance& instance, CheckpointManager &cm)
   else if (instance.opts.start_trees.count(StartingTree::user))
   {
     tree_type = "user";
-    tree_num = instance.opts.start_trees.at(StartingTree::random);
   }
   else if (instance.opts.start_trees.count(StartingTree::random))
     tree_type = "random";
