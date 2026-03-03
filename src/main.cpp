@@ -3318,6 +3318,25 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
 
   if (opts.command == Command::modeltest)
   {
+    if (!opts.modeltest_results_file().empty())
+    {
+      #ifdef _RAXML_JSON
+        try
+        {
+          if (opts.modeltest_json_output)
+            print_json(opts, instance.parted_msa.get(), checkp, instance.model_test.get(), instance.used_wh);
+        }
+        catch (exception& e)
+        {
+          LOG_ERROR << "ERROR: Failed to write JSON output: " << e.what() << endl << endl ;
+        }
+      #endif
+
+      instance.model_test->print_results_to_file();
+
+      if (sysutil_file_exists(opts.modeltest_results_file()))
+        LOG_INFO << "Model testing results saved to: " << sysutil_realpath(opts.modeltest_results_file()) << endl;
+    }
     if (!opts.modeltest_best_model_file().empty())
       LOG_INFO << "Best-fit model saved to: " << sysutil_realpath(opts.modeltest_best_model_file()) << endl;
     if (!opts.binary_msa_file().empty())
@@ -3329,13 +3348,8 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
     LOG_RESULT << *instance.msa_diff_predictor << endl;
   }
 
-  LOG_INFO << "\n";
-
-  if (!opts.json_file().empty())
-      LOG_INFO << "JSON file saved to: " << sysutil_realpath(opts.json_file()) << endl;
-
   if (!opts.log_file().empty())
-      LOG_INFO << "Execution log saved to: " << sysutil_realpath(opts.log_file()) << endl;
+    LOG_INFO << "\nExecution log saved to: " << sysutil_realpath(opts.log_file()) << endl;
 
 
   LOG_INFO << "\nAnalysis started: " << global_timer().start_time();
@@ -3851,10 +3865,6 @@ void thread_infer_model(RaxmlInstance& instance, CheckpointManager& cm)
 
   if (ParallelContext::master_thread())
   {
-    /* in standalone mode, print model testing results to files */
-    if (instance.opts.command == Command::modeltest && ParallelContext::master())
-      instance.model_test->print_results_to_file();
-
     /* apply best-fit model(s) to the partitioned MSA */
     for (unsigned p = 0; p < optimal_models.size(); ++p)
     {
@@ -4368,11 +4378,8 @@ int internal_main(int argc, char** argv, void* comm)
 
       /* finalize */
       finalize_energy(instance, cm.checkp_file());
-      if (ParallelContext::master_rank()) {
-        #ifdef _RAXML_JSON
-          print_json(instance.opts, instance.parted_msa.get(), cm.checkp_file(), instance.model_test.get(), instance.used_wh);
-        #endif
-
+      if (ParallelContext::master_rank())
+      {
         print_final_output(instance, cm.checkp_file());
       }
 

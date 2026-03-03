@@ -1225,6 +1225,16 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.dup_seqs_action = AbnormalSequenceAction::error;
             else if (eopt == "newick-stream")
               opts.use_tree_streaming = true;
+            else if (eopt == "moose-xml")
+              opts.modeltest_json_output = false;
+            else if (eopt == "moose-json")
+            {
+#ifndef _RAXML_JSON
+              throw  OptionException("JSON output requested but not supported.\n"
+                  "Please build RAxML-NG with JSON support.");
+#endif
+              opts.modeltest_json_output = true;
+            }
             else if (eopt == "compat-v11")
             {
               compat_ver = 110;

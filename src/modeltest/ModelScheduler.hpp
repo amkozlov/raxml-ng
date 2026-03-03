@@ -41,6 +41,9 @@ class ModelScheduler final {
 
         static vector<size_t> determine_acceptable_thread_counts(size_t total_cores);
         static size_t pick_acceptable_thread_count(const vector<size_t> &acceptable_thread_counts, size_t requested_thread_count);
+
+        void print_xml(ostream &os) const;
+
 private:
     std::mutex mutex_evaluation;
     std::mutex mutex_log;

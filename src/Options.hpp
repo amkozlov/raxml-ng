@@ -44,7 +44,8 @@ struct OutputFileNames
   std::string mut_map_tree;
   std::string mut_map_list;
   std::string modeltest_best_model;
-  std::string json_file;
+  std::string modeltest_xml;
+  std::string modeltest_json;
   std::string tmp_best_tree;
   std::string tmp_ml_trees;
   std::string tmp_bs_trees;
@@ -170,7 +171,7 @@ public:
   RateHeterogeneitySelection modeltest_rhas;
   RHASHeuristicMode modeltest_rhas_heuristic_mode;
   std::vector<std::string> modeltest_subst_models;
-
+  bool modeltest_json_output;
 
   bool coarse() const { return num_workers > 1; };
   bool auto_model() const {
@@ -221,8 +222,10 @@ public:
   const std::string mut_maptree_file() const { return outfile_names.mut_map_tree; }
   const std::string mut_maplist_file() const { return outfile_names.mut_map_list; }
 
-  const std::string modeltest_best_model_file() const { return outfile_names.modeltest_best_model; }
-  const std::string json_file() const { return outfile_names.json_file; }
+  const std::string& modeltest_best_model_file() const { return outfile_names.modeltest_best_model; }
+  const std::string& modeltest_xml_file() const { return outfile_names.modeltest_xml; }
+  const std::string& modeltest_json_file() const { return outfile_names.modeltest_json; }
+  const std::string& modeltest_results_file() const;
 
   const std::string tmp_best_tree_file() const { return outfile_names.tmp_best_tree; }
   const std::string tmp_ml_trees_file() const { return outfile_names.tmp_ml_trees; }

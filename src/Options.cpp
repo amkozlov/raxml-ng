@@ -50,7 +50,13 @@ free_rate_min_categories(2), free_rate_max_categories(10), free_rate_opt_method(
 model_selection_criterion(InformationCriterion::bic), modeltest_heuristics({HeuristicType::FREERATE, HeuristicType::RHAS}),
 modeltest_significant_ic_delta(10.0), modeltest_rhas(default_rate_heterogeneity_selection),
 modeltest_rhas_heuristic_mode(RHASHeuristicMode::AllSignficantCategoryCounts)
-{}
+{
+#ifdef _RAXML_JSON
+  modeltest_json_output = true;
+#else
+  modeltest_json_output = false;
+#endif
+}
 
 unsigned int Options::max_num_replicates(const SupportMetricSet& mset) const
 {
@@ -131,12 +137,13 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.mut_map_list, "mutationMapList");
   set_default_outfile(outfile_names.site_loglh, "siteLH");
   set_default_outfile(outfile_names.modeltest_best_model, "moose.bestModel");
+  if (modeltest_json_output)
+    set_default_outfile(outfile_names.modeltest_json, "moose.json");
+  else
+    set_default_outfile(outfile_names.modeltest_xml, "moose.xml");
   set_default_outfile(outfile_names.tmp_best_tree, "lastTree.TMP");
   set_default_outfile(outfile_names.tmp_ml_trees, "mlTrees.TMP");
   set_default_outfile(outfile_names.tmp_bs_trees, "bootstraps.TMP");
-  #ifdef _RAXML_JSON
-    set_default_outfile(outfile_names.json_file, "json");
-  #endif
 }
 
 std::string Options::checkp_file() const
@@ -189,6 +196,11 @@ std::string Options::bootstrap_partition_file() const
 {
   return outfile_names.bootstrap_msa.empty() ? "" :
              outfile_names.bootstrap_msa + ".partition";
+}
+
+const std::string& Options::modeltest_results_file() const
+{
+  return modeltest_json_output ? outfile_names.modeltest_json : outfile_names.modeltest_xml;
 }
 
 bool Options::result_files_exist() const
@@ -293,7 +305,8 @@ void Options::remove_result_files() const
 
   if (command == Command::modeltest)
   {
-    sysutil_file_remove(json_file());
+    sysutil_file_remove(modeltest_json_file());
+    sysutil_file_remove(modeltest_xml_file());
     sysutil_file_remove(modeltest_best_model_file());
   }
 }

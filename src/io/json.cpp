@@ -17,8 +17,10 @@ json moose_json(const Options &options, const ModelTest *modeltest, const Partit
     return {};
   }
 
-  const auto datatype = options.data_type;
-  const auto datatype_name = results.at(0).at(0)->model.data_type_name();
+  // assume all models have the same datatype for now
+  const auto& first_model = results.at(0).at(0)->model;
+  const auto datatype = first_model.data_type();
+  const auto datatype_name = first_model.data_type_name();
 
   vector<string> frequencies;
   frequencies.reserve(default_frequency_type.size());
@@ -75,7 +77,7 @@ json moose_json(const Options &options, const ModelTest *modeltest, const Partit
   }
 
   json candidate_selection;
-  const auto matrices = options.modeltest_subst_models.empty() ? moose_matrix_names(options.data_type)
+  const auto matrices = options.modeltest_subst_models.empty() ? moose_matrix_names(datatype)
                                                                 : options.modeltest_subst_models;
   candidate_selection[datatype_name] = {
       {"substitution_matrix", matrices},
@@ -101,12 +103,12 @@ json moose_json(const Options &options, const ModelTest *modeltest, const Partit
 
 
 void print_json(const Options& opts, const PartitionedMSA *msa, const CheckpointFile& checkp, const ModelTest *modeltest, double used_wh) {
-  if (opts.json_file().empty()) {
+  if (opts.modeltest_json_file().empty()) {
     return;
   }
 
   json j = {
-    {"$schema",  "https://raxml.ng/schema/raxml-ng-schema-v1.json"},
+//    {"$schema",  "https://raxml.ng/schema/raxml-ng-schema-v1.json"},
     {"$version", "1"},
     {"metadata", {
       {"elapsed_time", global_timer().elapsed_seconds()},
@@ -160,7 +162,7 @@ void print_json(const Options& opts, const PartitionedMSA *msa, const Checkpoint
     }
   }
 
-  std::ofstream of(opts.json_file());
+  std::ofstream of(opts.modeltest_json_file());
   of << j << "\n";
 }
 

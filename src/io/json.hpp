@@ -1,4 +1,3 @@
-#ifdef _RAXML_JSON
 #ifndef RAXML_IO_JSON_HPP_
 #define RAXML_IO_JSON_HPP_
 
@@ -10,5 +9,4 @@
 
 void print_json(const Options& opts, const PartitionedMSA *msa, const CheckpointFile& checkp, const ModelTest *modeltest, double used_wh);
 
-#endif
 #endif

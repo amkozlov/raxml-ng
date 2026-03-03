@@ -279,8 +279,15 @@ unsigned int ModelTest::recommended_thread_count() const { return model_schedule
 
 void ModelTest::print_results_to_file() const
 {
-  auto bestmodel_fname = options.modeltest_best_model_file();
+  auto xml_fname = options.modeltest_xml_file();
+  if (!xml_fname.empty())
+  {
+    fstream xml_stream(xml_fname, std::ios::out);
+    model_scheduler.print_xml(xml_stream);
+    xml_stream.close();
+  }
 
+  auto bestmodel_fname = options.modeltest_best_model_file();
   if (!bestmodel_fname.empty())
   {
     fstream bestmodel_stream(bestmodel_fname, std::ios::out);
