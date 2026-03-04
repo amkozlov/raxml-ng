@@ -482,7 +482,7 @@ void ParallelContext::parallel_reduce(double * data, size_t size, int op)
 #endif
 }
 
-void ParallelContext::mpi_allreduce(double * data, size_t size, int op)
+void ParallelContext::mpi_allreduce(double * data, size_t size, int op, bool _thread_broadcast)
 {
 #ifdef _RAXML_MPI
   if (_num_ranks > _num_groups)
@@ -510,7 +510,7 @@ void ParallelContext::mpi_allreduce(double * data, size_t size, int op)
 #endif
     }
 
-    if (_thread_group->num_threads > 1)
+    if (_thread_group->num_threads > 1 && _thread_broadcast)
       thread_broadcast(0, data, size * sizeof(double));
   }
 #else

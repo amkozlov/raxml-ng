@@ -444,7 +444,7 @@ void StoppingCriterion::mpi_fill(bool plnl_old)
         {
             //ParallelContext::parallel_reduce_cb((void *) nullptr, vec[part], lengths_array[part], CORAX_REDUCE_MIN);   
             // Theoretically it should work or ?
-            ParallelContext::mpi_allreduce(vec[part], lengths_array[part], CORAX_REDUCE_SUM);
+            ParallelContext::mpi_allreduce(vec[part], lengths_array[part], CORAX_REDUCE_SUM, false);
         }
         //ParallelContext::mpi_allreduce_alternative(vec[part], lengths_array[part], CORAX_REDUCE_SUM);
     
