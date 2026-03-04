@@ -27,7 +27,7 @@ StoppingCriterion::StoppingCriterion(shared_ptr<PartitionedMSA> parted_msa,
     {   
         total_patterns = parted_msa->total_patterns();
         
-        patterns = new unsigned int[part_count];
+        patterns = new size_t[part_count];
         for(unsigned int i = 0; i < part_count; ++i)
             patterns[i] = parted_msa->part_info(i).length();
 
@@ -37,14 +37,14 @@ StoppingCriterion::StoppingCriterion(shared_ptr<PartitionedMSA> parted_msa,
             for(unsigned int i = 0; i < part_count; ++i)
             {
                 pa[i] = new unsigned int[patterns[i]];
-                std::fill(pa[i], pa[i] + patterns[i], 0);
+                std::fill(pa[i], pa[i] + patterns[i], 0u);
             }
         }
     }
     
     // sites
     total_sites = parted_msa->total_sites();
-    sites = new unsigned int[part_count];
+    sites = new size_t[part_count];
     for(unsigned int part = 0; part < part_count; ++part)
         sites[part] = pattern_compression ? 0 : parted_msa->part_info(part).length();
     
@@ -144,15 +144,16 @@ void StoppingCriterion::set_proc_offset(TreeInfo* treeinfo,
             }
 
         }
-
         ParallelContext::thread_barrier();
         
         // MPI reduction if needed
         if(mpi_fine_grained)
         {
             vector<unsigned int *> weights = pattern_weights[ParallelContext::local_group_id()];
+
             for(unsigned int part = 0; part < part_count; ++part)
                 ParallelContext::mpi_allreduce_weights(weights[part], patterns[part], CORAX_REDUCE_SUM);
+            
         }
         
         // Mark weights as initialized
@@ -252,7 +253,7 @@ void StoppingCriterion::initialize_uncompressed()
 
 void StoppingCriterion::initialize_persite_vector(vector<vector<double *>> &vec){
     
-    unsigned int * lengths_array = 
+    size_t * lengths_array = 
         pattern_compression ? patterns : sites;
     
     vec.resize(n_effective_groups);
@@ -424,7 +425,7 @@ void StoppingCriterion::mpi_fill(bool plnl_old)
 {   
     if(ParallelContext::group_master_thread() || true)
     {
-        unsigned int * lengths_array = 
+        size_t * lengths_array = 
             pattern_compression ? patterns : sites;
         
         vector<double*> vec;

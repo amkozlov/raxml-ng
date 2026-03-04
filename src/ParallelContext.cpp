@@ -551,8 +551,8 @@ void ParallelContext::mpi_allreduce_weights(unsigned int * data, size_t size, in
 #endif
     }
 
-    if (_thread_group->num_threads > 1)
-      thread_broadcast(0, data, size * sizeof(unsigned int));
+    //if (_thread_group->num_threads > 1)
+      //thread_broadcast(0, data, size * sizeof(unsigned int));
   }
 #else
   RAXML_UNUSED(data);

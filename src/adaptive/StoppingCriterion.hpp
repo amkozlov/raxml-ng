@@ -41,15 +41,15 @@ class StoppingCriterion {
 
     protected:
         unsigned int part_count;
-        unsigned int total_sites;
-        unsigned int* sites;
+        size_t total_sites;
+        size_t* sites;
         
         // MPI fine grained
         bool mpi_fine_grained;
         
 
-        unsigned int total_patterns;
-        unsigned int * patterns;
+        size_t total_patterns;
+        size_t * patterns;
         vector<vector<unsigned int *>> pattern_weights;
         
         vector<vector<double *>> persite_lnl;
