@@ -226,6 +226,10 @@ const vector<Model>& ModelTest::optimize_model()
       LOG_THREAD_TS << " announced results in " << 1e3 * (t1 - t0) << " milliseconds." << endl;
     }
 
+    // Without the following barrier, other threads might enter the critical section before thread 0 has
+    // updated the results, causing unnecessary model evaluations
+    evaluator->barrier();
+
     LOG_THREAD_TS << " evaluation of " << model_descriptor << " concluded." << endl;
   }
 
