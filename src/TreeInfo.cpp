@@ -341,7 +341,10 @@ double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor
   /* update all CLVs and p-matrices before calling BLO */
   double new_loglh = loglh();
 
-  if (_pll_treeinfo->params_to_optimize[0] & CORAX_OPT_PARAM_BRANCHES_ITERATIVE) {
+  if (_pll_treeinfo->params_to_optimize[0] & CORAX_OPT_PARAM_BRANCHES_ITERATIVE)
+  {
+    Tree old_tree(*_pll_treeinfo->tree);
+
     int max_iters = brlen_smooth_factor * RAXML_BRLEN_SMOOTHINGS;
     new_loglh = -1 * corax_algo_opt_brlen_treeinfo(_pll_treeinfo,
                                                    _brlen_min,
@@ -352,6 +355,37 @@ double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor
                                                    CORAX_OPT_BRLEN_OPTIMIZE_ALL
                 );
 
+    if (corax_errno == CORAX_OPT_ERROR_NEWTON_WORSE_LK &&
+        _pll_treeinfo->brlen_linkage != CORAX_BRLEN_UNLINKED)
+    {
+      LOG_WARN << "WARNING: " << string(corax_errmsg) << endl;
+
+      /* fallback to nr_safe mode (check loglh after every branch opt) */
+      _brlen_opt_method = CORAX_OPT_BLO_NEWTON_SAFE;
+      corax_reset_error();
+
+      /* retore old branch lengths */
+      auto old_brlens = old_tree.brlens();
+      auto corax_tree =  _pll_treeinfo->tree;
+      for (size_t i = 0; i < corax_tree->tip_count + corax_tree->inner_count; ++i)
+      {
+        auto node = corax_tree->nodes[i];
+        auto length = old_brlens[node->pmatrix_index];
+        corax_utree_set_length(node, length);
+      }
+
+      new_loglh = loglh();
+
+      new_loglh = -1 * corax_algo_opt_brlen_treeinfo(_pll_treeinfo,
+                                                     _brlen_min,
+                                                     _brlen_max,
+                                                     lh_epsilon,
+                                                     max_iters,
+                                                     _brlen_opt_method,
+                                                     CORAX_OPT_BRLEN_OPTIMIZE_ALL
+                  );
+    }
+
     LOG_DEBUG << "\t - after brlen: logLH = " << new_loglh << endl;
 
     libpll_check_error("ERROR in branch length optimization");
@@ -360,7 +394,8 @@ double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor
 
   /* optimize brlen scalers, if needed */
   if (_pll_treeinfo->brlen_linkage == CORAX_BRLEN_SCALED &&
-      _pll_treeinfo->partition_count > 1) {
+      _pll_treeinfo->partition_count > 1)
+  {
     new_loglh = -1 * corax_algo_opt_brlen_scalers_treeinfo(_pll_treeinfo,
                                                            RAXML_BRLEN_SCALER_MIN,
                                                            RAXML_BRLEN_SCALER_MAX,
