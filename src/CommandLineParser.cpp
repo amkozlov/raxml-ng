@@ -482,6 +482,7 @@ void CommandLineParser::parse_modeltest_options(Options &opts, const string& arg
 
     if (mopt_name == "criterion")
     {
+      std::transform(mopt_val.begin(), mopt_val.end(), mopt_val.begin(), ::tolower);
       if (mopt_val == "aic")
           opts.model_selection_criterion = InformationCriterion::aic;
       else if (mopt_val == "aicc")
