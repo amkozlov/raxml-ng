@@ -1397,7 +1397,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
       case 57: /* write bootstrap alignments*/
         opts.write_bs_msa = true;
-        opts.use_par_pars = false; // Disables parallel parsing so master populates instance.bs_reps
+        opts.use_par_pars = false;
         break;
       
       case 58: /* LH epsilon triplet */
