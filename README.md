@@ -13,22 +13,20 @@ Documentation: [github wiki](https://github.com/amkozlov/raxml-ng/wiki)
 ## Installation instructions
 
 * For most desktop Unix/Linux and macOS systems, the easiest way to install RAxML-NG is by using the pre-compiled binary:  
-[**Download 64-bit Linux binary**](https://github.com/amkozlov/raxml-ng/releases/download/2.0-beta3/raxml-ng_v2.0-beta3_linux_x86_64.zip)  
-[**Download 64-bit OSX/macOS binary**](https://github.com/amkozlov/raxml-ng/releases/download/2.0-beta3/raxml-ng_v2.0-beta3_macos.zip)   
+[**Download 64-bit Linux binary**](https://github.com/amkozlov/raxml-ng/releases/download/2.0.0/raxml-ng_v2.0.0_linux_x86_64.zip)  
+[**Download 64-bit macOS binary**](https://github.com/amkozlov/raxml-ng/releases/download/2.0.0/raxml-ng_v2.0.0_macos.zip)   
 
-* For clusters/supercomputers (i.e., if you want to use MPI), please use the following installation package which contains pre-built *coraxlib*. You will need `GCC 6.4+` and `CMake 3.0.2+` in order to compile RAxML-NG for your system.  
-[**Download RAxML-NG-MPI for Linux**]() -> NOT AVAILABLE for BETA release
-
-* On Windows, you can use [linux binary](https://github.com/amkozlov/raxml-ng/releases/download/2.0-beta3/raxml-ng_v2.0-beta3_linux_x86_64.zip) via [Windows Subsystem for Linux](https://ubuntu.com/wsl), but performance might be lower than with native Linux execution. 
+* On Windows, you can use [linux binary](https://github.com/amkozlov/raxml-ng/releases/download/2.0.0/raxml-ng_v2.0.0_linux_x86_64.zip) via [Windows Subsystem for Linux](https://ubuntu.com/wsl), but performance might be lower than with native Linux execution. 
 
 * If neither of the above options worked for you, please clone this repository and build RAxML-NG from scratch.
 
 **1. Install the dependecies (optional).** On Ubuntu and other Debian-based systems, you can simply run:
 ```
-sudo apt-get install libgmp3-dev
+sudo apt-get install libgmp3-dev libhts-dev libhtscodecs-dev 
 ```
 For other systems, please make sure you have following packages/libraries installed:  
 - [`GMP`](https://gmplib.org/)
+- [`htslib`](https://github.com/samtools/htslib)
 
 If you do not want to use git submodules (e.g., for packaging), you also need to install:
 - [`coraxlib`](https://codeberg.org/Exelixis-Lab/coraxlib) 
