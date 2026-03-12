@@ -968,7 +968,7 @@ void check_options_early(Options& opts)
   /* disable pythia if command cannot use difficulty score */
   opts.use_pythia &= (opts.command == Command::parse || opts.command == Command::search ||
                       opts.command == Command::bootstrap || opts.command == Command::all ||
-                      opts.command == Command::pythia);
+                      opts.command == Command::pythia || opts.command == Command::start);
 
   if (opts.use_pythia && !opts.use_pattern_compression)
   {
@@ -4343,6 +4343,7 @@ int internal_main(int argc, char** argv, void* comm)
         {
           load_parted_msa(instance);
           load_constraint(instance);
+          autotune_start_trees(instance);
           build_start_trees(instance);
           if (!opts.start_tree_file().empty())
           {

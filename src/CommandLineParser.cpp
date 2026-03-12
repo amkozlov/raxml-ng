@@ -1101,6 +1101,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       case 40: /* start tree generation */
         opts.command = Command::start;
+        if (optarg_tree.empty())
+          optarg_tree = "pars{1}";
         num_commands++;
         break;
       case 41: /* compute tree logLH w/o optimization */
