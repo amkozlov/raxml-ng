@@ -1,11 +1,16 @@
-file(GLOB RAXML_SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp 
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/libs/coraxlib/cmake")
+include(simd)
+
+file(GLOB RAXML_SOURCES ${PROJECT_SOURCE_DIR}/src/common.h
+                        ${PROJECT_SOURCE_DIR}/src/*.cpp 
                         ${PROJECT_SOURCE_DIR}/src/util/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/io/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/bootstrap/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/autotune/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/loadbalance/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/topology/*.cpp
-                        )
+                        ${PROJECT_SOURCE_DIR}/src/adaptive/*.cpp
+                        ${PROJECT_SOURCE_DIR}/src/modeltest/*.cpp)
 
 if(USE_TERRAPHAST)
   file (GLOB TERRACE_SOURCES ${PROJECT_SOURCE_DIR}/src/terraces/*.cpp)
@@ -13,8 +18,16 @@ if(USE_TERRAPHAST)
   set(RAXML_SOURCES ${RAXML_SOURCES} ${TERRACE_SOURCES})
 endif()
 
+if(USE_VCF)
+  find_path(HTSLIB_INCLUDE_DIR NAMES htslib/vcf.h HINTS "${HTSLIB_DIR}/include")
+  set(RAXML_INCLUDES ${HTSLIB_INCLUDE_DIR} ${RAXML_INCLUDES})
+else()
+  list(REMOVE_ITEM RAXML_SOURCES ${PROJECT_SOURCE_DIR}/src/io/VCFStream.cpp)
+endif()
+
 # export to the parent dir to use in GTest makefile
 set(RAXML_SOURCES ${RAXML_SOURCES} PARENT_SCOPE)
+set(RAXML_INCLUDES ${RAXML_INCLUDES} PARENT_SCOPE)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -38,46 +51,73 @@ else()
   add_executable(raxml_module ${RAXML_SOURCES})
 endif()
 
-
-if (USE_LIBPLL_CMAKE)
-  target_include_directories(raxml_module PRIVATE ${PLLMOD_EXPORTED_INCLUDE_PATH})
-  set(LIBPLL_LIBS  ${PLLMODULES_LIBRARIES} ${PLL_LIBRARIES})
+if (PORTABLE_BUILD)
+    target_add_vnone_definitions(raxml_module)
 else()
-  set(LIBPLL_LIBS ${RAXML_LOCALDEPS_DIR}/lib/libpll_algorithm.a
-                  ${RAXML_LOCALDEPS_DIR}/lib/libpll_binary.a
-                  ${RAXML_LOCALDEPS_DIR}/lib/libpll_optimize.a
-                  ${RAXML_LOCALDEPS_DIR}/lib/libpll_msa.a
-                  ${RAXML_LOCALDEPS_DIR}/lib/libpll_tree.a
-                  ${RAXML_LOCALDEPS_DIR}/lib/libpll_util.a
-                  ${RAXML_LOCALDEPS_DIR}/lib/libpll.a
-                  )
+    target_add_vnative_definitions(raxml_module)
 endif()
 
+if (USE_CORAXLIB_CMAKE)
+  target_include_directories(raxml_module PUBLIC ${PROJECT_SOURCE_DIR}/libs/coraxlib/src ${PROJECT_SOURCE_DIR}/libs/coraxlib/lib/difficulty_prediction/src)
+  #target_link_libraries(raxml_module PUBLIC corax)
+  target_link_directories(raxml_module PUBLIC ${PROJECT_SOURCE_DIR}/libs/coraxlib/bin)
+  set(CORAX_LIBS corax)
+endif()
 
-set(RAXML_LIBS ${LIBPLL_LIBS} m)
+set(RAXML_LIBS ${CORAX_LIBS} m ${RAXML_LIBS})
+
+if(USE_EBG)
+  set(RAXML_LIBS ebg ${RAXML_LIBS})
+endif()
 
 if(USE_TERRAPHAST)
   set(RAXML_LIBS ${RAXML_LOCALDEPS_DIR}/lib/libterraces.a ${RAXML_LIBS})
-  add_dependencies(raxml_module terraces)
+  target_link_libraries(raxml_module PUBLIC ${RAXML_LIBS})
+endif()
+
+if(USE_VCF)
+  if (APPLE)
+    find_library(HTSLIB_LIBRARY NAMES libhts hts HINTS "${HTSLIB_DIR}/lib")
+    find_library(HTSLIB_LZMA NAMES lzma "${HTSLIB_DIR}/lib")
+    find_library(HTSLIB_BZ2 NAMES bz2 "${HTSLIB_DIR}/lib")
+    find_library(HTSLIB_DEFLATE NAMES deflate "${HTSLIB_DIR}/lib")
+    set(RAXML_LIBS ${HTSLIB_LIBRARY} z ${HTSLIB_LZMA} ${HTSLIB_BZ2} ${HTSLIB_DEFLATE} ${RAXML_LIBS})
+  else()
+    find_library(HTSLIB_LIBRARY NAMES libhts hts HINTS "${HTSLIB_DIR}/lib")
+    if(STATIC_BUILD)
+      find_library(HTSLIB_CODECS NAMES htscodecs HINTS "${HTSLIB_DIR}/lib")
+    else()  
+      # htscodecs not required when htslib is dynamically linked
+      set(HTSLIB_CODECS "")
+    endif()
+    set(RAXML_LIBS ${HTSLIB_LIBRARY} ${HTSLIB_CODECS} z lzma bz2 deflate ${RAXML_LIBS})
+  endif()
 endif()
 
 # export to the parent dir to use in GTest makefile
 set(RAXML_LIBS ${RAXML_LIBS} PARENT_SCOPE)
 
-#message(STATUS "Libs: ${RAXML_LIBS}")
+message(STATUS "Libs: ${RAXML_LIBS}")
+message(STATUS "Includes: ${RAXML_INCLUDES}")
 
-target_link_libraries(raxml_module ${RAXML_LIBS})
+target_include_directories(raxml_module PRIVATE ${RAXML_INCLUDES})
+target_link_libraries(raxml_module PUBLIC ${RAXML_LIBS})
 
 if (BUILD_AS_LIBRARY AND NOT APPLE)
-  target_link_libraries(raxml_module gcc_s gcc)
+  target_link_libraries(raxml_module PUBLIC gcc_s gcc)
+endif()
+
+target_include_directories(raxml_module PRIVATE ../thirdparty)
+if (USE_JSON)
+  target_compile_definitions(raxml_module PRIVATE _RAXML_JSON)
 endif()
 
 if(GMP_FOUND)
-  target_link_libraries(raxml_module ${GMP_LIBRARIES})
+  target_link_libraries(raxml_module PUBLIC ${GMP_LIBRARIES})
 endif()
 
 if(MPI_FOUND)
-  target_link_libraries(raxml_module ${MPI_CXX_LIBRARIES})
+  target_link_libraries(raxml_module PUBLIC ${MPI_CXX_LIBRARIES})
 endif()
 
 if(MPI_COMPILE_FLAGS)

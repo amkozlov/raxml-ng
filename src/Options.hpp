@@ -3,9 +3,12 @@
 
 #include "common.h"
 #include "PartitionedMSA.hpp"
+#include "modeltest/RHASHeuristic.hpp"
+#include "types.hpp"
 #include "util/SafetyCheck.hpp"
+#include "modeltest/ModelDefinitions.hpp"
 
-constexpr int RAXML_OPT_VERSION = 2;
+constexpr int RAXML_OPT_VERSION = 5;
 
 struct OutputFileNames
 {
@@ -20,7 +23,15 @@ struct OutputFileNames
   std::string bootstrap_trees;
   std::string support_tree;
   std::string tbe_support_tree;
+  std::string ebg_support_tree;
+  std::string ps_support_tree;
+  std::string pbs_support_tree;
   std::string fbp_support_tree;
+  std::string rbs_support_tree;
+  std::string sh_support_tree;
+  std::string ic1_support_tree;
+  std::string ica_support_tree;
+  std::string gcf_support_tree;
   std::string terrace;
   std::string binary_msa;
   std::string bootstrap_msa;
@@ -30,6 +41,11 @@ struct OutputFileNames
   std::string asr_tree;
   std::string asr_probs;
   std::string asr_states;
+  std::string mut_map_tree;
+  std::string mut_map_list;
+  std::string modeltest_best_model;
+  std::string modeltest_xml;
+  std::string modeltest_json;
   std::string tmp_best_tree;
   std::string tmp_ml_trees;
   std::string tmp_bs_trees;
@@ -62,9 +78,14 @@ public:
   bool use_spr_fastclv;
   bool use_bs_pars;
   bool use_par_pars;
+  bool use_pythia;
+  bool use_tree_streaming;
+  bool use_pars_spr;
 
   bool optimize_model;
   bool optimize_brlen;
+  TopologyOptMethod topology_opt_method;
+  StoppingRule stopping_rule;
 
   bool force_mode;
   SafetyCheck safety_checks;
@@ -73,6 +94,9 @@ public:
   bool nofiles_mode;
   bool write_interim_results;
   bool write_bs_msa;
+
+  AbnormalSequenceAction allgap_seqs_action;
+  AbnormalSequenceAction dup_seqs_action;
 
   LogLevel log_level;
   FileFormat msa_format;
@@ -87,12 +111,15 @@ public:
   int brlen_opt_method;
   double brlen_min;
   double brlen_max;
+  bool brlen_reset_usertree;
+  bool use_pars_brlen;
 
   unsigned int num_searches;
   unsigned long long terrace_maxsize;
 
   unsigned int num_bootstraps;
-  std::vector<BranchSupportMetric> bs_metrics;
+  std::set<BranchSupportMetric> bs_metrics;
+  SupportMetricMap bs_replicate_counts;
   BootstopCriterion bootstop_criterion;
   double bootstop_cutoff;
   unsigned int bootstop_interval;
@@ -124,10 +151,49 @@ public:
   bool thread_pinning;                  /* pin threads to cores */
   LoadBalancing load_balance_method;
 
-  bool coarse() const { return num_workers > 1; };
+  /* adaptive */
+  int diff_pred_pars_trees;
+  double nni_tolerance;
+  double nni_epsilon;
 
+  /* SH-like test */
+  unsigned int num_sh_reps;
+  double sh_epsilon;
+
+
+  /* Modeltest */
+  unsigned int free_rate_min_categories;
+  unsigned int free_rate_max_categories;
+  FreerateOptMethod free_rate_opt_method;
+  InformationCriterion model_selection_criterion;
+  HeuristicSelection modeltest_heuristics;
+  double modeltest_significant_ic_delta;
+  RateHeterogeneitySelection modeltest_rhas;
+  RHASHeuristicMode modeltest_rhas_heuristic_mode;
+  std::vector<std::string> modeltest_subst_models;
+  bool modeltest_json_output;
+
+  bool coarse() const { return num_workers > 1; };
+  bool auto_model() const {
+      return command == Command::modeltest || \
+            (strcasecmp(model_file.c_str(), "auto") == 0) || \
+            (strcasecmp(model_file.c_str(), "dna") == 0) || \
+            (strcasecmp(model_file.c_str(), "aa") == 0) || \
+            (strcasecmp(model_file.c_str(), "bin") == 0) ||
+            (strncasecmp(model_file.c_str(), "auto=", 5) == 0);
+  }
+
+  unsigned int num_bootstrap_ml_trees() const;
+  unsigned int num_bootstrap_pars_trees() const;
+  unsigned int num_pars_trees() const;
+  unsigned int num_bootstrap_msa_reps() const;
+
+  std::string ic_name() const;
+  std::string free_rate_opt_method_name() const;
+  std::string free_rate_opt_method_short_name() const;
   std::string simd_arch_name() const;
   std::string consense_type_name() const;
+  std::string stopping_rule_name() const;
 
   std::string output_fname(const std::string& suffix) const;
 
@@ -153,6 +219,14 @@ public:
   const std::string asr_probs_file() const { return outfile_names.asr_probs; }
   const std::string asr_states_file() const { return outfile_names.asr_states; }
 
+  const std::string mut_maptree_file() const { return outfile_names.mut_map_tree; }
+  const std::string mut_maplist_file() const { return outfile_names.mut_map_list; }
+
+  const std::string& modeltest_best_model_file() const { return outfile_names.modeltest_best_model; }
+  const std::string& modeltest_xml_file() const { return outfile_names.modeltest_xml; }
+  const std::string& modeltest_json_file() const { return outfile_names.modeltest_json; }
+  const std::string& modeltest_results_file() const;
+
   const std::string tmp_best_tree_file() const { return outfile_names.tmp_best_tree; }
   const std::string tmp_ml_trees_file() const { return outfile_names.tmp_ml_trees; }
   const std::string tmp_bs_trees_file() const { return outfile_names.tmp_bs_trees; }
@@ -165,6 +239,7 @@ public:
 
 private:
   void set_default_outfile(std::string& fname, const std::string& suffix);
+  unsigned int max_num_replicates(const SupportMetricSet& mset) const;
 };
 
 std::ostream& operator<<(std::ostream& stream, const Options& opts);

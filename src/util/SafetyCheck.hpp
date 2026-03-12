@@ -10,23 +10,27 @@ struct SafetyCheck
 
   enum Flags: enum_type
   {
-    none                 = 0,
-    all                  = ~0u,
-    perf_threads         = 1 << 0,
+    none                 = 0ull,
+    all                  = ~0ull,
+    perf_threads         = 1ull << 0,
     perf                 = perf_threads,
-    msa_names            = 1 << 10,
-    msa_dups             = 1 << 11,
-    msa_allgaps          = 1 << 12,
-    msa                  = msa_names | msa_dups | msa_allgaps,
-    model_zero_freqs     = 1 << 21,
-    model_invalid_freqs  = 1 << 22,
-    model_lg4_freqs      = 1 << 23,
-    model_asc_bias       = 1 << 24,
-    model_overfit        = 1 << 25,
-    model_lh_impr        = 1 << 26,
-    model_rate_scalers   = 1 << 27,
+    msa_names            = 1ull << 10,
+    msa_dups             = 1ull << 11,
+    msa_allgaps          = 1ull << 12,
+    msa_extra_cols       = 1ull << 13,
+    msa                  = msa_names | msa_dups | msa_allgaps | msa_extra_cols,
+    model_zero_freqs     = 1ull << 21,
+    model_invalid_freqs  = 1ull << 22,
+    model_lg4_freqs      = 1ull << 23,
+    model_asc_bias       = 1ull << 24,
+    model_overfit        = 1ull << 25,
+    model_lh_impr        = 1ull << 26,
+    model_rate_scalers   = 1ull << 27,
     model                = model_zero_freqs | model_invalid_freqs | model_lg4_freqs |
-                           model_asc_bias | model_overfit | model_lh_impr | model_rate_scalers
+                           model_asc_bias | model_overfit | model_lh_impr | model_rate_scalers,
+    ckp_start_trees      = 1ull << 31,
+    ckp_options          = 1ull << 32,
+    ckp                  = ckp_start_trees | ckp_options,
   };
 
 

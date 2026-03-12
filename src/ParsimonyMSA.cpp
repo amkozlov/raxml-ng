@@ -1,14 +1,25 @@
 #include "ParsimonyMSA.hpp"
 
-ParsimonyMSA::ParsimonyMSA (std::shared_ptr<PartitionedMSA> parted_msa, unsigned int attributes)
+ParsimonyMSA::ParsimonyMSA(std::shared_ptr<PartitionedMSA> parted_msa, unsigned int attributes) :
+ParsimonyMSA(parted_msa, attributes, true, true, std::vector<WeightVector>())
 {
-  init_pars_msa(parted_msa);
-  create_pll_partitions(attributes);
 }
 
-void ParsimonyMSA::init_pars_msa(std::shared_ptr<PartitionedMSA> orig_msa)
+ParsimonyMSA::ParsimonyMSA (std::shared_ptr<PartitionedMSA> parted_msa, unsigned int attributes,
+                            bool compress_patterns, bool combine_partitions,
+                            const std::vector<WeightVector>& site_weights)
 {
-  if (orig_msa->part_count() == 1)
+  // TODO: check if there is any reason not to use tip-inner
+  attributes |= CORAX_ATTRIB_PATTERN_TIP;
+
+  init_pars_msa(parted_msa, compress_patterns, combine_partitions);
+  create_pll_partitions(attributes, site_weights);
+}
+
+void ParsimonyMSA::init_pars_msa(std::shared_ptr<PartitionedMSA> orig_msa,
+                                 bool compress_patterns, bool combine_partitions)
+{
+  if (orig_msa->part_count() == 1 || !combine_partitions)
   {
     _pars_msa = orig_msa;
     return;
@@ -81,46 +92,50 @@ void ParsimonyMSA::init_pars_msa(std::shared_ptr<PartitionedMSA> orig_msa)
   }
 
   /* Currently, parsimony computation can not use pattern compression */
-//  if (instance.opts.use_pattern_compression)
-//  {
-//    for (auto& pinfo: pars_msa->part_list())
-//    {
-//      pinfo.compress_patterns();
-//    }
-//  }
+  if (compress_patterns)
+  {
+    for (auto& pinfo: pars_msa->part_list())
+    {
+      pinfo.compress_patterns();
+    }
+  }
 
 }
 
-void ParsimonyMSA::create_pll_partitions(unsigned int attributes)
+void ParsimonyMSA::create_pll_partitions(unsigned int attributes,
+                                         const std::vector<WeightVector>& site_weights)
 {
   free_pll_partitions();
 
+  size_t p = 0;
   for (const auto& pinfo: _pars_msa->part_list())
   {
     const auto& model = pinfo.model();
     const auto& msa = pinfo.msa();
+    const auto& weights = site_weights.empty() ? msa.weights() : site_weights.at(p);
 
-    auto partition = pll_partition_create(_pars_msa->taxon_count(),
-                                         0,   /* number of CLVs */
-                                         model.num_states(),
-                                         msa.length(),
-                                         1,
-                                         1, /* pmatrix count */
-                                         1,  /* rate_cats */
-                                         0,  /* scale buffers */
-                                         attributes);
+    auto partition = corax_partition_create(_pars_msa->taxon_count(),
+                                             0,   /* number of CLVs */
+                                             model.num_states(),
+                                             msa.length(),
+                                             1,
+                                             1, /* pmatrix count */
+                                             1,  /* rate_cats */
+                                             0,  /* scale buffers */
+                                             attributes);
 
     /* set pattern weights */
-    if (!msa.weights().empty())
-      pll_set_pattern_weights(partition, msa.weights().data());
+    if (!weights.empty())
+      corax_set_pattern_weights(partition, weights.data());
 
     /* set tip states */
     for (size_t j = 0; j < msa.size(); ++j)
     {
-      pll_set_tip_states(partition, j, model.charmap(), msa.at(j).c_str());
+      corax_set_tip_states(partition, j, model.charmap(), msa.at(j).c_str());
     }
 
     _pll_partitions.push_back(partition);
+    ++p;
   }
   assert(_pll_partitions.size() == _pars_msa->part_count());
 }
@@ -128,7 +143,7 @@ void ParsimonyMSA::create_pll_partitions(unsigned int attributes)
 void ParsimonyMSA::free_pll_partitions()
 {
   for (auto p: _pll_partitions)
-    pll_partition_destroy(p);
+    corax_partition_destroy(p);
   _pll_partitions.clear();
 }
 

@@ -8,16 +8,7 @@
 #include <sstream>
 #include <stdexcept>
 
-extern "C" {
-//#include <libpll/pll.h>
-#include <libpll/pllmod_common.h>
-#include <libpll/pll_optimize.h>
-#include <libpll/pll_msa.h>
-#include <libpll/pll_tree.h>
-#include <libpll/pllmod_util.h>
-#include <libpll/pllmod_algorithm.h>
-}
-
+#include <corax/corax.h>
 #include "types.hpp"
 #include "constants.hpp"
 #include "ParallelContext.hpp"
@@ -30,7 +21,7 @@ extern "C" {
 /* system utils */
 void sysutil_fatal(const char * format, ...);
 void sysutil_fatal_libpll();
-void libpll_check_error(const std::string& errmsg = "ERROR in libpll", bool force = false);
+void libpll_check_error(const std::string& errmsg = "ERROR in coraxlib", bool force = false);
 void libpll_reset_error();
 
 double sysutil_gettime();
@@ -40,10 +31,9 @@ unsigned long sysutil_get_memtotal(bool ignore_errors = true);
 
 std::string sysutil_get_cpu_model();
 unsigned int sysutil_get_cpu_cores();
+unsigned int sysutil_task_cpu_cores(bool physical = false);
 unsigned long sysutil_get_cpu_features();
 unsigned int sysutil_simd_autodetect();
-
-unsigned int sysutil_task_cpu_cores(bool physical = false);
 
 double sysutil_get_energy();
 
@@ -60,5 +50,6 @@ bool sysutil_isnumber(const std::string& s);
 /* parsing utils */
 std::vector<std::string> split_string(const std::string& s, char delim);
 bool isprefix(const std::string& s, const std::string& prefix);
+bool isprefixi(const std::string& s, const std::string& prefix);
 
 #endif /* RAXML_COMMON_H_ */

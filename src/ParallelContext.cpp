@@ -4,6 +4,10 @@
 
 #include "util/EnergyMonitor.hpp"
 
+#if defined(__linux__)
+#include <malloc.h>
+#endif
+
 using namespace std;
 
 // This is just a default size; the buffer will be resized later according to #part and #threads
@@ -113,6 +117,13 @@ void ParallelContext::init_pthreads(const Options& opts, const std::function<voi
   init_pthreads_custom(opts, thread_main, opts.num_threads, opts.num_workers);
 }
 
+size_t ParallelContext::calculate_workers_per_rank(unsigned int num_workers)
+{
+  const auto num_groups = std::max(num_workers, 1u);
+  const size_t groups_per_rank = num_groups > 1 ? num_groups / _num_ranks : 1;
+  return std::max<size_t>(groups_per_rank, 1u);
+}
+
 void ParallelContext::init_pthreads_custom(const Options& opts, const std::function<void()>& thread_main,
                                            unsigned int num_threads, unsigned int num_workers)
 {
@@ -123,8 +134,7 @@ void ParallelContext::init_pthreads_custom(const Options& opts, const std::funct
   _local_rank_id = _num_ranks > _num_groups ? _rank_id : 0;
 
   /* init thread groups */
-  size_t groups_per_rank = _num_groups > 1 ? _num_groups / _num_ranks : 1;
-  groups_per_rank = std::max<size_t>(groups_per_rank, 1u);
+  size_t groups_per_rank = calculate_workers_per_rank(num_workers);
   size_t group_size = num_threads / groups_per_rank;
   auto start_grp_id = _num_groups > 1 ? _rank_id * groups_per_rank : 0;
   for (size_t i = 0; i < groups_per_rank; ++i)
@@ -253,6 +263,12 @@ void ParallelContext::finalize_threads(bool force)
   }
   _thread_groups.clear();
   _threads.clear();
+
+//  /* IMPORTANT: ensure that no memory is blocked by dead threads */
+#if defined(__linux__)
+  malloc_trim(0);
+#endif
+
 #else
   RAXML_UNUSED(force);
 #endif
@@ -389,21 +405,21 @@ void ParallelContext::thread_reduce(double * data, size_t size, int op)
   {
     switch(op)
     {
-      case PLLMOD_COMMON_REDUCE_SUM:
+      case CORAX_REDUCE_SUM:
       {
         data[i] = 0.;
         for (j = 0; j < num_group_threads; ++j)
           data[i] += double_buf[j * size + i];
       }
       break;
-      case PLLMOD_COMMON_REDUCE_MAX:
+      case CORAX_REDUCE_MAX:
       {
         data[i] = double_buf[i];
         for (j = 1; j < num_group_threads; ++j)
           data[i] = max(data[i], double_buf[j * size + i]);
       }
       break;
-      case PLLMOD_COMMON_REDUCE_MIN:
+      case CORAX_REDUCE_MIN:
       {
         data[i] = double_buf[i];
         for (j = 1; j < num_group_threads; ++j)
@@ -420,11 +436,11 @@ void ParallelContext::mpi_reduce(double * data, size_t size, int op)
   if (_num_ranks > 1)
   {
       MPI_Op reduce_op;
-      if (op == PLLMOD_COMMON_REDUCE_SUM)
+      if (op == CORAX_REDUCE_SUM)
         reduce_op = MPI_SUM;
-      else if (op == PLLMOD_COMMON_REDUCE_MAX)
+      else if (op == CORAX_REDUCE_MAX)
         reduce_op = MPI_MAX;
-      else if (op == PLLMOD_COMMON_REDUCE_MIN)
+      else if (op == CORAX_REDUCE_MIN)
         reduce_op = MPI_MIN;
       else
         assert(0);
@@ -476,11 +492,11 @@ void ParallelContext::mpi_allreduce(double * data, size_t size, int op)
     if (_thread_id == 0)
     {
       MPI_Op reduce_op;
-      if (op == PLLMOD_COMMON_REDUCE_SUM)
+      if (op == CORAX_REDUCE_SUM)
         reduce_op = MPI_SUM;
-      else if (op == PLLMOD_COMMON_REDUCE_MAX)
+      else if (op == CORAX_REDUCE_MAX)
         reduce_op = MPI_MAX;
-      else if (op == PLLMOD_COMMON_REDUCE_MIN)
+      else if (op == CORAX_REDUCE_MIN)
         reduce_op = MPI_MIN;
       else
         assert(0);

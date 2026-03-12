@@ -9,6 +9,20 @@ ICScoreCalculator::~ICScoreCalculator()
 {
 }
 
+double ICScoreCalculator::compute(InformationCriterion criterion, double loglh) const
+{
+    switch (criterion)
+    {
+        case InformationCriterion::aic:
+            return aic(loglh);
+        case InformationCriterion::aicc:
+            return aicc(loglh);
+        case InformationCriterion::bic:
+            return bic(loglh);
+        default:
+            assert(0);
+    }
+}
 double ICScoreCalculator::aic(double loglh) const
 {
   return 2.0 * _free_params - 2.0 * loglh;

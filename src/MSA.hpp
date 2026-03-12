@@ -3,6 +3,12 @@
 
 #include "common.h"
 
+#include <vector>
+#include <map>
+#include <tuple>
+#include <math.h>
+#include "difficulty.h"
+
 typedef std::vector<double> ProbVector;
 typedef std::vector<ProbVector> ProbVectorList;
 
@@ -29,7 +35,7 @@ public:
       _states(0), _pll_msa(nullptr), _dirty(false) {};
   MSA(const RangeList& rl);
 
-  MSA(const pll_msa_t * pll_msa);
+  MSA(const corax_msa_t * pll_msa);
   MSA(MSA&& other);
   MSA(const MSA& other) = delete;
 
@@ -39,7 +45,7 @@ public:
   MSA& operator=(const MSA& other) = delete;
 
   void append(const std::string& sequence, const std::string& header = "");
-  void compress_patterns(const pll_state_t * charmap, bool store_backmap = false);
+  void compress_patterns(const corax_state_t * charmap, bool store_backmap = false);
 
   bool empty() const { return _sequences.empty(); }
   size_t size() const { return _sequences.size(); }
@@ -49,7 +55,8 @@ public:
   const WeightVector& weights() const {return _weights; }
   const NameIdMap& label_id_map() const { return _label_id_map; }
   const WeightVector& site_pattern_map() const { return _site_pattern_map; }
-  const pll_msa_t * pll_msa() const;
+  const corax_msa_t * pll_msa() const;
+  corax_msa_t* pll_msa_nonconst() const;
 
   const container& labels() const { return _labels; };
   const std::string& label(size_t index) const { return _labels.at(index); }
@@ -70,11 +77,17 @@ public:
 
   doubleVector state_freqs() const;
 
+  void site_name(size_t index, const std::string& name);
+  const NameList& site_names() const { return _site_names; }
+
   void num_sites(const unsigned int sites) { _num_sites = sites; }
   void weights(const WeightVector& v);
   void weights(WeightVector&& v);
+  void site_pattern_map(const WeightVector& v);
+  void site_pattern_map(WeightVector&& v);
 
   void remove_sites(const std::vector<size_t>& site_indices);
+  void remove_taxa(const IDSet& taxon_ids);
 
   const RangeList& local_seq_ranges() const;
   size_t get_local_offset(size_t global_offset) const;
@@ -97,12 +110,13 @@ private:
   container _sequences;
   container _labels;
   NameIdMap _label_id_map;
+  NameList _site_names;
   WeightVector _weights;
   WeightVector _site_pattern_map;
   ProbVectorList _probs;
   RangeList _local_seq_ranges;
   size_t _states;
-  mutable pll_msa_t * _pll_msa;
+  mutable corax_msa_t * _pll_msa;
   mutable bool _dirty;
 
   void update_pll_msa() const;

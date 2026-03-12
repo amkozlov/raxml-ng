@@ -27,6 +27,7 @@
 *.exe
 *.out
 *.app
+*.sh
 
 # binaries
 build/
@@ -41,3 +42,13 @@ release/
 .settings/
 .vscode
 .devcontainer
+
+# python scripts
+*.py
+
+# some json files
+.vscode/launch.json
+.vscode/tasks.json
+
+# TODO file
+todo.txt

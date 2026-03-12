@@ -4,8 +4,8 @@
 using namespace std;
 
 const uint64_t RBA_MAGIC       = *(reinterpret_cast<const uint64_t*>("RBAF\x13\x12\x17\x0A"));
-const uint32_t RBA_VERSION     = 2;
-const uint32_t RBA_MIN_VERSION = 2;
+const uint32_t RBA_VERSION     = 5;
+const uint32_t RBA_MIN_VERSION = 3;
 
 struct RBAHeader
 {
@@ -41,6 +41,19 @@ bool RBAStream::rba_file(const std::string& fname, bool check_version)
   return valid;
 }
 
+uint32_t RBAStream::rba_version(const std::string& fname)
+{
+  BinaryFileStream bos(fname, std::ios::in);
+  RBAHeader header;
+
+  bos >> header;
+
+  bool valid = bos.good() && header.valid();
+
+  return valid ? header.version : 0;
+}
+
+
 RBAStream& operator<<(RBAStream& stream, const PartitionedMSA& part_msa)
 {
   BinaryFileStream bos(stream.fname(), std::ios::out);
@@ -52,13 +65,21 @@ RBAStream& operator<<(RBAStream& stream, const PartitionedMSA& part_msa)
   header.pattern_count = part_msa.total_patterns();
   header.part_count = part_msa.part_count();
 
+  bos.version(header.version);
+
   bos << header;
+
+  // msa difficulty (pythia)
+  bos << part_msa.difficulty_score();
 
   // taxon labels
   for (const auto& label: part_msa.taxon_names())
   {
     bos << label;
   }
+
+  // duplicate sequence map
+  bos << part_msa.dup_seq_map();
 
   // models
   for (const auto& pinfo: part_msa.part_list())
@@ -68,6 +89,9 @@ RBAStream& operator<<(RBAStream& stream, const PartitionedMSA& part_msa)
     bos << pinfo.stats();
     bos << std::make_tuple(std::ref(pinfo.model()), ModelBinaryFmt::full);
   }
+
+  // partition model linkage
+  bos << part_msa.subst_linkage() << part_msa.freqs_linkage();
 
   // per-partition alignment blocks
   for (const auto& pinfo: part_msa.part_list())
@@ -92,6 +116,8 @@ RBAStream& operator>>(RBAStream& stream, RBAStream::RBAOutput out)
 
   bos >> header;
 
+  LOG_DEBUG << "RBA version: " << header.version << endl;
+
   if (!bos.good())
     throw runtime_error("Invalid RBA file!");
 
@@ -100,6 +126,8 @@ RBAStream& operator>>(RBAStream& stream, RBAStream::RBAOutput out)
 
   if (!header.supported())
     throw runtime_error("Unsupported RBA file version: " + to_string(header.version));
+
+  bos.version(header.version);
 
   auto& part_msa = std::get<0>(out);
   auto& elem = std::get<1>(out);
@@ -124,6 +152,15 @@ RBAStream& operator>>(RBAStream& stream, RBAStream::RBAOutput out)
     ensure_equal("pattern count", header.pattern_count, part_msa.total_patterns());
   }
 
+  // msa difficulty (pythia)
+  if (header.version >= 3)
+  {
+    double pythia_score;
+    bos >> pythia_score;
+    if (load_meta)
+      part_msa.difficulty_score(pythia_score);
+  }
+
   NameList taxon_names(header.taxon_count, "");
   for (auto& taxon: taxon_names)
   {
@@ -131,8 +168,16 @@ RBAStream& operator>>(RBAStream& stream, RBAStream::RBAOutput out)
 //    LOG_INFO << bos.get<std::string>() << endl;
   }
 
+  NameIdMap dup_seq_map;
+  if (header.version >= 5)
+    bos >> dup_seq_map;
+
   if (load_meta)
+  {
     part_msa = PartitionedMSA(taxon_names);
+    for (const auto& d: dup_seq_map)
+      part_msa.mark_dup_seq(d.first, d.second);
+  }
 
   for (size_t i = 0; i < header.part_count; ++i)
   {
@@ -151,6 +196,18 @@ RBAStream& operator>>(RBAStream& stream, RBAStream::RBAOutput out)
 
     if (load_meta)
       part_msa.emplace_part_info(pname, pstats, m, prange);
+  }
+
+  // partition model linkage
+  if (header.version >= 4)
+  {
+    uintVector subst_linkage, freqs_linkage;
+    bos >> subst_linkage >> freqs_linkage;
+    if (load_meta)
+    {
+      part_msa.subst_linkage(subst_linkage);
+      part_msa.freqs_linkage(freqs_linkage);
+    }
   }
 
   if (load_seq)

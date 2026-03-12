@@ -18,3 +18,10 @@ bool isprefix(const std::string& s, const std::string& prefix)
 {
   return s.rfind(prefix, 0) == 0;
 }
+
+bool isprefixi(const std::string& s, const std::string& prefix)
+{
+  return strncasecmp(s.c_str(), prefix.c_str(), prefix.length()) == 0;
+}
+
+

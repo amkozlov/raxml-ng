@@ -2,6 +2,7 @@
 #define RAXML_ICCALCULATOR_HPP_
 
 #include "common.h"
+#include "types.hpp"
 
 class ICScoreCalculator
 {
@@ -9,6 +10,7 @@ public:
   ICScoreCalculator(size_t free_params, size_t sample_size);
   virtual ~ICScoreCalculator();
 
+  double compute(InformationCriterion criterion, double loglh) const;
   double aic(double loglh) const;
   double aicc(double loglh) const;
   double bic(double loglh) const;

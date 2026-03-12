@@ -10,9 +10,6 @@ public:
 
   virtual
   ~BootstrapTree ();
-
-protected:
-  virtual void add_tree(const pll_unode_t& root);
 };
 
 #endif /* RAXML_BOOTSTRAP_BOOTSTRAPTREE_HPP_ */

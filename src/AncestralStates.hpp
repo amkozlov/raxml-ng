@@ -17,6 +17,7 @@ struct AncestralStates
   NameList state_names;
   StateNameMap state_namemap;
   NameList node_names;
+  NameIdMap node_namemap;
   std::vector<PartitionAncestralProbs> probs;
 
   bool ambiguity;
@@ -28,14 +29,15 @@ struct AncestralStates
   void allocate_probs();
 
   size_t num_parts() const;
-  std::string ml_state_seq(size_t node_idx, size_t part_idx = 0) const ;
+  std::string ml_state_seq(size_t node_idx, size_t part_idx = 0) const;
+  std::string ml_state_seq(const std::string& node_name, size_t part_idx = 0) const;
   std::string ml_state(size_t node_idx, size_t site_idx, size_t part_idx = 0) const;
 };
 
 typedef std::shared_ptr<AncestralStates> AncestralStatesSharedPtr;
 
-void assign_tree(AncestralStates& ancestral, const pllmod_ancestral_t& pll_ancestral);
-void assign_probs(AncestralStates& ancestral, const pllmod_ancestral_t& pll_ancestral,
+void assign_tree(AncestralStates& ancestral, const corax_ancestral_t& pll_ancestral);
+void assign_probs(AncestralStates& ancestral, const corax_ancestral_t& pll_ancestral,
                   const PartitionAssignment& part_assign);
 
 #endif /* RAXML_ANCESTRALSTATES_HPP_ */

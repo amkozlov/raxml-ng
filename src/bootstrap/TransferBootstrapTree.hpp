@@ -10,13 +10,11 @@ public:
   virtual ~TransferBootstrapTree();
 
 protected:
-  virtual void add_tree(const pll_unode_t& root);
-
-protected:
-  PllSplitSharedPtr _ref_splits;
+  virtual void get_replicate_supports(const corax_unode_t& root,
+                                      PllSplitSharedPtr& splits, doubleVector& support);
 
 private:
-  pllmod_tbe_split_info_t * _split_info;
+  corax_tbe_split_info_t * _split_info;
   bool _naive_method;
 };
 

@@ -2,15 +2,15 @@
 #define RAXML_MODEL_H_
 
 #include <algorithm>
-
 #include "common.h"
+#include "modeltest/ModelDefinitions.hpp"
 
-typedef std::unordered_map<pll_state_t,std::string> StateNameMap;
+typedef std::unordered_map<corax_state_t,std::string> StateNameMap;
 
 class SubstitutionModel
 {
 public:
-  SubstitutionModel(const pllmod_subst_model_t& sm) :
+  SubstitutionModel(const corax_subst_model_t& sm) :
     _states(sm.states), _name(sm.name)
   {
     if (sm.freqs)
@@ -46,7 +46,10 @@ public:
     {
       doubleVector uniq_rates(num_uniq_rates());
       for (size_t i = 0; i < _subst_rates.size(); ++i)
-        uniq_rates[_rate_sym[i]] = _subst_rates[i];
+      {
+        if (_rate_sym[i] >= 0)
+          uniq_rates[_rate_sym[i]] = _subst_rates[i];
+      }
       return uniq_rates;
     }
     else
@@ -81,7 +84,7 @@ public:
 
       _subst_rates.resize(num_rates());
       for (size_t i = 0; i < _subst_rates.size(); ++i)
-        _subst_rates[i] = v[_rate_sym[i]];
+        _subst_rates[i] = _rate_sym[i] < 0 ? CORAX_OPT_MIN_SUBST_RATE : v[_rate_sym[i]];
     }
     else
       subst_rates(v);
@@ -105,6 +108,9 @@ public:
   Model (const std::string &model_string) : Model(DataType::autodetect, model_string) {};
 
   Model(const Model&) = default;
+  Model(Model &&) = default;
+  Model &operator=(const Model &) = default;
+  Model &operator=(Model &&) = default;
 
   /* getters */
   DataType data_type() const { return _data_type; };
@@ -112,11 +118,11 @@ public:
   unsigned int num_states() const { return _num_states; };
   std::string name() const { return _name; };
 
-  const pll_state_t* charmap() const;
+  const corax_state_t* charmap() const;
   const NameList& state_names() const;            // non-ambiguous states only, eg A C G T
   const StateNameMap& full_state_namemap() const; // + ambiguous states, eg A C G T M R W S Y K -
 
-  const SubstitutionModel submodel(size_t i) const { return _submodels.at(i); };
+  const SubstitutionModel &submodel(size_t i) const { return _submodels.at(i); };
 
   unsigned int ratehet_mode() const { return _rate_het; };
   unsigned int num_ratecats() const { return _num_ratecats; };
@@ -136,7 +142,7 @@ public:
   int params_to_optimize() const;
   const ParamModeMap& param_mode() const { return _param_mode; }
   ParamValue param_mode(int param) const { return _param_mode.at(param); };
-  bool param_estimated(int param) const;
+  bool param_estimated(int param, int mask = CORAX_OPT_PARAM_ALL) const;
 
   AscBiasCorrection ascbias_type() const { return _ascbias_type; }
   const WeightVector& ascbias_weights() const { return _ascbias_weights; }
@@ -144,7 +150,7 @@ public:
   /* per alignment site, given in elements (NOT in bytes) */
   size_t clv_entry_size() const { return _num_states * _num_ratecats; }
 
-  unsigned int  num_free_params() const;
+  unsigned int  num_free_params(int mask = CORAX_OPT_PARAM_ALL) const;
 
   /* setters */
   void alpha(double value) { _alpha = value; };
@@ -175,7 +181,7 @@ private:
   std::string _custom_states;
   std::string _custom_gaps;
   bool _custom_case_sensitive;
-  std::shared_ptr<pll_state_t> _custom_charmap;
+  std::shared_ptr<corax_state_t> _custom_charmap;
   mutable NameList _state_names;
   mutable StateNameMap _full_state_namemap;
 
@@ -199,19 +205,26 @@ private:
   ParamModeMap _param_mode;
 
   void autodetect_data_type(const std::string& model_name);
-  pllmod_mixture_model_t * init_mix_model(const std::string& model_name);
-  void init_model_opts(const std::string& model_opts, const pllmod_mixture_model_t& mix_model);
+  corax_mixture_model_t * init_mix_model(const std::string& model_name);
+  void init_model_opts(const std::string& model_opts, const corax_mixture_model_t& mix_model);
   void init_state_names() const;
   void set_user_srates(doubleVector& srates, bool normalize = true);
   void set_user_freqs(doubleVector& freqs);
 };
 
+struct ModelEvaluation {
+  Model model;
+  double loglh;
+  double ic_score;
+};
+
 typedef std::unordered_map<size_t, Model> ModelMap;
+typedef std::unordered_map<PartitionCandidateModel, ModelEvaluation, std::hash<PartitionCandidateModel>> ModelEvaluationMap;
 typedef std::unordered_map<size_t, Model&> ModelRefMap;
 typedef std::unordered_map<size_t, const Model&> ModelCRefMap;
 
-void assign(Model& model, const pll_partition_t * partition);
-void assign(pll_partition_t * partition, const Model& model);
+void assign(Model& model, const corax_partition_t * partition);
+void assign(corax_partition_t * partition, const Model& model);
 
 LogStream& operator<<(LogStream& stream, const Model& m);
 

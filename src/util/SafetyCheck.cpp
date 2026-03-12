@@ -17,6 +17,8 @@ SafetyCheck::Flags SafetyCheck::from_string(const string& s)
     return SafetyCheck::msa_dups;
   else if (s == "msa_allgaps")
     return SafetyCheck::msa_allgaps;
+  else if (s == "msa_extra_cols")
+    return SafetyCheck::msa_extra_cols;
   else if (s == "model")
     return SafetyCheck::model;
   else if (s == "model_zero_freqs")
@@ -33,6 +35,12 @@ SafetyCheck::Flags SafetyCheck::from_string(const string& s)
     return SafetyCheck::model_lh_impr;
   else if (s == "model_rate_scalers")
     return SafetyCheck::model_rate_scalers;
+  else if (s == "ckp_start_trees")
+    return SafetyCheck::ckp_start_trees;
+  else if (s == "ckp_options")
+    return SafetyCheck::ckp_options;
+  else if (s == "ckp" || s == "checkp" || s == "checkpoint")
+    return SafetyCheck::ckp;
   else
     throw runtime_error("Invalid SafetyCheck enum value: " + s);
 }

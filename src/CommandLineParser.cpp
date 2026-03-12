@@ -1,4 +1,10 @@
 #include "CommandLineParser.hpp"
+#include "Options.hpp"
+#include "common.h"
+#include "corax/core/partition.h"
+#include "modeltest/ModelDefinitions.hpp"
+#include "modeltest/RHASHeuristic.hpp"
+#include "types.hpp"
 #include "version.h"
 
 #include <getopt.h>
@@ -6,6 +12,8 @@
 #ifdef _RAXML_PTHREADS
 #include <thread>
 #endif
+
+#include <regex>
 
 using namespace std;
 
@@ -81,6 +89,26 @@ static struct option long_options[] =
   {"site-weights",       required_argument, 0, 0 },  /*  56 */
   {"bs-write-msa",       no_argument, 0, 0 },        /*  57 */
   {"lh-epsilon-triplet", required_argument, 0, 0 },  /*  58 */
+  {"adaptive",           optional_argument, 0, 0 },  /*  59 */
+  {"pythia-trees",       required_argument, 0, 0 },  /*  60 */
+  {"nni-tolerance",      required_argument, 0, 0 },  /*  61 */
+  {"nni-epsilon",        required_argument, 0, 0 },  /*  62 */
+  {"pythia",             optional_argument, 0, 0 },  /*  63 */
+  {"pt",                 optional_argument, 0, 0 },  /*  64 */
+  {"sh",                 optional_argument, 0, 0 },  /*  65 */
+  {"sh-reps",            required_argument, 0, 0 },  /*  66 */
+  {"sh-epsilon",         required_argument, 0, 0 },  /*  67 */
+  {"opt-topology",       required_argument, 0, 0 },  /*  68 */
+  {"stop-rule",          required_argument, 0, 0 },  /*  69 */
+  {"ebg",                no_argument,       0, 0 },  /*  70 */
+  {"fast",               no_argument,       0, 0 },  /*  71 */
+  {"allfast",            no_argument,       0, 0 },  /*  72 */
+  {"opt-freerate",       required_argument, 0, 0 },  /*  73 */
+  {"gcf",                optional_argument, 0, 0 },  /*  74 */
+  {"modeltest",          optional_argument, 0, 0 },  /*  75 */
+  {"moose",              optional_argument, 0, 0 },  /*  76 */
+  {"moose-options",      required_argument, 0, 0 },  /*  77 */
+  {"mutmap",             optional_argument, 0, 0 },  /*  78 */
 
   { 0, 0, 0, 0 }
 };
@@ -100,7 +128,7 @@ void CommandLineParser::check_options(Options &opts)
       opts.command == Command::bootstrap || opts.command == Command::all ||
       opts.command == Command::terrace || opts.command == Command::check ||
       opts.command == Command::parse || opts.command == Command::start ||
-      opts.command == Command::ancestral)
+      opts.command == Command::ancestral || opts.command == Command::modeltest)
   {
     if (opts.msa_file.empty())
       throw OptionException("You must specify a multiple alignment file with --msa switch");
@@ -111,7 +139,7 @@ void CommandLineParser::check_options(Options &opts)
       opts.command == Command::sitelh || opts.command == Command::ancestral ||
       opts.command == Command::consense)
   {
-    if (opts.tree_file.empty())
+    if (opts.tree_file.empty() && (opts.start_trees.count(StartingTree::user) || opts.start_trees.empty()))
       throw OptionException("Please provide a valid Newick file as an argument of --tree option.");
   }
 
@@ -120,6 +148,47 @@ void CommandLineParser::check_options(Options &opts)
     throw OptionException("You specified a user starting tree) for the starting tree generation "
         "command, which does not make any sense!\n"
         "Please choose whether you want to generate parsimony or random starting trees!");
+  }
+
+  if (opts.command == Command::support)
+  {
+    /* only FBP, TBE, GCF and IC1/ICA are allowed in support mapping mode; other values are ignored */
+    opts.bs_metrics.erase(BranchSupportMetric::rbs);
+    opts.bs_metrics.erase(BranchSupportMetric::ps);
+    opts.bs_metrics.erase(BranchSupportMetric::pbs);
+    opts.bs_metrics.erase(BranchSupportMetric::ebg);
+    opts.bs_metrics.erase(BranchSupportMetric::sh_alrt);
+    if (opts.bs_metrics.empty())
+      opts.bs_metrics.insert(BranchSupportMetric::fbp);
+
+    /* gCF works in Newick streaming mode only */
+    if (opts.bs_metrics.count(BranchSupportMetric::gcf))
+      opts.use_tree_streaming = true;;
+  }
+
+  if (opts.command == Command::bootstrap)
+  {
+    if (opts.bs_metrics.empty())
+      opts.bs_metrics.insert(BranchSupportMetric::fbp);
+    else if (opts.bs_metrics.size() > 1)
+      throw OptionException("Please provide a single value for the --bs-metric option.");
+    else if (!opts.bs_metrics.count(BranchSupportMetric::fbp) &&
+             !opts.bs_metrics.count(BranchSupportMetric::rbs) &&
+             !opts.bs_metrics.count(BranchSupportMetric::ps) &&
+             !opts.bs_metrics.count(BranchSupportMetric::pbs))
+    {
+      throw OptionException("Invalid --bs-metric value! Only FBP, RBS, PS or PBS are supported.");
+    }
+
+    /* only FBP, TBE and IC1/ICA are allowed in support mapping mode; other values are ignored */
+    opts.bs_metrics.erase(BranchSupportMetric::rbs);
+    opts.bs_metrics.erase(BranchSupportMetric::ps);
+    opts.bs_metrics.erase(BranchSupportMetric::pbs);
+    opts.bs_metrics.erase(BranchSupportMetric::ebg);
+    opts.bs_metrics.erase(BranchSupportMetric::sh_alrt);
+    opts.bs_metrics.erase(BranchSupportMetric::gcf);
+    if (opts.bs_metrics.empty())
+      opts.bs_metrics.insert(BranchSupportMetric::fbp);
   }
 
   if (opts.command == Command::support || opts.command == Command::bsconverge)
@@ -134,10 +203,13 @@ void CommandLineParser::check_options(Options &opts)
   if (opts.command == Command::support || opts.command == Command::rfdist ||
       opts.command == Command::consense)
   {
-    assert(!opts.tree_file.empty());
+    assert(!opts.tree_file.empty() || !opts.outfile_names.bootstrap_trees.empty());
 
     if (opts.outfile_prefix.empty())
-      opts.outfile_prefix = opts.tree_file;
+    {
+      opts.outfile_prefix = !opts.tree_file.empty() ? opts.tree_file :
+                                                      opts.outfile_names.bootstrap_trees;
+    }
   }
 
   if (opts.command == Command::bsconverge)
@@ -179,7 +251,7 @@ void CommandLineParser::check_options(Options &opts)
   if (opts.simd_arch > sysutil_simd_autodetect())
   {
     if (opts.force_mode)
-      pll_hardware_ignore();
+      corax_hardware_ignore();
     else
     {
       throw OptionException("Cannot detect " + opts.simd_arch_name() +
@@ -193,7 +265,8 @@ void CommandLineParser::compute_num_searches(Options &opts)
 {
   if (opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate || opts.command == Command::start ||
-      opts.command == Command::ancestral || opts.command == Command::sitelh)
+      opts.command == Command::ancestral || opts.command == Command::sitelh ||
+      opts.command == Command::modeltest || opts.command == Command::mutmap)
   {
     assert(!opts.start_trees.empty());
 
@@ -202,8 +275,10 @@ void CommandLineParser::compute_num_searches(Options &opts)
     {
       if (it.first == StartingTree::user)
         it.second = 1;
+      else if (it.first == StartingTree::adaptive)
+        it.second = 0;
       else
-        it.second = it.second > 0 ? it.second : def_tree_count;
+        it.second = it.second != RAXML_UINT32_NONE ? it.second : def_tree_count;
     }
 
     for (const auto& it: opts.start_trees)
@@ -218,13 +293,30 @@ void CommandLineParser::compute_num_searches(Options &opts)
   }
 }
 
+void CommandLineParser::set_fast_options(Options &opts)
+{
+  opts.topology_opt_method = TopologyOptMethod::simplified;
+  opts.stopping_rule = StoppingRule::kh_mult;
+  opts.use_pythia = false;
+  opts.use_pars_spr = true;
+  opts.free_rate_opt_method = FreerateOptMethod::EM_BRENT;
+  opts.modeltest_rhas_heuristic_mode = RHASHeuristicMode::OnlyOptimalCategoryCount;
+  opts.modeltest_rhas = fast_rate_heterogeneity_selection;
+  if (opts.command == Command::all)
+  {
+    opts.bs_metrics.clear();
+    opts.bs_metrics.insert(BranchSupportMetric::ebg);
+  }
+}
+
 void CommandLineParser::parse_start_trees(Options &opts, const string& arg)
 {
   auto start_trees = split_string(arg, ',');
+  char strarg[11];
   for (const auto& st_tree: start_trees)
   {
     StartingTree st_tree_type;
-    unsigned int num_searches = 0;
+    unsigned int num_searches = RAXML_UINT32_NONE;
     if (st_tree == "rand" || st_tree == "random" ||
         sscanf(st_tree.c_str(), "rand{%u}", &num_searches) == 1 ||
         sscanf(st_tree.c_str(), "random{%u}", &num_searches) == 1)
@@ -237,21 +329,259 @@ void CommandLineParser::parse_start_trees(Options &opts, const string& arg)
     {
       st_tree_type = StartingTree::parsimony;
     }
+    else if (st_tree ==  "auto" || st_tree == "adaptive")
+    {
+      st_tree_type = StartingTree::adaptive;
+    }
+    else if (sscanf(st_tree.c_str(), "cons:%10s", strarg) == 1)
+    {
+      parse_consense_cutoff(opts, strarg);
+      st_tree_type = StartingTree::consensus;
+    }
     else
     {
       opts.tree_file += (opts.tree_file.empty() ? "" : ",") + st_tree;
       st_tree_type = StartingTree::user;
     }
-    if (!opts.start_trees.count(st_tree_type) || num_searches > 0)
+    if (num_searches == 0)
+      throw InvalidOptionValueException("Number of starting trees must be positive!");
+    if (!opts.start_trees.count(st_tree_type) || num_searches != RAXML_UINT32_NONE)
       opts.start_trees[st_tree_type] = num_searches;
+  }
+}
+
+void CommandLineParser::parse_bs_trees(Options &opts, const string& arg)
+{
+  if (sysutil_file_exists(arg) && !sysutil_isnumber(arg))
+  {
+    opts.outfile_names.bootstrap_trees = arg;
+  }
+  else
+  {
+    string optstr = arg;
+    std::transform(optstr.begin(), optstr.end(), optstr.begin(), ::tolower);
+    auto metrics = split_string(optstr, ',');
+    opts.bs_replicate_counts.clear();
+    for (const auto& m: metrics)
+    {
+      unsigned int num;
+      if (sscanf(m.c_str(), "fbp{%u}", &num) == 1)
+      {
+        opts.bs_replicate_counts[BranchSupportMetric::fbp] = num;
+      }
+      else if (sscanf(m.c_str(), "rbs{%u}", &num) == 1)
+      {
+        opts.bs_replicate_counts[BranchSupportMetric::rbs] = num;
+      }
+      else if (sscanf(m.c_str(), "tbe{%u}", &num) == 1)
+      {
+        opts.bs_replicate_counts[BranchSupportMetric::tbe] = num;
+      }
+      else if (sscanf(m.c_str(), "ebg{%u}", &num) == 1)
+      {
+        opts.bs_replicate_counts[BranchSupportMetric::ebg] = num;
+      }
+      else if (sscanf(m.c_str(), "ps{%u}", &num) == 1)
+      {
+        opts.bs_replicate_counts[BranchSupportMetric::ps] = num;
+      }
+      else if (sscanf(m.c_str(), "pbs{%u}", &num) == 1)
+      {
+        opts.bs_replicate_counts[BranchSupportMetric::pbs] = num;
+      }
+      else if (sscanf(m.c_str(), "sh{%u}", &num) == 1)
+      {
+        opts.bs_replicate_counts[BranchSupportMetric::sh_alrt] = num;
+        opts.num_sh_reps = num;
+      }
+      else if (strncasecmp(m.c_str(), "autoMRE", 7) == 0)
+      {
+        opts.bootstop_criterion = BootstopCriterion::autoMRE;
+        if (sscanf(m.c_str(), "automre{%u}", &opts.num_bootstraps) != 1)
+          opts.num_bootstraps = 1000;
+      }
+      else if (sscanf(m.c_str(), "%u", &opts.num_bootstraps) != 1 || opts.num_bootstraps == 0)
+      {
+        throw InvalidOptionValueException("Invalid number of bootstrap replicates: " + string(arg));
+      }
+    }
+  }
+
+  if (opts.command == Command::bootstrap || opts.command == Command::all ||
+      opts.command == Command::bsmsa)
+  {
+    // apply defaults
+    for (auto m: opts.bs_metrics)
+    {
+      if (!opts.bs_replicate_counts.count(m))
+      {
+        if (opts.bs_metrics.size() == 1 && opts.num_bootstraps > 0)
+          opts.bs_replicate_counts[m] = opts.num_bootstraps;
+        else if (m == BranchSupportMetric::ebg)
+        {
+          opts.bs_replicate_counts[m] = RAXML_EBG_PBS_TREES_NUM;
+        }
+        else if (m == BranchSupportMetric::ps || m == BranchSupportMetric::pbs)
+        {
+          opts.bs_replicate_counts[m] = RAXML_PS_PBS_TREES_NUM;
+        }
+        else if (m == BranchSupportMetric::sh_alrt)
+          opts.bs_replicate_counts[m] = opts.num_sh_reps ? opts.num_sh_reps : RAXML_SH_ALRT_REPS;
+        else
+        {
+          if (opts.num_bootstraps)
+            opts.bs_replicate_counts[m] = opts.num_bootstraps;
+          else
+            opts.bs_replicate_counts[m] = (opts.bootstop_criterion == BootstopCriterion::none) ? 100 : 1000;
+        }
+      }
+    }
+  }
+
+  /* special case: EBG requires parsimony trees, so set default count for them */
+  if (opts.bs_replicate_counts.count(BranchSupportMetric::ebg) &&
+      !opts.bs_replicate_counts.count(BranchSupportMetric::ps))
+  {
+    opts.bs_replicate_counts[BranchSupportMetric::ps] = RAXML_EBG_PS_TREES_NUM;
+  }
+
+  if ((opts.command == Command::bootstrap || opts.command == Command::all) &&
+      opts.num_bootstraps == 0)
+  {
+    opts.num_bootstraps = opts.num_bootstrap_ml_trees();
+  }
+}
+
+void CommandLineParser::parse_consense_cutoff(Options &opts, const char* optarg)
+{
+  if (strcasecmp(optarg, "mr") == 0)
+    opts.consense_cutoff = ConsenseCutoff::MR;
+  else if (strcasecmp(optarg, "mre") == 0)
+    opts.consense_cutoff = ConsenseCutoff::MRE;
+  else if (strcasecmp(optarg, "strict") == 0)
+    opts.consense_cutoff = ConsenseCutoff::strict;
+  else if (sscanf(optarg, "%*[Mm]%*[Rr]%u", &opts.consense_cutoff) != 1 ||
+           opts.consense_cutoff < 50 || opts.consense_cutoff > 100)
+  {
+    auto errmsg = "Invalid consensus type or threshold value: " +
+                  string(optarg) + "\n" +
+                  "Allowed values: MR, MRE, STRICT or MR<n>, where 50 <= n <= 100.";
+    throw  InvalidOptionValueException(errmsg);
+  }
+}
+
+void CommandLineParser::parse_modeltest_options(Options &opts, const string& arg)
+{
+  auto model_opts = split_string(arg, '/');
+
+  for (auto& mopt: model_opts)
+  {
+    auto toks = split_string(mopt, '=');
+    auto mopt_name = toks[0];
+    auto mopt_val = toks.size() > 1 ? toks[1] : "";
+
+    if (mopt_name == "criterion")
+    {
+      std::transform(mopt_val.begin(), mopt_val.end(), mopt_val.begin(), ::tolower);
+      if (mopt_val == "aic")
+          opts.model_selection_criterion = InformationCriterion::aic;
+      else if (mopt_val == "aicc")
+          opts.model_selection_criterion = InformationCriterion::aicc;
+      else if (mopt_val == "bic")
+          opts.model_selection_criterion = InformationCriterion::bic;
+      else
+          throw InvalidOptionValueException("Unknown information criterion: " + mopt_val);
+    }
+    else if (mopt_name == "freerate-categories" || mopt_name == "rcat")
+    {
+      const std::regex pattern(R"(^(\d+)(?:-(\d+))?$)");
+      std::smatch match;
+      if (!std::regex_match(mopt_val, match, pattern)) {
+        throw InvalidOptionValueException(
+          "Invalid FreeRate category specification: " + mopt_val +
+          ", argument must be specified as single integer or range of two positive integers, e.g. \"5\" or \"2-10\".");
+      }
+
+      auto cmin = std::stoi(match[1]);
+      auto cmax = match[2].matched ? std::stoi(match[2]) : cmin;
+      assert(cmin >= 0 && cmax >= 0); // regex should disallow negative integers
+
+      if (cmin == 0) {
+        throw InvalidOptionValueException("Error, number of FreeRate categories must be greater than 0: " + mopt_val);
+      }
+
+      if (cmin > cmax) {
+        throw InvalidOptionValueException(
+          "Error, minimum number of FreeRate categories higher than maximum: " + mopt_val);
+      }
+
+      opts.free_rate_min_categories = cmin;
+      opts.free_rate_max_categories = cmax;
+    }
+    else if (mopt_name == "ic-delta")
+    {
+      opts.modeltest_significant_ic_delta = std::strtod(mopt_val.c_str(), nullptr);
+    }
+    else if (mopt_name == "heuristics")
+    {
+      const auto heuristics = split_string(mopt_val, ',');
+
+      HeuristicSelection selection;
+
+      for (const auto &heuristic : heuristics)
+      {
+        if (heuristic == std::string("off"))
+        {
+          selection.clear();
+          break;
+        }
+        else if (heuristic == std::string("rhas") or heuristic == std::string("rhas-all"))
+        {
+          selection.insert(HeuristicType::RHAS);
+          opts.modeltest_rhas_heuristic_mode = RHASHeuristicMode::AllSignficantCategoryCounts;
+        }
+        else if (heuristic == std::string("rhas-best"))
+        {
+          selection.insert(HeuristicType::RHAS);
+          opts.modeltest_rhas_heuristic_mode = RHASHeuristicMode::OnlyOptimalCategoryCount;
+        }
+        else if (heuristic == std::string("freerate"))
+          selection.insert(HeuristicType::FREERATE);
+        else
+          throw InvalidOptionValueException("Invalid modeltest heuristic: '" + heuristic + "'");
+      }
+
+      opts.modeltest_heuristics = selection;
+    }
+    else if (mopt_name == "rhas")
+    {
+      RateHeterogeneitySelection selection;
+      for (const auto &rhas : split_string(mopt_val, ','))
+      {
+          const auto &effective_rhas_name = (rhas == "E" ? "" : rhas);
+          const auto &it = std::find(rate_heterogeneity_label.cbegin(), rate_heterogeneity_label.cend(), effective_rhas_name);
+          if (it == rate_heterogeneity_label.cend())
+              throw InvalidOptionValueException("Invalid modeltest rate-heterogeneity model: '" + rhas + "'");
+          selection.insert(static_cast<RateHeterogeneityType>(std::distance(rate_heterogeneity_label.cbegin(), it)));
+      }
+
+      opts.modeltest_rhas = selection;
+    }
+    else if (mopt_name == "substitution-models" || mopt_name == "qmat")
+    {
+      opts.modeltest_subst_models = split_string(mopt_val, ',');
+    }
+    else
+      throw InvalidOptionValueException("Unknown modeltest option: '" + mopt_name + "'");
   }
 }
 
 void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 {
+
   opts.cmdline = get_cmdline(argc, argv);
 
-  /* if no command specified, default to --search (or --help if no args were given) */
+  /* if no command specified, default to --adaptive (or --help if no args were given) */
   opts.command = (argc > 1) ? Command::search : Command::help;
   opts.start_trees.clear();
   opts.random_seed = (long)time(NULL);
@@ -275,9 +605,15 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   /* use new split-based constraint checking method -> slightly slower, but more reliable */
   opts.use_old_constraint = false;
-
+  
   /* enable incremental CLV updates across pruned subtrees in SPR rounds */
   opts.use_spr_fastclv = true;
+
+  /* pre-load all trees from a Newick file */
+  opts.use_tree_streaming = false;
+
+  /* default: do not use SPRs to improve parsimony-based stepwise addition trees */
+  opts.use_pars_spr = false;
 
   /* optimize model and branch lengths */
   opts.optimize_model = true;
@@ -291,21 +627,38 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.spr_radius = -1;
   opts.spr_cutoff = 1.0;
 
+  /* default: nni parameters */
+  opts.nni_tolerance = DEF_NNI_TOLERANCE;
+  opts.nni_epsilon = DEF_NNI_BR_LEN_EPSILON;
+
+  /* default: disable stop rule */
+  opts.stopping_rule = StoppingRule::none;
+
+  /* default: SH parameters */
+  opts.num_sh_reps = RAXML_SH_ALRT_REPS;
+  opts.sh_epsilon = RAXML_SH_ALRT_EPSILON;
+
   /* bootstrapping / bootstopping */
-  opts.bs_metrics.push_back(BranchSupportMetric::fbp);
+  opts.bs_metrics.insert(BranchSupportMetric::fbp);
   opts.bootstop_criterion = BootstopCriterion::autoMRE;
   opts.bootstop_cutoff = RAXML_BOOTSTOP_CUTOFF;
   opts.bootstop_interval = RAXML_BOOTSTOP_INTERVAL;
   opts.bootstop_permutations = RAXML_BOOTSTOP_PERMUTES;
 
   /* default: linked branch lengths */
-  opts.brlen_linkage = PLLMOD_COMMON_BRLEN_SCALED;
+  opts.brlen_linkage = CORAX_BRLEN_SCALED;
   opts.brlen_min = RAXML_BRLEN_MIN;
   opts.brlen_max = RAXML_BRLEN_MAX;
 
   /* by default, autodetect optimal number of threads and workers for the dataset */
   opts.num_threads = 0;
   opts.num_workers = 0;
+
+  /* Number of parsimony trees used for Pythia difficulty prediction */
+  opts.diff_pred_pars_trees = RAXML_CPYTHIA_TREES_NUM;
+
+  bool use_adaptive_search = true;
+  opts.topology_opt_method = TopologyOptMethod::adaptive;
 
   /* max #threads = # available CPU cores */
 #if !defined(_RAXML_PTHREADS)
@@ -345,7 +698,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   int compat_ver = RAXML_INTVER;
   bool log_level_set = false;
   bool lh_epsilon_set = false;
+  bool optarg_tree_required = false;
   string optarg_tree = "";
+  string optarg_bs_trees = "";
+  string optarg_modeltest = "";
 
   int option_index = 0;
   int c;
@@ -397,8 +753,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
 
       case 5: /* starting tree */
-        if (optarg_tree.empty())
-          optarg_tree = strdup(optarg);
+        optarg_tree = strdup(optarg);
         break;
 
       case 6: /* set prefix for output files */
@@ -441,6 +796,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.use_pattern_compression = false;
           opts.use_tip_inner = false;
           opts.use_repeats = false;
+          opts.use_pythia = false;
+          opts.stopping_rule = StoppingRule::none;
+          use_adaptive_search = false;
         }
         else
           opts.use_prob_msa = false;
@@ -458,11 +816,11 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
       case 14: /* branch length linkage mode */
         if (strcasecmp(optarg, "scaled") == 0 || strcasecmp(optarg, "proportional") == 0)
-          opts.brlen_linkage = PLLMOD_COMMON_BRLEN_SCALED;
+          opts.brlen_linkage = CORAX_BRLEN_SCALED;
         else if (strcasecmp(optarg, "linked") == 0)
-          opts.brlen_linkage = PLLMOD_COMMON_BRLEN_LINKED;
+          opts.brlen_linkage = CORAX_BRLEN_LINKED;
         else if (strcasecmp(optarg, "unlinked") == 0)
-          opts.brlen_linkage = PLLMOD_COMMON_BRLEN_UNLINKED;
+          opts.brlen_linkage = CORAX_BRLEN_UNLINKED;
         else
           throw InvalidOptionValueException("Unknown branch linkage mode: " + string(optarg));
         break;
@@ -492,6 +850,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
                                             string(optarg) +
                                             ", please provide a positive real number.");
         lh_epsilon_set = true;
+        opts.stopping_rule = StoppingRule::none;
         break;
 
       case 18: /* random seed */
@@ -509,25 +868,42 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           throw InvalidOptionValueException("Invalid number of threads: %s " + string(optarg) +
                                             ", please provide a positive integer number or `auto`!");
         }
+        /* if fixed number of threads is given, we should never exceed it */
+        if (opts.num_threads > 0)
+          opts.num_threads_max = opts.num_threads;
         break;
       case 20: /* SIMD instruction set */
         if (strcasecmp(optarg, "none") == 0 || strcasecmp(optarg, "scalar") == 0)
         {
-          opts.simd_arch = PLL_ATTRIB_ARCH_CPU;
+#ifdef HAVE_AUTOVEC
+          throw InvalidOptionValueException("Non-vectorized kernels not available!\n"
+              "Please recompile RAxML-NG in portable mode, or use '--simd native' for auto-vectorized kernels.");
+#else
+          opts.simd_arch = CORAX_ATTRIB_ARCH_CPU;
+#endif
+        }
+        else if (strcasecmp(optarg, "native") == 0 || strcasecmp(optarg, "autovec") == 0)
+        {
+#ifdef HAVE_AUTOVEC
+          opts.simd_arch = CORAX_ATTRIB_ARCH_CPU;
+#else
+          throw InvalidOptionValueException("Auto-vectorized kernels not available!\n"
+              "Please recompile RAxML-NG in native mode, or use '--simd none' for non-vectorized kernels.");
+#endif
         }
         else if (strcasecmp(optarg, "sse3") == 0 || strcasecmp(optarg, "sse") == 0)
         {
-          opts.simd_arch = PLL_ATTRIB_ARCH_SSE;
+          opts.simd_arch = CORAX_ATTRIB_ARCH_SSE;
         }
         else if (strcasecmp(optarg, "avx") == 0)
         {
-          opts.simd_arch = PLL_ATTRIB_ARCH_AVX;
+          opts.simd_arch = CORAX_ATTRIB_ARCH_AVX;
         }
         else if (strcasecmp(optarg, "avx2") == 0)
         {
-          opts.simd_arch = PLL_ATTRIB_ARCH_AVX2;
+          opts.simd_arch = CORAX_ATTRIB_ARCH_AVX2;
         }
-        else
+        else if (strcasecmp(optarg, "auto") != 0)
         {
           throw InvalidOptionValueException("Unknown SIMD instruction set: " + string(optarg));
         }
@@ -557,7 +933,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         {
           opts.msa_format = FileFormat::catg;
         }
-        else if (strcasecmp(optarg, "binary") == 0)
+        else if (strcasecmp(optarg, "binary") == 0 || strcasecmp(optarg, "rba") == 0)
         {
           opts.msa_format = FileFormat::binary;
         }
@@ -600,23 +976,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       case 26:  /* number of bootstrap replicates */
         opts.bootstop_criterion = BootstopCriterion::none;
-        if (sysutil_file_exists(optarg) && !sysutil_isnumber(optarg))
-        {
-          opts.outfile_names.bootstrap_trees = optarg;
-        }
-        else if (strncasecmp(optarg, "autoMRE", 7) == 0)
-        {
-          string optstr = optarg;
-          std::transform(optstr.begin(), optstr.end(), optstr.begin(), ::tolower);
-          opts.bootstop_criterion = BootstopCriterion::autoMRE;
-          if (sscanf(optstr.c_str(), "automre{%u}", &opts.num_bootstraps) != 1)
-            opts.num_bootstraps = 1000;
-        }
-        else if (sscanf(optarg, "%u", &opts.num_bootstraps) != 1 || opts.num_bootstraps == 0)
-        {
-          throw InvalidOptionValueException("Invalid number of num_bootstraps: " + string(optarg) +
-              ", please provide a positive integer number!");
-        }
+        optarg_bs_trees = optarg;
         break;
       case 27:
         opts.redo_mode = true;
@@ -655,7 +1015,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 31: /* terrace */
 #ifdef _RAXML_TERRAPHAST
         opts.command = Command::terrace;
-        opts.brlen_linkage = PLLMOD_COMMON_BRLEN_UNLINKED;
+        opts.brlen_linkage = CORAX_BRLEN_UNLINKED;
         num_commands++;
 #else
         throw  OptionException("Unsupported command: --terrace.\n"
@@ -675,21 +1035,23 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       case 34: /* parse */
         opts.command = Command::parse;
+        opts.dup_seqs_action = AbnormalSequenceAction::regraft;
+        opts.allgap_seqs_action = AbnormalSequenceAction::remove;
         num_commands++;
         break;
       case 35: /* branch length optimization method */
         if (strcasecmp(optarg, "nr_fast") == 0)
-          opts.brlen_opt_method = PLLMOD_OPT_BLO_NEWTON_FAST;
+          opts.brlen_opt_method = CORAX_OPT_BLO_NEWTON_FAST;
         else if (strcasecmp(optarg, "nr_oldfast") == 0)
-          opts.brlen_opt_method = PLLMOD_OPT_BLO_NEWTON_OLDFAST;
+          opts.brlen_opt_method = CORAX_OPT_BLO_NEWTON_OLDFAST;
         else if (strcasecmp(optarg, "nr_safe") == 0)
-          opts.brlen_opt_method = PLLMOD_OPT_BLO_NEWTON_SAFE;
+          opts.brlen_opt_method = CORAX_OPT_BLO_NEWTON_SAFE;
         else if (strcasecmp(optarg, "nr_oldsafe") == 0)
-          opts.brlen_opt_method = PLLMOD_OPT_BLO_NEWTON_OLDSAFE;
+          opts.brlen_opt_method = CORAX_OPT_BLO_NEWTON_OLDSAFE;
         else if (strcasecmp(optarg, "nr_fallback") == 0)
-          opts.brlen_opt_method = PLLMOD_OPT_BLO_NEWTON_FALLBACK;
+          opts.brlen_opt_method = CORAX_OPT_BLO_NEWTON_FALLBACK;
         else if (strcasecmp(optarg, "nr_global") == 0)
-          opts.brlen_opt_method = PLLMOD_OPT_BLO_NEWTON_GLOBAL;
+          opts.brlen_opt_method = CORAX_OPT_BLO_NEWTON_GLOBAL;
         else if (strcasecmp(optarg, "off") == 0 || strcasecmp(optarg, "none") == 0)
           opts.optimize_brlen = false;
         else
@@ -715,6 +1077,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       case 38: /* constraint tree */
         opts.constraint_tree_file = optarg;
+        /* all-gap or duplicate taxa can be in constraint tree, so keep them */
+        opts.allgap_seqs_action = AbnormalSequenceAction::keep;
+        opts.dup_seqs_action = AbnormalSequenceAction::keep;
         break;
       case 39: /* no output files (only console output) */
         if (!optarg || strlen(optarg) == 0)
@@ -792,6 +1157,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 46: /* extra options */
         {
           auto extra_opts = split_string(optarg, ',');
+
           for (auto& eopt: extra_opts)
           {
             if (eopt == "lb-naive")
@@ -828,15 +1194,73 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_par_pars = true;
             else if (eopt == "pars-seq")
               opts.use_par_pars = false;
+            else if (eopt == "pars-spr")
+              opts.use_pars_spr = true;
+            else if (eopt == "pars-nospr")
+              opts.use_pars_spr = false;
+            else if (eopt == "pythia-on")
+              opts.use_pythia = true;
+            else if (eopt == "pythia-off")
+              opts.use_pythia = false;
+            else if (eopt == "brlen-reset")
+              opts.brlen_reset_usertree = true;
+            else if (eopt == "brlen-keep")
+              opts.brlen_reset_usertree = false;
+            else if (eopt == "brlen-start-pars")
+              opts.use_pars_brlen = true;
+            else if (eopt == "brlen-start-fixed")
+              opts.use_pars_brlen = false;
+            else if (eopt == "seq-allgap-keep")
+              opts.allgap_seqs_action = AbnormalSequenceAction::keep;
+            else if (eopt == "seq-allgap-remove")
+              opts.allgap_seqs_action = AbnormalSequenceAction::remove;
+            else if (eopt == "seq-allgap-error")
+              opts.allgap_seqs_action = AbnormalSequenceAction::error;
+            else if (eopt == "seq-dup-keep")
+              opts.dup_seqs_action = AbnormalSequenceAction::keep;
+            else if (eopt == "seq-dup-regraft")
+              opts.dup_seqs_action = AbnormalSequenceAction::regraft;
+            else if (eopt == "seq-dup-remove")
+              opts.dup_seqs_action = AbnormalSequenceAction::remove;
+            else if (eopt == "seq-dup-error")
+              opts.dup_seqs_action = AbnormalSequenceAction::error;
+            else if (eopt == "newick-stream")
+              opts.use_tree_streaming = true;
+            else if (eopt == "moose-xml")
+              opts.modeltest_json_output = false;
+            else if (eopt == "moose-json")
+            {
+#ifndef _RAXML_JSON
+              throw  OptionException("JSON output requested but not supported.\n"
+                  "Please build RAxML-NG with JSON support.");
+#endif
+              opts.modeltest_json_output = true;
+            }
             else if (eopt == "compat-v11")
             {
               compat_ver = 110;
               opts.use_spr_fastclv = false;
               opts.use_bs_pars = false;
               opts.use_par_pars = false;
+              opts.use_pythia = false;
+              opts.use_pars_brlen = false;
+              opts.allgap_seqs_action = AbnormalSequenceAction::keep;
+              opts.dup_seqs_action = AbnormalSequenceAction::keep;
+              opts.stopping_rule = StoppingRule::none;
+              opts.topology_opt_method = TopologyOptMethod::classic;
               if (!lh_epsilon_set)
                 opts.lh_epsilon = DEF_LH_EPSILON_V11;
               opts.lh_epsilon_brlen_triplet = DEF_LH_EPSILON_V11;
+            }
+            else if (eopt == "compat-v12")
+            {
+              compat_ver = 120;
+              opts.use_pythia = false;
+              opts.use_pars_brlen = false;
+              opts.allgap_seqs_action = AbnormalSequenceAction::keep;
+              opts.dup_seqs_action = AbnormalSequenceAction::keep;
+              opts.stopping_rule = StoppingRule::none;
+              opts.topology_opt_method = TopologyOptMethod::classic;
             }
             else
               throw InvalidOptionValueException("Unknown extra option: " + string(eopt));
@@ -852,15 +1276,51 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           {
             if (strncasecmp(m.c_str(), "fbp", 3) == 0)
             {
-              opts.bs_metrics.push_back(BranchSupportMetric::fbp);
+              opts.bs_metrics.insert(BranchSupportMetric::fbp);
+            }
+            else if (strncasecmp(m.c_str(), "rbs", 3) == 0)
+            {
+              opts.bs_metrics.insert(BranchSupportMetric::rbs);
             }
             else if (strncasecmp(m.c_str(), "tbe", 3) == 0)
             {
-              opts.bs_metrics.push_back(BranchSupportMetric::tbe);
+              opts.bs_metrics.insert(BranchSupportMetric::tbe);
+            }
+            else if (strncasecmp(m.c_str(), "ebg", 3) == 0)
+            {
+              opts.bs_metrics.insert(BranchSupportMetric::ebg);
+            }
+            else if (strncasecmp(m.c_str(), "ps", 2) == 0)
+            {
+              opts.bs_metrics.insert(BranchSupportMetric::ps);
+            }
+            else if (strncasecmp(m.c_str(), "pbs", 3) == 0)
+            {
+              opts.bs_metrics.insert(BranchSupportMetric::pbs);
+            }
+            else if (strncasecmp(m.c_str(), "sh", 2) == 0 || strncasecmp(m.c_str(), "alrt", 4) == 0)
+            {
+              opts.bs_metrics.insert(BranchSupportMetric::sh_alrt);
+            }
+            else if (strncasecmp(m.c_str(), "ic1", 3) == 0)
+            {
+              opts.bs_metrics.insert(BranchSupportMetric::ic1);
+            }
+            else if (strncasecmp(m.c_str(), "ica", 3) == 0)
+            {
+              opts.bs_metrics.insert(BranchSupportMetric::ica);
+            }
+            else if (strncasecmp(m.c_str(), "gcf", 3) == 0)
+            {
+              opts.bs_metrics.insert(BranchSupportMetric::gcf);
             }
             else
             {
               throw InvalidOptionValueException("Unknown branch support metric: " + string(optarg));
+            }
+            if (opts.bs_metrics.count(BranchSupportMetric::fbp) && opts.bs_metrics.count(BranchSupportMetric::rbs))
+            {
+              throw OptionException("Invalid branch support metric: FBP and RBS can not be used together!");
             }
           }
         }
@@ -898,22 +1358,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.command = Command::consense;
         num_commands++;
         if (optarg)
-        {
-          if (strcasecmp(optarg, "mr") == 0)
-            opts.consense_cutoff = ConsenseCutoff::MR;
-          else if (strcasecmp(optarg, "mre") == 0)
-            opts.consense_cutoff = ConsenseCutoff::MRE;
-          else if (strcasecmp(optarg, "strict") == 0)
-            opts.consense_cutoff = ConsenseCutoff::strict;
-          else if (sscanf(optarg, "%*[Mm]%*[Rr]%u", &opts.consense_cutoff) != 1 ||
-                   opts.consense_cutoff < 50 || opts.consense_cutoff > 100)
-          {
-            auto errmsg = "Invalid consensus type or threshold value: " +
-                          string(optarg) + "\n" +
-                          "Allowed values: MR, MRE, STRICT or MR<n>, where 50 <= n <= 100.";
-            throw  InvalidOptionValueException(errmsg);
-          }
-        }
+          parse_consense_cutoff(opts, optarg);
         else
           opts.consense_cutoff = ConsenseCutoff::MR;
         break;
@@ -952,16 +1397,214 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
       case 57: /* write bootstrap alignments*/
         opts.write_bs_msa = true;
-        opts.use_par_pars = false; // Disables parallel parsing so master populates instance.bs_reps
+        opts.use_par_pars = false;
         break;
-
-      case 58: /* triplet LH epsilon */
+      
+      case 58: /* LH epsilon triplet */
         if(sscanf(optarg, "%lf", &opts.lh_epsilon_brlen_triplet) != 1 || opts.lh_epsilon_brlen_triplet < 0.)
           throw InvalidOptionValueException("Invalid triplet LH epsilon parameter value: " +
                                             string(optarg) +
                                             ", please provide a positive real number.");
         break;
-            
+      
+      case 59: /* Adaptive RAxML-ng analysis with difficulty prediction */
+        if (!optarg || (strcasecmp(optarg, "on") == 0))
+        {
+          use_adaptive_search = true;
+          opts.use_pythia = true;
+          opts.stopping_rule = StoppingRule::kh;
+        }
+        else if (strcasecmp(optarg, "start") == 0)
+        {
+          use_adaptive_search = false;
+          opts.use_pythia = true;
+          optarg_tree = "adaptive";
+          opts.stopping_rule = StoppingRule::none;
+        }
+        else if (strcasecmp(optarg, "off") == 0)
+        {
+          use_adaptive_search = false;
+          opts.use_pythia = false;
+          opts.stopping_rule = StoppingRule::none;
+        }
+        else
+        {
+          throw InvalidOptionValueException("Invalid --adaptive  mode: " + string(optarg));
+        }
+        break;
+      
+      case 60: /* Number of parsimony trees in difficulty prediction */
+        
+        if (sscanf(optarg, "%d", &opts.diff_pred_pars_trees) != 1 || opts.diff_pred_pars_trees <= 0)
+        {
+          throw InvalidOptionValueException("Invalid number of parsimony trees for Pythia difficulty prediction: " +
+                                            string(optarg) + ", please provide a positive integer!");
+        }
+        break;
+
+      case 61: /* NNI tolerance */
+        if(sscanf(optarg, "%lf", &opts.nni_tolerance) != 1 || opts.nni_tolerance <= 0.)
+        {
+          throw InvalidOptionValueException("Invalid NNI tolerance: " + string(optarg) +
+                                            ", please provide a positive real number!\n");
+        }
+        break;
+      
+      case 62: /* NNI epsilon */
+        if(sscanf(optarg, "%lf", &opts.nni_epsilon) != 1 || opts.nni_epsilon <= 0.)
+        {
+          throw InvalidOptionValueException("Invalid NNI epsilon  : " + string(optarg) +
+                                            ", please provide a positive real number!\n");
+        }
+        break;
+
+      case 63: /* pythia: msa difficulty prediction */
+        opts.command = Command::pythia;
+        num_commands++;
+        break;
+
+      case 64: /* pythia quiet */
+        opts.command = Command::pythia;
+        num_commands++;
+        opts.nofiles_mode = true;
+        opts.log_level = LogLevel::result;
+        log_level_set = true;
+        break;
+
+      case 65: /* sh: compute SH-like ALRT branch supports for a given tree */
+        opts.command = Command::all;
+        opts.bs_metrics.clear();
+        opts.bs_metrics.insert(BranchSupportMetric::sh_alrt);
+        opts.topology_opt_method = TopologyOptMethod::nniRound;
+        opts.use_pythia = false;
+        optarg_tree_required = true;
+        num_commands++;
+        /* fall through */
+      case 66: /* number of SH replicates */
+        if (optarg)
+        {
+          if (sscanf(optarg, "%u", &opts.num_sh_reps) != 1 || opts.num_sh_reps == 0)
+          {
+            throw InvalidOptionValueException("Invalid number of SH replicates: " + string(optarg) +
+                ", please provide a positive integer number!");
+          }
+        }
+        break;
+      case 67: /* SH epsilon */
+        if(sscanf(optarg, "%lf", &opts.sh_epsilon) != 1 || opts.sh_epsilon <= 0.)
+        {
+          throw InvalidOptionValueException("Invalid SH epsilon  : " + string(optarg) +
+                                            ", please provide a positive real number!\n");
+        }
+        break;
+      case 68: /* topology optimization method */
+        if (strcasecmp(optarg, "off") == 0 || strcasecmp(optarg, "none") == 0)
+          opts.topology_opt_method = TopologyOptMethod::none;
+        else if (strcasecmp(optarg, "classic") == 0 || strcasecmp(optarg, "v1") == 0)
+          opts.topology_opt_method = TopologyOptMethod::classic;
+        else if (strcasecmp(optarg, "adaptive") == 0)
+          opts.topology_opt_method = TopologyOptMethod::adaptive;
+        else if (strcasecmp(optarg, "rapidbs") == 0 || strcasecmp(optarg, "rbs") == 0)
+          opts.topology_opt_method = TopologyOptMethod::rapidBS;
+        else if (strcasecmp(optarg, "nni-round") == 0 || strcasecmp(optarg, "nni") == 0)
+          opts.topology_opt_method = TopologyOptMethod::nniRound;
+        else if (strncasecmp(optarg, "simpl", 5) == 0 || strcasecmp(optarg, "sRAxML-NG") == 0){
+          opts.topology_opt_method = TopologyOptMethod::simplified;
+          opts.use_pythia = false;
+        } else if (strcasecmp(optarg, "adafast") == 0) {
+          opts.topology_opt_method = TopologyOptMethod::adafast;
+          opts.stopping_rule = StoppingRule::kh_mult;
+          opts.use_pythia = true;
+        } 
+        else
+          throw InvalidOptionValueException("Unknown topology optimization method: " + string(optarg));
+        break;
+      
+      case 69: /* Stopping criterion */
+        if (strcasecmp(optarg, "sn-rell") == 0) {
+          opts.stopping_rule = StoppingRule::sn_rell;
+        } else if (strcasecmp(optarg, "sn-normal") == 0) {
+          opts.stopping_rule = StoppingRule::sn_normal;
+        } else if (strcasecmp(optarg, "KH") == 0) {
+          opts.stopping_rule = StoppingRule::kh;
+        } else if (strcasecmp(optarg, "KH-mult") == 0) {
+          opts.stopping_rule = StoppingRule::kh_mult;
+        } else if (strcasecmp(optarg, "off") == 0) {
+          opts.stopping_rule = StoppingRule::none;
+        } else {
+          throw InvalidOptionValueException("Invalid stopping criterion: " + string(optarg) +
+                                            ", please provide one of the following options: \n" +
+                                            "- sn-rell : Sampling Noise RELL apporach\n" +
+                                            "- sn-normal : Sampling Noise Normal apporach\n" + 
+                                            "- KH : KH test\n" +
+                                            "- KH-mult : KH test with multiple correction\n"  +
+                                            "- off : To turn off stopping rules\n");
+        }
+        break;
+      
+      case 70: /* ebg: use educated bootstrap guesser to estimate branch support */
+        opts.command = Command::all;
+        opts.bs_metrics.clear();
+        opts.bs_metrics.insert(BranchSupportMetric::ebg);
+        opts.topology_opt_method = TopologyOptMethod::none;
+        opts.use_pythia = false;
+        optarg_tree_required = true;
+        num_commands++;
+        break;
+      /* --fast mode: single pars tree + simplified heuristic + kh_mult stop rule */
+      case 71:
+        if (optarg_tree.empty())
+          optarg_tree = "pars{1}";
+        set_fast_options(opts);
+        break;
+      /* --allfast mode: fast ML tree search + EBG branch supports */
+      case 72:
+        opts.command = Command::all;
+        if (optarg_tree.empty())
+          optarg_tree = "pars{1}";
+        set_fast_options(opts);
+        break;
+      case 73: /* freerate optimization method */
+        if (strcasecmp(optarg, "em-bfgs") == 0) {
+          opts.free_rate_opt_method = FreerateOptMethod::EM_BFGS;
+        } else if (strcasecmp(optarg, "em-brent") == 0) {
+          opts.free_rate_opt_method = FreerateOptMethod::EM_BRENT;
+        } else if (strcasecmp(optarg, "lbfgsb") == 0 || strcasecmp(optarg, "bfgs") == 0) {
+          opts.free_rate_opt_method = FreerateOptMethod::LBFGSB;
+        } else if (strcasecmp(optarg, "auto") == 0) {
+          opts.free_rate_opt_method = FreerateOptMethod::AUTO;
+        } else
+          throw InvalidOptionValueException("Unknown FreeRate optimization method: " + string(optarg));
+        break;
+      case 74: /* gcf: compute gene concordance factors */
+        opts.command = Command::support;
+        opts.bs_metrics.clear();
+        opts.bs_metrics.insert(BranchSupportMetric::gcf);
+        opts.use_pythia = false;
+        optarg_tree_required = true;
+        if (optarg)
+          optarg_tree = optarg;
+        num_commands++;
+        break;
+      case 75: /* modeltest (for backward-compatibility) */
+      case 76: /* model selection / moose */
+        opts.command = Command::modeltest;
+        if (optarg)
+          optarg_modeltest = optarg;
+        if (optarg_tree.empty())
+          optarg_tree = "pars{1}";
+        num_commands++;
+        break;
+      case 77: /* model selection options */
+        optarg_modeltest = optarg;
+        break;
+      case 78: /* mutation mapping */
+        opts.command = Command::mutmap;
+        opts.use_pattern_compression = false;
+        opts.use_repeats = false;
+        opts.use_tip_inner = true;
+        num_commands++;
+        break;
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -974,14 +1617,34 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   if (num_commands > 1)
     throw OptionException("More than one command specified");
 
-  /* process start tree & LH epsilon defaults */
+  parse_modeltest_options(opts, optarg_modeltest);
+
+  if (optarg_tree.empty() && optarg_tree_required)
+    throw OptionException("This command requires a reference tree, please use --tree option!");
+
+  if (!use_adaptive_search && opts.topology_opt_method == TopologyOptMethod::adaptive)
+    opts.topology_opt_method = TopologyOptMethod::classic;
+
+  /* process start tree defaults */
   if (opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::start)
   {
     if (optarg_tree.empty())
-      optarg_tree = opts.use_old_constraint ? "rand{20}" : RAXML_DEF_START_TREE;
+    {
+      if (use_adaptive_search)
+        optarg_tree = "adaptive";
+      else
+        optarg_tree = opts.use_old_constraint ? "rand{20}" : RAXML_DEF_START_TREE;
+    }
     else if (optarg_tree == "default1")
       optarg_tree = compat_ver < 120 ? RAXML_DEF_START_TREE1_V11 : RAXML_DEF_START_TREE1;
+  }
+  parse_start_trees(opts, optarg_tree);
+
+  /* process LH epsilon defaults */
+  if (opts.command == Command::search || opts.command == Command::bootstrap ||
+      opts.command == Command::all)
+  {
     if (!lh_epsilon_set)
       opts.lh_epsilon = compat_ver < 120 ? DEF_LH_EPSILON_V11 : DEF_LH_EPSILON;
   }
@@ -991,17 +1654,12 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
     if (!lh_epsilon_set)
       opts.lh_epsilon = DEF_LH_EPSILON_V11;
   }
-  parse_start_trees(opts, optarg_tree);
+
+  parse_bs_trees(opts, optarg_bs_trees);
 
   check_options(opts);
 
-  if ((opts.command == Command::bootstrap || opts.command == Command::all) &&
-      opts.num_bootstraps == 0)
-  {
-    opts.num_bootstraps = (opts.bootstop_criterion == BootstopCriterion::none) ? 100 : 1000;
-  }
-
-  compute_num_searches(opts);
+  compute_num_searches(opts); // FOR ADAPTIVE RAXML
 
   /* set default log output level  */
   if (!log_level_set)
@@ -1023,7 +1681,7 @@ void CommandLineParser::print_help()
             "  --help                                     display help information\n"
             "  --version                                  display version information\n"
             "  --evaluate                                 evaluate the likelihood of a tree (with model+brlen optimization)\n"
-            "  --search                                   ML tree search (default: 10 parsimony + 10 random starting trees)\n"
+            "  --search                                   ML tree search (default: use adaptive heuristic)\n"
             "  --bootstrap                                bootstrapping (default: use bootstopping to auto-detect #replicates)\n"
             "  --all                                      all-in-one (ML search + bootstrapping)\n"
             "  --support                                  compute bipartition support for a given reference tree (e.g., best ML tree)\n"
@@ -1040,16 +1698,25 @@ void CommandLineParser::print_help()
             "  --consense [ STRICT | MR | MR<n> | MRE ]   build strict, majority-rule (MR) or extended MR (MRE) consensus tree (default: MR)\n"
             "                                             eg: --consense MR75 --tree bsrep.nw\n"
             "  --ancestral                                ancestral state reconstruction at all inner nodes\n"
+            "  --mutmap                                   map mutations to the tree branches\n"
             "  --sitelh                                   print per-site log-likelihood values\n"
+            "  --pythia                                   compute and print Pythia MSA difficulty score\n"
+            "  --moose [ OPTIONS ]                        select best-fit MOdel Of Sequence Evolution (OPTIONS: see below)\n"
             "\n"
             "Command shortcuts (mutually exclusive):\n"
-            "  --search1                                  Alias for: --search --tree rand{1}\n"
+            "  --search1                                  Alias for: --search --tree pars{1}\n"
+            "  --fast                                     Alias for: --search --tree pars{1} --opt-topology simplified --stop-rule kh-mult\n"
+            "  --allfast                                  Alias for: --all --tree pars{1} --opt-topology simplified --stop-rule kh-mult --bs-metric ebg\n"
             "  --loglh                                    Alias for: --evaluate --opt-model off --opt-branches off --nofiles --log result\n"
             "  --rf                                       Alias for: --rfdist --nofiles --log result\n"
+            "  --pt                                       Alias for: --pythia --nofiles --log result\n"
+            "  --sh [ REPS ]                              Alias for: --all --opt-topology nni --bs-metric sh [ --sh-reps REPS ]\n"
+            "  --ebg                                      Alias for: --all --bs-metric ebg --opt-topology off\n"
+            "  --gcf [ REF_TREE ]                         Alias for: --support --bs-metric gcf [ --tree REF_TREE ] \n"
             "\n"
             "Input and output options:\n"
-            "  --tree            rand{N} | pars{N} | FILE starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
-            "                                             N = number of trees (default: rand{10},pars{10})\n"
+            "  --tree            rand{N} | pars{N} |      starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
+            "                    FILE | auto              N = number of trees (default: auto-detect based on MSA difficulty)\n"
             "  --msa             FILE                     alignment file\n"
             "  --msa-format      VALUE                    alignment file format: FASTA, PHYLIP, CATG or AUTO-detect (default)\n"
             "  --data-type       VALUE                    data type: DNA, AA, BIN(ary) or AUTO-detect (default)\n"
@@ -1067,9 +1734,14 @@ void CommandLineParser::print_help()
             "  --pat-comp     on | off                    alignment pattern compression (default: ON)\n"
             "  --tip-inner    on | off                    tip-inner case optimization (default: OFF)\n"
             "  --site-repeats on | off                    use site repeats optimization, 10%-60% faster than tip-inner (default: ON)\n" <<
-            "  --threads      VALUE                       number of parallel threads to use (default: " << sysutil_get_cpu_cores() << ")\n" <<
-            "  --workers      VALUE                       number of tree searches to run in parallel (default: 1)\n" <<
-            "  --simd         none | sse3 | avx | avx2    vector instruction set to use (default: auto-detect).\n"
+            "  --threads      VALUE                       number of parallel threads to use (default: auto{" << sysutil_get_cpu_cores() << "})\n" <<
+            "  --workers      VALUE                       number of tree searches to run in parallel (default: auto)\n" <<
+#ifdef HAVE_AUTOVEC
+            "  --simd         native | sse3 | avx | avx2  "
+#else
+            "  --simd         none | sse3 | avx | avx2    "
+#endif
+                                                      << "vector instruction set to use (default: auto-detect).\n"
             "  --rate-scalers on | off                    use individual CLV scalers for each rate category (default: ON for >2000 taxa)\n"
             "  --force        [ <CHECKS> ]                disable safety checks (please think twice!)\n"
             "\n"
@@ -1083,28 +1755,51 @@ void CommandLineParser::print_help()
             "  --opt-model    on | off                    ML optimization of all model parameters (default: ON)\n"
             "  --opt-branches on | off                    ML optimization of all branch lengths (default: ON)\n"
             "  --prob-msa     on | off                    use probabilistic alignment (works with CATG and VCF)\n"
-            "  --lh-epsilon   VALUE                       log-likelihood epsilon for optimization/tree search (default: 0.1)\n"
+            "  --lh-epsilon   VALUE                       log-likelihood epsilon for optimization/tree search (default: 10)\n"
+            "  --opt-freerate em | lbfgsb                 optimization method for FreeRates (default: lbfgsb)\n"
+            "\n"
+            "Model selection options:\n"
+            "  --moose-options OPT=VAL/OPT=VAL/...        list of MOdel Optimization and SElection options separated by '/'\n"
+            "      criterion=AIC | AICc | BIC             information criterion to use for model selection (default: BIC)\n"
+            "      ic-delta=VALUE                         significance threshold for IC score difference (default: 10.0)\n"
+            "      freerate-categories=n[-m]              test FreeRate models with n categories (optionally up to and including m)\n"
+            "      rhas=VAL1,VAL2,...                     list of rate heterogeneity across sites (RHAS) models (default: R,I+R,E,I,G,I+G)\n"
+            "      substitution-models=VAL1,VAL2,...      list of substitutions models (default: all supported)\n"
+            "      heuristics=VAL1,VAL2,... | OFF         heuristics to skip models (default: rhas,freerate)\n"
             "\n"
             "Topology search options:\n"
-            "  --spr-radius           VALUE               SPR re-insertion radius for fast iterations (default: AUTO)\n"
-            "  --spr-cutoff           VALUE | off         relative LH cutoff for descending into subtrees (default: 1.0)\n"
-            "  --lh-epsilon-triplet   VALUE               log-likelihood epsilon for branch length triplet optimization (default: 1000)\n"
+            "  --opt-topology        classic | adaptive   topology optimization method (default: adaptive)\n"
+            "                        simple  | nni        \n"
+            "                        rbs | off            \n"
+            "  --adaptive            [ on | off | start ] adaptive ML tree search (start = starting trees only)\n"
+            "  --spr-radius          VALUE                SPR re-insertion radius for fast iterations (default: AUTO)\n"
+            "  --spr-cutoff          VALUE | off          relative LH cutoff for descending into subtrees (default: 1.0)\n"
+            "  --lh-epsilon-triplet  VALUE                log-likelihood epsilon for branch length triplet optimization (default: 1000)\n"
+            "  --stop-rule           sn-rell | sn-normal  stopping criterion for SPR rounds (default: OFF)\n"
+            "                        kh | kh-mult | off   \n"
             "\n"
-            "Bootstrapping options:\n"
-            "  --bs-trees     VALUE                       number of bootstraps replicates\n"
+            "Bootstrapping and branch support options:\n"
+            "  --bs-trees     N | fbp{N1},sh{N2},...      number of bootstrap replicates N, can be global or per-metric (see below)\n"
             "  --bs-trees     autoMRE{N}                  use MRE-based bootstrap convergence criterion, up to N replicates (default: 1000)\n"
             "  --bs-trees     FILE                        Newick file containing set of bootstrap replicate trees (with --support)\n"
             "  --bs-cutoff    VALUE                       cutoff threshold for the MRE-based bootstopping criteria (default: 0.03)\n"
-            "  --bs-metric    fbp | tbe                   branch support metric: fbp = Felsenstein bootstrap (default), tbe = transfer distance\n"
-            "  --bs-write-msa on | off                    write all bootstrap alignments (default: OFF)\n";
+            "  --bs-metric    fbp | rbs |                 branch support metric: fbp = Felsenstein bootstrap (default), rbs = Rapid bootstrap\n"
+            "                 ebg | tbe | sh              ebg = Educated bootstrap guesser, tbe = Transfer bootstrap estimate, sh = SH-like aLRT\n"
+            "                 ps  | pbs |                 ps = Parsimony support, pbs = Parsimony bootstrap support\n"
+            "                 ic1 | ica                   ic1 = Internode certainty (most prevalent), ica = Internode certainty (all)\n"
+            "                 gcf                         gcf = Gene concordance factor\n"
+            "  --bs-write-msa on | off                    write all bootstrap alignments (default: OFF)\n"
+            "\n"
+            "SH-like test options:\n"
+            "  --sh-reps      VALUE                       number of bootstrap replicates for SH-aLRT test (default: 1000)\n"
+            "  --sh-epsilon   VALUE                       log-likelihood epsilon for SH-aLRT test (default: 0.1)\n";
 
   cout << "\n"
             "EXAMPLES:\n"
             "  1. Perform tree inference on DNA alignment \n"
-            "     (10 random + 10 parsimony starting trees, general time-reversible model, ML estimate of substitution rates and\n"
-            "      nucleotide frequencies, discrete GAMMA model of rate heterogeneity with 4 categories):\n"
+            "     (select best-fit model, adaptive search heuristic based on MSA difficulty):\n"
             "\n"
-            "     ./raxml-ng --msa testDNA.fa --model GTR+G\n"
+            "     ./raxml-ng --msa testDNA.fa --model DNA\n"
             "\n";
 
   cout << "\n"

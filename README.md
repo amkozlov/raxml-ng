@@ -4,40 +4,32 @@
 
 ## Introduction
 
-RAxML-NG is a phylogenetic tree inference tool which uses maximum-likelihood (ML) optimality criterion. Its search heuristic is based on iteratively performing a series of Subtree Pruning and Regrafting (SPR) moves, which allows to quickly navigate to the best-known ML tree. RAxML-NG is a successor of RAxML (Stamatakis 2014) and leverages the highly optimized likelihood computation implemented in [*libpll*](https://github.com/xflouris/libpll) (Flouri et al. 2014).
+RAxML-NG is a phylogenetic tree inference tool which uses maximum-likelihood (ML) optimality criterion. Its search heuristic is based on iteratively performing a series of Subtree Pruning and Regrafting (SPR) moves, which allows to quickly navigate to the best-known ML tree. RAxML-NG is a successor of RAxML (Stamatakis 2014) and leverages the highly optimized likelihood computation implemented in [`coraxlib`](https://codeberg.org/Exelixis-Lab/coraxlib).
 
-RAxML-NG offers improvements in speed, flexibility and user-friendliness over the previous RAxML versions. It also implements some of the features previously available in ExaML (Kozlov et al. 2015), including checkpointing and efficient load balancing for partitioned alignments (Kobert et al. 2014).
-
-RAxML-NG is currently under active development, and the mid-term goal is to have most functionality of RAxML 8.x covered.
-You can see some of the planned features [here](https://github.com/amkozlov/raxml-ng/issues).
+RAxML-NG offers improvements in speed, flexibility and user-friendliness over the previous RAxML versions. It also implements some of the features previously available in ExaML (Kozlov et al. 2015), including checkpointing and efficient load balancing for partitioned alignments (Kobert et al. 2014). RAxML-NG version 2.0 offers a plethora of new features such as [adaptive search heuristics](https://doi.org/10.1093/molbev/msad227), [automatic model selection](https://github.com/amkozlov/raxml-ng/wiki/Automatic-model-selection-(MOOSE)), and [fast branch support metrics](https://github.com/amkozlov/raxml-ng/wiki/Computing-branch-support-metrics).
 
 Documentation: [github wiki](https://github.com/amkozlov/raxml-ng/wiki)
 
 ## Installation instructions
 
 * For most desktop Unix/Linux and macOS systems, the easiest way to install RAxML-NG is by using the pre-compiled binary:  
-[**Download Linux binary (x86)**](https://github.com/amkozlov/raxml-ng/releases/download/1.2.2/raxml-ng_v1.2.2_linux_x86_64.zip)  
-[**Download OSX/macOS binary (x86 and ARM)**](https://github.com/amkozlov/raxml-ng/releases/download/1.2.2/raxml-ng_v1.2.2_macos.zip)   
+[**Download 64-bit Linux binary**](https://github.com/amkozlov/raxml-ng/releases/download/2.0.0/raxml-ng_v2.0.0_linux_x86_64.zip)  
+[**Download 64-bit macOS binary**](https://github.com/amkozlov/raxml-ng/releases/download/2.0.0/raxml-ng_v2.0.0_macos.zip)   
 
-* For clusters/supercomputers (i.e., if you want to use MPI), please use the following installation package which contains pre-built *libpll*. You will need `GCC 6.4+` and `CMake 3.0.2+` in order to compile RAxML-NG for your system.  
-[**Download RAxML-NG-MPI for Linux**](https://github.com/amkozlov/raxml-ng/releases/download/1.2.2/raxml-ng_v1.2.2_linux_x86_64_MPI.zip)
-
-* On Windows, you can use [linux binary](https://github.com/amkozlov/raxml-ng/releases/download/1.2.2/raxml-ng_v1.2.2_linux_x86_64.zip) via [Windows Subsystem for Linux](https://ubuntu.com/wsl), but performance might be lower than with native Linux execution. 
+* On Windows, you can use [linux binary](https://github.com/amkozlov/raxml-ng/releases/download/2.0.0/raxml-ng_v2.0.0_linux_x86_64.zip) via [Windows Subsystem for Linux](https://ubuntu.com/wsl), but performance might be lower than with native Linux execution. 
 
 * If neither of the above options worked for you, please clone this repository and build RAxML-NG from scratch.
 
-**1. Install the dependecies.** On Ubuntu (and other Debian-based systems), you can simply run:
+**1. Install the dependecies (optional).** On Ubuntu and other Debian-based systems, you can simply run:
 ```
-sudo apt-get install flex bison libgmp3-dev
+sudo apt-get install libgmp3-dev libhts-dev libhtscodecs-dev 
 ```
 For other systems, please make sure you have following packages/libraries installed:  
-- [`GNU Bison`](http://www.gnu.org/software/bison/)
-- [`Flex`](http://flex.sourceforge.net/) 
 - [`GMP`](https://gmplib.org/)
+- [`htslib`](https://github.com/samtools/htslib)
 
 If you do not want to use git submodules (e.g., for packaging), you also need to install:
-- [`pll-modules`](https://github.com/ddarriba/pll-modules/) 
-- [`libpll-2`](https://github.com/xflouris/libpll-2)
+- [`coraxlib`](https://codeberg.org/Exelixis-Lab/coraxlib) 
 - [`terraphast`](https://github.com/amkozlov/terraphast-one) (optional)
 
 **2. Build RAxML-NG.**
@@ -68,7 +60,17 @@ Portable PTHREADS version (static linkage, compatible with old non-AVX CPUs):
 git clone --recursive https://github.com/amkozlov/raxml-ng
 cd raxml-ng
 mkdir build && cd build
-cmake -DSTATIC_BUILD=ON -DENABLE_RAXML_SIMD=OFF -DENABLE_PLLMOD_SIMD=OFF ..
+cmake -DSTATIC_BUILD=ON -DPORTABLE_BUILD=ON ..
+make
+```
+
+Latest **unstable** development version (`dev` branch):
+
+```
+git clone --recursive -b dev https://github.com/amkozlov/raxml-ng raxml-ng-dev
+cd raxml-ng-dev
+mkdir build && cd build
+cmake ..
 make
 ```
 
@@ -84,10 +86,9 @@ If still in doubt, please feel free to post to the [RAxML google group](https://
 ## Usage examples
 
   1. Perform single quick&dirty tree inference on DNA alignment 
-     (one parsimony starting tree, general time-reversible model, ML estimate of substitution rates and
-      nucleotide frequencies, discrete GAMMA model of rate heterogeneity with 4 categories):
+     (auto-select best-fit model, simplified search heuristic with early stopping):
 
-     `./raxml-ng --search1 --msa testDNA.fa --model GTR+G`
+     `./raxml-ng --fast --msa testDNA.fa --model DNA`
 
   2. Perform an all-in-one analysis (ML tree search + non-parametric bootstrap) 
      (10 randomized parsimony starting trees, fixed empirical substitution matrix (LG),
@@ -106,6 +107,10 @@ If still in doubt, please feel free to post to the [RAxML google group](https://
 
      `./raxml-ng --support --tree bestML.tree --bs-trees bootstraps.tree`
 
+  5. To run in `v1.1.0` compatibility mode (disable adaptive search, aggressive logLH thresholds etc.), use:
+
+    ./raxml-ng --msa testDNA.fa --model GTR+G --extra compat-v11
+
 ## License and citation
 
 The code is currently licensed under the GNU Affero General Public License version 3.
@@ -117,17 +122,21 @@ Alexey M. Kozlov, Diego Darriba, Tom&aacute;&scaron; Flouri, Benoit Morel, and A
 *Bioinformatics, 35 (21), 4453-4455* 
 doi:[10.1093/bioinformatics/btz305](https://doi.org/10.1093/bioinformatics/btz305)
 
-## The team
+When using the **adaptive** tree search, please cite [(Togkousidis et al. 2023)](https://academic.oup.com/mbe/article/40/10/msad227/7296053)
 
-* Alexey Kozlov
+When using **Educated Bootstrap Guesser (EBG)**, please cite [(Wiegert et al. 2024)](https://doi.org/10.1093/molbev/msae215)
+
+When using **Pythia difficulty prediction**, please cite [(Haag & Stamatakis 2025)](https://doi.org/10.1101/2025.03.25.645182)
+
+## Developer team
+
+* Oleksiy Kozlov
 * Alexandros Stamatakis
-* Diego Darriba
-* Tom&aacute;&scaron; Flouri
-* Benoit Morel
-* Ben Bettisworth
-* Sarah Lutteropp
-* Julia Haag
 * Anastasis Togkousidis
+* Christoph Stelz
+* Ben Bettisworth
+
+Former contributors: Diego Darriba, Tom&aacute;&scaron; Flouri, Julia Haag, Sarah Lutteropp, Benoit Morel. 
 
 ## References
 

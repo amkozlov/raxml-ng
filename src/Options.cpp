@@ -1,28 +1,93 @@
 #include "Options.hpp"
+#include "modeltest/ModelDefinitions.hpp"
+#include "modeltest/RHASHeuristic.hpp"
+#include "types.hpp"
 //#include <stdlib.h>
 #include <climits>
 
 using namespace std;
 
+SupportMetricSet BS_METRICS_WITH_ML_TREES   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
+                                              BranchSupportMetric::tbe,
+                                              BranchSupportMetric::ic1, BranchSupportMetric::ica};
+
+SupportMetricSet BS_METRICS_WITH_PB_TREES   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
+                                              BranchSupportMetric::tbe, BranchSupportMetric::ebg,
+                                              BranchSupportMetric::pbs,
+                                              BranchSupportMetric::ic1, BranchSupportMetric::ica};
+
+SupportMetricSet BS_METRICS_WITH_PARS_TREES { BranchSupportMetric::ps };
+
+SupportMetricSet BS_METRICS_WITH_MSA_REPS   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
+                                              BranchSupportMetric::tbe, BranchSupportMetric::ebg,
+                                              BranchSupportMetric::pbs, BranchSupportMetric::sh_alrt,
+                                              BranchSupportMetric::ic1, BranchSupportMetric::ica };
+
 Options::Options() : opt_version(RAXML_OPT_VERSION), cmdline(""), command(Command::none),
 use_tip_inner(true), use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false),
 use_repeats(true), use_rba_partload(true), use_energy_monitor(true), use_old_constraint(false),
-use_spr_fastclv(true), use_bs_pars(true), use_par_pars(true),
-optimize_model(true), optimize_brlen(true), force_mode(false), safety_checks(SafetyCheck::all),
+use_spr_fastclv(true), use_bs_pars(true), use_par_pars(true), use_pythia(true), use_tree_streaming(false),
+use_pars_spr(false),
+optimize_model(true), optimize_brlen(true), topology_opt_method(TopologyOptMethod::adaptive),
+stopping_rule(StoppingRule::none), force_mode(false), safety_checks(SafetyCheck::all),
 redo_mode(false), nofiles_mode(false), write_interim_results(true), write_bs_msa(false),
+allgap_seqs_action(AbnormalSequenceAction::error), dup_seqs_action(AbnormalSequenceAction::keep),
 log_level(LogLevel::progress), msa_format(FileFormat::autodetect), data_type(DataType::autodetect),
 random_seed(0), start_trees(), lh_epsilon(DEF_LH_EPSILON), lh_epsilon_brlen_triplet(DEF_LH_EPSILON_BRLEN_TRIPLET),
 spr_radius(-1), spr_cutoff(1.0),
-brlen_linkage(PLLMOD_COMMON_BRLEN_SCALED), brlen_opt_method(PLLMOD_OPT_BLO_NEWTON_FAST),
-brlen_min(RAXML_BRLEN_MIN), brlen_max(RAXML_BRLEN_MAX),
+brlen_linkage(CORAX_BRLEN_SCALED), brlen_opt_method(CORAX_OPT_BLO_NEWTON_FAST),
+brlen_min(RAXML_BRLEN_MIN), brlen_max(RAXML_BRLEN_MAX), brlen_reset_usertree(false), use_pars_brlen(true),
 num_searches(1), terrace_maxsize(100),
-num_bootstraps(1000), bootstop_criterion(BootstopCriterion::none), bootstop_cutoff(0.03),
+num_bootstraps(1000), bootstop_criterion(BootstopCriterion::none), bootstop_cutoff(RAXML_BOOTSTOP_CUTOFF),
 bootstop_interval(RAXML_BOOTSTOP_INTERVAL), bootstop_permutations(RAXML_BOOTSTOP_PERMUTES),
 tbe_naive(false), consense_cutoff(ConsenseCutoff::MR), tree_file(""), constraint_tree_file(""),
 msa_file(""), model_file(""), weights_file(""), outfile_prefix(""),
 num_threads(1), num_threads_max(1), num_ranks(1), num_workers(1), num_workers_max(UINT_MAX),
-simd_arch(PLL_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(LoadBalancing::benoit)
-{}
+simd_arch(CORAX_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(LoadBalancing::benoit),
+diff_pred_pars_trees(RAXML_CPYTHIA_TREES_NUM), nni_tolerance(1.0), nni_epsilon(10),
+num_sh_reps(RAXML_SH_ALRT_REPS), sh_epsilon(RAXML_SH_ALRT_EPSILON),
+free_rate_min_categories(2), free_rate_max_categories(10), free_rate_opt_method(FreerateOptMethod::AUTO),
+model_selection_criterion(InformationCriterion::bic), modeltest_heuristics({HeuristicType::FREERATE, HeuristicType::RHAS}),
+modeltest_significant_ic_delta(10.0), modeltest_rhas(default_rate_heterogeneity_selection),
+modeltest_rhas_heuristic_mode(RHASHeuristicMode::AllSignficantCategoryCounts)
+{
+#ifdef _RAXML_JSON
+  modeltest_json_output = true;
+#else
+  modeltest_json_output = false;
+#endif
+}
+
+unsigned int Options::max_num_replicates(const SupportMetricSet& mset) const
+{
+  unsigned int num = 0;
+  for (auto& m: bs_replicate_counts)
+  {
+    if (mset.count(m.first))
+      num = std::max(num, m.second);
+  }
+  return num;
+}
+
+unsigned int Options::num_bootstrap_ml_trees() const
+{
+  return max_num_replicates(BS_METRICS_WITH_ML_TREES);
+}
+
+unsigned int Options::num_bootstrap_pars_trees() const
+{
+  return max_num_replicates(BS_METRICS_WITH_PB_TREES);
+}
+
+unsigned int Options::num_pars_trees() const
+{
+  return max_num_replicates(BS_METRICS_WITH_PARS_TREES);
+}
+
+unsigned int Options::num_bootstrap_msa_reps() const
+{
+  return max_num_replicates(BS_METRICS_WITH_MSA_REPS);
+}
 
 string Options::output_fname(const string& suffix) const
 {
@@ -51,7 +116,15 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.bootstrap_trees, "bootstraps");
   set_default_outfile(outfile_names.support_tree, "support");
   set_default_outfile(outfile_names.fbp_support_tree, "supportFBP");
+  set_default_outfile(outfile_names.rbs_support_tree, "supportRBS");
   set_default_outfile(outfile_names.tbe_support_tree, "supportTBE");
+  set_default_outfile(outfile_names.ebg_support_tree, "supportEBG");
+  set_default_outfile(outfile_names.ps_support_tree, "supportPS");
+  set_default_outfile(outfile_names.pbs_support_tree, "supportPBS");
+  set_default_outfile(outfile_names.sh_support_tree, "supportSH");
+  set_default_outfile(outfile_names.ic1_support_tree, "supportIC1");
+  set_default_outfile(outfile_names.ica_support_tree, "supportICA");
+  set_default_outfile(outfile_names.gcf_support_tree, "supportGCF");
   set_default_outfile(outfile_names.terrace, "terrace");
   set_default_outfile(outfile_names.binary_msa, "rba");
   set_default_outfile(outfile_names.bootstrap_msa, "bootstrapMSA");
@@ -60,7 +133,14 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.asr_tree, "ancestralTree");
   set_default_outfile(outfile_names.asr_probs, "ancestralProbs");
   set_default_outfile(outfile_names.asr_states, "ancestralStates");
+  set_default_outfile(outfile_names.mut_map_tree, "mutationMapTree");
+  set_default_outfile(outfile_names.mut_map_list, "mutationMapList");
   set_default_outfile(outfile_names.site_loglh, "siteLH");
+  set_default_outfile(outfile_names.modeltest_best_model, "moose.bestModel");
+  if (modeltest_json_output)
+    set_default_outfile(outfile_names.modeltest_json, "moose.json");
+  else
+    set_default_outfile(outfile_names.modeltest_xml, "moose.xml");
   set_default_outfile(outfile_names.tmp_best_tree, "lastTree.TMP");
   set_default_outfile(outfile_names.tmp_ml_trees, "mlTrees.TMP");
   set_default_outfile(outfile_names.tmp_bs_trees, "bootstraps.TMP");
@@ -77,14 +157,30 @@ std::string Options::checkp_file() const
 
 const std::string& Options::support_tree_file(BranchSupportMetric bsm) const
 {
-  if (bs_metrics.size() < 2)
+  if (bs_metrics.size() < 2 && bsm == BranchSupportMetric::fbp)
     return outfile_names.support_tree;
   else
   {
     if (bsm == BranchSupportMetric::fbp)
       return outfile_names.fbp_support_tree;
+    else if (bsm == BranchSupportMetric::rbs)
+      return outfile_names.rbs_support_tree;
     else if (bsm == BranchSupportMetric::tbe)
       return outfile_names.tbe_support_tree;
+    else if (bsm == BranchSupportMetric::ebg)
+      return outfile_names.ebg_support_tree;
+    else if (bsm == BranchSupportMetric::ps)
+      return outfile_names.ps_support_tree;
+    else if (bsm == BranchSupportMetric::pbs)
+      return outfile_names.pbs_support_tree;
+    else if (bsm == BranchSupportMetric::sh_alrt)
+      return outfile_names.sh_support_tree;
+    else if (bsm == BranchSupportMetric::ic1)
+      return outfile_names.ic1_support_tree;
+    else if (bsm == BranchSupportMetric::ica)
+      return outfile_names.ica_support_tree;
+    else if (bsm == BranchSupportMetric::gcf)
+      return outfile_names.gcf_support_tree;
     else
       return outfile_names.support_tree;
   }
@@ -100,6 +196,11 @@ std::string Options::bootstrap_partition_file() const
 {
   return outfile_names.bootstrap_msa.empty() ? "" :
              outfile_names.bootstrap_msa + ".partition";
+}
+
+const std::string& Options::modeltest_results_file() const
+{
+  return modeltest_json_output ? outfile_names.modeltest_json : outfile_names.modeltest_xml;
 }
 
 bool Options::result_files_exist() const
@@ -135,8 +236,12 @@ bool Options::result_files_exist() const
     case Command::ancestral:
       return sysutil_file_exists(asr_tree_file()) || sysutil_file_exists(asr_probs_file()) ||
              sysutil_file_exists(asr_states_file());
+    case Command::mutmap:
+      return sysutil_file_exists(mut_maplist_file()) || sysutil_file_exists(mut_maptree_file());
     case Command::sitelh:
       return sysutil_file_exists(sitelh_file());
+    case Command::modeltest:
+      return sysutil_file_exists(modeltest_best_model_file());
     default:
       return false;
   }
@@ -144,8 +249,7 @@ bool Options::result_files_exist() const
 
 void Options::remove_result_files() const
 {
-  if (command == Command::search || command == Command::all ||
-      command == Command::evaluate)
+  if (command == Command::search || command == Command::all || command == Command::evaluate)
   {
     sysutil_file_remove(best_tree_file());
     sysutil_file_remove(best_tree_collapsed_file());
@@ -192,6 +296,19 @@ void Options::remove_result_files() const
     sysutil_file_remove(asr_probs_file());
     sysutil_file_remove(asr_states_file());
   }
+
+  if (command == Command::mutmap)
+  {
+    sysutil_file_remove(mut_maplist_file());
+    sysutil_file_remove(mut_maptree_file());
+  }
+
+  if (command == Command::modeltest)
+  {
+    sysutil_file_remove(modeltest_json_file());
+    sysutil_file_remove(modeltest_xml_file());
+    sysutil_file_remove(modeltest_best_model_file());
+  }
 }
 
 void Options::remove_tmp_files() const
@@ -201,23 +318,76 @@ void Options::remove_tmp_files() const
   sysutil_file_remove(tmp_bs_trees_file());
 }
 
+string Options::free_rate_opt_method_name() const
+{
+    switch(free_rate_opt_method)
+    {
+    case FreerateOptMethod::AUTO:
+        return "AUTO";
+    case FreerateOptMethod::EM_BFGS:
+        return "weights: Expectation-Maximization, rates: L-BFGS-B";
+    case FreerateOptMethod::EM_BRENT:
+        return "weights: Expectation-Maximization, rates: Brent";
+    case FreerateOptMethod::LBFGSB:
+        return "weights: L-BFGS-B, rates: L-BFGS-B";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+string Options::free_rate_opt_method_short_name() const
+{
+    switch(free_rate_opt_method)
+    {
+    case FreerateOptMethod::AUTO:
+        return "AUTO";
+    case FreerateOptMethod::EM_BFGS:
+        return "EM-BFGS";
+    case FreerateOptMethod::EM_BRENT:
+        return "EM-BRENT";
+    case FreerateOptMethod::LBFGSB:
+        return "BFGS-BFGS";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+std::string Options::ic_name() const
+{
+    switch (model_selection_criterion)
+    {
+        case InformationCriterion::aic:
+            return "AIC";
+        case InformationCriterion::aicc:
+            return "AICc";
+        case InformationCriterion::bic:
+            return "BIC";
+        default:
+            assert(0);
+    }
+}
+
 string Options::simd_arch_name() const
 {
   switch(simd_arch)
   {
-    case PLL_ATTRIB_ARCH_CPU:
-      return "NONE";
+    case CORAX_ATTRIB_ARCH_CPU:
+#ifdef HAVE_AUTOVEC
+      return "NATIVE (autovec)";
+#else
+      return "NONE (scalar)";
+#endif
       break;
-    case PLL_ATTRIB_ARCH_SSE:
+    case CORAX_ATTRIB_ARCH_SSE:
       return "SSE3";
       break;
-    case PLL_ATTRIB_ARCH_AVX:
+    case CORAX_ATTRIB_ARCH_AVX:
       return "AVX";
       break;
-    case PLL_ATTRIB_ARCH_AVX2:
+    case CORAX_ATTRIB_ARCH_AVX2:
       return "AVX2";
       break;
-    case PLL_ATTRIB_ARCH_AVX512:
+    case CORAX_ATTRIB_ARCH_AVX512:
       return "AVX512";
       break;
     default:
@@ -243,6 +413,26 @@ string Options::consense_type_name() const
   }
 }
 
+string Options::stopping_rule_name() const
+{
+  switch (stopping_rule)
+  {
+    case StoppingRule::none:
+      return  "OFF";
+    case StoppingRule::sn_rell:
+      return  "Sampling Noise RELL";
+    case StoppingRule::sn_normal:
+      return "Sampling Noise Normal";
+    case StoppingRule::kh:
+      return "KH";
+    case StoppingRule::kh_mult:
+      return "KH - multiple testing correction";
+    default:
+      assert(0);
+      return "UNKNOWN";
+  }
+}
+
 std::ostream& operator<<(std::ostream& stream, const Options& opts)
 {
   stream << "RAxML-NG was called at " << sysutil_fmt_time(global_timer().start_time())
@@ -251,6 +441,8 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   stream << "Analysis options:" << endl;
 
   stream << "  run mode: ";
+  if (opts.auto_model() && opts.command != Command::modeltest)
+    stream << "Model selection + ";
   switch(opts.command)
   {
     case Command::search:
@@ -263,7 +455,7 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       stream << "Bootstrapping";
       break;
     case Command::all:
-      stream << "ML tree search + bootstrapping";
+      stream << "Tree with branch support";
       break;
     case Command::support:
       stream << "Compute bipartition support";
@@ -295,14 +487,56 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     case Command::ancestral:
       stream << "Ancestral state reconstruction";
       break;
+    case Command::mutmap:
+      stream << "Mutation mapping";
+      break;
     case Command::sitelh:
       stream << "Per-site likelihood computation";
+      break;
+    case Command::pythia:
+      stream << "Phylogenetic difficulty prediction";
+      break;
+    case Command::modeltest:
+      stream << "Model selection";
       break;
     default:
       break;
   }
 
-  if (opts.command == Command::all || opts.command == Command::support)
+  if ((opts.command == Command::search || opts.command == Command::bootstrap ||
+      opts.command == Command::all) &&
+      opts.topology_opt_method != TopologyOptMethod::none)
+  {
+    stream << " (";
+    switch (opts.topology_opt_method)
+    {
+      case TopologyOptMethod::classic:
+        stream << "classic";
+        break;
+      case TopologyOptMethod::adaptive:
+        stream << "adaptive";
+        break;
+      case TopologyOptMethod::rapidBS:
+         stream << "rapid bootstrap";
+         break;
+      case TopologyOptMethod::nniRound:
+        stream << "NNI round";
+        break;
+      case TopologyOptMethod::simplified:
+        stream << "simplified";
+        break;
+      case TopologyOptMethod::adafast:
+        stream << "fast adaptive";
+        break;
+      case TopologyOptMethod::none:
+        stream << "OFF";
+        break;
+    }
+    stream << ")";
+  }
+
+  if (opts.command == Command::bootstrap || opts.command == Command::all ||
+      opts.command == Command::support)
   {
     stream << " (";
     for (auto it = opts.bs_metrics.cbegin(); it != opts.bs_metrics.cend(); ++it)
@@ -315,8 +549,32 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
         case BranchSupportMetric::fbp:
           stream << "Felsenstein Bootstrap";
           break;
+        case BranchSupportMetric::rbs:
+          stream << "Rapid Bootstrap";
+          break;
         case BranchSupportMetric::tbe:
           stream << "Transfer Bootstrap";
+          break;
+        case BranchSupportMetric::ebg:
+          stream << "Educated Bootstrap Guesser";
+          break;
+        case BranchSupportMetric::sh_alrt:
+          stream << "SH-aLRT";
+          break;
+        case BranchSupportMetric::ps:
+          stream << "Parsimony Support";
+          break;
+        case BranchSupportMetric::pbs:
+          stream << "Parsimony Bootstrap";
+          break;
+        case BranchSupportMetric::ic1:
+          stream << "Internode Certainty";
+          break;
+        case BranchSupportMetric::ica:
+          stream << "Internode Certainty All";
+          break;
+        case BranchSupportMetric::gcf:
+          stream << "Gene Concordance Factor";
           break;
       }
     }
@@ -343,17 +601,24 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
         stream << "random" << " (" << it->second << ")";
         break;
       case StartingTree::parsimony:
-        stream << "parsimony" << " (" << it->second << ")";
+        stream << "parsimony" << (opts.use_pars_spr ? "+SPR" : "") << (opts.use_pars_brlen ? "+BRLEN" : "")
+               << " (" << it->second << ")";
         break;
       case StartingTree::user:
         stream << "user";
+        break;
+      case StartingTree::adaptive:
+        stream << "adaptive";
+        break;
+      case StartingTree::consensus:
+        stream << "consensus (cutoff: " << opts.consense_cutoff << "%)";
         break;
     }
   }
   stream << endl;
 
-  if (opts.command == Command::bootstrap || opts.command == Command::all ||
-      opts.command == Command::bsmsa)
+  if ((opts.command == Command::bootstrap || opts.command == Command::all ||
+      opts.command == Command::bsmsa) && opts.num_bootstraps > 0)
   {
     stream << "  bootstrap replicates: ";
     stream << (opts.use_bs_pars ? "parsimony (" : "random (");
@@ -407,7 +672,8 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
 
   if (opts.command == Command::bootstrap || opts.command == Command::all ||
       opts.command == Command::search || opts.command == Command::evaluate ||
-      opts.command == Command::parse || opts.command == Command::ancestral)
+      opts.command == Command::parse || opts.command == Command::ancestral ||
+      opts.command == Command::modeltest)
   {
     stream << "  tip-inner: " << (opts.use_tip_inner ? "ON" : "OFF") << endl;
     stream << "  pattern compression: " << (opts.use_pattern_compression ? "ON" : "OFF") << endl;
@@ -418,10 +684,12 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     stream << "general: " << opts.lh_epsilon << ", ";
     stream << "brlen-triplet: " << opts.lh_epsilon_brlen_triplet;
     stream << endl;
-
-    if (opts.command == Command::search || opts.command == Command::all ||
+    
+    if (opts.command == Command::search ||  opts.command == Command::all ||
         opts.command == Command::bootstrap)
     {
+      stream << "  stopping rule: " << opts.stopping_rule_name() << endl;
+
       if (opts.spr_radius > 0)
         stream << "  fast spr radius: " << opts.spr_radius << endl;
       else
@@ -436,9 +704,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     }
 
     stream << "  branch lengths: ";
-    if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_SCALED)
+    if (opts.brlen_linkage == CORAX_BRLEN_SCALED)
       stream << "proportional";
-    else if (opts.brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED)
+    else if (opts.brlen_linkage == CORAX_BRLEN_UNLINKED)
       stream << "unlinked";
     else
       stream << "linked";
@@ -450,19 +718,19 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       stream << "ML estimate, algorithm: ";
       switch(opts.brlen_opt_method)
       {
-        case PLLMOD_OPT_BLO_NEWTON_FAST:
+        case CORAX_OPT_BLO_NEWTON_FAST:
           stream << "NR-FAST";
           break;
-        case PLLMOD_OPT_BLO_NEWTON_SAFE:
+        case CORAX_OPT_BLO_NEWTON_SAFE:
           stream << "NR-SAFE";
           break;
-        case PLLMOD_OPT_BLO_NEWTON_GLOBAL:
+        case CORAX_OPT_BLO_NEWTON_GLOBAL:
           stream << "NR-GLOBAL";
           break;
-        case PLLMOD_OPT_BLO_NEWTON_OLDFAST:
+        case CORAX_OPT_BLO_NEWTON_OLDFAST:
           stream << "legacy NR-FAST";
           break;
-        case PLLMOD_OPT_BLO_NEWTON_OLDSAFE:
+        case CORAX_OPT_BLO_NEWTON_OLDSAFE:
           stream << "legacy NR-SAFE";
           break;
       }
@@ -470,6 +738,60 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     else
       stream << "user-specified";
     stream << ")" << endl;
+
+    stream << "  FreeRate optimization method: " << opts.free_rate_opt_method_name() << endl;
+  }
+
+  if (opts.auto_model())
+  {
+    stream << "  model selection information criterion: " << opts.ic_name() << endl;
+    stream << "  model selection heuristics: ";
+
+    for (const auto &heuristic : opts.modeltest_heuristics)
+    {
+      switch(heuristic)
+      {
+
+        case HeuristicType::FREERATE:
+          stream << "FreeRate "; break;
+        case HeuristicType::RHAS:
+          stream << "RHAS(ic-delta=" << opts.modeltest_significant_ic_delta
+              << ", mode=" << (opts.modeltest_rhas_heuristic_mode == RHASHeuristicMode::AllSignficantCategoryCounts ? "all significant" : "only optimal")
+              << ") ";
+          break;
+        default:
+          break;
+      }
+    }
+    if (opts.modeltest_heuristics.empty())
+    {
+      stream << " none";
+    }
+    stream << endl;
+
+    if (!opts.modeltest_subst_models.empty())
+    {
+      stream << "  model selection substitution models: ";
+      for (const auto &m : opts.modeltest_subst_models)
+      {
+        stream << m << " ";
+      }
+      stream << endl;
+    }
+
+    stream << "  model selection RHAS: ";
+    for (const auto &r : opts.modeltest_rhas)
+    {
+      const auto &label = rate_heterogeneity_label.at(static_cast<size_t>(r));
+      stream << (label.empty() ? "E" : label) << " ";
+    }
+    if (opts.modeltest_rhas.count(RateHeterogeneityType::FREE_RATE) ||
+        opts.modeltest_rhas.count(RateHeterogeneityType::INVARIANT_FREE_RATE))
+    {
+      stream << " (FreeRate categories: " << opts.free_rate_min_categories << "-"
+             << opts.free_rate_max_categories << ")";
+    }
+    stream << endl;
   }
 
   stream << "  SIMD kernels: " << opts.simd_arch_name() << endl;

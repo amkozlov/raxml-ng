@@ -3,10 +3,12 @@
 
 #include "PartitionInfo.hpp"
 
+class AutoPartitioner;
+
 class PartitionedMSA
 {
 public:
-  PartitionedMSA() {};
+  PartitionedMSA();
   PartitionedMSA(const NameList& taxon_names);
 
   // copy/move constructors and assignments
@@ -22,10 +24,12 @@ public:
   const std::vector<PartitionInfo>& part_list() const { return _part_list; };
   std::vector<PartitionInfo>& part_list() { return _part_list; };
   const NameList& taxon_names()  const { return _taxon_names; };
+  bool has_taxon(const std::string& taxon_name, bool with_dups = false) const;
   const NameIdMap& taxon_id_map() const { return _taxon_id_map; }
+  const IDVector& unassigned_sites()  const { return _unassigned_sites; };
 
   size_t full_msa_site(size_t index, size_t site) const;
-  const uintVector& site_part_map() const;
+  const uintVector& site_part_map(bool force_update = false) const;
   IdPairVector full_to_parted_sitemap() const;
 
   size_t taxon_count() const { return _taxon_names.size(); };
@@ -39,17 +43,33 @@ public:
   /* given in elements (NOT in bytes) */
   size_t taxon_clv_size() const;
 
+
   // setters
   void full_msa(MSA&& msa);
   void part_msa(size_t index, MSA&& msa) { _part_list.at(index).msa(std::move(msa)); };
-  void part_msa(size_t index, const pll_msa_t * pll_msa)
+  void part_msa(size_t index, const corax_msa_t * pll_msa)
   {
     _part_list.at(index).msa(MSA(pll_msa));
   };
   void model(size_t index, Model&& m) { _part_list.at(index).model(std::move(m)); };
   void model(size_t index, const Model& m) { _part_list.at(index).model(m); };
 
+  double difficulty_score() const { return _difficulty_score; }
+  void difficulty_score(double score) { _difficulty_score = score; }
+
+  const uintVector& subst_linkage() const { return _subst_linkage; }
+  const uintVector& freqs_linkage() const { return _freqs_linkage; }
+
+  void subst_linkage(const uintVector& v) { _subst_linkage = v; }
+  void freqs_linkage(const uintVector& v) { _freqs_linkage = v; }
+
+  // mapping taxon name of (removed) duplicate sequence -> original tip_id
+  const NameIdMap& dup_seq_map() const { return _dup_seq_map; }
+  void mark_dup_seq(const std::string& dup_taxon_name, size_t orig_taxon_id)
+  { _dup_seq_map[dup_taxon_name] = orig_taxon_id; }
+
   // operations
+  void init_single_model(DataType data_type, const std::string &model_string);
   void append_part_info(PartitionInfo&& part_info) { _part_list.push_back(std::move(part_info)); };
 
   template <class... Args>
@@ -62,15 +82,34 @@ public:
   void compress_patterns(bool store_backmap = false);
   void set_model_empirical_params();
 
+  void remove_taxa(const IDSet& taxon_ids);
+
 private:
   std::vector<PartitionInfo> _part_list;
+  std::shared_ptr<AutoPartitioner> _auto_part;
   MSA _full_msa;
   NameList _taxon_names;
   NameIdMap _taxon_id_map;
+  NameIdMap _dup_seq_map;
   mutable uintVector _site_part_map;
+  mutable IDVector _unassigned_sites;
+  double _difficulty_score;
+  uintVector _subst_linkage;
+  uintVector _freqs_linkage;
 
   uintVector get_site_part_assignment() const;
   void set_taxon_names(const NameList& taxon_names);
+};
+
+class AutoPartitioner
+{
+public:
+  void init_from_string(PartitionedMSA& part_msa, DataType data_type, const std::string &model_string);
+  void update_partition_ranges(PartitionedMSA& part_msa);
+
+private:
+  doubleVector get_column_entropies(const PartitionedMSA& part_msa);
+  std::string resolve_auto_range(const doubleVector& col_entropies, size_t part_num, double binw);
 };
 
 std::ostream& operator<<(std::ostream& stream, const PartitionedMSA& part_msa);

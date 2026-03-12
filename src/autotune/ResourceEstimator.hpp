@@ -39,11 +39,13 @@ protected:
   virtual void compute_estimates(ResEstimates& res);
 
 private:
-  size_t estimate_cores(size_t taxon_clv_size, size_t elems_per_core);
+  size_t estimate_cores(size_t taxon_clv_size, size_t elems_per_core,
+                        bool correct_low = true, bool correct_high = true);
 
 protected:
   size_t _num_tipvecs;
   size_t _num_clvs;
+  bool _smart_correction;
 };
 
 

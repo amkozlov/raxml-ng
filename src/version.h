@@ -1,3 +1,3 @@
-#define RAXML_VERSION "1.2.2-master"
-#define RAXML_DATE    "30.04.2024"
-#define RAXML_INTVER  122
+#define RAXML_VERSION "2.0.0-master"
+#define RAXML_DATE    "11.03.2026"
+#define RAXML_INTVER  200

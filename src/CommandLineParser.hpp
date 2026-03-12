@@ -37,8 +37,12 @@ public:
 
 private:
   void compute_num_searches(Options &opts);
+  void set_fast_options(Options &opts);
   void check_options(Options &opts);
   void parse_start_trees(Options &opts, const std::string& arg);
+  void parse_bs_trees(Options &opts, const std::string& arg);
+  void parse_consense_cutoff(Options &opts, const char* optarg);
+  void parse_modeltest_options(Options &opts, const string& arg);
 };
 
 #endif /* SRC_COMMANDLINEPARSER_HPP_ */

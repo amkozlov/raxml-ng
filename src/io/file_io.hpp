@@ -2,9 +2,9 @@
 #define RAXML_FILE_IO_HPP_
 
 #include <fstream>
-
 #include "../Tree.hpp"
 #include "../AncestralStates.hpp"
+#include "../MutationMap.hpp"
 #include "../bootstrap/BootstrapTree.hpp"
 #include "../bootstrap/BootstrapGenerator.hpp"
 #include "../PartitionedMSAView.hpp"
@@ -12,27 +12,35 @@
 class NewickStream : public std::fstream
 {
 public:
-  NewickStream(const std::string& fname) : std::fstream(fname, std::ios::out), _brlens(true) {};
+  NewickStream(const std::string& fname) : std::fstream(fname, std::ios::out),
+    _brlens(true), _brlabs(false) {};
   NewickStream(const std::string& fname, std::ios_base::openmode mode) :
-    std::fstream(fname, mode), _brlens(true) {};
+    std::fstream(fname, mode), _brlens(true), _brlabs(false) {};
 
   bool brlens() const { return _brlens; }
   void brlens(bool v) { _brlens = v; }
 
+  bool brlabs() const { return _brlabs; }
+  void brlabs(bool v) { _brlabs = v; }
+
 private:
   bool _brlens;
+  bool _brlabs;
 };
 
 class MSAFileStream
 {
 public:
-  MSAFileStream(const std::string& fname) :
-    _fname(fname) {}
+  MSAFileStream(const std::string& fname, DataType data_type = DataType::autodetect) :
+    _fname(fname), _data_type(data_type) {}
 
   const std::string& fname() const { return _fname; };
+  DataType data_type() const { return _data_type; };
+  unsigned int num_states() const { return DatatypeStates.at(_data_type); };
 
 private:
   std::string _fname;
+  DataType _data_type;
 };
 
 class PhylipStream : public MSAFileStream
@@ -60,8 +68,44 @@ private:
 class CATGStream : public MSAFileStream
 {
 public:
-  CATGStream(const std::string& fname) : MSAFileStream(fname) {}
+  CATGStream(const std::string& fname, DataType data_type) :
+    MSAFileStream(fname, data_type) {}
 };
+
+#ifdef _RAXML_VCF
+enum class VCFLikelihoodMode
+{
+  autodetect = -1,
+  none = 0,
+  gl = 1,
+  pl = 2,
+  fpl = 3,
+  g10 = 4,
+  g10n = 5
+};
+
+class VCFStream : public MSAFileStream
+{
+public:
+  VCFStream(const std::string& fname, DataType data_type, bool normalized_gl = false,
+            VCFLikelihoodMode likelihood_mode = VCFLikelihoodMode::autodetect) :
+    MSAFileStream(fname, data_type), _use_normalized_gl(normalized_gl),
+    _skip_invalid_snvs(false), _gt_likelihood_mode(likelihood_mode) {}
+
+  bool use_normalized_gl() const { return _use_normalized_gl; }
+  VCFLikelihoodMode gt_likelihood_mode() const { return _gt_likelihood_mode; }
+
+  bool skip_invalid_snvs() const { return _skip_invalid_snvs; }
+  void skip_invalid_snvs(bool skip) { _skip_invalid_snvs = skip; }
+
+  static bool vcf_file(const std::string& fname);
+
+private:
+  bool _use_normalized_gl;
+  bool _skip_invalid_snvs;
+  VCFLikelihoodMode _gt_likelihood_mode;
+};
+#endif
 
 class RBAStream : public MSAFileStream
 {
@@ -79,6 +123,7 @@ public:
   RBAStream(const std::string& fname) : MSAFileStream(fname) {}
 
   static bool rba_file(const std::string& fname, bool check_version = false);
+  static uint32_t rba_version(const std::string& fname);
 };
 
 class RaxmlPartitionStream : public std::fstream
@@ -86,12 +131,17 @@ class RaxmlPartitionStream : public std::fstream
 public:
   RaxmlPartitionStream(const std::string& fname, bool use_range_string = false) :
     std::fstream(fname, std::ios::out), _offset(0), _print_model_params(false),
-    _use_range_string(use_range_string) {}
+    _use_range_string(use_range_string), _ignore_range(false) {}
   RaxmlPartitionStream(const std::string& fname, std::ios_base::openmode mode) :
-    std::fstream(fname, mode), _offset(0), _print_model_params(false), _use_range_string(false) {}
+    std::fstream(fname, mode), _offset(0), _print_model_params(false),
+    _use_range_string(false), _ignore_range(false) {}
 
   bool print_model_params() const { return _print_model_params; }
   void print_model_params(bool value) { _print_model_params = value; }
+
+  /* should site range be ignored, and the first model applied to all MSA sites? */
+  bool ignore_range() const { return _ignore_range; }
+  void ignore_range(bool value) { _ignore_range = value; }
 
   void reset() { _offset = 0; }
   void put_range(const PartitionInfo& part_info)
@@ -110,6 +160,7 @@ private:
   size_t _offset;
   bool _print_model_params;
   bool _use_range_string;
+  bool _ignore_range;
 };
 
 class FileIOStream : public std::fstream
@@ -144,20 +195,34 @@ public:
     FileIOStream(fname, mode) {};
 };
 
-NewickStream& operator<<(NewickStream& stream, const pll_unode_t& root);
-NewickStream& operator<<(NewickStream& stream, const pll_utree_t& tree);
+class MutationMapListStream : public FileIOStream
+{
+public:
+  MutationMapListStream(const std::string& fname) : FileIOStream(fname) {};
+  MutationMapListStream(const std::string& fname, std::ios_base::openmode mode) :
+    FileIOStream(fname, mode) {};
+};
+
+NewickStream& operator<<(NewickStream& stream, const corax_unode_t& root);
+NewickStream& operator<<(NewickStream& stream, const corax_utree_t& tree);
 NewickStream& operator<<(NewickStream& stream, const Tree& tree);
 NewickStream& operator>>(NewickStream& stream, Tree& tree);
 
 NewickStream& operator<<(NewickStream& stream, const AncestralStates& ancestral);
-//NewickStream& operator>>(NewickStream& stream, BootstrapTree& tree);
+NewickStream& operator<<(NewickStream& stream, const MutationMap& mutmap);
 
 NewickStream& operator<<(NewickStream& stream, const SupportTree& tree);
 
 PhylipStream& operator>>(PhylipStream& stream, MSA& msa);
 FastaStream& operator>>(FastaStream& stream, MSA& msa);
 CATGStream& operator>>(CATGStream& stream, MSA& msa);
-MSA msa_load_from_file(const std::string &filename, const FileFormat format);
+
+#ifdef _RAXML_VCF
+VCFStream& operator>>(VCFStream& stream, MSA& msa);
+#endif
+
+MSA msa_load_from_file(const std::string &filename, FileFormat format, const Options& opts,
+                       DataType data_type = DataType::autodetect);
 
 PhylipStream& operator<<(PhylipStream& stream, const MSA& msa);
 PhylipStream& operator<<(PhylipStream& stream, const PartitionedMSA& msa);
@@ -178,7 +243,9 @@ RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const Partitioned
 AncestralProbStream& operator<<(AncestralProbStream& stream, const AncestralStates& ancestral);
 AncestralStateStream& operator<<(AncestralStateStream& stream, const AncestralStates& ancestral);
 
+MutationMapListStream& operator<<(MutationMapListStream& stream, const MutationMap& mutmap);
+
 std::string to_newick_string_rooted(const Tree& tree, double root_brlen = 0.0);
-void to_newick_file(const pll_utree_t& tree, const std::string& fname);
+void to_newick_file(const corax_utree_t& tree, const std::string& fname);
 
 #endif /* RAXML_FILE_IO_HPP_ */

@@ -71,6 +71,7 @@ void PartitionedMSAView::exclude_taxon(size_t taxon_id)
   {
     _excluded_taxa.insert(taxon_id);
     _orig_taxon_ids.clear();
+    _view_taxon_ids.clear();
   }
   else
     throw std::out_of_range("PartitionedMSAView::exclude_taxon(): Taxon ID out of range");
@@ -291,3 +292,26 @@ size_t PartitionedMSAView::orig_taxon_id(size_t taxon_id) const
     return _orig_taxon_ids.at(taxon_id);
   }
 }
+
+size_t PartitionedMSAView::view_taxon_id(size_t orig_taxon_id) const
+{
+  if (_excluded_taxa.empty())
+   return orig_taxon_id;
+  else if (_excluded_taxa.count(orig_taxon_id))
+   return taxon_count() + 1;  //exception ?
+  else
+  {
+    if (_view_taxon_ids.empty())
+    {
+      _view_taxon_ids.reserve(taxon_count());
+      size_t view_id = 0;
+      for (size_t i = 0; i < _parted_msa->taxon_count(); ++i)
+      {
+        if (!_excluded_taxa.count(i))
+          _view_taxon_ids[i] = view_id++;
+      }
+    }
+    return _view_taxon_ids.at(orig_taxon_id);
+  }
+}
+

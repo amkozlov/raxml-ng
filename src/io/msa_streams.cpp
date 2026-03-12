@@ -3,13 +3,14 @@
 #include <map>
 
 #include "file_io.hpp"
+#include "../Options.hpp"
 
 using namespace std;
 
 FastaStream& operator>>(FastaStream& stream, MSA& msa)
 {
   /* open the file */
-  auto file = pll_fasta_open(stream.fname().c_str(), pll_map_generic);
+  auto file = corax_fasta_open(stream.fname().c_str(), corax_map_generic);
   if (!file)
     libpll_check_error("Unable to parse FASTA file");
 
@@ -23,7 +24,7 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
   int sites = 0;
 
   /* read the rest */
-  while (pll_fasta_getnext(file, &header, &header_length, &sequence, &sequence_length, &sequence_number))
+  while (corax_fasta_getnext(file, &header, &header_length, &sequence, &sequence_length, &sequence_number))
   {
     if (!sites)
     {
@@ -41,19 +42,20 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
         throw runtime_error{"FASTA file does not contain equal size sequences"};
     }
 
-    if (!header_length)
-    {
-      throw runtime_error{"FASTA file contains empty sequence label: " + to_string(msa.size() + 1) };
-    }
-
     if (!sequence_length)
     {
       throw runtime_error{"FASTA file contains empty sequence:" + string(header) };
     }
 
-    /* trim trailing whitespace from the sequence label */
+    /* trim leading and trailing whitespace from the sequence label */
     std::string label(header);
     label.erase(label.find_last_not_of(" \n\r\t")+1);
+    label.erase(0, label.find_first_not_of(" \n\r\t"));
+
+    if (label.empty())
+    {
+      throw runtime_error{"FASTA file contains empty sequence label: " + to_string(msa.size() + 1) };
+    }
 
     /* two ways to deal with spaces in headers: */
     if (stream.long_labels())
@@ -74,10 +76,10 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
     free(header);
   }
 
-  if (pll_errno != PLL_ERROR_FILE_EOF)
+  if (corax_errno != CORAX_ERROR_FILE_EOF)
     libpll_check_error("Error parsing FASTA file: " +  stream.fname() + "\n");
 
-  pll_fasta_close(file);
+  corax_fasta_close(file);
 
   libpll_reset_error();
 
@@ -86,13 +88,13 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
 
 PhylipStream& operator>>(PhylipStream& stream, MSA& msa)
 {
-  pll_msa_t * pll_msa = pll_phylip_load(stream.fname().c_str(),
-                                        stream.interleaved() ? PLL_TRUE : PLL_FALSE);
+  corax_msa_t * pll_msa = corax_phylip_load(stream.fname().c_str(),
+                                        stream.interleaved() ? CORAX_TRUE : CORAX_FALSE);
 
   if (pll_msa)
   {
     msa = MSA(pll_msa);
-    pll_msa_destroy(pll_msa);
+    corax_msa_destroy(pll_msa);
   }
   else
     libpll_check_error("Unable to parse PHYLIP file: " +  stream.fname() + "\n");
@@ -102,10 +104,10 @@ PhylipStream& operator>>(PhylipStream& stream, MSA& msa)
 
 PhylipStream& operator<<(PhylipStream& stream, const MSA& msa)
 {
-  auto retval = pllmod_msa_save_phylip(msa.pll_msa(), stream.fname().c_str());
+  auto retval = corax_phylip_save(stream.fname().c_str(), msa.pll_msa());
 
   if (!retval)
-    throw runtime_error{pll_errmsg};
+    throw runtime_error{corax_errmsg};
 
   return stream;
 }
@@ -286,38 +288,77 @@ CATGStream& operator>>(CATGStream& stream, MSA& msa)
   return stream;
 }
 
-MSA msa_load_from_file(const std::string &filename, const FileFormat format)
+FileFormat msa_detect_file_format(const std::string &filename)
+{
+  map<FileFormat, string> msa_magic = { {FileFormat::fasta, ">"},
+                                        {FileFormat::vcf, "##fileformat=VCF"} };
+
+  ifstream fs(filename);
+
+  string s;
+  while (s.empty())
+  {
+    fs >> std::skipws >> s;
+    for (auto& m: msa_magic)
+    {
+      if (s.compare(0, m.second.size(), m.second) == 0)
+        return m.first;
+    }
+  }
+
+#ifdef _RAXML_VCF
+  /* more thorough check with htslib -> this will also detect compressed vcf.gz files */
+  if (VCFStream::vcf_file(filename))
+    return FileFormat::vcf;
+#endif
+
+  // failed to detect format so far, will try later
+  return FileFormat::autodetect;
+}
+
+
+MSA msa_load_from_file(const std::string &filename, FileFormat format, const Options& opts,
+                       DataType data_type)
 {
   MSA msa;
+  string parser_error;
+  vector<FileFormat> fmt_list;
 
-  typedef pair<FileFormat, string> FormatNamePair;
-  static vector<FormatNamePair> msa_formats = { {FileFormat::iphylip, "IPHYLIP"},
-                                                {FileFormat::phylip, "PHYLIP"},
-                                                {FileFormat::fasta, "FASTA"},
-                                                {FileFormat::fasta_longlabels, "FASTA (long labels)"},
-                                                {FileFormat::catg, "CATG"},
-                                                {FileFormat::vcf, "VCF"},
-                                                {FileFormat::binary, "RAxML-binary"} };
+  static map<FileFormat, string> msa_formats = { {FileFormat::iphylip, "IPHYLIP"},
+                                                 {FileFormat::phylip, "PHYLIP"},
+                                                 {FileFormat::catg, "CATG"},
+                                                 {FileFormat::fasta, "FASTA"},
+                                                 {FileFormat::fasta_longlabels, "FASTA (long labels)"},
+                                                 {FileFormat::vcf, "VCF"},
+                                                 {FileFormat::binary, "RAxML-binary"} };
 
-  auto fmt_begin = msa_formats.cbegin();
-  auto fmt_end = msa_formats.cend();
+
 
   if (!sysutil_file_exists(filename))
     throw runtime_error("File not found: " + filename);
 
+  // first quick&dirty attempt to guess file format
+  if (format == FileFormat::autodetect)
+    format = msa_detect_file_format(filename);
+
   if (format != FileFormat::autodetect)
   {
-    fmt_begin = std::find_if(msa_formats.begin(), msa_formats.end(),
-                             [format](const FormatNamePair& p) { return p.first == format; });
-    assert(fmt_begin != msa_formats.cend());
-    fmt_end = fmt_begin + 1;
+    fmt_list.push_back(format);
+  }
+  else
+  {
+    // PHYLIP-based formats are so bad that we can only rely on trial&error ...
+    fmt_list.push_back(FileFormat::iphylip);
+    fmt_list.push_back(FileFormat::phylip);
+    fmt_list.push_back(FileFormat::catg);
   }
 
-  for (; fmt_begin != fmt_end; fmt_begin++)
+  // if quick format autodetection failed, we will iterate over all available MSA parsers
+  for (auto fmt = fmt_list.cbegin(); fmt != fmt_list.cend(); fmt++)
   {
     try
     {
-      switch (fmt_begin->first)
+      switch (*fmt)
       {
         case FileFormat::fasta:
         {
@@ -349,9 +390,26 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format)
         }
         case FileFormat::catg:
         {
-          CATGStream s(filename);
+          CATGStream s(filename, data_type);
           s >> msa;
           return msa;
+          break;
+        }
+        case FileFormat::vcf:
+        {
+#ifdef _RAXML_VCF
+          auto vcf_lh_mode = opts.use_prob_msa ?
+                             VCFLikelihoodMode::autodetect : VCFLikelihoodMode::none;
+          bool normalized_gl = false;  // opts.vcf_normalized_gl
+          VCFStream s(filename, data_type, normalized_gl, vcf_lh_mode);
+          s.skip_invalid_snvs(true);
+          s >> msa;
+          return msa;
+#else
+          RAXML_UNUSED(opts);
+          if (format != FileFormat::autodetect)
+            throw runtime_error("RAxML-NG was built without VCF support!");
+#endif
           break;
         }
         default:
@@ -361,15 +419,16 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format)
     catch(exception &e)
     {
       libpll_reset_error();
+      parser_error = string(e.what());
       if (format == FileFormat::autodetect)
-        LOG_DEBUG << "Failed to load as " << fmt_begin->second << ": " << e.what() << endl;
+        LOG_DEBUG << "Failed to load as " << msa_formats.at(*fmt) << ": " << parser_error << endl;
       else
-        throw runtime_error("Error loading MSA: " + string(e.what()));
+        throw runtime_error("Error loading MSA: " + parser_error);
     }
   }
 
   throw runtime_error("Error loading MSA: cannot parse any format supported by RAxML-NG!\n"
-      "Please re-run with --msa-format <FORMAT> and/or --log debug to get more information.");
+      "Please re-run with --msa-format <FORMAT> and/or --log debug to get more information.\n");
 }
 
 

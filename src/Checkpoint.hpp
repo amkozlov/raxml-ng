@@ -1,12 +1,18 @@
 #ifndef RAXML_CHECKPOINT_HPP_
 #define RAXML_CHECKPOINT_HPP_
 
+#include "Model.hpp"
 #include "common.h"
 #include "TreeInfo.hpp"
 #include "io/binary_io.hpp"
+#include "adaptive/DifficultyPredictor.hpp"
+#include "modeltest/ModelDefinitions.hpp"
+#include <unordered_map>
+#include <chrono>
 
-constexpr int RAXML_CKP_VERSION = 5;
-constexpr int RAXML_CKP_MIN_SUPPORTED_VERSION = 5;
+constexpr int RAXML_CKP_VERSION = 8;
+constexpr int RAXML_CKP_MIN_SUPPORTED_VERSION = 7;
+constexpr auto RAXML_CKP_MIN_INTERVAL = std::chrono::seconds(1);
 
 struct MLTree
 {
@@ -20,7 +26,7 @@ enum class CheckpointStep
   start,
   brlenOpt,
   modOpt1,
-  radiusDetect,
+  radiusDetectOrNNI,
   modOpt2,
   fastSPR,
   modOpt3,
@@ -31,19 +37,40 @@ enum class CheckpointStep
 
 struct SearchState
 {
-  SearchState() : step(CheckpointStep::start), loglh(0.), iteration(0), fast_spr_radius(0) {}
+  SearchState() : step(CheckpointStep::start), loglh(0.), iteration(0), fast_spr_radius(0), slow_spr_radius(0) {}
 
   CheckpointStep step;
   double loglh;
 
   int iteration;
+  nni_round_params nni_params;
   spr_round_params spr_params;
+  
   int fast_spr_radius;
+  int slow_spr_radius;
 };
+
+class checkpoint_error : public runtime_error
+{
+public:
+  checkpoint_error(const std::string& msg = "") : std::runtime_error("Failed to load checkpoint!\n" + msg) {};
+};
+
+class incompatible_checkpoint_error : public checkpoint_error
+{
+public:
+  incompatible_checkpoint_error(const std::string& field,
+                                const std::string& ckp_val = "", const std::string& cmd_val = "") :
+    checkpoint_error("Incompatible values for '" + field + "'" +
+                     (ckp_val.empty() ? "." : ": checkpoint = " + ckp_val + ", cmdline = " + cmd_val) +
+                     "\nRemove the checkpoint file or re-run with --redo option.")
+    {};
+};
+
 
 struct Checkpoint
 {
-  Checkpoint() : search_state(), tree_index(0), tree(), models(), last_loglh(0.) {}
+  Checkpoint() : search_state(), tree_index(0), tree(), models(), last_loglh(0.), lh_epsilon(0.){}
 
   Checkpoint(const Checkpoint&) = default;
   Checkpoint& operator=(const Checkpoint&) = default;
@@ -56,6 +83,7 @@ struct Checkpoint
   Tree tree;
   ModelMap models;
   double last_loglh;
+  double lh_epsilon;
 
   double loglh() const { return search_state.loglh; }
 
@@ -64,16 +92,18 @@ struct Checkpoint
 
 struct CheckpointFile
 {
-  CheckpointFile() : version(RAXML_CKP_VERSION), elapsed_seconds(0.), consumed_wh(0.) {}
+  CheckpointFile() : version(RAXML_CKP_VERSION), elapsed_seconds(0.), consumed_wh(0.), pythia_score(-1.) {}
 
   int version;
   double elapsed_seconds;
   double consumed_wh;
+  double pythia_score;
   Options opts;
 
   std::vector<Checkpoint> checkp_list;
 
   ModelMap best_models;         /* model parameters for the best-scoring ML tree */
+  std::unordered_map<PartitionCandidateModel, ModelEvaluation> model_evaluations;    /* model parameters for model testing */
   ScoredTopologyMap ml_trees;   /* ML trees from all individual searches*/
   ScoredTopologyMap bs_trees;   /* bootstrap replicate trees */
 
@@ -84,6 +114,13 @@ struct CheckpointFile
   void write_tmp_best_tree() const;
   void write_tmp_ml_tree(const Tree& tree) const;
   void write_tmp_bs_tree(const Tree& tree) const;
+
+  void reset_search_state();
+
+  /* Return TRUE if current options (opts) are compatible with options stored in a checkpoint (old_opts).
+   * This allows to identify command line changes that make restarting from a checkpoint impossible.
+   * In such a case, the function will either return FALSE (default), or throw an exception. */
+  bool compatible(const Options& old_opts, bool throw_error = false) const;
 };
 
 class CheckpointManager
@@ -100,12 +137,29 @@ public:
   SearchState& search_state();
   void reset_search_state();
 
-  void init_checkpoints(const Tree& tree, const ModelCRefMap& models);
+  double pythia_score() const { return _checkp_file.pythia_score; }
+  void pythia_score(double score) { _checkp_file.pythia_score = score; }
+
+  void set_epsilon(double _epsilon) { checkpoint().lh_epsilon = _epsilon; }
+  double get_epsilon() const { return checkpoint().lh_epsilon; }
+
+  const ModelEvaluationMap &get_model_candidates() const {
+      return _checkp_file.model_evaluations;
+  }
+
+  void init_checkpoints(const Tree& tree, const ModelCRefMap& models, size_t num_local_groups);
+
+  /* Allow reinitialization of models after modeltesting routine has completed.
+     Necessary because the partition models might be different from the ones
+     passed during initialization (init_checkpoints)
+    */
+  void update_models(const ModelCRefMap& models);
 
   void enable() { _active = true; }
   void disable() { _active = false; }
 
   void update_and_write(const TreeInfo& treeinfo);
+  void update_and_write(const PartitionCandidateModel &candidate_model, const ModelEvaluation &model);
 
   void save_ml_tree();
   void save_bs_tree();
@@ -128,9 +182,15 @@ private:
   CheckpointFile _checkp_file;
   IDSet _updated_models;
   SearchState _empty_search_state;
-
+  
   void gather_model_params();
   std::string backup_fname() const { return _ckp_fname + ".bk"; }
+
+  bool minimum_time_exceeded() const {
+      return (std::chrono::steady_clock::now() - timestamp_last_checkpoint) > RAXML_CKP_MIN_INTERVAL;
+  };
+
+  mutable std::chrono::time_point<std::chrono::steady_clock> timestamp_last_checkpoint;
 };
 
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Checkpoint& ckp);

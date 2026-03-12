@@ -12,7 +12,7 @@ BootstopCheck::BootstopCheck(size_t max_bs_trees)
 BootstopCheck::~BootstopCheck ()
 {
   if (_pll_splits_hash)
-    pllmod_utree_split_hashtable_destroy(_pll_splits_hash);
+    corax_utree_split_hashtable_destroy(_pll_splits_hash);
 }
 
 void BootstopCheck::add_bootstrap_tree(const Tree& tree)
@@ -24,15 +24,15 @@ void BootstopCheck::add_bootstrap_tree(const Tree& tree)
   }
 
   if (!_pll_splits_hash)
-    _pll_splits_hash = pllmod_utree_split_hashtable_create(tree.num_tips(), 0);
+    _pll_splits_hash = corax_utree_split_hashtable_create(tree.num_tips(), 0);
 
   if (!_pll_splits_hash)
   {
-    assert(pll_errno);
+    assert(corax_errno);
     libpll_check_error("Cannot create split hashtable");
   }
 
-  pll_split_t * splits = pllmod_utree_split_create(&tree.pll_utree_root(),
+  corax_split_t * splits = corax_utree_split_create(&tree.pll_utree_root(),
                                                    tree.num_tips(),
                                                    nullptr);
 
@@ -40,7 +40,7 @@ void BootstopCheck::add_bootstrap_tree(const Tree& tree)
 
   for (size_t i = 0; i < tree.num_splits(); ++i)
   {
-    bitv_hash_entry_t * e = pllmod_utree_split_hashtable_insert_single(_pll_splits_hash,
+    bitv_hash_entry_t * e = corax_utree_split_hashtable_insert_single(_pll_splits_hash,
                                                                        splits[i],
                                                                        1.0);
     if (!e)
@@ -57,7 +57,7 @@ void BootstopCheck::add_bootstrap_tree(const Tree& tree)
 //    _split_occurence[e->bip_number].set(_num_bs_trees);
   }
 
-  pllmod_utree_split_destroy(splits);
+  corax_utree_split_destroy(splits);
 
   assert(_split_occurence.size() == _pll_splits_hash->entry_count);
 
@@ -225,7 +225,7 @@ void BootstopCheckMRE::mre(splitEntryVector& splits_all, const uintVector& suppo
     {
       for (auto ce = splits_cons.rbegin(); ce != splits_cons.rend(); ce++)
       {
-        if (!pllmod_utree_compatible_splits((*ce)->bit_vector, e->bit_vector,
+        if (!corax_utree_split_compatible((*ce)->bit_vector, e->bit_vector,
                                             split_len, tip_count))
         {
           compatible = false;

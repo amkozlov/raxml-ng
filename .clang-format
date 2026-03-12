@@ -1,0 +1,9 @@
+﻿---
+AlignConsecutiveMacros: 'true'
+BreakBeforeBraces: 'Allman'
+ColumnLimit: '120'
+IndentWidth: '2'
+Standard: Cpp11
+UseTab: Never
+SortIncludes: false
+...

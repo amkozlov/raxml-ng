@@ -54,7 +54,7 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Model& m)
   if (m.num_ratecats() > 1)
   {
     stream << m.ratehet_mode();
-    if (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_GAMMA)
+    if (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA)
       stream << m.alpha();
 
     stream << m.ratecat_weights();
@@ -62,8 +62,8 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Model& m)
   }
 
   /* store subst model parameters only if they were estimated */
-  if (m.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::ML ||
-      m.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::ML)
+  if (m.param_mode(CORAX_OPT_PARAM_FREQUENCIES) == ParamValue::ML ||
+      m.param_mode(CORAX_OPT_PARAM_SUBST_RATES) == ParamValue::ML)
   {
     stream << m.num_submodels();
     for (size_t i = 0; i < m.num_submodels(); ++i)
@@ -112,33 +112,33 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, std::tuple<const Model&
     stream << m.param_mode();
   }
 
-  if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER))
+  if (save_modparam(m, fmt, CORAX_OPT_PARAM_BRANCH_LEN_SCALER))
     stream << m.brlen_scaler();
 
-  if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_PINV))
+  if (save_modparam(m, fmt, CORAX_OPT_PARAM_PINV))
       stream << m.pinv();
 
   if (m.num_ratecats() > 1)
   {
-    if (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_GAMMA)
+    if (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA)
     {
-      if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_ALPHA))
+      if (save_modparam(m, fmt, CORAX_OPT_PARAM_ALPHA))
         stream << m.alpha();
     }
     else
     {
-      if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_RATE_WEIGHTS))
+      if (save_modparam(m, fmt, CORAX_OPT_PARAM_RATE_WEIGHTS))
         stream << m.ratecat_weights();
-      if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_FREE_RATES))
+      if (save_modparam(m, fmt, CORAX_OPT_PARAM_FREE_RATES))
         stream << m.ratecat_rates();
     }
   }
 
   for (size_t i = 0; i < m.num_submodels(); ++i)
   {
-    if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_FREQUENCIES))
+    if (save_modparam(m, fmt, CORAX_OPT_PARAM_FREQUENCIES))
       stream << m.submodel(i).base_freqs();
-    if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_SUBST_RATES))
+    if (save_modparam(m, fmt, CORAX_OPT_PARAM_SUBST_RATES))
       stream << m.submodel(i).subst_rates();
   }
 
@@ -162,15 +162,15 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, Model& m)
     auto ratehet_mode = stream.get<unsigned int>();
     assert(ratehet_mode == m.ratehet_mode());
 
-    if (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_GAMMA)
+    if (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA)
       m.alpha(stream.get<double>());
 
     m.ratecat_weights(stream.get<doubleVector>());
     m.ratecat_rates(stream.get<doubleVector>());
   }
 
-  if (m.param_mode(PLLMOD_OPT_PARAM_FREQUENCIES) == ParamValue::ML ||
-      m.param_mode(PLLMOD_OPT_PARAM_SUBST_RATES) == ParamValue::ML)
+  if (m.param_mode(CORAX_OPT_PARAM_FREQUENCIES) == ParamValue::ML ||
+      m.param_mode(CORAX_OPT_PARAM_SUBST_RATES) == ParamValue::ML)
   {
     auto num_submodels = stream.get<unsigned int>();
     assert(num_submodels == m.num_submodels());
@@ -203,33 +203,33 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, std::tuple<Model&, Mode
       m.param_mode(e.first, e.second);
   }
 
-  if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_BRANCH_LEN_SCALER))
+  if (save_modparam(m, fmt, CORAX_OPT_PARAM_BRANCH_LEN_SCALER))
     m.brlen_scaler(stream.get<double>());
 
-  if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_PINV))
+  if (save_modparam(m, fmt, CORAX_OPT_PARAM_PINV))
     m.pinv(stream.get<double>());
 
   if (m.num_ratecats() > 1)
   {
-    if (m.ratehet_mode() == PLLMOD_UTIL_MIXTYPE_GAMMA)
+    if (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA)
     {
-      if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_ALPHA))
+      if (save_modparam(m, fmt, CORAX_OPT_PARAM_ALPHA))
         m.alpha(stream.get<double>());
     }
     else
     {
-      if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_RATE_WEIGHTS))
+      if (save_modparam(m, fmt, CORAX_OPT_PARAM_RATE_WEIGHTS))
         m.ratecat_weights(stream.get<doubleVector>());
-      if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_FREE_RATES))
+      if (save_modparam(m, fmt, CORAX_OPT_PARAM_FREE_RATES))
         m.ratecat_rates(stream.get<doubleVector>());
     }
   }
 
   for (size_t i = 0; i < m.num_submodels(); ++i)
   {
-    if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_FREQUENCIES))
+    if (save_modparam(m, fmt, CORAX_OPT_PARAM_FREQUENCIES))
       m.base_freqs(i, stream.get<doubleVector>());
-    if (save_modparam(m, fmt, PLLMOD_OPT_PARAM_SUBST_RATES))
+    if (save_modparam(m, fmt, CORAX_OPT_PARAM_SUBST_RATES))
       m.subst_rates(i, stream.get<doubleVector>());
   }
 
@@ -248,6 +248,101 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, ModelMap& m)
   }
 
   return stream;
+}
+
+BasicBinaryStream& operator<<(BasicBinaryStream &stream,
+                              const ModelDescriptor& candidate_model)
+{
+    stream << candidate_model.datatype;
+    stream << candidate_model.substitution_model.matrix_name;
+    stream << candidate_model.substitution_model.base_frequency;
+    stream << candidate_model.rate_heterogeneity.type;
+    stream << candidate_model.rate_heterogeneity.category_count;
+
+    return stream;
+}
+
+BasicBinaryStream& operator>>(BasicBinaryStream &stream,
+                              ModelDescriptor& candidate_model)
+{
+
+    stream >> candidate_model.datatype;
+    stream >> candidate_model.substitution_model.matrix_name;
+    stream >> candidate_model.substitution_model.base_frequency;
+    stream >> candidate_model.rate_heterogeneity.type;
+    stream >> candidate_model.rate_heterogeneity.category_count;
+
+    return stream;
+}
+
+BasicBinaryStream& operator<<(BasicBinaryStream &stream,
+                              const ModelEvaluation& model_eval)
+{
+  stream << std::make_tuple(std::ref(model_eval.model), ModelBinaryFmt::full);
+  stream << model_eval.loglh;
+  stream << model_eval.ic_score;
+
+  return stream;
+}
+
+BasicBinaryStream& operator>>(BasicBinaryStream &stream,
+                              ModelEvaluation &model_eval)
+{
+  auto mtuple = std::make_tuple(std::ref(model_eval.model), ModelBinaryFmt::full);
+
+  stream >> mtuple;
+  stream >> model_eval.loglh;
+  stream >> model_eval.ic_score;
+
+  return stream;
+}
+
+BasicBinaryStream& operator<<(BasicBinaryStream &stream,
+                              const ModelEvaluationMap &model_evaluations)
+{
+
+    const size_t n = model_evaluations.size();
+    stream << n;
+
+    for (const auto &entry : model_evaluations)
+    {
+        stream << entry.first.partition;
+        stream << entry.first.candidate_model;
+
+        stream << entry.second.model;
+        stream << entry.second.loglh;
+    }
+    
+    return stream;
+}
+
+BasicBinaryStream& operator>>(BasicBinaryStream &stream,
+                              ModelEvaluationMap &model_evaluations)
+{
+    size_t n;
+    stream >> n;
+
+    for (size_t i = 0; i < n; ++i)
+    {
+        size_t partition_index;
+        ModelDescriptor candidate_model(DataType::dna, "", BaseFrequencyType::FIXED, RateHeterogeneityType::UNIFORM);
+
+        stream >> partition_index;
+        stream >> candidate_model;
+
+        Model m(candidate_model.descriptor());
+        stream >> m;
+
+        double loglh;
+        stream >> loglh;
+
+        PartitionCandidateModel key {0, candidate_model};
+        ModelEvaluation value { std::move(m), loglh, NAN };
+
+        model_evaluations[key] = value;
+    }
+
+    return stream;
 }
 
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const TreeTopology& t)
@@ -295,6 +390,9 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const MSA& m)
 
   stream << m.weights();
 
+  if (stream.version() >= 5)
+    stream << m.site_pattern_map();
+
   for (size_t i = 0; i < m.size(); ++i)
   {
     auto seq = m.at(i);
@@ -313,6 +411,9 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, MSA& m)
   m = MSA(pat_count);
 
   m.weights(stream.get<WeightVector>());
+
+  if (stream.version() >= 5)
+    m.site_pattern_map(stream.get<WeightVector>());
 
   std::string seq(pat_count, 0);
   for (size_t i = 0; i < taxa_count; ++i)
@@ -360,6 +461,20 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, MSARange mr)
 
   m.weights(std::move(w));
 
+  if (stream.version() >= 5)
+  {
+    /* number of _uncompressed_ sites in a local MSARange = sum of elements
+     * in the weights vector loaded above  */
+    auto local_sites = m.num_sites();
+
+    /* total number of _uncompressed_ sites in the MSA - we read it from stream */
+    auto global_sites = stream.get<size_t>();
+
+    WeightVector s(local_sites);
+    read_vector_range(stream, &s[0], rl, global_sites);
+    m.site_pattern_map(stream.get<WeightVector>());
+  }
+
   std::string seq(local_len, 0);
   for (size_t i = 0; i < taxa_count; ++i)
   {
@@ -390,6 +505,7 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const PartitionStats& p
   stream << ps.gap_prop;
   stream << ps.emp_base_freqs;
   stream << ps.emp_subst_rates;
+  stream << ps.mean_column_entropy;
 
   return stream;
 }
@@ -402,6 +518,7 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, PartitionStats& ps)
   stream >> ps.gap_prop;
   stream >> ps.emp_base_freqs;
   stream >> ps.emp_subst_rates;
+  stream >> ps.mean_column_entropy;
 
   return stream;
 }
@@ -450,6 +567,15 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Options& o)
 
   stream << o.write_bs_msa << o.use_old_constraint;
 
+  stream << o.use_spr_fastclv << o.use_bs_pars << o.use_par_pars << o.use_pythia;
+  stream << o.topology_opt_method << o.lh_epsilon_brlen_triplet;
+  stream << o.diff_pred_pars_trees << o.nni_tolerance << o.nni_epsilon;
+  stream << o.num_sh_reps << o.sh_epsilon;
+
+  stream << o.bs_replicate_counts;
+
+  stream << o.stopping_rule;
+
   return stream;
 }
 
@@ -496,6 +622,20 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, Options& o)
 
   if (o.opt_version >= 2)
     stream >> o.write_bs_msa >> o.use_old_constraint;
+
+  if (o.opt_version >= 3)
+  {
+    stream >> o.use_spr_fastclv >> o.use_bs_pars >> o.use_par_pars >> o.use_pythia;
+    stream >> o.topology_opt_method >> o.lh_epsilon_brlen_triplet;
+    stream >> o.diff_pred_pars_trees >> o.nni_tolerance >> o.nni_epsilon;
+    stream >> o.num_sh_reps >> o.sh_epsilon;
+  }
+
+  if (o.opt_version >= 4)
+    stream >> o.bs_replicate_counts;
+
+  if (o.opt_version >= 5)
+    stream >> o.stopping_rule;
 
   return stream;
 }

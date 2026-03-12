@@ -21,55 +21,12 @@ char * support_fmt_prop(double support)
 }
 
 
-SupportTree::SupportTree(const Tree& tree) : Tree(tree), _num_bs_trees(0)
+SupportTree::SupportTree(const Tree& tree) : SplitsTree(tree, true)
 {
-  _pll_splits_hash = nullptr;
 }
 
 SupportTree::~SupportTree ()
 {
-  if (_pll_splits_hash)
-    pllmod_utree_split_hashtable_destroy(_pll_splits_hash);
-}
-
-PllSplitSharedPtr SupportTree::extract_splits_from_tree(const pll_unode_t& root,
-                                                        pll_unode_t ** node_split_map)
-{
-  PllSplitSharedPtr splits(pllmod_utree_split_create((pll_unode_t*) &root,
-                                                       _num_tips,
-                                                       node_split_map),
-                           pllmod_utree_split_destroy);
-
-  return splits;
-}
-
-void SupportTree::add_splits_to_hashtable(const PllSplitSharedPtr& splits,
-                                          const doubleVector& support, bool update_only)
-{
-  _pll_splits_hash = pllmod_utree_split_hashtable_insert(_pll_splits_hash,
-                                                         splits.get(),
-                                                         _num_tips,
-                                                         num_splits(),
-                                                         support.empty() ? nullptr: support.data(),
-                                                         update_only);
-}
-
-
-void SupportTree::add_tree(const Tree& tree)
-{
-  add_tree(tree.pll_utree_root());
-}
-
-void SupportTree::add_replicate_tree(const Tree& tree)
-{
-  if (tree.num_tips() != _num_tips)
-    throw runtime_error("Incompatible tree!");
-
-  _num_bs_trees++;
-
-  /* extract replicate tree splits and add them into hashtable */
-  add_tree(tree);
-//  LOG_DEBUG_TS << "Added replicate trees: " << _num_bs_trees << endl;
 }
 
 void SupportTree::normalize_support_in_hashtable()
@@ -102,7 +59,8 @@ void SupportTree::collect_support()
 
 bool SupportTree::compute_support()
 {
-  normalize_support_in_hashtable();
+  if (_num_bs_trees > 0)
+    normalize_support_in_hashtable();
 
   collect_support();
 
@@ -121,8 +79,8 @@ void SupportTree::draw_support(bool support_in_pct)
 //    printf("node_id %d, split_id %d\n", _node_split_map[i]->node_index, i);
 //  printf("\n\n");
 
-  pll_unode_t ** node_map = _node_split_map.empty() ? nullptr : _node_split_map.data();
-  pllmod_utree_draw_support(_pll_utree.get(), _support.data(), node_map,
+  corax_unode_t ** node_map = _node_split_map.empty() ? nullptr : _node_split_map.data();
+  corax_utree_draw_support(_pll_utree.get(), _support.data(), node_map,
                             support_in_pct ? support_fmt_pct : support_fmt_prop);
 
   LOG_DEBUG_TS << "Done!" << endl << endl;

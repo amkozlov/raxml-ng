@@ -1,8 +1,11 @@
+#include <chrono>
 #include <stdio.h>
 
 #include "Checkpoint.hpp"
+#include "ParallelContext.hpp"
 #include "io/binary_io.hpp"
 #include "io/file_io.hpp"
+#include "modeltest/ModelDefinitions.hpp"
 #include "util/EnergyMonitor.hpp"
 
 using namespace std;
@@ -78,8 +81,43 @@ void CheckpointFile::write_tmp_bs_tree(const Tree& tree) const
     write_tmp_tree(tree, opts.tmp_bs_trees_file(), true);
 }
 
+void CheckpointFile::reset_search_state()
+{
+  for (auto& ckp: checkp_list)
+    ckp.reset_search_state();
+}
+
+bool CheckpointFile::compatible(const Options& old_opts, bool throw_error) const
+{
+  if (!opts.safety_checks.isset(SafetyCheck::ckp_options))
+    return true;
+
+  std::string errfield = "";
+  std::string ckp_val  = "";
+  std::string cmd_val  = "";
+  if (!opts.model_file.empty() && opts.model_file != old_opts.model_file)
+  {
+    errfield = "model";
+    ckp_val = old_opts.model_file;
+    cmd_val = opts.model_file;
+  }
+
+  if (opts.command != old_opts.command)
+  {
+    errfield = "command";
+    ckp_val = "--" + CommandNames[static_cast<size_t>(old_opts.command)];
+    cmd_val = "--" + CommandNames[static_cast<size_t>(opts.command)];
+  }
+
+  if (!errfield.empty() && throw_error)
+    throw incompatible_checkpoint_error(errfield, ckp_val, cmd_val);
+
+  return errfield.empty();
+}
+
+
 CheckpointManager::CheckpointManager(const Options& opts) :
-    _active(opts.nofiles_mode ? false : true), _ckp_fname(opts.checkp_file())
+    _active(opts.nofiles_mode ? false : true), _ckp_fname(opts.checkp_file()), timestamp_last_checkpoint{}
 {
   _checkp_file.opts = opts;
 }
@@ -94,15 +132,25 @@ Checkpoint& CheckpointManager::checkpoint(size_t ckp_id)
   return _checkp_file.checkp_list.at(ckp_id);
 }
 
-void CheckpointManager::init_checkpoints(const Tree& tree, const ModelCRefMap& models)
+void CheckpointManager::init_checkpoints(const Tree& tree, const ModelCRefMap& models, size_t num_local_groups)
 {
   /* create one checkpoint per *local* worker */
-  for (size_t i = 0; i < ParallelContext::num_local_groups(); ++i)
+  for (size_t i = 0; i < num_local_groups; ++i)
     _checkp_file.checkp_list.emplace_back();
 
   for (auto& ckp: _checkp_file.checkp_list)
   {
+    ckp.lh_epsilon = DEF_LH_EPSILON;
     ckp.tree = tree;
+  }
+
+  update_models(models);
+}
+
+void CheckpointManager::update_models(const ModelCRefMap& models)
+{
+  for (auto& ckp: _checkp_file.checkp_list)
+  {
     for (auto& it: models)
       ckp.models[it.first] = it.second;
   }
@@ -128,6 +176,8 @@ void CheckpointManager::write(const std::string& ckp_fname) const
     fs << _checkp_file;
 
     remove_backup();
+
+    timestamp_last_checkpoint = std::chrono::steady_clock::now();
   }
 }
 
@@ -143,10 +193,15 @@ bool CheckpointManager::read(const std::string& ckp_fname)
 
       return true;
     }
+    catch (incompatible_checkpoint_error& e)
+    {
+      /* checkpoint invalid since command line has changed -> exit with error */
+      throw e;
+    }
     catch (runtime_error& e)
     {
-      if (ParallelContext::group_master_thread())
-        checkpoint().reset_search_state();
+      /* checkpoint corrupted etc. -> ignore and start analysis from scratch */
+      _checkp_file.reset_search_state();
       LOG_DEBUG << "Error reading checkpoint: " << e.what() << endl;
       return false;
     }
@@ -276,6 +331,18 @@ void CheckpointManager::update_and_write(const TreeInfo& treeinfo)
   }
 }
 
+void CheckpointManager::update_and_write(const PartitionCandidateModel &candidate_model, const ModelEvaluation &model)
+{
+  _checkp_file.model_evaluations[candidate_model] = model;
+
+  /* The method could be called by any thread on the master rank. */
+  if (ParallelContext::master_rank() && _active && minimum_time_exceeded())
+  {
+    ParallelContext::UniqueLock lock;
+    write();
+  }
+}
+
 void CheckpointManager::gather_model_params()
 {
   /* send callback -> worker ranks */
@@ -386,6 +453,8 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Checkpoint& ckp)
 
   stream << ckp.models;
 
+  stream << ckp.lh_epsilon;
+
   return stream;
 }
 
@@ -398,6 +467,8 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, Checkpoint& ckp)
   ckp.tree.topology(stream.get<TreeTopology>());
 
   stream >> ckp.models;
+
+  stream >> ckp.lh_epsilon;
 
   return stream;
 }
@@ -413,9 +484,13 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const CheckpointFile& c
 
   stream << ckpfile.opts;
 
+  stream << ckpfile.pythia_score;
+
   stream << ckpfile.checkp_list;
 
   stream << ckpfile.best_models;
+
+  stream << ckpfile.model_evaluations;
 
   stream << ckpfile.ml_trees;
 
@@ -439,8 +514,14 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, CheckpointFile& ckpfile
   {
     stream >> ckpfile.consumed_wh;
 
-    stream >> ckpfile.opts;
+    Options ckp_opts;
+    stream >> ckp_opts;
+    if (ckpfile.compatible(ckp_opts, true))
+      ckpfile.opts = ckp_opts;
   }
+
+  if (ckpfile.version > 5)
+    stream >> ckpfile.pythia_score;
 
   {
     // we should take special care in case number of workers has been changed after restart:
@@ -452,13 +533,23 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, CheckpointFile& ckpfile
     for (size_t i = 0; i < num_ckp_in_file; ++i)
     {
       if (i < num_ckp_to_load)
+      {
         stream >> ckpfile.checkp_list[i];
+        // this worker is done with all trees assign to it -> reset search state
+        if (!ckpfile.checkp_list[i].tree_index)
+          ckpfile.checkp_list[i].reset_search_state();
+      }
       else
         stream >> dummy_ckp;
     }
   }
 
   stream >> ckpfile.best_models;
+
+  if (ckpfile.version > 7)
+  {
+      stream >> ckpfile.model_evaluations;
+  }
 
   stream >> ckpfile.ml_trees;
 
@@ -486,14 +577,7 @@ void assign_models(Checkpoint& ckp, const TreeInfo& treeinfo)
 
 void assign_models(TreeInfo& treeinfo, const Checkpoint& ckp)
 {
-  const pllmod_treeinfo_t& pll_treeinfo = treeinfo.pll_treeinfo();
-  for (auto& m: ckp.models)
-  {
-    if (!pll_treeinfo.partitions[m.first])
-      continue;
-
-    treeinfo.model(m.first, m.second);
-  }
+  assign_models(treeinfo, ckp.models);
 }
 
 void assign(Checkpoint& ckp, const TreeInfo& treeinfo)

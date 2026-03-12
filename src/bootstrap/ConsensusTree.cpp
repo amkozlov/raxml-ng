@@ -2,12 +2,23 @@
 
 using namespace std;
 
+ConsensusTree::ConsensusTree(const SplitsTree& splits, unsigned int consense_cutoff) : SupportTree()
+{
+  init_cutoff(consense_cutoff);
+  pll_utree(splits.pll_utree());
+  init_hashtable();
+  add_splits(splits);
+}
+
+
 ConsensusTree::ConsensusTree (const TreeList& trees, unsigned int consense_cutoff) : SupportTree()
 {
-  assert(consense_cutoff <= 100);
   assert(!trees.empty());
 
-  _cutoff = ((double) consense_cutoff) / 100.;
+  init_cutoff(consense_cutoff);
+  /* add new splits from replicates */
+  _ref_splits_only = false;
+
   pll_utree(trees[0].pll_utree());
 
   LOG_DEBUG_TS << "Extractring splits from replicate trees..." << endl;
@@ -25,9 +36,15 @@ ConsensusTree::~ConsensusTree ()
 {
 }
 
-void ConsensusTree::add_tree(const pll_unode_t& root)
+void ConsensusTree::init_cutoff(unsigned int consense_cutoff)
 {
-  pll_unode_t ** node_split_map = nullptr;
+  assert(consense_cutoff <= 100);
+  _cutoff = ((double) consense_cutoff) / 100.;
+}
+
+void ConsensusTree::add_tree(const corax_unode_t& root)
+{
+  corax_unode_t ** node_split_map = nullptr;
   doubleVector support;
   int update_only = 0;
 
@@ -44,7 +61,7 @@ bool ConsensusTree::compute_support()
   normalize_support_in_hashtable();
 
   /* build final split system */
-  pll_split_system_t * split_system = pllmod_utree_split_consensus(_pll_splits_hash,
+  corax_split_system_t * split_system = corax_utree_split_consensus(_pll_splits_hash,
                                                                    _num_tips,
                                                                    _cutoff);
 
@@ -56,7 +73,7 @@ bool ConsensusTree::compute_support()
   LOG_DEBUG_TS << "Building consensus tree topology..." << endl;
 
   /* build tree from splits */
-  pll_consensus_utree_t * cons_tree = pllmod_utree_from_splits(split_system,
+  corax_consensus_utree_t * cons_tree = corax_utree_from_splits(split_system,
                                                                _num_tips,
                                                                (char * const *) tip_labels_cstr().data());
 
@@ -79,12 +96,20 @@ bool ConsensusTree::compute_support()
       auto node = _pll_utree->nodes[_pll_utree->tip_count + i];
       assert(node->data);
       _node_split_map[i] = node;
-      _support[i] = ((pll_consensus_data_t *) node->data)->support;
+      _support[i] = ((corax_consensus_data_t *) node->data)->support;
     }
   }
 
-  pllmod_utree_split_system_destroy(split_system);
-  pllmod_utree_consensus_destroy(cons_tree);
+  // after calling corax_utree_split_consensus(), node->data contains
+  // non-owning pointers to a separate data structure which we do not need
+  // and which will be destroyed before return -> hence reset those pointers!
+  for (auto n: subnodes())
+  {
+    n->data = 0;
+  }
+
+  corax_utree_split_system_destroy(split_system);
+  corax_utree_consensus_destroy(cons_tree);
 
   return true;
 }

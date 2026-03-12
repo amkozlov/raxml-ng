@@ -3,8 +3,8 @@
 
 #include <cstring>
 #include <fstream>
+#include <cstdint>
 #include <stdexcept>
-
 
 class BasicBinaryStream
 {
@@ -20,6 +20,10 @@ public:
     return tmp;
   }
 
+  /* can be used to distinguish between versions or flavors of a binary format */
+  uint32_t version() const { return _version; };
+  void version(uint32_t ver) { _version = ver; };
+
   void get(void *data, size_t size) { read(data, size); }
   void put(const void *data, size_t size) { write(data, size); }
   void skip(size_t size) { read(nullptr, size); }
@@ -27,12 +31,17 @@ public:
 public:
   virtual void read(void *data, size_t size) = 0;
   virtual void write(const void *data, size_t size) = 0;
+
+protected:
+  uint32_t _version;
+
+  BasicBinaryStream() : _version(0) {}
 };
 
 class BinaryNullStream : public BasicBinaryStream
 {
 public:
-  BinaryNullStream(): _pos(0) {}
+  BinaryNullStream(): BasicBinaryStream(), _pos(0) {}
 
   size_t pos() const { return _pos; }
   void reset() { _pos = 0; }
@@ -55,7 +64,7 @@ private:
 class BinaryStream : public BasicBinaryStream
 {
 public:
-  BinaryStream(char * buf, size_t size)
+  BinaryStream(char * buf, size_t size) : BasicBinaryStream()
   {
     _buf = buf;
     _ptr = buf;
@@ -119,7 +128,7 @@ class BinaryFileStream : public BasicBinaryStream
 {
 public:
   BinaryFileStream(const std::string& fname, std::ios_base::openmode mode) :
-    _fstream(fname, std::ios::binary | mode) {}
+    BasicBinaryStream(), _fstream(fname, std::ios::binary | mode) {}
 
 public:
   void write(const void *data, size_t size) { _fstream.write((char*) data, size); }

@@ -17,34 +17,30 @@ struct PartitionStats
   doubleVector emp_base_freqs;
   doubleVector emp_subst_rates;
 
+  double mean_column_entropy;
+//  doubleVector column_entropies;
+
   bool empty() const { return site_count == 0; }
   size_t gap_seq_count() const { return gap_seqs.size(); }
   size_t inv_count() const { return (size_t) site_count * inv_prop; }
 
   PartitionStats() : site_count(0), pattern_count(0), inv_prop(0.), gap_prop(0.), gap_seqs(),
-      emp_base_freqs(), emp_subst_rates() {}
-
-  friend void swap(PartitionStats& first, PartitionStats& second)
-  {
-    std::swap(first.site_count, second.site_count);
-    std::swap(first.pattern_count, second.pattern_count);
-    std::swap(first.inv_prop, second.inv_prop);
-    std::swap(first.gap_prop, second.gap_prop);
-    std::swap(first.gap_seqs, second.gap_seqs);
-    std::swap(first.emp_base_freqs, second.emp_base_freqs);
-    std::swap(first.emp_subst_rates, second.emp_subst_rates);
-  }
+      emp_base_freqs(), emp_subst_rates(), mean_column_entropy(0.) /*, column_entropies()*/ {}
 
   PartitionStats(const PartitionStats& other) : site_count(other.site_count),
       pattern_count(other.pattern_count),
       inv_prop(other.inv_prop), gap_prop(other.gap_prop), gap_seqs(other.gap_seqs),
-      emp_base_freqs(other.emp_base_freqs), emp_subst_rates(other.emp_subst_rates) {}
+      emp_base_freqs(other.emp_base_freqs), emp_subst_rates(other.emp_subst_rates),
+      mean_column_entropy(other.mean_column_entropy) /*, column_entropies(other.emp_subst_rates)*/{}
 
-  PartitionStats& operator=(PartitionStats other)
-  {
-    swap(*this, other);
-    return *this;
-  }
+  PartitionStats(const PartitionStats&& other) noexcept: site_count(other.site_count),
+      pattern_count(other.pattern_count),
+      inv_prop(other.inv_prop), gap_prop(other.gap_prop), gap_seqs(std::move(other.gap_seqs)),
+      emp_base_freqs(std::move(other.emp_base_freqs)), emp_subst_rates(std::move(other.emp_subst_rates)),
+      mean_column_entropy(other.mean_column_entropy) /*, column_entropies(other.emp_subst_rates)*/{}
+
+  PartitionStats& operator=(PartitionStats& other) = default;
+  PartitionStats& operator=(PartitionStats&& other) = default;
 };
 
 class PartitionInfo
@@ -61,16 +57,22 @@ public:
   PartitionInfo (const std::string &name, const PartitionStats &stats,
                  const Model &model, const std::string &range_string = "") :
     _name(name), _range_string(range_string), _model(model), _msa(),
-    _stats(stats) {};
+    _stats(stats)
+  {
+    /* if model has empirical params (eg +FC), initialize them with values from stats */
+    set_model_empirical_params();
+  };
 
   virtual ~PartitionInfo ();
 
-  PartitionInfo (PartitionInfo&& other) : _name(std::move(other._name)),
+  PartitionInfo (PartitionInfo&& other) noexcept : _name(std::move(other._name)),
       _range_string(std::move(other._range_string)),  _model(std::move(other._model)),
       _msa(std::move(other._msa)), _stats(std::move(other._stats))
   {
     other._stats = PartitionStats();
   }
+
+  PartitionInfo& operator=(PartitionInfo&& other) = default;
 
   // getters
   const std::string& name() const { return _name; };
@@ -80,7 +82,7 @@ public:
   const MSA& msa() const { return _msa; };
   MSA& msa() { return _msa; };
   const PartitionStats& stats() const;
-  pllmod_msa_stats_t * compute_stats(unsigned long stats_mask) const;
+  corax_msa_stats_t * compute_stats(unsigned long stats_mask) const;
 
   size_t length() const;
 

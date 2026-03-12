@@ -2,6 +2,7 @@
 #define RAXML_PARTITIONEDMSAVIEW_HPP_
 
 #include "PartitionedMSA.hpp"
+#include <unordered_map>
 
 class PartitionedMSAView
 {
@@ -22,6 +23,7 @@ public:
   std::string taxon_name(size_t taxon_id) const;
   std::string orig_taxon_name(size_t taxon_id) const;
   const NameMap& taxon_name_map() const;
+  size_t view_taxon_id(size_t orig_taxon_id) const;
 
   const Model& part_model(size_t part_id) const;
   std::string part_name(size_t part_id) const;
@@ -48,6 +50,7 @@ private:
   WeightVectorList _site_weights;
 
   mutable IDVector _orig_taxon_ids;
+  mutable std::unordered_map<size_t, size_t> _view_taxon_ids;
 
   size_t orig_taxon_id(size_t taxon_id) const;
   IDQueue get_exclude_queue(size_t part_id) const;

@@ -36,21 +36,21 @@ void sysutil_fatal(const char * format, ...)
 
 void sysutil_fatal_libpll()
 {
-  sysutil_fatal("ERROR(%d): %s\n", pll_errno, pll_errmsg);
+  sysutil_fatal("ERROR(%d): %s\n", corax_errno, corax_errmsg);
 }
 
 void libpll_check_error(const std::string& errmsg, bool force)
 {
-  if (pll_errno)
-    throw runtime_error(errmsg +  " (LIBPLL-" + to_string(pll_errno) + "): " + string(pll_errmsg));
+  if (corax_errno)
+    throw runtime_error(errmsg +  " (CORAX-" + to_string(corax_errno) + "): " + string(corax_errmsg));
   else if (force)
-    throw runtime_error("Unknown LIBPLL error.");
+    throw runtime_error("Unknown CORAXLIB error.");
 }
 
 void libpll_reset_error()
 {
-  pll_errno = 0;
-  strcpy(pll_errmsg, "");
+  corax_errno = 0;
+  strcpy(corax_errmsg, "");
 }
 
 void * xmemalign(size_t size, size_t alignment)
@@ -196,18 +196,32 @@ size_t read_id_from_file(const std::string &filename)
     throw runtime_error("couldn't open sys files");
 }
 
-size_t get_numa_node_id(const std::string &cpu_path)
+size_t get_numa_node_pkg_id(const std::string &cpu_path)
 {
+  size_t numa_id = 0;
+  size_t pkg_id = 0;
+
   // this is ugly, but should be reliable -> please blame Linux kernel developers & Intel!
   string node_path = cpu_path + "../node";
   for (size_t i = 0; i < 1000; ++i)
   {
     if (sysutil_dir_exists(node_path + to_string(i)))
-      return i;
+    {
+      numa_id = i;
+      break;
+    }
   }
 
-  // fallback solution: return socket_id which is often identical to numa id
-  return read_id_from_file(cpu_path + "physical_package_id");
+  // get package id if available
+  try
+  {
+    pkg_id = read_id_from_file(cpu_path + "physical_package_id");
+  }
+  catch (const std::runtime_error&) {}
+
+  // to compute unique core id, we need the highest "granularity"
+  // this could be either NUMA node or socket -> so just take max of both
+  return std::max(numa_id, pkg_id);
 }
 
 size_t get_core_id(const std::string &cpu_path)
@@ -223,7 +237,7 @@ int get_physical_core_count(size_t n_cpu)
   {
     string cpu_path = "/sys/devices/system/cpu/cpu" + to_string(i) + "/topology/";
     size_t core_id = get_core_id(cpu_path);
-    size_t node_id = get_numa_node_id(cpu_path);
+    size_t node_id = get_numa_node_pkg_id(cpu_path);
     size_t uniq_core_id = (node_id << 16) + core_id;
     cores.insert(uniq_core_id);
   }
@@ -243,6 +257,11 @@ static bool ht_enabled()
   return (bool) (info[3] & (0x1 << 28));
 }
 
+static int threads_per_core()
+{
+  return ht_enabled() ? 2 : 1;
+}
+
 unsigned int sysutil_get_cpu_cores()
 {
   auto lcores = std::thread::hardware_concurrency();
@@ -252,15 +271,8 @@ unsigned int sysutil_get_cpu_cores()
   }
   catch (const std::runtime_error&)
   {
-    auto threads_per_core = ht_enabled() ? 2 : 1;
-
-    return lcores / threads_per_core;
+    return lcores / threads_per_core();
   }
-}
-
-static int threads_per_core()
-{
-  return ht_enabled() ? 2 : 1;
 }
 
 unsigned int sysutil_task_cpu_cores(bool physical /* = false */)
@@ -283,7 +295,6 @@ long sysutil_online_cpu_cores()
 {
   return sysconf(_SC_NPROCESSORS_ONLN);
 }
-
 
 unsigned long sysutil_get_cpu_features()
 {
@@ -370,14 +381,14 @@ unsigned long sysutil_get_cpu_features()
 unsigned int sysutil_simd_autodetect()
 {
 //  unsigned long features = sysutil_get_cpu_features();
-  if (PLL_STAT(avx2_present))
-    return PLL_ATTRIB_ARCH_AVX2;
-  else if (PLL_STAT(avx_present))
-    return PLL_ATTRIB_ARCH_AVX;
-  else if (PLL_STAT(sse3_present))
-    return PLL_ATTRIB_ARCH_SSE;
+  if (CORAX_HAS_CPU_FEATURE(avx2_present))
+    return CORAX_ATTRIB_ARCH_AVX2;
+  else if (CORAX_HAS_CPU_FEATURE(avx_present))
+    return CORAX_ATTRIB_ARCH_AVX;
+  else if (CORAX_HAS_CPU_FEATURE(sse3_present))
+    return CORAX_ATTRIB_ARCH_SSE;
   else
-    return PLL_ATTRIB_ARCH_CPU;
+    return CORAX_ATTRIB_ARCH_CPU;
 }
 
 #if defined(__linux__)

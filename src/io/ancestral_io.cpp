@@ -1,5 +1,4 @@
 #include "file_io.hpp"
-
 using namespace std;
 
 AncestralProbStream& operator<<(AncestralProbStream& stream, const AncestralStates& ancestral)
@@ -65,6 +64,31 @@ AncestralStateStream& operator<<(AncestralStateStream& stream, const AncestralSt
     stream << node_name << delim;
     for (size_t p = 0; p < num_parts; ++p)
       stream << ancestral.ml_state_seq(i, p);
+    stream << endl;
+  }
+  return stream;
+}
+
+MutationMapListStream& operator<<(MutationMapListStream& stream, const MutationMap& mutmap)
+{
+  auto delim = stream.delim();
+  stream << fixed << setprecision(stream.precision());
+
+  stream << "Branch" << delim << "MuCount" << delim << "MuSites" << endl;
+
+  for (size_t i = 0; i < mutmap.mut_list.size(); ++i)
+  {
+    const auto& branch_muts = mutmap.mut_list[i];
+    stream << i << delim;
+    stream << branch_muts.size() << delim;
+    for (size_t j = 0; j < branch_muts.size(); ++j)
+    {
+      auto m = branch_muts[j];
+      string mut_name = mutmap.mut_names.empty() ? to_string(m+1) : mutmap.mut_names[m];
+      stream << mut_name;
+      if (j < branch_muts.size()-1)
+        stream << ",";
+    }
     stream << endl;
   }
   return stream;

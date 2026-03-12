@@ -1,27 +1,27 @@
-cmake_minimum_required (VERSION 3.0.2...3.20 FATAL_ERROR)
+cmake_minimum_required (VERSION 3.5...3.20 FATAL_ERROR)
 
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES  ON)
 
-set(RAXML_BINARY_NAME "" CACHE STRING "Custom RAxML-NG binary name")
-set(USE_LIBPLL_CMAKE ON CACHE BOOL "Use CMake to build libpll and pll-modules")
+set(RAXML_BINARY_NAME "raxml-ng" CACHE STRING "Custom RAxML-NG binary name")
+set(USE_CORAXLIB_CMAKE ON CACHE BOOL "Use CMake to build Coraxlib")
 set(BUILD_AS_LIBRARY OFF CACHE BOOL "Build RAxML-NG as shared library (instead of stand-alone executable)")
-set(PLLMOD_DEBUG OFF CACHE BOOL "Debug pll-modules (tons of console output!)")
 
 set (USE_PTHREADS ON CACHE BOOL "Enable multi-threading support (PTHREADS)")
 set (USE_MPI OFF CACHE BOOL "Enable MPI support")
-set (USE_VCF OFF)
 
-# set both following options to OFF to build a portable binary 
-# (don't worry, libpll will still have full SIMD support!)
-set (ENABLE_RAXML_SIMD OFF CACHE BOOL "Enable SIMD instructions in RAxML (non-portable but slightly faster)")
-set (ENABLE_PLLMOD_SIMD OFF CACHE BOOL "Enable SIMD instructions in pll-modules (non-portable but slightly faster)")
+set (USE_VCF OFF CACHE BOOL "Enable VCF support")
+set (HTSLIB_DIR "" CACHE STRING "Path to htslib")
 
 # build a static binary
 set(STATIC_BUILD OFF CACHE BOOL "Build static binary")
+set(PORTABLE_BUILD OFF CACHE BOOL "Build a portable RAxML-NG binary (slightly slower)")
+set(BUILD_TESTS OFF CACHE BOOL "Build unit tests (requires GoogleTest)")
 
-set(USE_TERRAPHAST ON CACHE BOOL "Use phylogentic terraces library (terraphast) ")
+set(USE_TERRAPHAST OFF CACHE BOOL "Use phylogentic terraces library (terraphast) ")
 set(USE_GMP OFF CACHE BOOL "Use GNU Multiple precision (GMP) library ")
+
+set(USE_EBG ON CACHE BOOL "Use Educated Bootstrap Guesser (EBG) ")
 
 set(ENABLE_PTHREADS ${USE_PTHREADS})
 
@@ -35,14 +35,32 @@ else()
   set(ENABLE_GMP OFF)
 endif()
 
-#set(CMAKE_CXX_STANDARD 14)
-#set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # set these flags globally for all subprojects (libpll etc.)
-set (CMAKE_CXX_FLAGS_DEBUG    "-O3 -g" CACHE INTERNAL "")
+set(CMAKE_CXX_FLAGS_DEBUG "-O3 -ggdb" CACHE INTERNAL "")
 set (CMAKE_CXX_FLAGS_RELEASE  "-O3"    CACHE INTERNAL "")
-set (CMAKE_C_FLAGS_DEBUG    "-O3 -g" CACHE INTERNAL "")
+set(CMAKE_C_FLAGS_DEBUG "-O3 -ggdb" CACHE INTERNAL "")
 set (CMAKE_C_FLAGS_RELEASE  "-O3"    CACHE INTERNAL "")
+
+option(DEBUG_INFO "Compile with debug info" OFF)
+if (DEBUG_INFO)
+    set (CMAKE_C_FLAGS_RELEASE  "${CMAKE_C_FLAGS_RELEASE} -ggdb -grecord-gcc-switches"    CACHE INTERNAL "")
+    set (CMAKE_CXX_FLAGS_RELEASE  "${CMAKE_CXX_FLAGS_RELEASE} -ggdb -grecord-gcc-switches"    CACHE INTERNAL "")
+endif()
+
+option(ENABLE_SANITIZERS "Use UBSan and Thread Sanitizer" OFF)
+
+if (ENABLE_SANITIZERS)
+    set(SANITIZER "address")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=${SANITIZER}" CACHE INTERNAL "")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=${SANITIZER}" CACHE INTERNAL "")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=${SANITIZER}" CACHE INTERNAL "")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=${SANITIZER}" CACHE INTERNAL "")
+endif() 
+
+option(USE_JSON "Enable RAxML-NG JSON output" ON)
 
 project (raxml-ng C CXX)
 
@@ -70,8 +88,8 @@ if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS RAXML_COMPILER_TARGET_VERSION)
 endif()
 
 
-set (raxml-ng_VERSION_MAJOR 1)
-set (raxml-ng_VERSION_MINOR 2)
+set (raxml-ng_VERSION_MAJOR 2)
+set (raxml-ng_VERSION_MINOR 0)
 
 #set (CMAKE_BUILD_TYPE DEBUG)
 #set (CMAKE_BUILD_TYPE RELEASE)
@@ -84,30 +102,13 @@ endif()
 message (STATUS "Building ${CMAKE_BUILD_TYPE}")
 
 set (WARN_FLAGS               "-Wall -Wextra")
-set (CMAKE_CXX_FLAGS          "-std=c++11 ${WARN_FLAGS}")
+set (CMAKE_CXX_FLAGS          "${CMAKE_CXX_FLAGS} -std=c++11 ${WARN_FLAGS}")
 
 if (ENABLE_GMP)
 #find_package(GMP REQUIRED)
   set(GMP_FOUND ON)
   set(GMP_LIBRARIES gmpxx gmp)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_RAXML_GMP")
-endif()
-
-if (ENABLE_RAXML_SIMD)
-  include(CheckCXXCompilerFlag)
-  CHECK_CXX_COMPILER_FLAG(-mavx HAS_AVX)
-  CHECK_CXX_COMPILER_FLAG(-msse3 HAS_SSE3)
-  if(HAS_AVX)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx -D__AVX")
-  elseif(HAS_SSE3)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse3 -D__SSE3")
-  endif()
-endif()
-
-if(ENABLE_PLLMOD_SIMD)
-  set(PLLMOD_AUTOCONF_ARGS "--enable-avx --enable-sse")
-else()
-  set(PLLMOD_AUTOCONF_ARGS "")
 endif()
 
 if(ENABLE_PTHREADS)
@@ -118,7 +119,7 @@ endif()
 
 if(BUILD_AS_LIBRARY)
   # building shared library only works with CMake!
-  set(USE_LIBPLL_CMAKE ON)
+  set(USE_CORAXLIB_CMAKE ON)
 
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_RAXML_BUILD_AS_LIB -fPIC")
 endif()
@@ -127,13 +128,20 @@ if(USE_TERRAPHAST)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_RAXML_TERRAPHAST")
 endif()
 
+if(USE_VCF)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_RAXML_VCF")
+endif()
+
 message(STATUS "Using flags: ${CMAKE_CXX_FLAGS}")
 
 # build dependencies
 set(RAXML_LOCALDEPS_DIR ${PROJECT_BINARY_DIR}/localdeps)
+set(CORAX_BUILD_DIFFICULTY_PREDICTION ON CACHE BOOL "Build difficulty prediction module")
 add_subdirectory(${PROJECT_SOURCE_DIR}/libs)
+# set(CORAX_BUILD_DIFFICULTY_PREDICTION ON)
 
-include_directories(${RAXML_LOCALDEPS_DIR}/include ${TERRACES_INCLUDE_DIR})
+
+include_directories(${RAXML_LOCALDEPS_DIR}/include ${TERRACES_INCLUDE_DIR} ${PROJECT_SOURCE_DIR}/libs/coraxlib/src)
 
 if(ENABLE_MPI)
   find_package(MPI)
@@ -141,7 +149,7 @@ if(ENABLE_MPI)
     # set( ENV{OMPI_CXX}            "clang++" PARENT_SCOPE )
     set(CMAKE_CXX_COMPILER "${MPI_CXX_COMPILER}")
     include_directories(${MPI_CXX_INCLUDE_PATH})
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_COMPILER_FLAGS} -D_RAXML_MPI")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_COMPILER_FLAGS} -D_RAXML_MPI -DOMPI_SKIP_MPICXX")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_CXX_LINK_FLAGS}")
 
     # disable static build for MPI
@@ -151,5 +159,8 @@ endif()
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/src)
 
-enable_testing()
-add_subdirectory(${PROJECT_SOURCE_DIR}/test/src)
+if (BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(${PROJECT_SOURCE_DIR}/test/src)
+endif (BUILD_TESTS)
+
