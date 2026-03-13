@@ -517,6 +517,7 @@ void ParallelContext::mpi_allreduce(double * data, size_t size, int op, bool _th
   RAXML_UNUSED(data);
   RAXML_UNUSED(size);
   RAXML_UNUSED(op);
+  RAXML_UNUSED(_thread_broadcast);
 #endif
 }
 
