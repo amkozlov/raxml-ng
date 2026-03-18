@@ -179,16 +179,6 @@ void CommandLineParser::check_options(Options &opts)
     {
       throw OptionException("Invalid --bs-metric value! Only FBP, RBS, PS or PBS are supported.");
     }
-
-    /* only FBP, TBE and IC1/ICA are allowed in support mapping mode; other values are ignored */
-    opts.bs_metrics.erase(BranchSupportMetric::rbs);
-    opts.bs_metrics.erase(BranchSupportMetric::ps);
-    opts.bs_metrics.erase(BranchSupportMetric::pbs);
-    opts.bs_metrics.erase(BranchSupportMetric::ebg);
-    opts.bs_metrics.erase(BranchSupportMetric::sh_alrt);
-    opts.bs_metrics.erase(BranchSupportMetric::gcf);
-    if (opts.bs_metrics.empty())
-      opts.bs_metrics.insert(BranchSupportMetric::fbp);
   }
 
   if (opts.command == Command::support || opts.command == Command::bsconverge)
