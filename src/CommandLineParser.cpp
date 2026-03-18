@@ -179,6 +179,13 @@ void CommandLineParser::check_options(Options &opts)
     {
       throw OptionException("Invalid --bs-metric value! Only FBP, RBS, PS or PBS are supported.");
     }
+
+    /* autMRE not implemented (and probably not needed) for parsimony-based bootstrapping */
+    if (opts.bs_metrics.count(BranchSupportMetric::ps) ||
+        opts.bs_metrics.count(BranchSupportMetric::pbs))
+    {
+      opts.bootstop_criterion = BootstopCriterion::none;
+    }
   }
 
   if (opts.command == Command::support || opts.command == Command::bsconverge)

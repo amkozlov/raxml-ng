@@ -441,8 +441,12 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   stream << "Analysis options:" << endl;
 
   stream << "  run mode: ";
-  if (opts.auto_model() && opts.command != Command::modeltest)
+  if (opts.auto_model() && opts.command != Command::modeltest &&
+      opts.command != Command::check && opts.command != Command::start &&
+      opts.command != Command::bsmsa && opts.command != Command::pythia)
+  {
     stream << "Model selection + ";
+  }
   switch(opts.command)
   {
     case Command::search:
@@ -617,16 +621,18 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   }
   stream << endl;
 
+  auto num_bootstraps = opts.command != Command::bootstrap ? opts.num_bootstraps :
+                        opts.bs_replicate_counts.at(*opts.bs_metrics.begin());
   if ((opts.command == Command::bootstrap || opts.command == Command::all ||
-      opts.command == Command::bsmsa) && opts.num_bootstraps > 0)
+      opts.command == Command::bsmsa) && num_bootstraps > 0)
   {
     stream << "  bootstrap replicates: ";
     stream << (opts.use_bs_pars ? "parsimony (" : "random (");
     if (opts.bootstop_criterion == BootstopCriterion::none)
-      stream << opts.num_bootstraps << ")";
+      stream << num_bootstraps << ")";
     else
     {
-      stream << "max: " << opts.num_bootstraps << ") + bootstopping (";
+      stream << "max: " << num_bootstraps << ") + bootstopping (";
       switch(opts.bootstop_criterion)
       {
         case BootstopCriterion::autoFC:
