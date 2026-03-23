@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <cmath>
 
 #include <memory>
 
@@ -1541,6 +1542,9 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type, int random_
                                              instance.constraint_tree, instance.tip_msa_idmap);
 
       double avg_pars_brlen = ((double) score) / tree.num_branches() / pars_msa.part_msa().total_sites();
+      
+      /* rounding */
+      avg_pars_brlen = std::round(avg_pars_brlen * 1e5) / 1e5;
 
       if (opts.use_pars_brlen)
         tree.reset_brlens(avg_pars_brlen);
