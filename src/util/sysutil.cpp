@@ -196,18 +196,32 @@ size_t read_id_from_file(const std::string &filename)
     throw runtime_error("couldn't open sys files");
 }
 
-size_t get_numa_node_id(const std::string &cpu_path)
+size_t get_numa_node_pkg_id(const std::string &cpu_path)
 {
+  size_t numa_id = 0;
+  size_t pkg_id = 0;
+
   // this is ugly, but should be reliable -> please blame Linux kernel developers & Intel!
   string node_path = cpu_path + "../node";
   for (size_t i = 0; i < 1000; ++i)
   {
     if (sysutil_dir_exists(node_path + to_string(i)))
-      return i;
+    {
+      numa_id = i;
+      break;
+    }
   }
 
-  // fallback solution: return socket_id which is often identical to numa id
-  return read_id_from_file(cpu_path + "physical_package_id");
+  // get package id if available
+  try
+  {
+    pkg_id = read_id_from_file(cpu_path + "physical_package_id");
+  }
+  catch (const std::runtime_error&) {}
+
+  // to compute unique core id, we need the highest "granularity"
+  // this could be either NUMA node or socket -> so just take max of both
+  return std::max(numa_id, pkg_id);
 }
 
 size_t get_core_id(const std::string &cpu_path)
@@ -223,7 +237,7 @@ int get_physical_core_count(size_t n_cpu)
   {
     string cpu_path = "/sys/devices/system/cpu/cpu" + to_string(i) + "/topology/";
     size_t core_id = get_core_id(cpu_path);
-    size_t node_id = get_numa_node_id(cpu_path);
+    size_t node_id = get_numa_node_pkg_id(cpu_path);
     size_t uniq_core_id = (node_id << 16) + core_id;
     cores.insert(uniq_core_id);
   }

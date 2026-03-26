@@ -37,12 +37,13 @@ class ModelScheduler final {
         ModelEvaluator *get_by_descriptor(const PartitionCandidateModel &candidate_model);
         vector<vector<ModelEvaluation const *>> collect_finished_results_by_partition() const;
         void fetch_global_results();
-        void print_xml(std::ostream &os) const;
-
         const SubstitutionModelDescriptor &get_reference_model();
 
         static vector<size_t> determine_acceptable_thread_counts(size_t total_cores);
         static size_t pick_acceptable_thread_count(const vector<size_t> &acceptable_thread_counts, size_t requested_thread_count);
+
+        void print_xml(ostream &os) const;
+
 private:
     std::mutex mutex_evaluation;
     std::mutex mutex_log;

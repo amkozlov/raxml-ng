@@ -13,8 +13,8 @@ public:
 
   /* Optimize the model and return model name per partition */
   const vector<Model>& optimize_model();
-
   void print_results_to_file() const;
+  vector<vector<ModelEvaluation const *>> get_results() const;
 
   unsigned int recommended_thread_count() const;
 
@@ -30,11 +30,12 @@ private:
 
   ModelScheduler model_scheduler;
 
-  /// map from model descriptor to per-partition evaluation results
-  [[nodiscard]]
-  static vector<size_t> rank_by_score(const vector<ModelEvaluation const *> &results);
+  using PartitionModelResults = vector<ModelEvaluation const *>;
+  
+  static void sort_by_score(PartitionModelResults &results);
 
   vector<ModelDescriptor> generate_candidate_model_names(const DataType &dt) const;
+  vector<PartitionModelResults> _results;
 };
 
 #endif // MODELTEST_HPP_

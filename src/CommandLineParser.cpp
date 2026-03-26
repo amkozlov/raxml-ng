@@ -180,15 +180,12 @@ void CommandLineParser::check_options(Options &opts)
       throw OptionException("Invalid --bs-metric value! Only FBP, RBS, PS or PBS are supported.");
     }
 
-    /* only FBP, TBE and IC1/ICA are allowed in support mapping mode; other values are ignored */
-    opts.bs_metrics.erase(BranchSupportMetric::rbs);
-    opts.bs_metrics.erase(BranchSupportMetric::ps);
-    opts.bs_metrics.erase(BranchSupportMetric::pbs);
-    opts.bs_metrics.erase(BranchSupportMetric::ebg);
-    opts.bs_metrics.erase(BranchSupportMetric::sh_alrt);
-    opts.bs_metrics.erase(BranchSupportMetric::gcf);
-    if (opts.bs_metrics.empty())
-      opts.bs_metrics.insert(BranchSupportMetric::fbp);
+    /* autMRE not implemented (and probably not needed) for parsimony-based bootstrapping */
+    if (opts.bs_metrics.count(BranchSupportMetric::ps) ||
+        opts.bs_metrics.count(BranchSupportMetric::pbs))
+    {
+      opts.bootstop_criterion = BootstopCriterion::none;
+    }
   }
 
   if (opts.command == Command::support || opts.command == Command::bsconverge)
@@ -482,6 +479,7 @@ void CommandLineParser::parse_modeltest_options(Options &opts, const string& arg
 
     if (mopt_name == "criterion")
     {
+      std::transform(mopt_val.begin(), mopt_val.end(), mopt_val.begin(), ::tolower);
       if (mopt_val == "aic")
           opts.model_selection_criterion = InformationCriterion::aic;
       else if (mopt_val == "aicc")
@@ -1100,6 +1098,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       case 40: /* start tree generation */
         opts.command = Command::start;
+        if (optarg_tree.empty())
+          optarg_tree = "pars{1}";
         num_commands++;
         break;
       case 41: /* compute tree logLH w/o optimization */
@@ -1225,6 +1225,16 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.dup_seqs_action = AbnormalSequenceAction::error;
             else if (eopt == "newick-stream")
               opts.use_tree_streaming = true;
+            else if (eopt == "moose-xml")
+              opts.modeltest_json_output = false;
+            else if (eopt == "moose-json")
+            {
+#ifndef _RAXML_JSON
+              throw  OptionException("JSON output requested but not supported.\n"
+                  "Please build RAxML-NG with JSON support.");
+#endif
+              opts.modeltest_json_output = true;
+            }
             else if (eopt == "compat-v11")
             {
               compat_ver = 110;
@@ -1386,6 +1396,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
       case 57: /* write bootstrap alignments*/
         opts.write_bs_msa = true;
+        opts.use_par_pars = false;
         break;
       
       case 58: /* LH epsilon triplet */
@@ -1744,7 +1755,7 @@ void CommandLineParser::print_help()
             "  --opt-branches on | off                    ML optimization of all branch lengths (default: ON)\n"
             "  --prob-msa     on | off                    use probabilistic alignment (works with CATG and VCF)\n"
             "  --lh-epsilon   VALUE                       log-likelihood epsilon for optimization/tree search (default: 10)\n"
-            "  --opt-freerate em | lbfgsb                 optimization method for FreeRates (default: lbfgsb)\n"
+            "  --opt-freerate bfgs | em-bfgs | em-brent   optimization method for FreeRates (default: auto)\n"
             "\n"
             "Model selection options:\n"
             "  --moose-options OPT=VAL/OPT=VAL/...        list of MOdel Optimization and SElection options separated by '/'\n"
@@ -1753,7 +1764,7 @@ void CommandLineParser::print_help()
             "      freerate-categories=n[-m]              test FreeRate models with n categories (optionally up to and including m)\n"
             "      rhas=VAL1,VAL2,...                     list of rate heterogeneity across sites (RHAS) models (default: R,I+R,E,I,G,I+G)\n"
             "      substitution-models=VAL1,VAL2,...      list of substitutions models (default: all supported)\n"
-            "      heuristics=VAL1,VAL2,... | OFF         heuristics to skip models (default: rhas,freerate)\n"
+            "      heuristics=VAL1,VAL2,... | off         heuristics to skip models (default: rhas,freerate)\n"
             "\n"
             "Topology search options:\n"
             "  --opt-topology        classic | adaptive   topology optimization method (default: adaptive)\n"

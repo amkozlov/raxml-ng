@@ -65,6 +65,10 @@
 #include "terraces/TerraceWrapper.hpp"
 #endif
 
+#ifdef _RAXML_JSON
+#include "io/json.hpp"
+#endif
+
 using namespace std;
 
 struct RaxmlWorker;
@@ -965,7 +969,7 @@ void check_options_early(Options& opts)
   /* disable pythia if command cannot use difficulty score */
   opts.use_pythia &= (opts.command == Command::parse || opts.command == Command::search ||
                       opts.command == Command::bootstrap || opts.command == Command::all ||
-                      opts.command == Command::pythia);
+                      opts.command == Command::pythia || opts.command == Command::start);
 
   if (opts.use_pythia && !opts.use_pattern_compression)
   {
@@ -2351,7 +2355,6 @@ void autoselect_models(RaxmlInstance& instance, CheckpointManager &cm)
   else if (instance.opts.start_trees.count(StartingTree::user))
   {
     tree_type = "user";
-    tree_num = instance.opts.start_trees.at(StartingTree::random);
   }
   else if (instance.opts.start_trees.count(StartingTree::random))
     tree_type = "random";
@@ -3324,8 +3327,25 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
 
   if (opts.command == Command::modeltest)
   {
-    if (!opts.modeltest_xml_file().empty())
-      LOG_INFO << "Model testing results saved to: " << sysutil_realpath(opts.modeltest_xml_file()) << endl;
+    if (!opts.modeltest_results_file().empty())
+    {
+      #ifdef _RAXML_JSON
+        try
+        {
+          if (opts.modeltest_json_output)
+            print_json(opts, instance.parted_msa.get(), checkp, instance.model_test.get(), instance.used_wh);
+        }
+        catch (exception& e)
+        {
+          LOG_ERROR << "ERROR: Failed to write JSON output: " << e.what() << endl << endl ;
+        }
+      #endif
+
+      instance.model_test->print_results_to_file();
+
+      if (sysutil_file_exists(opts.modeltest_results_file()))
+        LOG_INFO << "Model testing results saved to: " << sysutil_realpath(opts.modeltest_results_file()) << endl;
+    }
     if (!opts.modeltest_best_model_file().empty())
       LOG_INFO << "Best-fit model saved to: " << sysutil_realpath(opts.modeltest_best_model_file()) << endl;
     if (!opts.binary_msa_file().empty())
@@ -3338,7 +3358,8 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
   }
 
   if (!opts.log_file().empty())
-      LOG_INFO << "\nExecution log saved to: " << sysutil_realpath(opts.log_file()) << endl;
+    LOG_INFO << "\nExecution log saved to: " << sysutil_realpath(opts.log_file()) << endl;
+
 
   LOG_INFO << "\nAnalysis started: " << global_timer().start_time();
   LOG_INFO << " / finished: " << global_timer().current_time() << std::endl;
@@ -3858,10 +3879,6 @@ void thread_infer_model(RaxmlInstance& instance, CheckpointManager& cm)
 
   if (ParallelContext::master_thread())
   {
-    /* in standalone mode, print model testing results to files */
-    if (instance.opts.command == Command::modeltest && ParallelContext::master())
-      instance.model_test->print_results_to_file();
-
     /* apply best-fit model(s) to the partitioned MSA */
     for (unsigned p = 0; p < optimal_models.size(); ++p)
     {
@@ -4340,6 +4357,7 @@ int internal_main(int argc, char** argv, void* comm)
         {
           load_parted_msa(instance);
           load_constraint(instance);
+          autotune_start_trees(instance);
           build_start_trees(instance);
           if (!opts.start_tree_file().empty())
           {
@@ -4376,7 +4394,9 @@ int internal_main(int argc, char** argv, void* comm)
       /* finalize */
       finalize_energy(instance, cm.checkp_file());
       if (ParallelContext::master_rank())
+      {
         print_final_output(instance, cm.checkp_file());
+      }
 
       /* analysis finished successfully, remove checkpoint and temp files */
       if (ParallelContext::group_master_rank())

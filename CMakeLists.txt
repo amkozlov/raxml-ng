@@ -3,7 +3,7 @@ cmake_minimum_required (VERSION 3.5...3.20 FATAL_ERROR)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES  ON)
 
-set(RAXML_BINARY_NAME "raxml-ng-2" CACHE STRING "Custom RAxML-NG binary name")
+set(RAXML_BINARY_NAME "raxml-ng" CACHE STRING "Custom RAxML-NG binary name")
 set(USE_CORAXLIB_CMAKE ON CACHE BOOL "Use CMake to build Coraxlib")
 set(BUILD_AS_LIBRARY OFF CACHE BOOL "Build RAxML-NG as shared library (instead of stand-alone executable)")
 
@@ -58,7 +58,9 @@ if (ENABLE_SANITIZERS)
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=${SANITIZER}" CACHE INTERNAL "")
     set(CMAKE_C_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=${SANITIZER}" CACHE INTERNAL "")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=${SANITIZER}" CACHE INTERNAL "")
-endif()
+endif() 
+
+option(USE_JSON "Enable RAxML-NG JSON output" ON)
 
 project (raxml-ng C CXX)
 

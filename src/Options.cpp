@@ -50,7 +50,13 @@ free_rate_min_categories(2), free_rate_max_categories(10), free_rate_opt_method(
 model_selection_criterion(InformationCriterion::bic), modeltest_heuristics({HeuristicType::FREERATE, HeuristicType::RHAS}),
 modeltest_significant_ic_delta(10.0), modeltest_rhas(default_rate_heterogeneity_selection),
 modeltest_rhas_heuristic_mode(RHASHeuristicMode::AllSignficantCategoryCounts)
-{}
+{
+#ifdef _RAXML_JSON
+  modeltest_json_output = true;
+#else
+  modeltest_json_output = false;
+#endif
+}
 
 unsigned int Options::max_num_replicates(const SupportMetricSet& mset) const
 {
@@ -131,7 +137,10 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.mut_map_list, "mutationMapList");
   set_default_outfile(outfile_names.site_loglh, "siteLH");
   set_default_outfile(outfile_names.modeltest_best_model, "moose.bestModel");
-  set_default_outfile(outfile_names.modeltest_xml, "moose.xml");
+  if (modeltest_json_output)
+    set_default_outfile(outfile_names.modeltest_json, "moose.json");
+  else
+    set_default_outfile(outfile_names.modeltest_xml, "moose.xml");
   set_default_outfile(outfile_names.tmp_best_tree, "lastTree.TMP");
   set_default_outfile(outfile_names.tmp_ml_trees, "mlTrees.TMP");
   set_default_outfile(outfile_names.tmp_bs_trees, "bootstraps.TMP");
@@ -189,6 +198,11 @@ std::string Options::bootstrap_partition_file() const
              outfile_names.bootstrap_msa + ".partition";
 }
 
+const std::string& Options::modeltest_results_file() const
+{
+  return modeltest_json_output ? outfile_names.modeltest_json : outfile_names.modeltest_xml;
+}
+
 bool Options::result_files_exist() const
 {
   if (nofiles_mode)
@@ -227,7 +241,7 @@ bool Options::result_files_exist() const
     case Command::sitelh:
       return sysutil_file_exists(sitelh_file());
     case Command::modeltest:
-      return sysutil_file_exists(modeltest_xml_file()) || sysutil_file_exists(modeltest_best_model_file());
+      return sysutil_file_exists(modeltest_best_model_file());
     default:
       return false;
   }
@@ -291,6 +305,7 @@ void Options::remove_result_files() const
 
   if (command == Command::modeltest)
   {
+    sysutil_file_remove(modeltest_json_file());
     sysutil_file_remove(modeltest_xml_file());
     sysutil_file_remove(modeltest_best_model_file());
   }
@@ -315,6 +330,23 @@ string Options::free_rate_opt_method_name() const
         return "weights: Expectation-Maximization, rates: Brent";
     case FreerateOptMethod::LBFGSB:
         return "weights: L-BFGS-B, rates: L-BFGS-B";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+string Options::free_rate_opt_method_short_name() const
+{
+    switch(free_rate_opt_method)
+    {
+    case FreerateOptMethod::AUTO:
+        return "AUTO";
+    case FreerateOptMethod::EM_BFGS:
+        return "EM-BFGS";
+    case FreerateOptMethod::EM_BRENT:
+        return "EM-BRENT";
+    case FreerateOptMethod::LBFGSB:
+        return "BFGS-BFGS";
     default:
         return "UNKNOWN";
     }
@@ -409,8 +441,12 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   stream << "Analysis options:" << endl;
 
   stream << "  run mode: ";
-  if (opts.auto_model() && opts.command != Command::modeltest)
+  if (opts.auto_model() && opts.command != Command::modeltest &&
+      opts.command != Command::check && opts.command != Command::start &&
+      opts.command != Command::bsmsa && opts.command != Command::pythia)
+  {
     stream << "Model selection + ";
+  }
   switch(opts.command)
   {
     case Command::search:
@@ -585,16 +621,18 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   }
   stream << endl;
 
+  auto num_bootstraps = opts.command != Command::bootstrap ? opts.num_bootstraps :
+                        opts.bs_replicate_counts.at(*opts.bs_metrics.begin());
   if ((opts.command == Command::bootstrap || opts.command == Command::all ||
-      opts.command == Command::bsmsa) && opts.num_bootstraps > 0)
+      opts.command == Command::bsmsa) && num_bootstraps > 0)
   {
     stream << "  bootstrap replicates: ";
     stream << (opts.use_bs_pars ? "parsimony (" : "random (");
     if (opts.bootstop_criterion == BootstopCriterion::none)
-      stream << opts.num_bootstraps << ")";
+      stream << num_bootstraps << ")";
     else
     {
-      stream << "max: " << opts.num_bootstraps << ") + bootstopping (";
+      stream << "max: " << num_bootstraps << ") + bootstopping (";
       switch(opts.bootstop_criterion)
       {
         case BootstopCriterion::autoFC:

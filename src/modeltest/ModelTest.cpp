@@ -4,7 +4,7 @@
 #include <memory>
 
 #include "../ICScoreCalculator.hpp"
-#include "Heuristics.hpp"
+#include "../version.h"
 #include "ModelDefinitions.hpp"
 #include "ModelEvaluator.hpp"
 #include "ModelScheduler.hpp"
@@ -25,27 +25,6 @@ Options modify_options(const Options &other)
   return options;
 }
 
-const std::vector<string> get_matrix_names(const DataType datatype)
-{
-  switch (datatype)
-  {
-    case DataType::dna:
-      return dna_substitution_matrix_names;
-    case DataType::protein:
-      return aa_substitution_matrix_names;
-    case DataType::binary:
-      return std::vector<string>({"BIN"});
-
-    case DataType::autodetect:
-    case DataType::multistate:
-    case DataType::genotype10:
-    case DataType::genotype16:
-      throw unsupported_datatype_error();
-  }
-
-  return {};
-}
-
 vector<ModelDescriptor> ModelTest::generate_candidate_model_names(const DataType &dt) const
 {
   vector<ModelDescriptor> candidate_models;
@@ -56,7 +35,7 @@ vector<ModelDescriptor> ModelTest::generate_candidate_model_names(const DataType
   const auto gamma_category_count = 4;
 
   const auto subst_models =
-      options.modeltest_subst_models.empty() ? get_matrix_names(dt) : options.modeltest_subst_models;
+      options.modeltest_subst_models.empty() ? moose_matrix_names(dt) : options.modeltest_subst_models;
 
   for (const auto &subst_model : subst_models)
   {
@@ -247,6 +226,10 @@ const vector<Model>& ModelTest::optimize_model()
       LOG_THREAD_TS << " announced results in " << 1e3 * (t1 - t0) << " milliseconds." << endl;
     }
 
+    // Without the following barrier, other threads might enter the critical section before thread 0 has
+    // updated the results, causing unnecessary model evaluations
+    evaluator->barrier();
+
     LOG_THREAD_TS << " evaluation of " << model_descriptor << " concluded." << endl;
   }
 
@@ -267,14 +250,16 @@ const vector<Model>& ModelTest::optimize_model()
     best_model_per_part.clear();
 
     LOG_INFO << endl << "Best model(s):" << endl;
-    const auto results = model_scheduler.collect_finished_results_by_partition();
+    _results = model_scheduler.collect_finished_results_by_partition();
+
     for (auto p = 0U; p < msa.part_count(); ++p)
     {
-      auto bic_ranking = rank_by_score(results.at(p));
-      const auto &best_model = results.at(p).at(bic_ranking.at(0));
-      LOG_RESULT << "Partition #" << p << ": " << best_model->model.to_string()
-                 << " (LogLH = " << FMT_LH(best_model->loglh)
-                 << "  BIC = " << FMT_LH(best_model->ic_score) << ")" << endl;
+      sort_by_score(_results.at(p));
+      const auto &best_model = _results[p].at(0);
+      logger().logstream(LogLevel::result, LogScope::thread)
+          << "Partition #" << p << ": " << best_model->model.to_string()
+          << " (LogLH = " << FMT_LH(best_model->loglh)
+          << "  BIC = " << FMT_LH(best_model->ic_score) << ")" << endl;
 
       best_model_per_part.emplace_back(best_model->model);
     }
@@ -286,6 +271,16 @@ const vector<Model>& ModelTest::optimize_model()
   return best_model_per_part;
 }
 
+void ModelTest::sort_by_score(PartitionModelResults &results)
+{
+  std::sort(results.begin(), results.end(),
+            [](const ModelEvaluation *a, const ModelEvaluation *b) {
+            return a->ic_score < b->ic_score;
+  });
+}
+
+unsigned int ModelTest::recommended_thread_count() const { return model_scheduler.recommended_thread_count(); }
+
 void ModelTest::print_results_to_file() const
 {
   auto xml_fname = options.modeltest_xml_file();
@@ -294,12 +289,9 @@ void ModelTest::print_results_to_file() const
     fstream xml_stream(xml_fname, std::ios::out);
     model_scheduler.print_xml(xml_stream);
     xml_stream.close();
-
-    LOG_DEBUG << "XML model selection file written to " << xml_fname << endl;
   }
 
   auto bestmodel_fname = options.modeltest_best_model_file();
-
   if (!bestmodel_fname.empty())
   {
     fstream bestmodel_stream(bestmodel_fname, std::ios::out);
@@ -308,22 +300,12 @@ void ModelTest::print_results_to_file() const
     for (auto p = 0U; p < best_model_per_part.size(); ++p)
     {
       const auto& best_model = best_model_per_part.at(p);
-      bestmodel_stream << best_model.to_string(true, logger().precision(LogElement::model)) << ", "
-                     << msa.part_info(p).name() << " = " << msa.part_info(p).range_string() << endl;
+      bestmodel_stream << best_model.to_string() << ", "
+                       << msa.part_info(p).name() << " = " << msa.part_info(p).range_string() << endl;
     }
   }
 }
 
-
-vector<size_t> ModelTest::rank_by_score(const vector<ModelEvaluation const *> &results)
-{
-  std::vector<size_t> ranking(results.size(), 0);
-  std::iota(ranking.begin(), ranking.end(), 0);
-
-  std::sort(ranking.begin(), ranking.end(),
-            [&results](const size_t &a, const size_t &b) { return results.at(a)->ic_score < results.at(b)->ic_score; });
-
-  return ranking;
+vector<vector<ModelEvaluation const *>> ModelTest::get_results() const {
+  return _results;
 }
-
-unsigned int ModelTest::recommended_thread_count() const { return model_scheduler.recommended_thread_count(); }

@@ -134,6 +134,8 @@ void DistributedSchedulingMPI::fetch_results(ModelUpdateCallback callback)
         stream >> result;
         callback(index, result);
     }
+
+    local_results_offset = new_offset;
 }
 
 #else

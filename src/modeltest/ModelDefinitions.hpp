@@ -314,4 +314,25 @@ const std::vector<std::string> aa_substitution_matrix_names{
     */
 };
 
+inline std::vector<string> moose_matrix_names(const DataType datatype)
+{
+  switch (datatype)
+  {
+    case DataType::dna:
+      return dna_substitution_matrix_names;
+    case DataType::protein:
+      return aa_substitution_matrix_names;
+    case DataType::binary:
+      return std::vector<string>({"BIN"});
+
+    case DataType::autodetect:
+    case DataType::multistate:
+    case DataType::genotype10:
+    case DataType::genotype16:
+      throw unsupported_datatype_error();
+  }
+
+  return {};
+}
+
 #endif
