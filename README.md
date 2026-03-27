@@ -6,17 +6,17 @@
 
 RAxML-NG is a phylogenetic tree inference tool which uses maximum-likelihood (ML) optimality criterion. Its search heuristic is based on iteratively performing a series of Subtree Pruning and Regrafting (SPR) moves, which allows to quickly navigate to the best-known ML tree. RAxML-NG is a successor of RAxML (Stamatakis 2014) and leverages the highly optimized likelihood computation implemented in [`coraxlib`](https://codeberg.org/Exelixis-Lab/coraxlib).
 
-RAxML-NG offers improvements in speed, flexibility and user-friendliness over the previous RAxML versions. It also implements some of the features previously available in ExaML (Kozlov et al. 2015), including checkpointing and efficient load balancing for partitioned alignments (Kobert et al. 2014). RAxML-NG version 2.0 offers a plethora of new features such as [adaptive search heuristics](https://doi.org/10.1093/molbev/msad227), [automatic model selection](https://github.com/amkozlov/raxml-ng/wiki/Automatic-model-selection-(MOOSE)), and [fast branch support metrics](https://github.com/amkozlov/raxml-ng/wiki/Computing-branch-support-metrics).
+RAxML-NG offers improvements in speed, flexibility and user-friendliness over the previous RAxML versions. It also implements some of the features previously available in ExaML (Kozlov et al. 2015), including checkpointing and efficient load balancing for partitioned alignments (Kobert et al. 2014). RAxML-NG version 2.0 offers a plethora of new features such as [adaptive search heuristics](https://doi.org/10.1093/molbev/msad227), [automatic model selection](https://codeberg.org/amkozlov/raxml-ng/wiki/Automatic-model-selection-(MOOSE)), and [fast branch support metrics](https://codeberg.org/amkozlov/raxml-ng/wiki/Computing-branch-support-metrics).
 
-Documentation: [github wiki](https://github.com/amkozlov/raxml-ng/wiki)
+Documentation: [github wiki](https://codeberg.org/amkozlov/raxml-ng/wiki)
 
 ## Installation instructions
 
 * For most desktop Unix/Linux and macOS systems, the easiest way to install RAxML-NG is by using the pre-compiled binary:  
-[**Download 64-bit Linux binary**](https://github.com/amkozlov/raxml-ng/releases/download/2.0.0/raxml-ng_v2.0.0_linux_x86_64.zip)  
-[**Download 64-bit macOS binary**](https://github.com/amkozlov/raxml-ng/releases/download/2.0.0/raxml-ng_v2.0.0_macos.zip)   
+[**Download 64-bit Linux binary**](https://codeberg.org/amkozlov/raxml-ng/releases/download/2.0.0/raxml-ng_v2.0.0_linux_x86_64.zip)  
+[**Download 64-bit macOS binary**](https://codeberg.org/amkozlov/raxml-ng/releases/download/2.0.0/raxml-ng_v2.0.0_macos.zip)   
 
-* On Windows, you can use [linux binary](https://github.com/amkozlov/raxml-ng/releases/download/2.0.0/raxml-ng_v2.0.0_linux_x86_64.zip) via [Windows Subsystem for Linux](https://ubuntu.com/wsl), but performance might be lower than with native Linux execution. 
+* On Windows, you can use [linux binary](https://codeberg.org/amkozlov/raxml-ng/releases/download/2.0.0/raxml-ng_v2.0.0_linux_x86_64.zip) via [Windows Subsystem for Linux](https://ubuntu.com/wsl), but performance might be lower than with native Linux execution. 
 
 * If neither of the above options worked for you, please clone this repository and build RAxML-NG from scratch.
 
@@ -37,7 +37,7 @@ If you do not want to use git submodules (e.g., for packaging), you also need to
 PTHREADS version:
 
 ```
-git clone --recursive https://github.com/amkozlov/raxml-ng
+git clone --recursive https://codeberg.org/amkozlov/raxml-ng
 cd raxml-ng
 mkdir build && cd build
 cmake ..
@@ -47,7 +47,7 @@ make
 MPI version:
 
 ```
-git clone --recursive https://github.com/amkozlov/raxml-ng
+git clone --recursive https://codeberg.org/amkozlov/raxml-ng
 cd raxml-ng
 mkdir build && cd build
 cmake -DUSE_MPI=ON ..
@@ -57,7 +57,7 @@ make
 Portable PTHREADS version (static linkage, compatible with old non-AVX CPUs):
 
 ```
-git clone --recursive https://github.com/amkozlov/raxml-ng
+git clone --recursive https://codeberg.org/amkozlov/raxml-ng
 cd raxml-ng
 mkdir build && cd build
 cmake -DSTATIC_BUILD=ON -DPORTABLE_BUILD=ON ..
@@ -67,7 +67,7 @@ make
 Latest **unstable** development version (`dev` branch):
 
 ```
-git clone --recursive -b dev https://github.com/amkozlov/raxml-ng raxml-ng-dev
+git clone --recursive -b dev https://codeberg.org/amkozlov/raxml-ng raxml-ng-dev
 cd raxml-ng-dev
 mkdir build && cd build
 cmake ..
@@ -76,8 +76,8 @@ make
 
 ## Documentation and Support
 
-Documentation can be found in the [github wiki](https://github.com/amkozlov/raxml-ng/wiki). 
-For a quick start, please check out the [hands-on tutorial](https://github.com/amkozlov/raxml-ng/wiki/Tutorial).
+Documentation can be found in the [codeberg wiki](https://codeberg.org/amkozlov/raxml-ng/wiki). 
+For a quick start, please check out the [hands-on tutorial](https://codeberg.org/amkozlov/raxml-ng/wiki/Tutorial).
 
 Also please check the online help with `raxml-ng -h`.
 
