@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <cmath>
 
 #include <memory>
 
@@ -988,9 +989,10 @@ void check_options_early(Options& opts)
   LOG_DEBUG << "RBA partial loading: " << (opts.use_rba_partload ? "ON" : "OFF") << endl;
 
   /* disable stopping rule with MPI (not implemented yet)*/
-  if (opts.num_ranks > 1 && opts.stopping_rule != StoppingRule::none)
+  if (opts.num_ranks > 1 && 
+    (opts.stopping_rule == StoppingRule::sn_normal || opts.stopping_rule == StoppingRule::sn_rell))
   {
-    LOG_WARN << endl << "WARNING: Stopping rule is not supported with MPI and has been automatically disabled."
+    LOG_WARN << endl << "WARNING: SN-based stopping rules are not supported with MPI and has been automatically disabled."
              << endl << endl;
     opts.stopping_rule = StoppingRule::none;
   }
@@ -1544,6 +1546,9 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type, int random_
                                              instance.constraint_tree, instance.tip_msa_idmap);
 
       double avg_pars_brlen = ((double) score) / tree.num_branches() / pars_msa.part_msa().total_sites();
+      
+      /* rounding */
+      avg_pars_brlen = std::round(avg_pars_brlen * 1e5) / 1e5;
 
       if (opts.use_pars_brlen)
         tree.reset_brlens(avg_pars_brlen);
@@ -2284,8 +2289,9 @@ void init_stop_criterion(RaxmlInstance& instance)
         case StoppingRule::sn_rell:
           instance.stop_criterion.reset(
             new NoiseSamplingTest(instance.parted_msa,
+                                  ParallelContext::num_ranks(),
                                   ParallelContext::num_groups(),
-                                  ParallelContext::num_threads(),
+                                  ParallelContext::threads_per_group(),
                                   true,
                                   opts.random_seed));
           break;
@@ -2293,8 +2299,9 @@ void init_stop_criterion(RaxmlInstance& instance)
         case StoppingRule::sn_normal:
           instance.stop_criterion.reset(
             new NoiseSamplingTest(instance.parted_msa,
+                                  ParallelContext::num_ranks(),
                                   ParallelContext::num_groups(),
-                                  ParallelContext::num_threads(),
+                                  ParallelContext::threads_per_group(),
                                   false,
                                   opts.random_seed));
           break;
@@ -2302,8 +2309,9 @@ void init_stop_criterion(RaxmlInstance& instance)
         case StoppingRule::kh:
           instance.stop_criterion.reset(
             new KHStoppingTest(instance.parted_msa,
+                               ParallelContext::num_ranks(),
                                ParallelContext::num_groups(),
-                               ParallelContext::num_threads(),
+                               ParallelContext::threads_per_group(),
                                false,
                                opts.random_seed,
                                opts.lh_epsilon));
@@ -2312,8 +2320,9 @@ void init_stop_criterion(RaxmlInstance& instance)
         case StoppingRule::kh_mult:
           instance.stop_criterion.reset(
             new KHStoppingTest(instance.parted_msa,
+                               ParallelContext::num_ranks(),
                                ParallelContext::num_groups(),
-                               ParallelContext::num_threads(),
+                               ParallelContext::threads_per_group(),
                                true,
                                opts.random_seed,
                                opts.lh_epsilon));
@@ -3540,9 +3549,10 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
     
     if (instance.stop_criterion)
     {
-      instance.stop_criterion->initialize_persite_lnl_vectors(treeinfo.get());
-      instance.stop_criterion->set_thread_offset(treeinfo.get(), part_assign,
+      instance.stop_criterion->set_proc_offset(treeinfo.get(), part_assign,
                                                  ParallelContext::local_proc_id());
+      
+      instance.stop_criterion->initialize_persite_lnl_vectors();
       optimizer.set_stopping_criterion(instance.stop_criterion);
     }
     else
@@ -3583,6 +3593,10 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
       LOG_PROGR << endl;
     }
 
+    // HERE I CHECK ALEXEY's IMPLEMENTATION OF PERSITE LOGLH
+    // This is a shared-memory implementation only
+    // there has to be somewhere an check statement, which forbids sitelh computation 
+    // on multiple ranks (MPI)
     if (!instance.persite_loglh.empty())
     {
       assert(start_tree_num <= instance.persite_loglh.size());
