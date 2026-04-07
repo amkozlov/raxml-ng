@@ -12,7 +12,7 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
   /* open the file */
   auto file = corax_fasta_open(stream.fname().c_str(), corax_map_generic);
   if (!file)
-    libpll_check_error("Unable to parse FASTA file");
+    coraxlib_check_error("Unable to parse FASTA file");
 
   char * sequence = NULL;
   char * header = NULL;
@@ -77,11 +77,11 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
   }
 
   if (corax_errno != CORAX_ERROR_FILE_EOF)
-    libpll_check_error("Error parsing FASTA file: " +  stream.fname() + "\n");
+    coraxlib_check_error("Error parsing FASTA file: " +  stream.fname() + "\n");
 
   corax_fasta_close(file);
 
-  libpll_reset_error();
+  coraxlib_reset_error();
 
   return stream;
 }
@@ -97,7 +97,7 @@ PhylipStream& operator>>(PhylipStream& stream, MSA& msa)
     corax_msa_destroy(pll_msa);
   }
   else
-    libpll_check_error("Unable to parse PHYLIP file: " +  stream.fname() + "\n");
+    coraxlib_check_error("Unable to parse PHYLIP file: " +  stream.fname() + "\n");
 
   return stream;
 }
@@ -418,7 +418,7 @@ MSA msa_load_from_file(const std::string &filename, FileFormat format, const Opt
     }
     catch(exception &e)
     {
-      libpll_reset_error();
+      coraxlib_reset_error();
       parser_error = string(e.what());
       if (format == FileFormat::autodetect)
         LOG_DEBUG << "Failed to load as " << msa_formats.at(*fmt) << ": " << parser_error << endl;

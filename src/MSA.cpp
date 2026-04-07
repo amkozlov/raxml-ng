@@ -127,7 +127,7 @@ void MSA::compress_patterns(const corax_state_t * charmap, bool store_backmap)
                                                     backmap_ptr);
 
   if (!w)
-    libpll_check_error("Pattern compression failed: ", true);
+    coraxlib_check_error("Pattern compression failed: ", true);
 
   /* set new, compressed length which has been updated in pll_msa */
   _length = _pll_msa->length;

@@ -129,7 +129,7 @@ void SplitsTree::add_splits(const SplitsTree& other)
   auto splits_added = corax_utree_split_hashtable_insert_copy(_pll_splits_hash,
                                                               other._pll_splits_hash);
 
-  libpll_check_error();
+  coraxlib_check_error();
 
   _num_bs_trees += other.num_bs_trees();
 

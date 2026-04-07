@@ -34,12 +34,12 @@ void sysutil_fatal(const char * format, ...)
   exit(EXIT_FAILURE);
 }
 
-void sysutil_fatal_libpll()
+void sysutil_fatal_coraxlib()
 {
   sysutil_fatal("ERROR(%d): %s\n", corax_errno, corax_errmsg);
 }
 
-void libpll_check_error(const std::string& errmsg, bool force)
+void coraxlib_check_error(const std::string& errmsg, bool force)
 {
   if (corax_errno)
     throw runtime_error(errmsg +  " (CORAX-" + to_string(corax_errno) + "): " + string(corax_errmsg));
@@ -47,7 +47,7 @@ void libpll_check_error(const std::string& errmsg, bool force)
     throw runtime_error("Unknown CORAXLIB error.");
 }
 
-void libpll_reset_error()
+void coraxlib_reset_error()
 {
   corax_errno = 0;
   strcpy(corax_errmsg, "");

@@ -398,7 +398,7 @@ bool check_msa_global(const MSA& msa, const Options& opts)
                                                         NULL,
                                                         stats_mask);
 
-  libpll_check_error("ERROR computing MSA stats");
+  coraxlib_check_error("ERROR computing MSA stats");
   assert(stats);
 
   if (stats->dup_taxa_pairs_count > 0)
@@ -503,7 +503,7 @@ bool check_msa(RaxmlInstance& instance)
                                                           NULL,
                                                           stats_mask);
 
-    libpll_check_error("ERROR computing MSA stats");
+    coraxlib_check_error("ERROR computing MSA stats");
     assert(stats);
 
     for (unsigned long c = 0; c < stats->dup_seqs_pairs_count; ++c)
@@ -541,7 +541,7 @@ bool check_msa(RaxmlInstance& instance)
       corax_msa_destroy_errors(errs);
     }
     else
-      libpll_check_error("MSA check failed");
+      coraxlib_check_error("MSA check failed");
 
 
     /* Check for all-gap columns and sequences */

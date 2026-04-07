@@ -173,7 +173,7 @@ void Model::init_from_string(const std::string &model_string)
     _num_states = corax_util_model_numstates_mult(model_name.c_str());
     _custom_charmap = shared_ptr<corax_state_t>(corax_util_model_charmap_mult(_num_states), free);
 
-    libpll_check_error("ERROR in model specification |" + model_name + "|");
+    coraxlib_check_error("ERROR in model specification |" + model_name + "|");
     assert(_custom_charmap);
   }
   else
@@ -306,7 +306,7 @@ corax_mixture_model_t * Model::init_mix_model(const std::string &model_name)
     if (!modinfo)
     {
       if (corax_errno)
-        libpll_check_error("ERROR model initialization |" + model_name + "|");
+        coraxlib_check_error("ERROR model initialization |" + model_name + "|");
       else
         throw runtime_error("Invalid model name: " + model_name);
     }
@@ -415,7 +415,7 @@ void Model::init_model_opts(const std::string &model_opts, const corax_mixture_m
         // read as PAML file (rates + frequencies)
         doubleVector rates(num_uniq_rates);
 
-        // convert rates: lower triangle (PAML) -> upper triangle (libpll)
+        // convert rates: lower triangle (PAML) -> upper triangle (coraxlib)
         for (size_t i = 0, j = 0, stride = 1, col = 1, start_col = 0; i < num_uniq_rates; ++i)
         {
           rates[i] = user_srates[j];
