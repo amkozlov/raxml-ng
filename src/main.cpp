@@ -2335,22 +2335,35 @@ void autoselect_models(RaxmlInstance& instance, CheckpointManager &cm)
   if (!opts.auto_model())
     return;
 
-  if (instance.start_trees.empty())
-    LOG_ERROR << "Please specify a tree to use for model testing" << endl;
-
   // for now, use first parsimony tree unless user/random tree is explicitly provided
   size_t tree_num = 0;
   std::string tree_type = "parsimony";
-  if (instance.opts.start_trees.count(StartingTree::parsimony) && instance.opts.start_trees.count(StartingTree::random))
-    tree_num = instance.opts.start_trees.at(StartingTree::random);
+  if (instance.opts.start_trees.count(StartingTree::parsimony))
+  {
+    /* random trees come before parsimony in start_trees -> set offset */
+    if (instance.opts.start_trees.count(StartingTree::random))
+      tree_num = instance.opts.start_trees.at(StartingTree::random);
+  }
   else if (instance.opts.start_trees.count(StartingTree::user))
   {
     tree_type = "user";
   }
   else if (instance.opts.start_trees.count(StartingTree::random))
+  {
     tree_type = "random";
+  }
+  else
+  {
+    /* no starting trees -> use a first tree from pars_trees, generate if needed */
+    if (instance.pars_trees.empty())
+    {
+      auto tree = generate_tree(instance, StartingTree::parsimony, rand());
+      instance.pars_trees.emplace_back(move(tree));
+    }
+  }
 
-  const auto &tree = instance.start_trees.at(tree_num);
+  assert(instance.start_trees.size() > tree_num || instance.pars_trees.size() > tree_num);
+  const auto &tree = instance.start_trees.empty() ? instance.pars_trees.at(tree_num) : instance.start_trees.at(tree_num);
 
   const PartitionedMSA &msa = *instance.parted_msa.get();
 
