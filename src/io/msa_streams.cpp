@@ -296,7 +296,7 @@ FileFormat msa_detect_file_format(const std::string &filename)
   ifstream fs(filename);
 
   string s;
-  while (s.empty())
+  while (s.empty() && !fs.eof())
   {
     fs >> std::skipws >> s;
     for (auto& m: msa_magic)
