@@ -22,10 +22,10 @@ MSA::MSA(const corax_msa_t *pll_msa) :
 }
 
 MSA::MSA(MSA&& other) : _length(other._length), _num_sites(other._num_sites),
-    _sequences(move(other._sequences)), _labels(move(other._labels)),
-    _label_id_map(move(other._label_id_map)), _site_names(move(other._site_names)),
-    _weights(move(other._weights)), _probs(move(other._probs)),
-    _local_seq_ranges(move(other._local_seq_ranges)), _states(other._states),
+    _sequences(std::move(other._sequences)), _labels(std::move(other._labels)),
+    _label_id_map(std::move(other._label_id_map)), _site_names(std::move(other._site_names)),
+    _weights(std::move(other._weights)), _probs(std::move(other._probs)),
+    _local_seq_ranges(std::move(other._local_seq_ranges)), _states(other._states),
     _pll_msa(other._pll_msa), _dirty(other._dirty)
 {
   other._length = other._num_sites = 0;

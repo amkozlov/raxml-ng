@@ -669,7 +669,7 @@ void assign(PartitionedMSA &parted_msa, const TreeInfo &treeinfo)
 
     Model model(parted_msa.model(p));
     assign(model, treeinfo, p);
-    parted_msa.model(p, move(model));
+    parted_msa.model(p, std::move(model));
   }
 }
 

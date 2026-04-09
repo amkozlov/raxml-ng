@@ -176,6 +176,8 @@ static void get_cpuid(int32_t out[4], int32_t x)
 {
 #ifdef __aarch64__
 // not supported
+  RAXML_UNUSED(out);
+  RAXML_UNUSED(x);
 #elif defined(_WIN32)
   __cpuid(out, x);
 #else
