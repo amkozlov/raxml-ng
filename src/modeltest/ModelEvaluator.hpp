@@ -36,6 +36,9 @@ public:
   ModelEvaluator(const ModelDescriptor &candidate_model, const PartitionStats &stats, size_t partition_index,
                  EvaluationPriority priority, size_t proposed_thread_count);
 
+  ModelEvaluator(ModelEvaluator &&other) noexcept;
+  ModelEvaluator &operator=(ModelEvaluator &&other) noexcept;
+
   /** Try to add calling thread with specified thread_id to the team */
   bool join_team();
 
@@ -90,9 +93,16 @@ private:
 
   /* Variables required for thread synchronization */
   volatile EvaluationStatus status;
+
+#ifdef _RAXML_ATOMIC_BARRIER
+  std::atomic_uint _barrier_counter;
+  std::atomic_uint _barrier_proceed;
+  static thread_local std::atomic_uint _barrier_mycycle;
+#else
   volatile unsigned int _barrier_counter;
   volatile int _barrier_proceed;
   static thread_local int _barrier_mycycle;
+#endif
 
   volatile unsigned int _assigned_threads;
   std::vector<double> _reduce_buffer;

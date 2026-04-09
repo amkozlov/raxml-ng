@@ -37,6 +37,12 @@ MPI_Comm ParallelContext::_comm = MPI_COMM_WORLD;
 bool ParallelContext::_owns_comm = true;
 #endif
 
+#ifdef HAVE_X86INTRIN_H
+#define RAXML_WAIT { _mm_pause(); }
+#else
+#define RAXML_WAIT {}
+#endif
+
 ThreadGroup& ParallelContext::thread_group(size_t id)
 {
   if (id < _thread_groups.size())
@@ -341,27 +347,44 @@ void ParallelContext::mpi_barrier()
 
 void ParallelContext::global_thread_barrier()
 {
+#ifdef _RAXML_ATOMIC_BARRIER
+  static atomic_uint barrier_counter { 0 };
+  static atomic_uint proceed { false };
+  static thread_local atomic_uint myCycle { proceed.load() };
+
+  std::atomic_fetch_add(&barrier_counter, 1);
+#else
   static volatile unsigned int barrier_counter = 0;
   static thread_local volatile int myCycle = 0;
   static volatile int proceed = 0;
 
   __sync_fetch_and_add( &barrier_counter, 1);
+#endif
 
   if(_thread_id == 0)
   {
-    while(barrier_counter != ParallelContext::_num_threads);
+    while(barrier_counter != ParallelContext::_num_threads) RAXML_WAIT;
     barrier_counter = 0;
     proceed = !proceed;
   }
   else
   {
-    while(myCycle == proceed);
+    while(myCycle == proceed) RAXML_WAIT;
     myCycle = !myCycle;
   }
 }
 
 void ParallelContext::thread_barrier()
 {
+#ifdef _RAXML_ATOMIC_BARRIER
+  auto& g = *_thread_group;
+  static thread_local atomic_uint myCycle { g.proceed.load() };
+
+  if (g.num_threads == 1)
+    return;
+
+  std::atomic_fetch_add(&g.barrier_counter, 1);
+#else
   static thread_local volatile int myCycle = 0;
   auto& g = *_thread_group;
 
@@ -369,20 +392,20 @@ void ParallelContext::thread_barrier()
     return;
 
   __sync_fetch_and_add(&g.barrier_counter, 1);
+#endif
 
   if(_local_thread_id == 0)
   {
-    while(g.barrier_counter != g.num_threads);
+    while(g.barrier_counter != g.num_threads) RAXML_WAIT;
     g.barrier_counter = 0;
     g.proceed = !g.proceed;
   }
   else
   {
-    while(myCycle == g.proceed);
+    while(myCycle == g.proceed) RAXML_WAIT;
     myCycle = !myCycle;
   }
 }
-
 
 void ParallelContext::thread_reduce(double * data, size_t size, int op)
 {
