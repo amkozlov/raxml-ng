@@ -104,7 +104,7 @@ ModelTest::ModelTest(const Options &original_options, const PartitionedMSA &msa,
     : options(modify_options(original_options)), optimizer(options), checkpoint_manager(checkpoint_manager), msa(msa),
       tree(tree), tip_msa_idmap(tip_msa_idmap),
       model_scheduler(generate_candidate_model_names(msa.part_info(0).model().data_type()), msa, options,
-                      checkpoint_manager, modeltest_estimate_cores)
+                      checkpoint_manager, modeltest_estimate_cores), _results()
 {
 }
 
@@ -265,6 +265,8 @@ const vector<Model>& ModelTest::optimize_model()
     }
     LOG_INFO << endl;
   }
+
+  ParallelContext::thread_barrier();
 
   thread_log->close();
 

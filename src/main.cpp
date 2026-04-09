@@ -3874,7 +3874,7 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
 void thread_infer_model(RaxmlInstance& instance, CheckpointManager& cm)
 {
   ParallelContext::global_barrier();
-  const auto optimal_models = instance.model_test->optimize_model();
+  const auto &optimal_models = instance.model_test->optimize_model();
 
   if (ParallelContext::master_thread())
   {
