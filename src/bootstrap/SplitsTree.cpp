@@ -70,12 +70,13 @@ PllSplitSharedPtr SplitsTree::extract_splits_from_tree(const corax_unode_t& root
 }
 
 void SplitsTree::add_splits_to_hashtable(const PllSplitSharedPtr& splits,
-                                         const doubleVector& support, bool update_only)
+                                         const doubleVector& support, bool update_only,
+                                         size_t num_splits /* = 0 */)
 {
   _pll_splits_hash = corax_utree_split_hashtable_insert(_pll_splits_hash,
                                                          splits.get(),
                                                          _num_tips,
-                                                         num_splits(),
+                                                         num_splits ? num_splits : this->num_splits(),
                                                          support.empty() ? nullptr: support.data(),
                                                          update_only);
 }
@@ -113,10 +114,16 @@ void SplitsTree::add_replicate_tree(const Tree& tree)
   const corax_unode_t& root = tree.pll_utree_root();
   auto splits = extract_splits_from_tree(root, nullptr);
 
+//  LOG_DEBUG_TS << "Replicate splits: " << tree.num_splits()
+//               << "   reference splits: " << num_splits() << endl;
+
   doubleVector support;
   get_replicate_supports(root, splits, support);
 
-  add_splits_to_hashtable(splits, support, _ref_splits_only);
+  /* In general, both reference and replicate tree can be multifucated (unresolved),
+   * and hence they can contain different number of splits.
+   * Therefore, we need to specify the the number of replicate tree splits below. */
+  add_splits_to_hashtable(splits, support, _ref_splits_only, tree.num_splits());
 //  LOG_DEBUG_TS << "Added replicate trees: " << _num_bs_trees << endl;
 }
 
