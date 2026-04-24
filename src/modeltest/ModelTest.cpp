@@ -249,17 +249,23 @@ const vector<Model>& ModelTest::optimize_model()
 
     best_model_per_part.clear();
 
-    LOG_INFO << endl << "Best model(s):" << endl;
+    if (ParallelContext::master())
+      LOG_INFO << endl << "Best model(s):" << endl;
+
     _results = model_scheduler.collect_finished_results_by_partition();
 
     for (auto p = 0U; p < msa.part_count(); ++p)
     {
       sort_by_score(_results.at(p));
       const auto &best_model = _results[p].at(0);
-      logger().logstream(LogLevel::result, LogScope::thread)
-          << "Partition #" << p << ": " << best_model->model.to_string()
-          << " (LogLH = " << FMT_LH(best_model->loglh)
-          << "  BIC = " << FMT_LH(best_model->ic_score) << ")" << endl;
+
+      if (ParallelContext::master())
+      {
+        logger().logstream(LogLevel::result, LogScope::thread)
+            << "Partition #" << p << ": " << best_model->model.to_string()
+            << " (LogLH = " << FMT_LH(best_model->loglh)
+            << "  BIC = " << FMT_LH(best_model->ic_score) << ")" << endl;
+      }
 
       best_model_per_part.emplace_back(best_model->model);
     }
