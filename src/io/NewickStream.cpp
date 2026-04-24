@@ -64,7 +64,7 @@ NewickStream& operator<<(NewickStream& stream, const corax_unode_t& root)
   else
   {
     assert(corax_errno);
-    libpll_check_error("Failed to generate Newick");
+    coraxlib_check_error("Failed to generate Newick");
   }
   return stream;
 }
@@ -96,7 +96,7 @@ NewickStream& operator>>(NewickStream& stream, Tree& tree)
 
     corax_utree_t * utree = corax_utree_parse_newick_string_unroot(newick_str.c_str());
 
-    libpll_check_error("ERROR reading tree file");
+    coraxlib_check_error("ERROR reading tree file");
 
     assert(utree);
 

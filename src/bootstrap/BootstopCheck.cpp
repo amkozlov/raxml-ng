@@ -29,7 +29,7 @@ void BootstopCheck::add_bootstrap_tree(const Tree& tree)
   if (!_pll_splits_hash)
   {
     assert(corax_errno);
-    libpll_check_error("Cannot create split hashtable");
+    coraxlib_check_error("Cannot create split hashtable");
   }
 
   corax_split_t * splits = corax_utree_split_create(&tree.pll_utree_root(),
@@ -44,7 +44,7 @@ void BootstopCheck::add_bootstrap_tree(const Tree& tree)
                                                                        splits[i],
                                                                        1.0);
     if (!e)
-      libpll_check_error("Cannot add a split into hashtable: ");
+      coraxlib_check_error("Cannot add a split into hashtable: ");
 
     assert(e->bip_number <= _split_occurence.size());
 

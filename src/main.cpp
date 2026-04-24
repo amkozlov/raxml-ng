@@ -97,6 +97,7 @@ struct RaxmlInstance
   /* shared list of parsimony trees used for difficulty prediction, starting trees etc. */
   TreeList pars_trees;
   unsigned int num_threads_parsimony;
+  bool pars_spr_enabled;   /* apply parsimony SPRs after stepwise addition? */
 
   /* IDs of the trees that have been already inferred (eg after resuming from a checkpoint) */
   IDSet done_ml_trees;
@@ -150,8 +151,8 @@ struct RaxmlInstance
   vector<RaxmlWorker> workers;
   RaxmlWorker& get_worker() { return workers.at(ParallelContext::local_group_id()); }
 
-  RaxmlInstance() : num_threads_parsimony(0), bs_converged(false), run_phase(RaxmlRunPhase::start),
-      used_wh(0), num_threads_modeltest(0) {}
+  RaxmlInstance() : num_threads_parsimony(0), pars_spr_enabled(false), bs_converged(false),
+      run_phase(RaxmlRunPhase::start), used_wh(0), num_threads_modeltest(0) {}
 };
 
 struct RaxmlWorker
@@ -398,7 +399,7 @@ bool check_msa_global(const MSA& msa, const Options& opts)
                                                         NULL,
                                                         stats_mask);
 
-  libpll_check_error("ERROR computing MSA stats");
+  coraxlib_check_error("ERROR computing MSA stats");
   assert(stats);
 
   if (stats->dup_taxa_pairs_count > 0)
@@ -503,7 +504,7 @@ bool check_msa(RaxmlInstance& instance)
                                                           NULL,
                                                           stats_mask);
 
-    libpll_check_error("ERROR computing MSA stats");
+    coraxlib_check_error("ERROR computing MSA stats");
     assert(stats);
 
     for (unsigned long c = 0; c < stats->dup_seqs_pairs_count; ++c)
@@ -541,7 +542,7 @@ bool check_msa(RaxmlInstance& instance)
       corax_msa_destroy_errors(errs);
     }
     else
-      libpll_check_error("MSA check failed");
+      coraxlib_check_error("MSA check failed");
 
 
     /* Check for all-gap columns and sequences */
@@ -968,7 +969,7 @@ void check_options_early(Options& opts)
   /* disable pythia if command cannot use difficulty score */
   opts.use_pythia &= (opts.command == Command::parse || opts.command == Command::search ||
                       opts.command == Command::bootstrap || opts.command == Command::all ||
-                      opts.command == Command::pythia);
+                      opts.command == Command::pythia || opts.command == Command::start);
 
   if (opts.use_pythia && !opts.use_pattern_compression)
   {
@@ -1540,13 +1541,15 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type, int random_
       }
 
       const ParsimonyMSA& pars_msa = bs_pmsa ? *bs_pmsa.get() : *instance.parted_msa_parsimony.get();
-      tree = Tree::buildParsimonyConstrained(pars_msa, random_seed, opts.use_pars_spr, &score,
+      tree = Tree::buildParsimonyConstrained(pars_msa, random_seed, instance.pars_spr_enabled, &score,
                                              instance.constraint_tree, instance.tip_msa_idmap);
 
       double avg_pars_brlen = ((double) score) / tree.num_branches() / pars_msa.part_msa().total_sites();
 
       if (opts.use_pars_brlen)
+      {
         tree.reset_brlens(avg_pars_brlen);
+      }
 
       LOG_WORKER_TS(LogLevel::verbose) << "Generated a PARSIMONY starting tree, seed: " << random_seed <<
           ", score: " << score << ", avg_brlen: " << FMT_BL(avg_pars_brlen) << endl;
@@ -1877,6 +1880,7 @@ void build_start_trees(RaxmlInstance& instance, unsigned int num_threads = 0)
   if (instance.start_trees.size() >= instance.opts.num_searches)
     return;
 
+  instance.pars_spr_enabled = opts.use_pars_spr;
   for (auto& st_tree: opts.start_trees)
   {
     auto st_tree_type = st_tree.first;
@@ -1907,9 +1911,12 @@ void build_start_trees(RaxmlInstance& instance, unsigned int num_threads = 0)
     {
       size_t trees_to_generate = st_tree_count;
 
-      if (instance.constraint_tree.empty() && !instance.pars_trees.empty())
+      if (instance.constraint_tree.empty() && !opts.use_pars_spr &&
+          !instance.pars_trees.empty())
       {
-        /* Try to reuse existing pars trees from pythia -> does not work with constraint */
+        /* Try to reuse existing pars trees from pythia
+         * - does not work with constraint tree
+         * - does not work if we want to apply parsimony SPRs */
         for (size_t i = 0; (i < instance.pars_trees.size()) && trees_to_generate; i++)
         {
           instance.start_trees.emplace_back(instance.pars_trees.at(i));
@@ -1951,6 +1958,9 @@ void build_start_trees(RaxmlInstance& instance, unsigned int num_threads = 0)
       }
     }
   }
+
+  /* for now. parsimony-based SPRs are used exclusively for starting trees! */
+  instance.pars_spr_enabled = false;
 
   if (::ParallelContext::master_rank())
   {
@@ -2171,7 +2181,7 @@ void generate_bootstraps(RaxmlInstance& instance, const CheckpointFile& checkp)
         for (size_t i = 0; i < trees_to_generate; ++i)
         {
           auto tree = generate_tree(instance, StartingTree::parsimony, rand());
-          instance.pars_trees.emplace_back(move(tree));
+          instance.pars_trees.emplace_back(std::move(tree));
         }
       }
       else
@@ -2208,7 +2218,7 @@ void generate_bootstraps(RaxmlInstance& instance, const CheckpointFile& checkp)
   //      if (b < checkp.bs_trees.size())
   //        continue;
 
-        instance.bs_start_trees.emplace_back(move(tree));
+        instance.bs_start_trees.emplace_back(std::move(tree));
       }
     }
     else if (instance.opts.bs_metrics.count(BranchSupportMetric::ebg) ||
@@ -2335,22 +2345,35 @@ void autoselect_models(RaxmlInstance& instance, CheckpointManager &cm)
   if (!opts.auto_model())
     return;
 
-  if (instance.start_trees.empty())
-    LOG_ERROR << "Please specify a tree to use for model testing" << endl;
-
   // for now, use first parsimony tree unless user/random tree is explicitly provided
   size_t tree_num = 0;
   std::string tree_type = "parsimony";
-  if (instance.opts.start_trees.count(StartingTree::parsimony) && instance.opts.start_trees.count(StartingTree::random))
-    tree_num = instance.opts.start_trees.at(StartingTree::random);
+  if (instance.opts.start_trees.count(StartingTree::parsimony))
+  {
+    /* random trees come before parsimony in start_trees -> set offset */
+    if (instance.opts.start_trees.count(StartingTree::random))
+      tree_num = instance.opts.start_trees.at(StartingTree::random);
+  }
   else if (instance.opts.start_trees.count(StartingTree::user))
   {
     tree_type = "user";
   }
   else if (instance.opts.start_trees.count(StartingTree::random))
+  {
     tree_type = "random";
+  }
+  else
+  {
+    /* no starting trees -> use a first tree from pars_trees, generate if needed */
+    if (instance.pars_trees.empty())
+    {
+      auto tree = generate_tree(instance, StartingTree::parsimony, rand());
+      instance.pars_trees.emplace_back(std::move(tree));
+    }
+  }
 
-  const auto &tree = instance.start_trees.at(tree_num);
+  assert(instance.start_trees.size() > tree_num || instance.pars_trees.size() > tree_num);
+  const auto &tree = instance.start_trees.empty() ? instance.pars_trees.at(tree_num) : instance.start_trees.at(tree_num);
 
   const PartitionedMSA &msa = *instance.parted_msa.get();
 
@@ -3861,7 +3884,7 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
 void thread_infer_model(RaxmlInstance& instance, CheckpointManager& cm)
 {
   ParallelContext::global_barrier();
-  const auto optimal_models = instance.model_test->optimize_model();
+  const auto &optimal_models = instance.model_test->optimize_model();
 
   if (ParallelContext::master_thread())
   {
@@ -4343,6 +4366,7 @@ int internal_main(int argc, char** argv, void* comm)
         {
           load_parted_msa(instance);
           load_constraint(instance);
+          autotune_start_trees(instance);
           build_start_trees(instance);
           if (!opts.start_tree_file().empty())
           {

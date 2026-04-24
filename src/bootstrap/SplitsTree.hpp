@@ -29,7 +29,8 @@ protected:
   PllSplitSharedPtr extract_splits_from_tree(const corax_unode_t& root,
                                              corax_unode_t ** node_split_map);
   void add_splits_to_hashtable(const PllSplitSharedPtr& splits,
-                               const doubleVector& support, bool update_only);
+                               const doubleVector& support, bool update_only,
+                               size_t num_splits = 0);
   void set_reference_tree();
 
   virtual void get_replicate_supports(const corax_unode_t& root,

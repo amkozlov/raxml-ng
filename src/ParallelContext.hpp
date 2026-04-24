@@ -29,6 +29,18 @@ typedef int MutexType;
 typedef int LockType;
 #endif
 
+/* Uncomment to force-enable portable barrier implementation. */
+//#define _RAXML_ATOMIC_BARRIER
+
+/* Always use portable barrier on non-x86 systems */
+#ifndef HAVE_X86INTRIN_H
+#define _RAXML_ATOMIC_BARRIER
+#endif
+
+#ifdef _RAXML_ATOMIC_BARRIER
+#include <atomic>
+#endif
+
 class Options;
 
 struct ThreadGroup
@@ -39,8 +51,14 @@ struct ThreadGroup
   std::vector<char> reduction_buf;
 
   MutexType mtx;
+
+#ifdef _RAXML_ATOMIC_BARRIER
+  std::atomic_uint barrier_counter;
+  std::atomic_uint proceed;
+#else
   volatile unsigned int barrier_counter;
   volatile int proceed;
+#endif
 
   ThreadGroup(size_t id, size_t local_id, size_t size, size_t bufsize = 0) :
     group_id(id), local_group_id(local_id), num_threads(size), reduction_buf(bufsize),
@@ -49,7 +67,13 @@ struct ThreadGroup
   ThreadGroup(ThreadGroup&& other):
     group_id(other.group_id), local_group_id(other.local_group_id),
     num_threads(other.num_threads), reduction_buf(std::move(other.reduction_buf)),
-    mtx(), barrier_counter(other.barrier_counter), proceed(other.proceed) {}
+    mtx(),
+#ifdef _RAXML_ATOMIC_BARRIER
+    barrier_counter(other.barrier_counter.load()), proceed(other.proceed.load())
+#else
+    barrier_counter(other.barrier_counter), proceed(other.proceed)
+#endif
+    {}
 };
 
 class ParallelContext

@@ -99,7 +99,7 @@ corax_msa_stats_t * PartitionInfo::compute_stats(unsigned long stats_mask) const
   corax_msa_stats_t * stats = corax_msa_compute_stats(_msa.pll_msa(), _model.num_states(),
                                                         _model.charmap(), weights, stats_mask);
 
-  libpll_check_error("ERROR computing MSA stats");
+  coraxlib_check_error("ERROR computing MSA stats");
   assert(stats);
 
   if ((stats_mask & CORAX_MSA_STATS_FREQS) &&_msa.probabilistic() &&

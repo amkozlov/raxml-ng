@@ -99,7 +99,7 @@ Tree Tree::buildRandom(size_t num_tips, const char * const* tip_labels,
 {
   PllUTreeUniquePtr pll_utree(corax_utree_random_create(num_tips, tip_labels, random_seed));
 
-  libpll_check_error("ERROR building random tree");
+  coraxlib_check_error("ERROR building random tree");
   assert(pll_utree);
 
   return Tree(pll_utree);
@@ -124,7 +124,7 @@ Tree Tree::buildRandomConstrained(const NameList& taxon_names, unsigned int rand
   if (!pll_utree)
   {
     assert(corax_errno);
-    libpll_check_error("ERROR in building a randomized constrained tree");
+    coraxlib_check_error("ERROR in building a randomized constrained tree");
   }
 
   Tree tree(pll_utree);
@@ -222,7 +222,7 @@ Tree Tree::buildParsimonyConstrained(const ParsimonyMSA& pars_msa, unsigned int 
     if (!pll_utree)
     {
       assert(corax_errno);
-      libpll_check_error("ERROR in building a constrained parsimony tree");
+      coraxlib_check_error("ERROR in building a constrained parsimony tree");
     }
 
     tree = Tree(pll_utree);
@@ -249,7 +249,7 @@ Tree Tree::buildParsimonyConstrained(const ParsimonyMSA& pars_msa, unsigned int 
 //    corax_utree_show_ascii(tree.pll_utree().vroot, CORAX_UTREE_SHOW_LABEL | CORAX_UTREE_SHOW_BRANCH_LENGTH | CORAX_UTREE_SHOW_CLV_INDEX);
   }
 
-  libpll_check_error("ERROR building parsimony tree");
+  coraxlib_check_error("ERROR building parsimony tree");
   assert(!tree.empty());
 
   return tree;
@@ -374,7 +374,7 @@ void Tree::remove_tips(const NameList& tips)
   else
   {
     assert(corax_errno);
-    libpll_check_error("ERROR in removing tips from a corax_tree");
+    coraxlib_check_error("ERROR in removing tips from a corax_tree");
   }
 }
 
@@ -414,7 +414,7 @@ void Tree::insert_tips(const NameIdMap& tips, double brlen /* = 0. */)
   else
   {
     assert(corax_errno);
-    libpll_check_error("ERROR in inserting new tips into a corax_tree");
+    coraxlib_check_error("ERROR in inserting new tips into a corax_tree");
   }
 }
 
@@ -436,7 +436,7 @@ void Tree::insert_tips_random(const NameList& tip_names, unsigned int random_see
   else
   {
     assert(corax_errno);
-    libpll_check_error("ERROR in randomized tree extension");
+    coraxlib_check_error("ERROR in randomized tree extension");
   }
 }
 
@@ -472,7 +472,7 @@ void Tree::insert_tips_pasimony(const NameList& tip_names, std::vector<corax_par
   else
   {
     assert(corax_errno);
-    libpll_check_error("ERROR in randomized tree extension");
+    coraxlib_check_error("ERROR in randomized tree extension");
   }
 }
 
@@ -541,7 +541,7 @@ void Tree::reset_brlens(double new_brlen)
 void Tree::collapse_short_branches(double min_brlen)
 {
   if (!corax_utree_collapse_branches(_pll_utree.get(), min_brlen))
-    libpll_check_error("Failed to collapse short branches: ", true);
+    coraxlib_check_error("Failed to collapse short branches: ", true);
 }
 
 PllNodeVector Tree::subnodes() const
@@ -698,7 +698,7 @@ void Tree::reroot(const NameList& outgroup_taxa, bool add_root_node)
                                        add_root_node);
 
   if (!res)
-    libpll_check_error("Unable to reroot tree");
+    coraxlib_check_error("Unable to reroot tree");
 }
 
 ScoredTopologyMap::const_iterator ScoredTopologyMap::best() const

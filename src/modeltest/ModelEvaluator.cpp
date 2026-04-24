@@ -4,7 +4,12 @@
 #include <utility>
 
 thread_local unsigned int ModelEvaluator::_thread_id = 0;
+
+#ifdef _RAXML_ATOMIC_BARRIER
+thread_local std::atomic_uint ModelEvaluator::_barrier_mycycle {0};
+#else
 thread_local int ModelEvaluator::_barrier_mycycle = 0;
+#endif
 
 size_t max_reduction_cardinality(const RateHeterogeneityDescriptor &rhas)
 {
@@ -23,12 +28,71 @@ ModelEvaluator::ModelEvaluator(const ModelDescriptor &candidate_model, const Par
       _partition_index{partition_index},
       _priority{priority}, _result{Model(_candidate_model->descriptor()), NAN, NAN},
       status{EvaluationStatus::WAITING},
+#ifdef _RAXML_ATOMIC_BARRIER
+      _barrier_counter{0},
+      _barrier_proceed{0},
+#else
       _barrier_counter(0),
       _barrier_proceed(0),
+#endif
       _assigned_threads(0),
       _reduce_buffer(_proposed_thread_count * max_reduction_cardinality(candidate_model.rate_heterogeneity), 0.)
 {
   assign(_result.model, stats);
+}
+
+// Move constructor
+ModelEvaluator::ModelEvaluator(ModelEvaluator &&other) noexcept
+          : _proposed_thread_count(other._proposed_thread_count),
+            _candidate_model(other._candidate_model),
+            _partition_index(other._partition_index),
+            _priority(other._priority),
+            _result(std::move(other._result)),
+            status(other.status),
+      #ifdef _RAXML_ATOMIC_BARRIER
+            _barrier_counter(other._barrier_counter.load()),
+            _barrier_proceed(other._barrier_proceed.load()),
+      #else
+            _barrier_counter(other._barrier_counter),
+            _barrier_proceed(other._barrier_proceed),
+      #endif
+            _assigned_threads(other._assigned_threads),
+            _reduce_buffer(std::move(other._reduce_buffer))
+{
+  // Note: Do not move _thread_id or _barrier_mycycle as they are thread_local statics
+  // Clear the source object
+  other._candidate_model = nullptr;
+  other._proposed_thread_count = 0;
+  other._partition_index = 0;
+  other._assigned_threads = 0;
+}
+
+ModelEvaluator &ModelEvaluator::operator=(ModelEvaluator &&other) noexcept
+{
+  if (this != &other)
+  {
+    _proposed_thread_count = other._proposed_thread_count;
+    _candidate_model = other._candidate_model;
+    _partition_index = other._partition_index;
+    _priority = other._priority;
+    _result = std::move(other._result);
+    status = other.status;
+#ifdef _RAXML_ATOMIC_BARRIER
+    _barrier_counter.store(other._barrier_counter.load());
+    _barrier_proceed.store(other._barrier_proceed.load());
+#else
+    _barrier_counter = other._barrier_counter;
+    _barrier_proceed = other._barrier_proceed;
+#endif
+    _assigned_threads = other._assigned_threads;
+    _reduce_buffer = std::move(other._reduce_buffer);
+
+    other._candidate_model = nullptr;
+    other._proposed_thread_count = 0;
+    other._partition_index = 0;
+    other._assigned_threads = 0;
+  }
+  return *this;
 }
 
 bool ModelEvaluator::join_team()
@@ -108,7 +172,11 @@ void ModelEvaluator::barrier()
 {
   assert(status != EvaluationStatus::WAITING);
 
+#ifdef _RAXML_ATOMIC_BARRIER
+  std::atomic_fetch_add(&_barrier_counter, 1);
+#else
   __sync_fetch_and_add( &_barrier_counter, 1);
+#endif
 
   if(_thread_id == 0)
   {

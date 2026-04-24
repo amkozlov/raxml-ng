@@ -104,7 +104,7 @@ ModelTest::ModelTest(const Options &original_options, const PartitionedMSA &msa,
     : options(modify_options(original_options)), optimizer(options), checkpoint_manager(checkpoint_manager), msa(msa),
       tree(tree), tip_msa_idmap(tip_msa_idmap),
       model_scheduler(generate_candidate_model_names(msa.part_info(0).model().data_type()), msa, options,
-                      checkpoint_manager, modeltest_estimate_cores)
+                      checkpoint_manager, modeltest_estimate_cores), _results()
 {
 }
 
@@ -249,22 +249,30 @@ const vector<Model>& ModelTest::optimize_model()
 
     best_model_per_part.clear();
 
-    LOG_INFO << endl << "Best model(s):" << endl;
+    if (ParallelContext::master())
+      LOG_INFO << endl << "Best model(s):" << endl;
+
     _results = model_scheduler.collect_finished_results_by_partition();
 
     for (auto p = 0U; p < msa.part_count(); ++p)
     {
       sort_by_score(_results.at(p));
       const auto &best_model = _results[p].at(0);
-      logger().logstream(LogLevel::result, LogScope::thread)
-          << "Partition #" << p << ": " << best_model->model.to_string()
-          << " (LogLH = " << FMT_LH(best_model->loglh)
-          << "  BIC = " << FMT_LH(best_model->ic_score) << ")" << endl;
+
+      if (ParallelContext::master())
+      {
+        logger().logstream(LogLevel::result, LogScope::thread)
+            << "Partition #" << p << ": " << best_model->model.to_string()
+            << " (LogLH = " << FMT_LH(best_model->loglh)
+            << "  BIC = " << FMT_LH(best_model->ic_score) << ")" << endl;
+      }
 
       best_model_per_part.emplace_back(best_model->model);
     }
     LOG_INFO << endl;
   }
+
+  ParallelContext::thread_barrier();
 
   thread_log->close();
 

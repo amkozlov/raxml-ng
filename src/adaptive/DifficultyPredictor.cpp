@@ -179,6 +179,7 @@ double DifficultyPredictor::load_pythia_score_from_log_file(const string& old_lo
         string score_string = line.substr(pos+22); // position of pythia score
         pythia_score = std::stod(score_string);
       }
+      RAXML_UNUSED(curLine);
     }
     fileInput.close();
   }

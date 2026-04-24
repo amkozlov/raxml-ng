@@ -486,7 +486,7 @@ doubleVector AutoPartitioner::get_column_entropies(const PartitionedMSA& part_ms
   double * e = corax_msa_column_entropies(part_msa.full_msa().pll_msa(),
                                           mod.num_states(), mod.charmap());
 
-  libpll_check_error("ERROR computing column entropies");
+  coraxlib_check_error("ERROR computing column entropies");
   assert(e);
 
 //  printf("Site entropy: ");

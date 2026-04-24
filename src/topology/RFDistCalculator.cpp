@@ -66,7 +66,7 @@ void RFDistCalculator::add_tree_splits(size_t tree_idx, const Tree& tree,
                                                                        splits[i],
                                                                        1.0);
     if (!e)
-      libpll_check_error("Cannot add a split into hashtable: ", true);
+      coraxlib_check_error("Cannot add a split into hashtable: ", true);
 
     assert(e->bip_number <= _split_occurence.size());
 
@@ -87,7 +87,7 @@ void RFDistCalculator::calc_rfdist(const TreeList& trees)
   if (!splits_hash)
   {
     assert(corax_errno);
-    libpll_check_error("Cannot create split hashtable");
+    coraxlib_check_error("Cannot create split hashtable");
   }
 
   /* add splits from all trees into a hashtable */

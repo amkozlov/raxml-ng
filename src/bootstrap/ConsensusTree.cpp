@@ -66,7 +66,7 @@ bool ConsensusTree::compute_support()
                                                                    _cutoff);
 
   if (!split_system)
-    libpll_check_error("Failed to create consensus tree (pllmod_utree_split_consensus)");
+    coraxlib_check_error("Failed to create consensus tree (pllmod_utree_split_consensus)");
 
   LOG_DEBUG_TS << "Split system size: " << split_system->split_count << endl;
 
@@ -78,7 +78,7 @@ bool ConsensusTree::compute_support()
                                                                (char * const *) tip_labels_cstr().data());
 
   if (!cons_tree)
-    libpll_check_error("Failed to create consensus tree (pllmod_utree_from_splits)");
+    coraxlib_check_error("Failed to create consensus tree (pllmod_utree_from_splits)");
 
   LOG_DEBUG_TS << "Consensus tree has " << to_string(cons_tree->branch_count)
                << " internal branches." << endl;
