@@ -13,10 +13,10 @@ Documentation: [github wiki](https://codeberg.org/amkozlov/raxml-ng/wiki)
 ## Installation instructions
 
 * For most desktop Unix/Linux and macOS systems, the easiest way to install RAxML-NG is by using the pre-compiled binary:  
-[**Download 64-bit Linux binary**](https://codeberg.org/amkozlov/raxml-ng/releases/download/2.0.0/raxml-ng_v2.0.0_linux_x86_64.zip)  
-[**Download 64-bit macOS binary**](https://codeberg.org/amkozlov/raxml-ng/releases/download/2.0.0/raxml-ng_v2.0.0_macos.zip)   
+[**Download 64-bit Linux binary**](https://codeberg.org/amkozlov/raxml-ng/releases/download/2.0.1/raxml-ng_v2.0.1_linux_x86_64.zip)  
+[**Download 64-bit macOS binary**](https://codeberg.org/amkozlov/raxml-ng/releases/download/2.0.1/raxml-ng_v2.0.1_macos.zip)   
 
-* On Windows, you can use [linux binary](https://codeberg.org/amkozlov/raxml-ng/releases/download/2.0.0/raxml-ng_v2.0.0_linux_x86_64.zip) via [Windows Subsystem for Linux](https://ubuntu.com/wsl), but performance might be lower than with native Linux execution. 
+* On Windows, you can use [linux binary](https://codeberg.org/amkozlov/raxml-ng/releases/download/2.0.1/raxml-ng_v2.0.1_linux_x86_64.zip) via [Windows Subsystem for Linux](https://ubuntu.com/wsl), but performance might be lower than with native Linux execution. 
 
 * If neither of the above options worked for you, please clone this repository and build RAxML-NG from scratch.
 
