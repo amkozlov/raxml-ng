@@ -240,7 +240,7 @@ void CommandLineParser::check_options(Options &opts)
   if (opts.write_bs_msa && opts.command != Command::bsmsa &&
       opts.command != Command::bootstrap && opts.command != Command::all)
   {
-    throw OptionException("You specified to write out boostrap alignments with --bs-write-msa option, "
+    throw OptionException("You specified to write out bootstrap alignments with --bs-write-msa option, "
       "but the current command does not perform bootstrapping.\n"
       "Did you forget --all option?");
   }
@@ -255,6 +255,13 @@ void CommandLineParser::check_options(Options &opts)
                             " instruction set on your system. If you are absolutely sure "
                             "it is supported, please use --force option to disable this check.");
     }
+  }
+
+  if (opts.auto_model() && !opts.force_mode && (!opts.optimize_model || !opts.optimize_brlen))
+  {
+    throw OptionException("Automatic model selection requires model and branch length optimization"
+        " to be enabled,\n"
+        "You can disable this check by adding the --force option, but ONLY if know what you are doing!\n");
   }
 }
 
