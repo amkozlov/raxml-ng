@@ -1548,6 +1548,12 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type, int random_
 
       if (opts.use_pars_brlen)
       {
+        /* round brlen to account for precision loss in the Newick file.
+         * this is required for MPI reproducibility since non-master ranks load start trees from file. */
+        const unsigned int precision = logger().precision(LogElement::brlen);
+        auto scaler = std::pow(10, precision);
+        avg_pars_brlen = std::round(avg_pars_brlen * scaler) / scaler;
+        avg_pars_brlen = std::max(avg_pars_brlen, opts.brlen_min);
         tree.reset_brlens(avg_pars_brlen);
       }
 
