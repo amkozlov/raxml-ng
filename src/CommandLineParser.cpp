@@ -481,6 +481,13 @@ void CommandLineParser::parse_modeltest_options(Options &opts, const string& arg
   for (auto& mopt: model_opts)
   {
     auto toks = split_string(mopt, '=');
+
+    if (toks.empty())
+    {
+        throw InvalidOptionValueException("Invalid moose options: " + arg + "\n" +
+                                          "Use format key1=value/key2=value/... Refer to --help for allowed options.");
+    }
+
     auto mopt_name = toks[0];
     auto mopt_val = toks.size() > 1 ? toks[1] : "";
 
