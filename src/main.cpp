@@ -3073,7 +3073,8 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
     }
   }
 
-  if (opts.command == Command::all || opts.command == Command::support)
+  if (opts.command == Command::all || opts.command == Command::support ||
+      (opts.command == Command::bootstrap && !instance.start_trees.empty()))
   {
     assert(!instance.support_trees.empty());
 
@@ -3943,8 +3944,8 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
   if ((opts.command == Command::bootstrap || opts.command == Command::all))
   {
     if (opts.bs_metrics.count(BranchSupportMetric::fbp) || opts.bs_metrics.count(BranchSupportMetric::rbs) ||
-        opts.bs_metrics.count(BranchSupportMetric::tbe) || opts.bs_metrics.count(BranchSupportMetric::ic1) ||
-        opts.bs_metrics.count(BranchSupportMetric::ica))
+        opts.bs_metrics.count(BranchSupportMetric::tbe) || opts.bs_metrics.count(BranchSupportMetric::gcf) ||
+        opts.bs_metrics.count(BranchSupportMetric::ic1) || opts.bs_metrics.count(BranchSupportMetric::ica))
     {
       thread_infer_bootstrap(instance, cm);
       ParallelContext::global_barrier();
@@ -4133,7 +4134,8 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   {
     instance.ml_tree = cm.checkp_file().best_tree();
 
-    if (opts.command == Command::all)
+    if (opts.command == Command::all ||
+        (opts.command == Command::bootstrap && !instance.start_trees.empty()))
     {
       auto& checkp = cm.checkp_file();
 
@@ -4141,12 +4143,18 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
       for (auto& t: checkp.bs_trees)
         bs_trees.push_back(t.second.second);
 
+      /* in bootstrapping mode, we use starting tree provided via --tree as a reference tree */
+      if (opts.command == Command::bootstrap)
+      {
+        assert(!instance.start_trees.empty());
+        instance.ml_tree.tree = instance.start_trees.at(0);
+      }
+
       draw_bootstrap_support(instance, instance.ml_tree.tree, bs_trees);
     }
 
     if (!instance.ml_tree.models.empty())
     {
-      // both in standard and adaptive mode, the code enters this if clause
       const auto& ml_models = instance.ml_tree.models;
       assert(ml_models.size() == parted_msa.part_count());
       for (size_t p = 0; p < parted_msa.part_count(); ++p)

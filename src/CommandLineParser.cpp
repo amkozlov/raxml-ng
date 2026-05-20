@@ -177,7 +177,8 @@ void CommandLineParser::check_options(Options &opts)
              !opts.bs_metrics.count(BranchSupportMetric::ps) &&
              !opts.bs_metrics.count(BranchSupportMetric::pbs))
     {
-      throw OptionException("Invalid --bs-metric value! Only FBP, RBS, PS or PBS are supported.");
+      if (opts.tree_file.empty())
+        throw OptionException("This branch support metric requires a fixed reference tree, please use the --tree option!");
     }
 
     /* autMRE not implemented (and probably not needed) for parsimony-based bootstrapping */
@@ -288,7 +289,8 @@ void CommandLineParser::compute_num_searches(Options &opts)
     for (const auto& it: opts.start_trees)
       opts.num_searches += it.second;
   }
-  else if (opts.command == Command::parse || opts.command == Command::check)
+  else if (opts.command == Command::parse || opts.command == Command::check ||
+           opts.command == Command::bootstrap)
   {
     /* ignore random and parsimony starting trees in check/parse mode */
     opts.start_trees.clear();
