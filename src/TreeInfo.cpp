@@ -684,7 +684,8 @@ void assign(Model &model, const TreeInfo &treeinfo, size_t partition_id)
     return;
 
   assign(model, pll_treeinfo.partitions[partition_id]);
-  model.alpha(pll_treeinfo.alphas[partition_id]);
+  if (model.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA)
+    model.alpha(pll_treeinfo.alphas[partition_id]);
   if (pll_treeinfo.brlen_scalers)
     model.brlen_scaler(pll_treeinfo.brlen_scalers[partition_id]);
 }
