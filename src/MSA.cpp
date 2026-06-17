@@ -344,9 +344,12 @@ void MSA::remove_taxa(const IDSet& taxon_ids)
     if (ignore == taxon_ids.cend() || i != *ignore)
     {
       new_sequences.push_back(_sequences[i]);
-      const auto label = _labels[i];
-      new_labels.push_back(label);
-      _label_id_map[label] = new_labels.size() - 1;
+      if (!_labels.empty())
+      {
+        const auto label = _labels[i];
+        new_labels.push_back(label);
+        _label_id_map[label] = new_labels.size() - 1;
+      }
     }
     else
       ignore++;
