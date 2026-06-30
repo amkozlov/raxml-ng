@@ -191,6 +191,10 @@ void print_banner()
   LOG_INFO << "Questions/problems/suggestions? "
               "Please visit: https://groups.google.com/forum/#!forum/raxml" << endl << endl;
 
+#ifdef _RAXML_DEBUG_BUILD
+  LOG_INFO << "\nWARNING: This is a debug build! Not all optimizations are enabled, performance may be degraded\n\n";
+#endif
+
   LOG_INFO << "System: " << sysutil_get_cpu_model() << ", ";
   LOG_INFO << sysutil_get_cpu_cores() << " cores, ";
   LOG_INFO << sysutil_get_memtotal() / (1024*1024*1024) << " GB RAM";
