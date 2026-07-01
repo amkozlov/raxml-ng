@@ -1150,6 +1150,10 @@ unsigned int Model::num_free_params(int mask /*  = CORAX_OPT_PARAM_ALL */) const
       if (param_estimated(CORAX_OPT_PARAM_ALPHA, mask))
         free_params += 1;
       break;
+    case CORAX_UTIL_MIXTYPE_GAMMA_OPT_WEIGHTS:
+      if (param_estimated(CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS, mask))
+        free_params += 1;
+      break;
     case CORAX_UTIL_MIXTYPE_FREE:
       if (param_estimated(CORAX_OPT_PARAM_FREE_RATES, mask))
         free_params += _num_ratecats - 1;
@@ -1274,7 +1278,8 @@ static string get_ratehet_mode_str(const Model& m)
     return "NONE";
   else
     return (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA) ? "GAMMA" :
-            (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_FREE) ? "FREE" : "FIXED";
+            (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_FREE) ? "FREE" : 
+            (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA_OPT_WEIGHTS) ? "GAMMA" : "FIXED";
 }
 
 LogStream& operator<<(LogStream& stream, const Model& m)
@@ -1288,11 +1293,19 @@ LogStream& operator<<(LogStream& stream, const Model& m)
   stream << "   Rate heterogeneity: " << get_ratehet_mode_str(m);
   if (m.num_ratecats() > 1)
   {
-    stream << " (" << m.num_ratecats() << " cats, " <<
-        (m.gamma_mode() == CORAX_GAMMA_RATES_MEDIAN ? "median" : "mean") << ")";
-    if (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA)
+    stream << " (" << m.num_ratecats() << " cats, ";
+    if(m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA_OPT_WEIGHTS)
+      stream << "opt";
+    else
+        stream << ((m.gamma_mode() == CORAX_GAMMA_RATES_MEDIAN) ? "median" : "mean");
+    stream << ")";
+    if (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA )
       stream << ",  alpha: " << FMT_MOD(m.alpha()) << " ("
              << get_param_mode_str(m.param_mode(CORAX_OPT_PARAM_ALPHA)) << ")";
+    if(m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA_OPT_WEIGHTS){
+      stream << ",  alpha: " << FMT_MOD(m.alpha()) << " ("
+             << get_param_mode_str(m.param_mode(CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS)) << ")";
+    }
     stream << ",  weights&rates: ";
     for (unsigned int i = 0; i < m.num_ratecats(); ++i)
     {
