@@ -752,6 +752,11 @@ void Model::init_model_opts(const std::string &model_opts, const corax_mixture_m
             ss.get();
             _gamma_mode = CORAX_GAMMA_RATES_MEAN;
           }
+          else if (ss.peek() == 'o' || ss.peek() == 'O')
+          {
+            ss.get();
+            _rate_het = CORAX_UTIL_MIXTYPE_GAMMA_OPT_WEIGHTS;
+          }
 
           if (read_param(ss, _alpha))
           {
@@ -946,6 +951,12 @@ void Model::init_model_opts(const std::string &model_opts, const corax_mixture_m
           _param_mode[CORAX_OPT_PARAM_ALPHA] = ParamValue::ML;
         break;
 
+      case CORAX_UTIL_MIXTYPE_GAMMA_OPT_WEIGHTS:
+        corax_compute_gamma_cats_opt_weights(_alpha, _num_ratecats, _ratecat_rates.data(), 
+            _ratecat_weights.data());
+        if (_param_mode[CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS] == ParamValue::undefined)
+          _param_mode[CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS] = ParamValue::ML;
+        break;
       case CORAX_UTIL_MIXTYPE_FREE:
         if (_param_mode[CORAX_OPT_PARAM_FREE_RATES] == ParamValue::undefined)
         {

@@ -4,9 +4,10 @@
 #include "ParallelContext.hpp"
 #include "corax/tree/treeinfo.h"
 
-const intVector PARAM_OPT_ORDER_DEFAULT = {CORAX_OPT_PARAM_SUBST_RATES, CORAX_OPT_PARAM_FREQUENCIES,
-                                           CORAX_OPT_PARAM_ALPHA, CORAX_OPT_PARAM_PINV,
-                                           CORAX_OPT_PARAM_FREE_RATES, CORAX_OPT_PARAM_BRANCHES_ITERATIVE};
+const intVector PARAM_OPT_ORDER_DEFAULT = {
+    CORAX_OPT_PARAM_SUBST_RATES,       CORAX_OPT_PARAM_FREQUENCIES, CORAX_OPT_PARAM_ALPHA,
+    CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS, CORAX_OPT_PARAM_PINV,        CORAX_OPT_PARAM_FREE_RATES,
+    CORAX_OPT_PARAM_BRANCHES_ITERATIVE};
 
 const  intVector PARAM_OPT_ORDER_MODELTEST = {CORAX_OPT_PARAM_BRANCHES_ITERATIVE, CORAX_OPT_PARAM_PINV,
                                               CORAX_OPT_PARAM_FREQUENCIES, CORAX_OPT_PARAM_ALPHA,
@@ -466,12 +467,29 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
         }
         break;
       case CORAX_OPT_PARAM_ALPHA:
+      case CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS:
         // TODO: co-optimization of PINV and ALPHA, mb with multiple starting points
         /* optimize ALPHA */
-        if (params_to_optimize & CORAX_OPT_PARAM_ALPHA)
+        if ((params_to_optimize & CORAX_OPT_PARAM_ALPHA) 
+            && !(params_to_optimize & CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS))
         {
           new_loglh = -1 * corax_algo_opt_onedim_treeinfo(_pll_treeinfo,
                                                           CORAX_OPT_PARAM_ALPHA,
+                                                          CORAX_OPT_MIN_ALPHA,
+                                                          CORAX_OPT_MAX_ALPHA,
+                                                          _param_epsilon);
+
+          LOG_DEBUG << "\t - after alpha: logLH = " << new_loglh << endl;
+
+          coraxlib_check_error("ERROR in alpha parameter optimization");
+          assert_lh_improvement(cur_loglh, new_loglh, "ALPHA");
+          cur_loglh = new_loglh;
+        }
+        if ((params_to_optimize & CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS) 
+            && !(params_to_optimize & CORAX_OPT_PARAM_ALPHA))
+        {
+          new_loglh = -1 * corax_algo_opt_onedim_treeinfo(_pll_treeinfo,
+                                                          CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS,
                                                           CORAX_OPT_MIN_ALPHA,
                                                           CORAX_OPT_MAX_ALPHA,
                                                           _param_epsilon);
