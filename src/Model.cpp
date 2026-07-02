@@ -3,7 +3,7 @@
 using namespace std;
 
 const vector<int> ALL_MODEL_PARAMS = {CORAX_OPT_PARAM_FREQUENCIES, CORAX_OPT_PARAM_SUBST_RATES,
-                                      CORAX_OPT_PARAM_PINV, CORAX_OPT_PARAM_ALPHA,
+                                      CORAX_OPT_PARAM_PINV, CORAX_OPT_PARAM_ALPHA, CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS,
                                       CORAX_OPT_PARAM_FREE_RATES, CORAX_OPT_PARAM_RATE_WEIGHTS,
                                       CORAX_OPT_PARAM_BRANCH_LEN_SCALER,
                                       CORAX_OPT_PARAM_BRANCHES_ITERATIVE};

@@ -470,8 +470,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
       case CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS:
         // TODO: co-optimization of PINV and ALPHA, mb with multiple starting points
         /* optimize ALPHA */
-        if ((params_to_optimize & CORAX_OPT_PARAM_ALPHA) 
-            && !(params_to_optimize & CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS))
+        if (params_to_optimize & CORAX_OPT_PARAM_ALPHA && !(params_to_optimize & CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS)) 
         {
           new_loglh = -1 * corax_algo_opt_onedim_treeinfo(_pll_treeinfo,
                                                           CORAX_OPT_PARAM_ALPHA,
@@ -485,8 +484,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
           assert_lh_improvement(cur_loglh, new_loglh, "ALPHA");
           cur_loglh = new_loglh;
         }
-        if ((params_to_optimize & CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS) 
-            && !(params_to_optimize & CORAX_OPT_PARAM_ALPHA))
+        else if (params_to_optimize & CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS)
         {
           new_loglh = -1 * corax_algo_opt_onedim_treeinfo(_pll_treeinfo,
                                                           CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS,
@@ -713,7 +711,7 @@ void assign(Model &model, const TreeInfo &treeinfo, size_t partition_id)
     return;
 
   assign(model, pll_treeinfo.partitions[partition_id]);
-  if (model.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA)
+  if (model.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA || model.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA_OPT_WEIGHTS)
     model.alpha(pll_treeinfo.alphas[partition_id]);
   if (pll_treeinfo.brlen_scalers)
     model.brlen_scaler(pll_treeinfo.brlen_scalers[partition_id]);
