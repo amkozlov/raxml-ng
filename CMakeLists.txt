@@ -42,11 +42,11 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # set these flags globally for all subprojects (libpll etc.)
-set(CMAKE_CXX_FLAGS_DEBUG "-Og -ggdb -g3 -grecord-gcc-switches" CACHE INTERNAL "")
-set(CMAKE_C_FLAGS_DEBUG "-Og -ggdb -g3 -grecord-gcc-switches" CACHE INTERNAL "")
+set(CMAKE_CXX_FLAGS_DEBUG "-Og -ggdb -g3 -grecord-gcc-switches -fno-omit-frame-pointer -fno-inline" CACHE INTERNAL "")
+set(CMAKE_C_FLAGS_DEBUG "-Og -ggdb -g3 -grecord-gcc-switches -fno-omit-frame-pointer -fno-inline" CACHE INTERNAL "")
 
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -ggdb -g3 -grecord-gcc-switches" CACHE INTERNAL "")
-set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O3 -ggdb -g3 -grecord-gcc-switches" CACHE INTERNAL "")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -ggdb -g3 -grecord-gcc-switches -fno-omit-frame-pointer -fno-inline" CACHE INTERNAL "")
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O3 -ggdb -g3 -grecord-gcc-switches -fno-omit-frame-pointer -fno-inline" CACHE INTERNAL "")
 
 set (CMAKE_CXX_FLAGS_RELEASE  "-O3"    CACHE INTERNAL "")
 set (CMAKE_C_FLAGS_RELEASE  "-O3"    CACHE INTERNAL "")
