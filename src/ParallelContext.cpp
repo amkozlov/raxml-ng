@@ -505,7 +505,7 @@ void ParallelContext::parallel_reduce(double * data, size_t size, int op)
 #endif
 }
 
-void ParallelContext::mpi_allreduce(double * data, size_t size, int op)
+void ParallelContext::mpi_allreduce(double * data, size_t size, int op, bool _thread_broadcast)
 {
 #ifdef _RAXML_MPI
   if (_num_ranks > _num_groups)
@@ -533,8 +533,50 @@ void ParallelContext::mpi_allreduce(double * data, size_t size, int op)
 #endif
     }
 
-    if (_thread_group->num_threads > 1)
+    if (_thread_group->num_threads > 1 && _thread_broadcast)
       thread_broadcast(0, data, size * sizeof(double));
+  }
+#else
+  RAXML_UNUSED(data);
+  RAXML_UNUSED(size);
+  RAXML_UNUSED(op);
+  RAXML_UNUSED(_thread_broadcast);
+#endif
+}
+
+/* This function is invoked only once, in the --fast version
+ * in order to reduce the per-site weights vector across all ranks
+*/
+void ParallelContext::mpi_allreduce_weights(unsigned int * data, size_t size, int op)
+{
+#ifdef _RAXML_MPI
+  if (_num_ranks > _num_groups)
+  {
+    thread_barrier();
+
+    if (_thread_id == 0)
+    {
+      MPI_Op reduce_op;
+      if (op == CORAX_REDUCE_SUM)
+        reduce_op = MPI_SUM;
+      else if (op == CORAX_REDUCE_MAX)
+        reduce_op = MPI_MAX;
+      else if (op == CORAX_REDUCE_MIN)
+        reduce_op = MPI_MIN;
+      else
+        assert(0);
+
+#if 1
+      MPI_Allreduce(MPI_IN_PLACE, data, size, MPI_UNSIGNED, reduce_op, _comm);
+#else
+      // not sure if MPI_IN_PLACE will work in all cases...
+      MPI_Allreduce(data, _parallel_buf.data(), size, MPI_UNSIGNED, reduce_op, _comm);
+      memcpy(data, _parallel_buf.data(), size * sizeof(unsigned int));
+#endif
+    }
+
+    //if (_thread_group->num_threads > 1)
+      //thread_broadcast(0, data, size * sizeof(unsigned int));
   }
 #else
   RAXML_UNUSED(data);
@@ -646,4 +688,3 @@ void ParallelContext::mpi_gather_custom(std::function<size_t(void*,size_t)> prep
   RAXML_UNUSED(process_recv_cb);
 #endif
 }
-
