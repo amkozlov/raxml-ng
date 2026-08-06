@@ -957,6 +957,7 @@ void Model::init_model_opts(const std::string &model_opts, const corax_mixture_m
         if (_param_mode[CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS] == ParamValue::undefined)
           _param_mode[CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS] = ParamValue::ML;
         break;
+
       case CORAX_UTIL_MIXTYPE_FREE:
         if (_param_mode[CORAX_OPT_PARAM_FREE_RATES] == ParamValue::undefined)
         {
@@ -1294,11 +1295,12 @@ LogStream& operator<<(LogStream& stream, const Model& m)
   if (m.num_ratecats() > 1)
   {
     stream << " (" << m.num_ratecats() << " cats, ";
-    if(m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA_OPT_WEIGHTS)
-      stream << "opt";
-    else
-        stream << ((m.gamma_mode() == CORAX_GAMMA_RATES_MEDIAN) ? "median" : "mean");
+    if(m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA_OPT_WEIGHTS){
+      stream << "opt";}
+    else{
+        stream << ((m.gamma_mode() == CORAX_GAMMA_RATES_MEDIAN) ? "median" : "mean");}
     stream << ")";
+
     if (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA )
       stream << ",  alpha: " << FMT_MOD(m.alpha()) << " ("
              << get_param_mode_str(m.param_mode(CORAX_OPT_PARAM_ALPHA)) << ")";

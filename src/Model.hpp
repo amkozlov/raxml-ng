@@ -100,7 +100,7 @@ public:
     if (ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA)
     {
       assert(_ratecat_rates.size() ==  _num_ratecats);
-      corax_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _gamma_mode);
+      corax_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _ratecat_weights.data(), _gamma_mode);
     }
   }
   void pinv(double value) { _pinv = value; }
