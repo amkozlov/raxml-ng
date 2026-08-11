@@ -1,9 +1,10 @@
 #include "Model.hpp"
+#include "corax/model/gamma.h"
 
 using namespace std;
 
 const vector<int> ALL_MODEL_PARAMS = {CORAX_OPT_PARAM_FREQUENCIES, CORAX_OPT_PARAM_SUBST_RATES,
-                                      CORAX_OPT_PARAM_PINV, CORAX_OPT_PARAM_ALPHA, CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS,
+                                      CORAX_OPT_PARAM_PINV, CORAX_OPT_PARAM_ALPHA,
                                       CORAX_OPT_PARAM_FREE_RATES, CORAX_OPT_PARAM_RATE_WEIGHTS,
                                       CORAX_OPT_PARAM_BRANCH_LEN_SCALER,
                                       CORAX_OPT_PARAM_BRANCHES_ITERATIVE};
@@ -755,7 +756,7 @@ void Model::init_model_opts(const std::string &model_opts, const corax_mixture_m
           else if (ss.peek() == 'o' || ss.peek() == 'O')
           {
             ss.get();
-            _rate_het = CORAX_UTIL_MIXTYPE_GAMMA_OPT_WEIGHTS;
+            _gamma_mode = CORAX_GAMMA_RATES_WEIGHTS_LLOYD_MAX;
           }
 
           if (read_param(ss, _alpha))
@@ -946,23 +947,16 @@ void Model::init_model_opts(const std::string &model_opts, const corax_mixture_m
       case CORAX_UTIL_MIXTYPE_GAMMA:
         /* compute the discretized category rates from a gamma distribution
            with given alpha shape and store them in rate_cats  */
-        corax_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _gamma_mode);
+        corax_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _ratecat_weights.data(), _gamma_mode);
         if (_param_mode[CORAX_OPT_PARAM_ALPHA] == ParamValue::undefined)
           _param_mode[CORAX_OPT_PARAM_ALPHA] = ParamValue::ML;
-        break;
-
-      case CORAX_UTIL_MIXTYPE_GAMMA_OPT_WEIGHTS:
-        corax_compute_gamma_cats_opt_weights(_alpha, _num_ratecats, _ratecat_rates.data(), 
-            _ratecat_weights.data());
-        if (_param_mode[CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS] == ParamValue::undefined)
-          _param_mode[CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS] = ParamValue::ML;
         break;
 
       case CORAX_UTIL_MIXTYPE_FREE:
         if (_param_mode[CORAX_OPT_PARAM_FREE_RATES] == ParamValue::undefined)
         {
           /* use GAMMA rates as initial values -> can be changed */
-          corax_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _gamma_mode);
+          corax_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _ratecat_weights.data(), _gamma_mode);
           _param_mode[CORAX_OPT_PARAM_FREE_RATES] = ParamValue::ML;
         }
         if (_param_mode[CORAX_OPT_PARAM_RATE_WEIGHTS] == ParamValue::undefined)
@@ -1151,10 +1145,6 @@ unsigned int Model::num_free_params(int mask /*  = CORAX_OPT_PARAM_ALL */) const
       if (param_estimated(CORAX_OPT_PARAM_ALPHA, mask))
         free_params += 1;
       break;
-    case CORAX_UTIL_MIXTYPE_GAMMA_OPT_WEIGHTS:
-      if (param_estimated(CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS, mask))
-        free_params += 1;
-      break;
     case CORAX_UTIL_MIXTYPE_FREE:
       if (param_estimated(CORAX_OPT_PARAM_FREE_RATES, mask))
         free_params += _num_ratecats - 1;
@@ -1304,10 +1294,6 @@ LogStream& operator<<(LogStream& stream, const Model& m)
     if (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA )
       stream << ",  alpha: " << FMT_MOD(m.alpha()) << " ("
              << get_param_mode_str(m.param_mode(CORAX_OPT_PARAM_ALPHA)) << ")";
-    if(m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA_OPT_WEIGHTS){
-      stream << ",  alpha: " << FMT_MOD(m.alpha()) << " ("
-             << get_param_mode_str(m.param_mode(CORAX_OPT_PARAM_ALPHA_OPT_WEIGHTS)) << ")";
-    }
     stream << ",  weights&rates: ";
     for (unsigned int i = 0; i < m.num_ratecats(); ++i)
     {

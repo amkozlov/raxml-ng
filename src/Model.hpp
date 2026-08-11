@@ -102,15 +102,15 @@ public:
       assert(_ratecat_rates.size() ==  _num_ratecats);
       corax_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _ratecat_weights.data(), _gamma_mode);
     }
-  }
-  void pinv(double value) { _pinv = value; }
-  void brlen_scaler(double value) { _brlen_scaler = value; }
-  void base_freqs(size_t i, const doubleVector& value) { _submodels.at(i).base_freqs(value); }
-  void subst_rates(size_t i, const doubleVector& value) { _submodels.at(i).subst_rates(value); }
-  void base_freqs(const doubleVector& value) { for (SubstitutionModel& s: _submodels) s.base_freqs(value); }
-  void subst_rates(const doubleVector& value) { for (SubstitutionModel& s: _submodels) s.subst_rates(value); }
-  void ratecat_rates(doubleVector const& value) { _ratecat_rates = value; }
-  void ratecat_weights(doubleVector const& value) { _ratecat_weights = value; }
+  };
+  void pinv(double value) { _pinv = value; };
+  void brlen_scaler(double value) { _brlen_scaler = value; };
+  void base_freqs(size_t i, const doubleVector& value) { _submodels.at(i).base_freqs(value); };
+  void subst_rates(size_t i, const doubleVector& value) { _submodels.at(i).subst_rates(value); };
+  void base_freqs(const doubleVector& value) { for (SubstitutionModel& s: _submodels) s.base_freqs(value); };
+  void subst_rates(const doubleVector& value) { for (SubstitutionModel& s: _submodels) s.subst_rates(value); };
+  void ratecat_rates(doubleVector const& value) { _ratecat_rates = value; };
+  void ratecat_weights(doubleVector const& value) { _ratecat_weights = value; };
 
   void param_mode(int param, ParamValue mode) { _param_mode[param] = mode; }
   void set_param_mode_default(int param, ParamValue mode)
