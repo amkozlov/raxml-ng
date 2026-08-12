@@ -8,6 +8,7 @@
 #include "ModelDefinitions.hpp"
 #include "ModelEvaluator.hpp"
 #include "ModelScheduler.hpp"
+#include "corax/model/gamma.h"
 #include "corax/tree/treeinfo.h"
 
 using namespace std;
@@ -27,7 +28,7 @@ Options modify_options(const Options &other)
   return options;
 }
 
-vector<ModelDescriptor> ModelTest::generate_candidate_model_names(const DataType &dt) const
+vector<ModelDescriptor> ModelTest::generate_candidate_model_names(const DataType &dt, bool test_gamma_modes) const
 {
   vector<ModelDescriptor> candidate_models;
   check_supported_datatype(dt);
@@ -60,7 +61,14 @@ vector<ModelDescriptor> ModelTest::generate_candidate_model_names(const DataType
             break;
           case RateHeterogeneityType::GAMMA:
           case RateHeterogeneityType::INVARIANT_GAMMA:
-            candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity, gamma_category_count);
+            static std::array<unsigned int, 4> gamma_modes { CORAX_GAMMA_RATES_MEAN, CORAX_GAMMA_RATES_MEDIAN, CORAX_GAMMA_RATES_WEIGHTS_LLOYD_MAX, CORAX_GAMMA_RATES_WEIGHTS_LAGUERRE };
+            if (test_gamma_modes) {
+                for (const auto &gamma_mode : gamma_modes) {
+                    candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity, gamma_category_count, gamma_mode);
+                }
+            } else {
+                candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity, gamma_category_count);
+            }
             break;
           default:
             candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity);
@@ -106,7 +114,7 @@ ModelTest::ModelTest(const Options &original_options, const PartitionedMSA &msa,
                      const IDVector &tip_msa_idmap, CheckpointManager &checkpoint_manager)
     : options(modify_options(original_options)), optimizer(options), checkpoint_manager(checkpoint_manager), msa(msa),
       tree(tree), tip_msa_idmap(tip_msa_idmap),
-      model_scheduler(generate_candidate_model_names(msa.part_info(0).model().data_type()), msa, options,
+      model_scheduler(generate_candidate_model_names(msa.part_info(0).model().data_type(), options.modeltest_gamma_modes), msa, options,
                       checkpoint_manager, modeltest_estimate_cores), _results()
 {
 }

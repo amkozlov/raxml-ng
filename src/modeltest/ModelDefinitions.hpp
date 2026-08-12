@@ -1,4 +1,5 @@
 #pragma once
+#include "corax/model/gamma.h"
 #include <cassert>
 #include <stdexcept>
 #include <type_traits>
@@ -87,12 +88,17 @@ const RateHeterogeneitySelection fast_rate_heterogeneity_selection{
 class RateHeterogeneityDescriptor
 {
 public:
-  RateHeterogeneityDescriptor(RateHeterogeneityType type_, unsigned int count) : type{type_}, category_count{count} {}
+  RateHeterogeneityDescriptor(RateHeterogeneityType type, unsigned int count,
+                              unsigned int gamma_mode = CORAX_GAMMA_RATES_MEAN)
+      : type{type}, category_count{count}, gamma_mode{gamma_mode}
+  {
+  }
 
   RateHeterogeneityDescriptor(const RateHeterogeneityDescriptor &other) = default;
 
   RateHeterogeneityType type;
   unsigned int category_count;
+  unsigned int gamma_mode;
 
   std::string label() const
   {
@@ -104,7 +110,29 @@ public:
     case RateHeterogeneityType::INVARIANT:
       return "+" + rate_heterogeneity_label.at(lookup_index);
     case RateHeterogeneityType::GAMMA:
-    case RateHeterogeneityType::INVARIANT_GAMMA:
+    case RateHeterogeneityType::INVARIANT_GAMMA: {
+        std::string result {"+" + rate_heterogeneity_label.at(lookup_index) + std::to_string(category_count)};
+
+        // TODO: extract into proper function unified with other RAxML-NG code
+        switch (gamma_mode) {
+            case CORAX_GAMMA_RATES_MEAN:
+                result += "m";
+                break;
+            case CORAX_GAMMA_RATES_MEDIAN:
+                result += "a";
+                break;
+            case CORAX_GAMMA_RATES_WEIGHTS_LLOYD_MAX:
+                result += "o";
+                break;
+            case CORAX_GAMMA_RATES_WEIGHTS_LAGUERRE:
+                result += "q";
+                break;
+            default:
+                throw std::invalid_argument("Unknown gamma mode");
+        }
+        return result;
+    }
+
     case RateHeterogeneityType::FREE_RATE:
     case RateHeterogeneityType::INVARIANT_FREE_RATE:
       return "+" + rate_heterogeneity_label.at(lookup_index) + std::to_string(category_count);
@@ -174,10 +202,10 @@ public:
   SubstitutionModelDescriptor substitution_model;
   RateHeterogeneityDescriptor rate_heterogeneity;
 
-  ModelDescriptor(DataType datatype_, string matrix_name_, const BaseFrequencyType frequency_type_,
-                  const RateHeterogeneityType rate_heterogeneity_, unsigned int rate_categories = 1)
-      : datatype(datatype_), substitution_model(matrix_name_, frequency_type_),
-        rate_heterogeneity(rate_heterogeneity_, rate_categories)
+  ModelDescriptor(DataType datatype, string matrix_name, const BaseFrequencyType frequency_type,
+                  const RateHeterogeneityType rate_heterogeneity, unsigned int rate_categories = 1, unsigned int gamma_mode = CORAX_GAMMA_RATES_MEAN)
+      : datatype(datatype), substitution_model(matrix_name, frequency_type),
+        rate_heterogeneity(rate_heterogeneity, rate_categories, gamma_mode)
   {
   }
 

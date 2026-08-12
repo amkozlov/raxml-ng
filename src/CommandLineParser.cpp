@@ -604,6 +604,9 @@ void CommandLineParser::parse_modeltest_options(Options &opts, const string& arg
     {
       opts.modeltest_subst_models = split_string(mopt_val, ',');
     }
+    else if (mopt_name == "gamma_modes") {
+      opts.modeltest_gamma_modes = true;
+    }
     else
       throw InvalidOptionValueException("Unknown modeltest option: '" + mopt_name + "'");
   }

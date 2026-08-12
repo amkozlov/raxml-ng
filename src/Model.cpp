@@ -1,4 +1,5 @@
 #include "Model.hpp"
+#include "corax/corax_model.h"
 #include "corax/model/gamma.h"
 
 using namespace std;
@@ -1275,7 +1276,7 @@ static string get_ratehet_mode_str(const Model& m)
     return "NONE";
   else
     return (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA) ? "GAMMA" :
-            (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_FREE) ? "FREE";
+           (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_FREE) ? "FREE" : "FIXED";
 }
 
 LogStream& operator<<(LogStream& stream, const Model& m)
@@ -1290,10 +1291,10 @@ LogStream& operator<<(LogStream& stream, const Model& m)
   if (m.num_ratecats() > 1)
   {
     stream << " (" << m.num_ratecats() << " cats, ";
-    if(m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA_OPT_WEIGHTS){
-      stream << "opt";}
-    else{
-        stream << ((m.gamma_mode() == CORAX_GAMMA_RATES_MEDIAN) ? "median" : "mean");}
+    stream << ((m.gamma_mode() == CORAX_GAMMA_RATES_MEDIAN) ? "median" :
+               (m.gamma_mode() == CORAX_GAMMA_RATES_MEAN) ? "mean" :
+               (m.gamma_mode() == CORAX_GAMMA_RATES_WEIGHTS_LLOYD_MAX) ? "opt" :
+               (m.gamma_mode() == CORAX_GAMMA_RATES_WEIGHTS_LAGUERRE) ? "laguerre" : "unknown mode");
     stream << ")";
 
     if (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA )

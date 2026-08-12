@@ -1,4 +1,5 @@
 #include "ICScoreCalculator.hpp"
+#include <stdexcept>
 
 ICScoreCalculator::ICScoreCalculator(size_t free_params, size_t sample_size):
     _free_params(free_params), _sample_size(sample_size)
@@ -20,6 +21,7 @@ double ICScoreCalculator::compute(InformationCriterion criterion, double loglh) 
         case InformationCriterion::bic:
             return bic(loglh);
         default:
+            throw std::invalid_argument("Requested invalid information criterion");
             assert(0);
     }
 }
