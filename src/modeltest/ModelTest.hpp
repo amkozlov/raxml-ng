@@ -34,7 +34,7 @@ private:
   
   static void sort_by_score(PartitionModelResults &results);
 
-  std::vector<ModelDescriptor> generate_candidate_model_names(const DataType &dt) const;
+  std::vector<ModelDescriptor> generate_candidate_model_names(const DataType &dt, bool test_gamma_modes) const;
   std::vector<PartitionModelResults> _results;
 };
 

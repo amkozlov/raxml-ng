@@ -758,6 +758,11 @@ void Model::init_model_opts(const std::string &model_opts, const corax_mixture_m
             ss.get();
             _gamma_mode = CORAX_GAMMA_RATES_WEIGHTS_LLOYD_MAX;
           }
+          else if (ss.peek() == 'q' || ss.peek() == 'Q')
+          {
+            ss.get();
+            _gamma_mode = CORAX_GAMMA_RATES_WEIGHTS_LAGUERRE;
+          }
 
           if (read_param(ss, _alpha))
           {
@@ -1035,6 +1040,7 @@ std::string Model::to_string(bool print_params, unsigned int precision) const
     if (_rate_het == CORAX_UTIL_MIXTYPE_GAMMA)
     {
       model_string << "+G" << _num_ratecats;
+      // TODO: add lloyd max convention here
       model_string << (_gamma_mode == CORAX_GAMMA_RATES_MEDIAN ? "a" : "m");
       if (out_param_mode.at(CORAX_OPT_PARAM_ALPHA) == ParamValue::user)
         model_string << "{" << _alpha << "}";
@@ -1269,8 +1275,7 @@ static string get_ratehet_mode_str(const Model& m)
     return "NONE";
   else
     return (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA) ? "GAMMA" :
-            (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_FREE) ? "FREE" : 
-            (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA_OPT_WEIGHTS) ? "GAMMA" : "FIXED";
+            (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_FREE) ? "FREE";
 }
 
 LogStream& operator<<(LogStream& stream, const Model& m)
