@@ -75,7 +75,7 @@ public:
 
   const char* buf() { return _buf; }
   size_t size() const { return _size; }
-  size_t pos() const { return _ptr - _buf;}
+  size_t pos() const { return (size_t) (_ptr - _buf);}
   char* reset() { _ptr = _buf; return _buf; }
 
   template<typename T>
@@ -131,13 +131,13 @@ public:
     BasicBinaryStream(), _fstream(fname, std::ios::binary | mode) {}
 
 public:
-  void write(const void *data, size_t size) { _fstream.write((char*) data, size); }
+  void write(const void *data, size_t size) { _fstream.write((char*) data, (std::streamsize) size); }
   void read(void *data, size_t size)
   {
     if (data)
-      _fstream.read((char*) data, size);
+      _fstream.read((char*) data, (std::streamsize) size);
     else
-      _fstream.seekg(size, std::ios_base::cur);
+      _fstream.seekg((std::fstream::off_type) size, std::ios_base::cur);
   }
 
   bool good() const { return _fstream.good(); }

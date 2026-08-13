@@ -52,7 +52,7 @@ EnergyMonitor::EnergyMonitor ()
   _active = false;
 #endif
   _consumed_joules = 0;
-  _last_update_ts = time(NULL);
+  _last_update_ts = time(nullptr);
 }
 
 void EnergyMonitor::reset()
@@ -63,7 +63,7 @@ void EnergyMonitor::reset()
 
 void EnergyMonitor::update(double interval)
 {
-  if (!_active || (interval > 0. && time(NULL) - _last_update_ts  < interval))
+  if (!_active || (interval > 0. && time(nullptr) - _last_update_ts  < interval))
     return;
 
   for(auto& pkg: _pkg_list)
@@ -77,7 +77,7 @@ void EnergyMonitor::update(double interval)
     pkg.last_energy_uj = energy_uj;
     _consumed_joules += diff_uj / 1e6f; // convert to Joules
   }
-  _last_update_ts = time(NULL);
+  _last_update_ts = time(nullptr);
 }
 
 double EnergyMonitor::consumed_joules(bool do_update)

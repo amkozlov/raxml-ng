@@ -10,8 +10,8 @@
 #include <unordered_map>
 #include <chrono>
 
-constexpr int RAXML_CKP_VERSION = 8;
-constexpr int RAXML_CKP_MIN_SUPPORTED_VERSION = 7;
+constexpr int RAXML_CKP_VERSION = 9;
+constexpr int RAXML_CKP_MIN_SUPPORTED_VERSION = 9;
 constexpr auto RAXML_CKP_MIN_INTERVAL = std::chrono::seconds(1);
 
 struct MLTree
@@ -42,15 +42,15 @@ struct SearchState
   CheckpointStep step;
   double loglh;
 
-  int iteration;
+  unsigned int iteration;
   nni_round_params nni_params;
   spr_round_params spr_params;
   
-  int fast_spr_radius;
-  int slow_spr_radius;
+  unsigned int fast_spr_radius;
+  unsigned int slow_spr_radius;
 };
 
-class checkpoint_error : public runtime_error
+class checkpoint_error : public std::runtime_error
 {
 public:
   checkpoint_error(const std::string& msg = "") : std::runtime_error("Failed to load checkpoint!\n" + msg) {};

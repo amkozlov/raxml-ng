@@ -10,9 +10,9 @@
 struct spr_round_params
 {
   bool thorough;
-  int radius_min;
-  int radius_max;
-  int ntopol_keep;
+  unsigned int radius_min;
+  unsigned int radius_max;
+  unsigned int ntopol_keep;
   double subtree_cutoff;
   cutoff_info_t cutoff_info;
   double lh_epsilon_brlen_full;
@@ -44,7 +44,7 @@ struct sh_support_params
   double sh_epsilon;
   std::vector<unsigned int *> bsrep_site_weights;
 
-  sh_support_params(size_t bsnum, size_t partnum) : num_bootstraps(bsnum),
+  sh_support_params(size_t bsnum, size_t partnum) : num_bootstraps((unsigned int) bsnum),
                                                     bsrep_site_weights(bsnum * partnum)
   {}
 };

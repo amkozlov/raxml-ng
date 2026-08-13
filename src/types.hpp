@@ -272,7 +272,7 @@ protected:
   template<typename ... Args>
   std::string format_message(const std::string& fmt, Args ... args) const
   {
-    size_t size = std::snprintf(nullptr, 0, fmt.c_str(), args ...) + 1;
+    size_t size = (size_t) std::snprintf(nullptr, 0, fmt.c_str(), args ...) + 1;
     std::string msg;
     msg.resize(size);
     std::snprintf(&msg[0], size, fmt.c_str(), args ...);

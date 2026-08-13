@@ -11,13 +11,17 @@
 class Heuristics
 {
     public:
-        Heuristics(size_t partition_count, HeuristicSelection selection, const std::vector<RateHeterogeneityDescriptor> selected_rhas, const SubstitutionModelDescriptor &reference_model, unsigned int min_freerate_categories, unsigned int max_freerate_categories, double significant_ic_difference, RHASHeuristicMode rhas_mode);
-        void update(unsigned int partition, const ModelDescriptor &candidate_model, double score);
-        bool can_skip(unsigned int partition, const ModelDescriptor &candidate_model) const;
+        Heuristics(size_t partition_count, HeuristicSelection selection,
+                   const std::vector<RateHeterogeneityDescriptor> selected_rhas,
+                   const SubstitutionModelDescriptor &reference_model,
+                   unsigned int min_freerate_categories, unsigned int max_freerate_categories,
+                   double significant_ic_difference, RHASHeuristicMode rhas_mode);
+        void update(size_t partition, const ModelDescriptor &candidate_model, double score);
+        bool can_skip(size_t partition, const ModelDescriptor &candidate_model) const;
         ~Heuristics() = default;
 
         /** Return whether the evaluation of a given candidate was essential or could have been skipped in hindsight. */
-        bool evaluation_essential(unsigned int partition, const ModelDescriptor &candidate_model) const;
+        bool evaluation_essential(size_t partition, const ModelDescriptor &candidate_model) const;
 
     private:
         bool enabled(const HeuristicType & heuristic) const;

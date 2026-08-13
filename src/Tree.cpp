@@ -90,14 +90,15 @@ void Tree::pll_utree(const corax_utree_t& tree)
 void Tree::pll_utree(unsigned int tip_count, const corax_unode_t& root)
 {
   _num_tips = tip_count;
-  _pll_utree.reset(corax_utree_wraptree_multi(corax_utree_graph_clone(&root), _num_tips, 0));
+  _pll_utree.reset(corax_utree_wraptree_multi(corax_utree_graph_clone(&root), tip_count, 0));
   _pll_utree_tips.clear();
 }
 
 Tree Tree::buildRandom(size_t num_tips, const char * const* tip_labels,
                        unsigned int random_seed)
 {
-  PllUTreeUniquePtr pll_utree(corax_utree_random_create(num_tips, tip_labels, random_seed));
+  PllUTreeUniquePtr pll_utree(corax_utree_random_create((unsigned int) num_tips, tip_labels,
+                                                        random_seed));
 
   coraxlib_check_error("ERROR building random tree");
   assert(pll_utree);
@@ -182,11 +183,11 @@ Tree Tree::buildParsimonyConstrained(const ParsimonyMSA& pars_msa, unsigned int 
   if (constrained_tree.empty())
   {
     // TODO something less adhoc ...
-    unsigned int max_spr_rounds = std::max(std::min(int(10000 / taxon_count), 10), 1);
+    auto max_spr_rounds = (unsigned int) std::max(std::min(int(10000 / taxon_count), 10), 1);
 
     pll_utree.reset(corax_utree_create_parsimony_multipart_spr(taxon_count,
                                                                (char* const*) tip_labels.data(),
-                                                               pars_partitions.size(),
+                                                               (unsigned int) pars_partitions.size(),
                                                                pars_partitions.data(),
                                                                refine_with_spr ? max_spr_rounds : 0,
                                                                spr_cost_epsilon,
@@ -208,11 +209,11 @@ Tree Tree::buildParsimonyConstrained(const ParsimonyMSA& pars_msa, unsigned int 
      * by resolving multifurcations in the constraint tree *randomly*, and then applying
      * parsimony-based SPR moves to improve the parsimony score, */
     // TODO something less adhoc ...
-    unsigned int max_spr_rounds = std::max(std::min(int(10000 / constrained_tree.num_tips()), 10), 1);
+    auto max_spr_rounds = (unsigned int) std::max(std::min(int(10000 / constrained_tree.num_tips()), 10), 1);
 
     intVector clv_index_map(taxon_count * 2);
     pll_utree.reset(corax_utree_resolve_parsimony_multipart(&constrained_tree.pll_utree(),
-                                                             pars_partitions.size(),
+                                                             (unsigned int) pars_partitions.size(),
                                                              pars_partitions.data(),
                                                              tip_idmap.data(),
                                                              max_spr_rounds,
@@ -351,7 +352,7 @@ void Tree::remove_tips(const NameList& tips)
   {
     if (old_tips.count(t))
     {
-      del_tip_ids.push_back(old_tips.at(t));
+      del_tip_ids.push_back((unsigned int) old_tips.at(t));
 //      printf("%u  %s\n", del_tip_ids.back(), t.c_str());
     }
   }
@@ -390,7 +391,7 @@ void Tree::insert_tips(const NameIdMap& tips, double brlen /* = 0. */)
   {
     if (old_tips.count(t.first))
       continue;
-    insert_nodes.push_back(t.second);
+    insert_nodes.push_back( (unsigned int) t.second);
     tip_labels.push_back(t.first.data());
 //    printf("%u  %s\n", insert_nodes.back(), tip_labels.back());
   }
@@ -401,7 +402,7 @@ void Tree::insert_tips(const NameIdMap& tips, double brlen /* = 0. */)
     return;
 
   int retval = corax_utree_insert_tips(_pll_utree.get(),
-                                       tip_labels.size(),
+                                       (unsigned int) tip_labels.size(),
                                        (const char * const*) tip_labels.data(),
                                        insert_nodes.data(),
                                        brlen);
@@ -427,9 +428,9 @@ void Tree::insert_tips_random(const NameList& tip_names, unsigned int random_see
     tip_labels[i] = tip_names[i].data();
 
   int retval = corax_utree_random_extend(_pll_utree.get(),
-                                          tip_labels.size(),
-                                          (const char * const*) tip_labels.data(),
-                                          random_seed);
+                                         (unsigned int) tip_labels.size(),
+                                         (const char * const*) tip_labels.data(),
+                                         random_seed);
 
   if (retval)
     _num_tips = _pll_utree->tip_count;
@@ -459,13 +460,13 @@ void Tree::insert_tips_pasimony(const NameList& tip_names, std::vector<corax_par
 
   
   int retval = corax_utree_extend_parsimony_multipart(_pll_utree.get(),
-                                          tip_labels.size(),
-                                          (char * const*) tip_labels.data(),
-                                          tip_idmap.data(),
-                                          pars_partitions.size(),
-                                          pars_partitions.data(),
-                                          random_seed,
-                                          score);
+                                                      (unsigned int) tip_labels.size(),
+                                                      (char * const*) tip_labels.data(),
+                                                      tip_idmap.data(),
+                                                      (unsigned int) pars_partitions.size(),
+                                                      pars_partitions.data(),
+                                                      random_seed,
+                                                      score);
 
   if (retval)
     _num_tips = _pll_utree->tip_count;
@@ -484,7 +485,7 @@ void Tree::reset_tip_ids(const NameIdMap& label_id_map)
 
   for (auto& node: tip_nodes())
   {
-    const unsigned int tip_id = label_id_map.at(node->label);
+    const unsigned int tip_id = (unsigned int) label_id_map.at(node->label);
     node->clv_index = node->node_index = tip_id;
   }
 }
@@ -690,11 +691,11 @@ void Tree::reroot(const NameList& outgroup_taxa, bool add_root_node)
   for (const auto& label: outgroup_taxa)
   {
     const auto tip_id = name_id_map.at(label);
-    tip_ids.push_back(tip_id);
+    tip_ids.push_back((unsigned int) tip_id);
   }
 
   // re-root tree with the outgroup
-  int res = corax_utree_outgroup_root(_pll_utree.get(), tip_ids.data(), tip_ids.size(),
+  int res = corax_utree_outgroup_root(_pll_utree.get(), tip_ids.data(), (unsigned int) tip_ids.size(),
                                        add_root_node);
 
   if (!res)

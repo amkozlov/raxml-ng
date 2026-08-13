@@ -62,8 +62,8 @@ PllSplitSharedPtr SplitsTree::extract_splits_from_tree(const corax_unode_t& root
                                                        corax_unode_t ** node_split_map)
 {
   PllSplitSharedPtr splits(corax_utree_split_create((corax_unode_t*) &root,
-                                                       _num_tips,
-                                                       node_split_map),
+                                                    (unsigned int)  _num_tips,
+                                                    node_split_map),
                            corax_utree_split_destroy);
 
   return splits;
@@ -75,8 +75,8 @@ void SplitsTree::add_splits_to_hashtable(const PllSplitSharedPtr& splits,
 {
   _pll_splits_hash = corax_utree_split_hashtable_insert(_pll_splits_hash,
                                                          splits.get(),
-                                                         _num_tips,
-                                                         num_splits ? num_splits : this->num_splits(),
+                                                         (unsigned int)  _num_tips,
+                                                         (unsigned int) num_splits ? num_splits : this->num_splits(),
                                                          support.empty() ? nullptr: support.data(),
                                                          update_only);
 }

@@ -75,7 +75,7 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Model& m)
   return stream;
 }
 
-static bool save_modparam(const Model& m, ModelBinaryFmt fmt, unsigned int param)
+static bool save_modparam(const Model& m, ModelBinaryFmt fmt, int param)
 {
   auto pmode = m.param_mode(param);
   switch (pmode)

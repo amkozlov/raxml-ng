@@ -24,7 +24,7 @@ void BootstopCheck::add_bootstrap_tree(const Tree& tree)
   }
 
   if (!_pll_splits_hash)
-    _pll_splits_hash = corax_utree_split_hashtable_create(tree.num_tips(), 0);
+    _pll_splits_hash = corax_utree_split_hashtable_create((unsigned int) tree.num_tips(), 0);
 
   if (!_pll_splits_hash)
   {
@@ -33,7 +33,7 @@ void BootstopCheck::add_bootstrap_tree(const Tree& tree)
   }
 
   corax_split_t * splits = corax_utree_split_create(&tree.pll_utree_root(),
-                                                   tree.num_tips(),
+                                                   (unsigned int) tree.num_tips(),
                                                    nullptr);
 
   assert(_pll_splits_hash);
@@ -72,7 +72,7 @@ splitEntryVector BootstopCheck::all_splits()
   for (size_t i = 0; i < _pll_splits_hash->table_size; ++i)
   {
     bitv_hash_entry_t * e =  _pll_splits_hash->table[i];
-    while (e != NULL)
+    while (e != nullptr)
     {
       assert(e->bip_number < _pll_splits_hash->entry_count);
 
@@ -87,7 +87,7 @@ splitEntryVector BootstopCheck::all_splits()
   return all_splits;
 }
 
-bool BootstopCheck::converged(unsigned long random_seed)
+bool BootstopCheck::converged(unsigned int random_seed)
 {
   RandomGenerator gen(random_seed);
 
@@ -118,7 +118,7 @@ bool BootstopCheckMRE::check_convergence(RandomGenerator& gen)
   uintVector support1(num_splits), support2(num_splits);
   splitEntryVector cons1_splits, cons2_splits;
 
-  size_t min_better_count = 0.99 * _num_permutations;
+  size_t min_better_count = (size_t) round(0.99 * _num_permutations);
   double wrf_thresh_avg = 0;
   _num_better = 0;
   _avg_pct = 0;
@@ -128,7 +128,7 @@ bool BootstopCheckMRE::check_convergence(RandomGenerator& gen)
 
   /* init permutation array with 1:1 mapping */
   for (size_t i = 0; i < _num_bs_trees; ++i)
-    perm[i] = i;
+    perm[i] = (unsigned int) i;
 
   for (size_t p = 0; p < _num_permutations; ++p)
   {

@@ -44,15 +44,16 @@ StaticResourceEstimator::StaticResourceEstimator(const PartitionedMSA& parted_ms
 size_t StaticResourceEstimator::estimate_cores(size_t taxon_clv_size, size_t elems_per_core,
                                                bool correct_low, bool correct_high)
 {
-  size_t naive_cores = CORAX_MAX(round(((double) taxon_clv_size) / elems_per_core), 1.);
+  size_t naive_cores = (size_t) CORAX_MAX(round(((double) taxon_clv_size) / elems_per_core), 1.);
+  double corr_elems_per_core = (double) elems_per_core;
 
   /* correct for edge cases: too few/too many cores -> TODO: make it less adhoc! */
   if (naive_cores <= 8 && correct_low)
-    elems_per_core /= 4. - log2(naive_cores);
+    corr_elems_per_core /= 4. - log2(naive_cores);
   else if (naive_cores > 16 && correct_high)
-    elems_per_core *= log2(naive_cores) - 3.;
+    corr_elems_per_core *= log2(naive_cores) - 3.;
 
-  return CORAX_MAX(round(((double)taxon_clv_size) / elems_per_core), 1.);
+  return (size_t) CORAX_MAX(round(((double)taxon_clv_size) / corr_elems_per_core), 1.);
 }
 
 void StaticResourceEstimator::compute_estimates(ResEstimates& res)

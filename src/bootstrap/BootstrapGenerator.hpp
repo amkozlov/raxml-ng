@@ -19,8 +19,8 @@ public:
   virtual
   ~BootstrapGenerator ();
 
-  BootstrapReplicate generate(const PartitionedMSA& parted_msa, unsigned long random_seed);
-  WeightVector generate(const MSA& msa, unsigned long random_seed);
+  BootstrapReplicate generate(const PartitionedMSA& parted_msa, unsigned int random_seed);
+  WeightVector generate(const MSA& msa, unsigned int random_seed);
 
 private:
   WeightVector generate(const MSA& msa, RandomGenerator& gen);

@@ -79,8 +79,9 @@ void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA 
   double total_weight = 0;
 
   _pll_treeinfo = corax_treeinfo_create(corax_utree_graph_clone(&tree.pll_utree_root()),
-                                        tree.num_tips(),
-                                        partition_count, opts.brlen_linkage);
+                                        (unsigned int) tree.num_tips(),
+                                        (unsigned int) partition_count,
+                                        opts.brlen_linkage);
 
   coraxlib_check_error("ERROR creating treeinfo structure");
   assert(_pll_treeinfo);
@@ -160,8 +161,9 @@ void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA 
   double total_weight = 0;
 
   _pll_treeinfo = corax_treeinfo_create(corax_utree_graph_clone(&tree.pll_utree_root()),
-                                        tree.num_tips(),
-                                        parted_msa.part_count(), opts.brlen_linkage);
+                                        (unsigned int) tree.num_tips(),
+                                        (unsigned int) parted_msa.part_count(),
+                                        opts.brlen_linkage);
 
   coraxlib_check_error("ERROR creating treeinfo structure");
   assert(_pll_treeinfo);
@@ -190,7 +192,9 @@ void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA 
       corax_partition_t *partition = create_pll_partition(opts, pinfo.msa(), model,
                                                           tip_msa_idmap, *part_range, weights);
 
-      int retval = corax_treeinfo_init_partition(_pll_treeinfo, p, partition,
+      int retval = corax_treeinfo_init_partition(_pll_treeinfo,
+                                                 (unsigned int) p,
+                                                 partition,
                                                  params_to_optimize,
                                                  model.gamma_mode(),
                                                  model.alpha(),
@@ -345,7 +349,7 @@ double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor
   {
     Tree old_tree(*_pll_treeinfo->tree);
 
-    int max_iters = brlen_smooth_factor * RAXML_BRLEN_SMOOTHINGS;
+    int max_iters = (int) floor(brlen_smooth_factor * RAXML_BRLEN_SMOOTHINGS);
     new_loglh = -1 * corax_algo_opt_brlen_treeinfo(_pll_treeinfo,
                                                    _brlen_min,
                                                    _brlen_max,
@@ -752,14 +756,14 @@ void set_partition_tips(const Options &opts, const MSA &msa, const IDVector &tip
     // we need a coraxlib function for that!
     auto clv_size = partition->sites * partition->states;
     std::vector<double> tmp_clv(clv_size);
-    for (size_t tip_id = 0; tip_id < partition->tips; ++tip_id) {
+    for (unsigned int tip_id = 0; tip_id < partition->tips; ++tip_id) {
       auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
       auto prob_start = msa.probs(seq_id, seq_offset);
       build_clv(prob_start, partition->sites, msa.weights(), seq_offset, partition, normalize, tmp_clv);
       corax_set_tip_clv(partition, tip_id, tmp_clv.data(), CORAX_FALSE);
     }
   } else {
-    for (size_t tip_id = 0; tip_id < partition->tips; ++tip_id) {
+    for (unsigned int  tip_id = 0; tip_id < partition->tips; ++tip_id) {
       auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
       corax_set_tip_states(partition, tip_id, charmap, msa.at(seq_id).c_str() + seq_offset);
     }
@@ -873,15 +877,15 @@ corax_partition_t *create_pll_partition(const Options &opts, const MSA &msa, con
 
   BasicTree tree(msa.size());
   corax_partition_t *partition = corax_partition_create(
-    tree.num_tips(), /* number of tip sequences */
-    tree.num_inner(), /* number of CLV buffers */
-    model.num_states(), /* number of states in the data */
-    part_length, /* number of alignment sites/patterns */
-    model.num_submodels(), /* number of different substitution models (LG4 = 4) */
-    tree.num_branches(), /* number of probability matrices */
-    model.num_ratecats(), /* number of (GAMMA) rate categories */
-    tree.num_inner(), /* number of scaling buffers */
-    attrs /* list of flags (SSE3/AVX, TIP-INNER special cases etc.) */
+    (unsigned int) tree.num_tips(),     /* number of tip sequences */
+    (unsigned int) tree.num_inner(),    /* number of CLV buffers */
+    model.num_states(),                 /* number of states in the data */
+    (unsigned int) part_length,         /* number of alignment sites/patterns */
+    model.num_submodels(),              /* number of different substitution models (LG4 = 4) */
+    (unsigned int) tree.num_branches(), /* number of probability matrices */
+    model.num_ratecats(),               /* number of (GAMMA) rate categories */
+    (unsigned int) tree.num_inner(),    /* number of scaling buffers */
+    attrs                               /* list of flags (SSE3/AVX, TIP-INNER special cases etc.) */
   );
 
   coraxlib_check_error("ERROR creating pll_partition");

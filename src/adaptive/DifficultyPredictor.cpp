@@ -2,6 +2,8 @@
 #include <memory>
 #include <random>
 
+using namespace std;
+
 DifficultyPredictor::DifficultyPredictor() : _difficulty(-1), _parsimony_msa_ptr(nullptr),
 _features(nullptr), _prop_uniq(-1), _avg_rrf(-1)
 {
@@ -20,10 +22,10 @@ void DifficultyPredictor::compute_msa_features(ParsimonyMSA* _pmsa)
   const PartitionedMSA& part_msa = _parsimony_msa_ptr->part_msa();
   
   _features                    = (corax_msa_features *) calloc(1, sizeof(corax_msa_features));
-  _features->taxa              = part_msa.taxon_count();
-  _features->sites             = part_msa.total_sites();
+  _features->taxa              = (int) part_msa.taxon_count();
+  _features->sites             = (int) part_msa.total_sites();
   _features->sites_per_taxa    = (double) _features->sites / _features->taxa;
-  _features->patterns          = part_msa.total_patterns();
+  _features->patterns          = (int) part_msa.total_patterns();
   _features->patterns_per_taxa = (double) _features->patterns / _features->taxa;
   _features->patterns_per_site = (double) _features->patterns / _features->sites;
 
@@ -65,28 +67,28 @@ void DifficultyPredictor::compute_msa_features(ParsimonyMSA* _pmsa)
   _features->bollback_multinomial -= number_of_sites * log(number_of_sites);
 }
 
-double DifficultyPredictor::predict_difficulty(int n_trees)
+double DifficultyPredictor::predict_difficulty(unsigned int n_trees)
 {
   map<std::string, unsigned int> labelToId;
   unsigned int score;
-  int n_taxa = (int) _parsimony_msa_ptr->part_msa().taxon_count();
+  unsigned int n_taxa = (unsigned int) _parsimony_msa_ptr->part_msa().taxon_count();
   
   // init seeds
   intVector seeds(n_trees);
-  for (int i = 0; i < n_trees; ++i)
-    seeds[i] = rand();
+  for (unsigned int i = 0; i < n_trees; ++i)
+    seeds[i] = (unsigned int) rand();
 
-  for (int i = 0; i < n_trees; ++i)
+  for (unsigned int i = 0; i < n_trees; ++i)
     _pars_tree_list.emplace_back(Tree::buildParsimony(*_parsimony_msa_ptr, seeds[i], false, &score));
   
   // re-label trees
-  for (int i = 0; i < n_taxa; ++i)
+  for (unsigned int i = 0; i < n_taxa; ++i)
     labelToId.insert({std::string(_pars_tree_list[0].pll_utree().nodes[i]->label), i});
 
   for(size_t j = 0; j < _pars_tree_list.size(); j++)
   {
     const corax_utree_t * tree = &_pars_tree_list[j].pll_utree();
-    for (int i = 0; i < n_taxa; ++i)
+    for (unsigned int i = 0; i < n_taxa; ++i)
     {
       auto leaf        = tree->nodes[i];
       auto id          = labelToId.at(std::string(leaf->label));
@@ -117,13 +119,13 @@ double DifficultyPredictor::predict_difficulty(const TreeList& pars_trees)
 }
 
 
-int DifficultyPredictor::num_start_trees(double diff, double amp, double mean, double s)
+unsigned int DifficultyPredictor::num_start_trees(double diff, double amp, double mean, double s)
 {
-  int num_trees;
+  unsigned int num_trees;
 
-  num_trees = (int) (amp * normal_pdf(diff, mean, s));
-  num_trees = min(num_trees, 10);
-  num_trees = !num_trees ? 1 : num_trees;
+  num_trees = (unsigned int) (amp * normal_pdf(diff, mean, s));
+  num_trees = min(num_trees, 10u);
+  num_trees = max(num_trees, 1u);
 
   return num_trees;
 }

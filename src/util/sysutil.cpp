@@ -55,7 +55,7 @@ void coraxlib_reset_error()
 
 void * xmemalign(size_t size, size_t alignment)
 {
-  void * t = NULL;
+  void * t = nullptr;
   int err = posix_memalign(& t, alignment, size);
 
   if (err || !t)
@@ -78,7 +78,7 @@ double sysutil_gettime()
         return (double)t / 10000000.0;
 #else // Unixoid build
   struct timeval ttime;
-  gettimeofday(&ttime , NULL);
+  gettimeofday(&ttime , nullptr);
   return ttime.tv_sec + ttime.tv_usec * 0.000001;
 #endif
 }
@@ -148,7 +148,7 @@ unsigned long sysutil_get_memtotal(bool ignore_errors)
   int mib [] = { CTL_HW, HW_MEMSIZE };
   int64_t ram = 0;
   size_t length = sizeof(ram);
-  if(-1 == sysctl(mib, 2, &ram, &length, NULL, 0))
+  if(-1 == sysctl(mib, 2, &ram, &length, nullptr, 0))
   {
     if (ignore_errors)
       return 0;
@@ -231,7 +231,7 @@ size_t get_core_id(const std::string &cpu_path)
   return read_id_from_file(cpu_path + "core_id");
 }
 
-int get_physical_core_count(size_t n_cpu)
+unsigned int get_physical_core_count(size_t n_cpu)
 {
 #if defined(__linux__)
   unordered_set<size_t> cores;
@@ -243,7 +243,7 @@ int get_physical_core_count(size_t n_cpu)
     size_t uniq_core_id = (node_id << 16) + core_id;
     cores.insert(uniq_core_id);
   }
-  return cores.size();
+  return (unsigned int) cores.size();
 #else
   RAXML_UNUSED(n_cpu);
   throw std::runtime_error("This function only supports linux");
@@ -259,7 +259,7 @@ static bool ht_enabled()
   return (bool) (info[3] & (0x1 << 28));
 }
 
-static int threads_per_core()
+static unsigned int threads_per_core()
 {
   return ht_enabled() ? 2 : 1;
 }
@@ -309,9 +309,9 @@ unsigned long sysutil_get_cpu_features()
 //  OS_AVX = detect_OS_AVX();
 //  OS_AVX512 = detect_OS_AVX512();
 
-  int info[4];
+  int32_t info[4];
   get_cpuid(info, 0);
-  int nIds = info[0];
+  int32_t nIds = info[0];
 
   get_cpuid(info, 0x80000000);
   u_int32_t nExIds = info[0];
@@ -427,7 +427,7 @@ string sysutil_get_cpu_model()
 #elif defined(__APPLE__)
   char str[256];
   size_t len = 256;
-  if (sysctlbyname("machdep.cpu.brand_string", &str, &len, NULL, 0) == 0)
+  if (sysctlbyname("machdep.cpu.brand_string", &str, &len, nullptr, 0) == 0)
     model = str;
 #endif
   return model;
@@ -463,7 +463,7 @@ double sysutil_get_energy()
 
 std::string sysutil_realpath(const std::string& path)
 {
-  char * real_path = realpath(path.c_str(), NULL);
+  char * real_path = realpath(path.c_str(), nullptr);
   if (real_path)
   {
     const string result(real_path);

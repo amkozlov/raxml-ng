@@ -10,6 +10,8 @@
 #include "ModelScheduler.hpp"
 #include "corax/tree/treeinfo.h"
 
+using namespace std;
+
 static thread_local std::unique_ptr<std::ofstream> thread_log;
 #define LOG_THREAD_TS                                                                                                  \
   (*thread_log << std::setprecision(19) << global_timer().elapsed_seconds() << " MT Thread "                           \
@@ -90,13 +92,14 @@ size_t modeltest_estimate_cores(const Options &options, const PartitionInfo &pin
    */
   size_t elems_per_core = priority > EvaluationPriority::NORMAL ? 4000 : 80000;
 
-  const size_t naive_cores = CORAX_MAX(round(static_cast<double>(taxon_clv_size) / elems_per_core), 1.);
+  double corr_elems_per_core = static_cast<double>(elems_per_core);
+  const size_t naive_cores = CORAX_MAX(round(static_cast<double>(taxon_clv_size) / corr_elems_per_core), 1.);
   if (naive_cores <= 8)
-    elems_per_core /= 4. - log2(naive_cores);
+    corr_elems_per_core /= 4. - log2(naive_cores);
   else
-    elems_per_core *= log2(naive_cores) - 2;
+    corr_elems_per_core *= log2(naive_cores) - 2;
 
-  return CORAX_MAX(round(static_cast<double>(taxon_clv_size) / elems_per_core), 1.);
+  return CORAX_MAX(round(static_cast<double>(taxon_clv_size) / corr_elems_per_core), 1.);
 }
 
 ModelTest::ModelTest(const Options &original_options, const PartitionedMSA &msa, const Tree &tree,

@@ -1,11 +1,13 @@
 #include "StoppingCriterion.hpp"
 
+using namespace std;
+
 StoppingCriterion::StoppingCriterion(shared_ptr<PartitionedMSA> parted_msa, 
-                                    int _n_groups, 
-                                    int _n_threads, 
-                                    bool _kh_test, 
-                                    bool _count_spr_moves,
-                                    int _seed) : 
+                                     size_t _n_groups,
+                                     size_t _n_threads,
+                                     bool _kh_test,
+                                     bool _count_spr_moves,
+                                     unsigned int _seed) :
     n_groups(_n_groups), n_threads(_n_threads), kh_test_case(_kh_test), count_spr_moves(_count_spr_moves), seed(_seed)
 {   
     // partitions
@@ -235,7 +237,8 @@ void StoppingCriterion::initialize_thread_offset(){
     }
 }
 
-void StoppingCriterion::set_thread_offset(TreeInfo* treeinfo, const PartitionAssignment& part_assignment, int local_thread_id){
+void StoppingCriterion::set_thread_offset(TreeInfo* treeinfo, const PartitionAssignment& part_assignment,
+                                          size_t local_thread_id){
     
     {
         ParallelContext::GroupLock lock;
@@ -269,7 +272,7 @@ void StoppingCriterion::set_thread_offset(TreeInfo* treeinfo, const PartitionAss
     ParallelContext::barrier();
 }
 
-vector<double *> StoppingCriterion::get_vec(int group_id, int local_thread_id, bool plnl){
+vector<double *> StoppingCriterion::get_vec(size_t group_id, size_t local_thread_id, bool plnl){
     // copy
     vector<double*> vec;
 

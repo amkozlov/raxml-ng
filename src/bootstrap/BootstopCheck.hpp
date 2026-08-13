@@ -31,7 +31,7 @@ protected:
 public:
   void add_bootstrap_tree(const Tree& tree);
 
-  bool converged(unsigned long random_seed = 0);
+  bool converged(unsigned int random_seed = 0);
 
   size_t num_bs_trees() const { return _num_bs_trees; }
   size_t max_bs_trees() const { return _max_bs_trees; }

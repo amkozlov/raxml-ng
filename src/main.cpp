@@ -92,7 +92,7 @@ struct RaxmlInstance
   BootstrapReplicateList bs_reps;
   TreeList bs_start_trees;
 
-  intVector bs_seeds;
+  uintVector bs_seeds;
 
   /* shared list of parsimony trees used for difficulty prediction, starting trees etc. */
   TreeList pars_trees;
@@ -354,9 +354,9 @@ void print_reduced_msa(const RaxmlInstance& instance, const PartitionedMSAView& 
 {
   // save reduced MSA and partition files
   auto reduced_msa_fname = instance.opts.output_fname("reduced.phy");
-  PhylipStream ps(reduced_msa_fname);
+  PhylipStream phy_stream(reduced_msa_fname);
 
-  ps << reduced_msa_view;
+  phy_stream << reduced_msa_view;
 
   LOG_INFO << "\nNOTE: Reduced alignment (with duplicates and gap-only sites/taxa removed) "
               "\nNOTE: was saved to: ";
@@ -366,9 +366,9 @@ void print_reduced_msa(const RaxmlInstance& instance, const PartitionedMSAView& 
   if (sysutil_file_exists(instance.opts.model_file))
   {
     auto reduced_part_fname = instance.opts.output_fname("reduced.partition");
-    RaxmlPartitionStream ps(reduced_part_fname, ios::out);
+    RaxmlPartitionStream part_stream(reduced_part_fname, ios::out);
 
-    ps << reduced_msa_view;
+    part_stream << reduced_msa_view;
 
     LOG_INFO << "\nNOTE: The corresponding reduced partition file was saved to:\n";
     LOG_INFO << sysutil_realpath(reduced_part_fname) << endl;
@@ -1139,7 +1139,7 @@ void autotune_threads(RaxmlInstance& instance)
 
   unsigned int num_bs_searches = opts.num_bootstrap_ml_trees();
   unsigned int max_workers = std::max(opts.num_searches, num_bs_searches);
-  unsigned int max_workers_mem = 0.9 * num_ranks * sysutil_get_memtotal() / res.total_mem_size;
+  unsigned int max_workers_mem = (unsigned int) floor(0.9 * num_ranks * sysutil_get_memtotal() / res.total_mem_size);
   max_workers = std::min(max_workers, max_workers_mem);
   max_workers = std::min(max_workers, opts.num_workers_max);
 
@@ -1391,19 +1391,18 @@ void autotune_start_trees(RaxmlInstance& instance)
       //int pars_trees = diff_pred->num_start_trees(difficulty, 10.0, 0.5, 0.3);
       if(opts.topology_opt_method == TopologyOptMethod::adafast)
       {
-        opts.start_trees[StartingTree::random] = 0;
-        opts.start_trees[StartingTree::parsimony] = 
-          diff_pred->num_start_trees(difficulty, 10.0, 0.5, 0.3) + 
-          diff_pred->num_start_trees(difficulty, 5.0, 0.5, 0.25);
+        opts.start_trees[StartingTree::random]    = 0;
+        opts.start_trees[StartingTree::parsimony] = diff_pred->num_start_trees(difficulty, 10.0, 0.5, 0.3) +
+                                                    diff_pred->num_start_trees(difficulty, 5.0, 0.5, 0.25);
       }
       else
       {
-        opts.start_trees[StartingTree::random] = diff_pred->num_start_trees(difficulty, 5.0, 0.5, 0.25);
+        opts.start_trees[StartingTree::random]    = diff_pred->num_start_trees(difficulty, 5.0, 0.5, 0.25);
         opts.start_trees[StartingTree::parsimony] = diff_pred->num_start_trees(difficulty, 10.0, 0.5, 0.3);
       }
     }
     else
-      opts.start_trees[StartingTree::random] = 2*diff_pred->num_start_trees(difficulty, 8.0, 0.5, 0.3);
+      opts.start_trees[StartingTree::random] = 2 * diff_pred->num_start_trees(difficulty, 8.0, 0.5, 0.3);
   }
 
   for (const auto& it: opts.start_trees)
@@ -1480,7 +1479,7 @@ void prepare_tree(const RaxmlInstance& instance, Tree& tree)
   tree.reset_tip_ids(instance.tip_id_map);
 }
 
-Tree generate_tree(const RaxmlInstance& instance, StartingTree type, int random_seed,
+Tree generate_tree(const RaxmlInstance& instance, StartingTree type, unsigned int random_seed,
                    bool bootstrap = false)
 {
   Tree tree;
@@ -1582,7 +1581,7 @@ void load_start_trees(RaxmlInstance& instance, bool assert_count = false)
   const auto& opts = instance.opts;
 
   NewickStream ts(opts.start_tree_file(), std::ios::in);
-  size_t i = 0;
+  unsigned int i = 0;
   while (ts.peek() != EOF)
   {
     Tree tree;
@@ -1831,7 +1830,7 @@ void load_constraint(RaxmlInstance& instance)
 }
 
 void thread_start_trees(RaxmlInstance& instance, TreeList& tree_list, StartingTree st_tree_type,
-                        const intVector& seeds, size_t offset, bool bootstrap = false)
+                        const uintVector& seeds, size_t offset, bool bootstrap = false)
 {
   for (size_t i = 0; i < seeds.size(); ++i)
   {
@@ -1848,9 +1847,9 @@ void build_trees_parallel(RaxmlInstance& instance, TreeList& tree_list, Starting
   tree_list.resize(old_size + tree_count);
 
   // init seeds
-  intVector seeds(tree_count);
+  uintVector seeds(tree_count);
   for (size_t i = 0; i < tree_count; ++i)
-    seeds[i] = rand();
+    seeds[i] = (unsigned int) rand();
 
   auto thread_fn = std::bind(thread_start_trees,
                              std::ref(instance),
@@ -1871,7 +1870,7 @@ void build_trees_parallel(RaxmlInstance& instance, TreeList& tree_list, Starting
   {
     auto mem_per_thread = instance.parted_msa_parsimony->memsize_estimate();
     LOG_VERB << "Estimated memory per parsimony thread: " <<  mem_per_thread/1024/1024 << " MB" << endl;
-    unsigned int num_threads_max = 0.7 * sysutil_get_memtotal() / mem_per_thread;
+    unsigned int num_threads_max = (unsigned int) floor(0.7 * sysutil_get_memtotal() / mem_per_thread);
     num_threads = std::min(num_threads, num_threads_max);
     LOG_INFO_TS << "Parallel parsimony: " << tree_count <<  " trees with " << num_threads << " threads" << endl;
   }
@@ -1943,9 +1942,9 @@ void build_start_trees(RaxmlInstance& instance, unsigned int num_threads = 0)
     else
     {
       // init seeds
-      intVector seeds(st_tree_count);
+      uintVector seeds(st_tree_count);
       for (size_t i = 0; i < st_tree_count; ++i)
-        seeds[i] = rand();
+        seeds[i] = (unsigned int) rand();
 
       for (size_t i = 0; i < st_tree_count; ++i)
       {
@@ -2177,7 +2176,7 @@ void generate_bootstraps(RaxmlInstance& instance, const CheckpointFile& checkp)
     auto& seeds = instance.bs_seeds;
     seeds.resize(num_bsreps);
     for (size_t i = 0; i < seeds.size(); ++i)
-      seeds[i] = rand();
+      seeds[i] = (unsigned int) rand();
 
     /* generate missing parsimony trees from the original MSA */
     if (instance.opts.num_pars_trees() > instance.pars_trees.size())
@@ -3403,8 +3402,8 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
     LOG_INFO << "Consumed energy: " << used_wh << " Wh";
     if (used_wh > 200.)
     {
-      size_t km_car = round(used_wh / 200.);
-      size_t km_scooter = round(used_wh / 40.);
+      size_t km_car = (size_t) round(used_wh / 200.);
+      size_t km_scooter = (size_t) round(used_wh / 40.);
       LOG_INFO << " (= " << km_car << " km in an electric car, or "
                << km_scooter << " km with an e-scooter!)";
     }
@@ -3496,7 +3495,7 @@ void init_parallel_buffers(const RaxmlInstance& instance)
     }
 
     // add some reserve
-    worker_buf_size *= 1.2;
+    worker_buf_size *=  1.2;
   }
 
   LOG_INFO << "Parallel reduction/worker buffer size: " << reduce_buffer_size/1024 <<  " KB  / "
@@ -3772,8 +3771,8 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
     };
 
   /* infer bootstrap trees if needed */
-  unsigned int bs_batch_start = instance.bootstop_checker ?
-                                instance.bootstop_checker->num_bs_trees() : cm.checkp_file().bs_trees.size();
+  auto bs_batch_start = (unsigned int) (instance.bootstop_checker ?
+                                        instance.bootstop_checker->num_bs_trees() : cm.checkp_file().bs_trees.size());
 
   ParallelContext::global_master_broadcast(&bs_batch_start, sizeof(unsigned int));
 
@@ -4244,7 +4243,7 @@ int internal_main(int argc, char** argv, void* comm)
     try
     {
       // make sure all MPI ranks use the same random seed
-      ParallelContext::mpi_broadcast(&opts.random_seed, sizeof(long));
+      ParallelContext::mpi_broadcast(&opts.random_seed, sizeof(unsigned int));
       srand(opts.random_seed);
 
       logger().log_level(instance.opts.log_level);

@@ -67,7 +67,7 @@ uintVector PartitionedMSA::get_site_part_assignment() const
   const size_t full_len = _full_msa.length();
   uintVector spa(full_len);
 
-  size_t p = 0;
+  unsigned int p = 0;
   for (auto& pinfo: _part_list)
   {
     try
@@ -82,7 +82,7 @@ uintVector PartitionedMSA::get_site_part_assignment() const
     p++;
   }
 
-  assert(p == part_count());
+  assert((size_t) p == part_count());
 
   /* check if all sites were assigned to partitions */
   for (size_t i = 0; i < full_len; ++i)
@@ -184,7 +184,7 @@ void PartitionedMSA::split_msa()
 
     /* split MSA into partitions */
     corax_msa_t ** part_msa_list =
-        corax_msa_split(_full_msa.pll_msa(), site_part_map().data(), part_count());
+        corax_msa_split(_full_msa.pll_msa(), site_part_map().data(), (unsigned int) part_count());
 
     for (size_t p = 0; p < part_count(); ++p)
     {

@@ -14,14 +14,14 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
   if (!file)
     coraxlib_check_error("Unable to parse FASTA file");
 
-  char * sequence = NULL;
-  char * header = NULL;
+  char * sequence = nullptr;
+  char * header = nullptr;
   long sequence_length;
   long header_length;
   long sequence_number;
 
   /* read sequences and make sure they are all of the same length */
-  int sites = 0;
+  long sites = 0;
 
   /* read the rest */
   while (corax_fasta_getnext(file, &header, &header_length, &sequence, &sequence_length, &sequence_number))
@@ -34,7 +34,7 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
 
       sites = sequence_length;
 
-      msa = MSA(sites);
+      msa = MSA((size_t) sites);
     }
     else
     {
@@ -250,8 +250,8 @@ CATGStream& operator>>(CATGStream& stream, MSA& msa)
 
       if (msa.states() == 0)
       {
-        auto states = std::count_if(prob_str.cbegin(), prob_str.cend(),
-                                    [](char c) -> bool { return c == ','; }) + 1;
+        auto states = (size_t) std::count_if(prob_str.cbegin(), prob_str.cend(),
+                                             [](char c) -> bool { return c == ','; }) + 1;
         msa.states(states);
 
         /* see above: for datatypes other than DNA we assume 1:1 mapping */
@@ -365,35 +365,30 @@ MSA msa_load_from_file(const std::string &filename, FileFormat format, const Opt
           FastaStream s(filename);
           s >> msa;
           return msa;
-          break;
         }
         case FileFormat::fasta_longlabels:
         {
           FastaStream s(filename, true);
           s >> msa;
           return msa;
-          break;
         }
         case FileFormat::iphylip:
         {
           PhylipStream s(filename, true);
           s >> msa;
           return msa;
-          break;
         }
         case FileFormat::phylip:
         {
           PhylipStream s(filename, false);
           s >> msa;
           return msa;
-          break;
         }
         case FileFormat::catg:
         {
           CATGStream s(filename, data_type);
           s >> msa;
           return msa;
-          break;
         }
         case FileFormat::vcf:
         {

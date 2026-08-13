@@ -22,7 +22,7 @@ struct PartitionStats
 
   bool empty() const { return site_count == 0; }
   size_t gap_seq_count() const { return gap_seqs.size(); }
-  size_t inv_count() const { return (size_t) site_count * inv_prop; }
+  size_t inv_count() const { return (size_t) round(site_count * inv_prop); }
 
   PartitionStats() : site_count(0), pattern_count(0), inv_prop(0.), gap_prop(0.), gap_seqs(),
       emp_base_freqs(), emp_subst_rates(), mean_column_entropy(0.) /*, column_entropies()*/ {}

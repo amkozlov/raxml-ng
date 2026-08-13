@@ -328,8 +328,21 @@ void Model::set_user_srates(doubleVector& srates, bool normalize)
   // normalize the rates
   if (normalize)
   {
-    auto last_rate = smodel.rate_sym().empty() ?
-                                srates.back() : srates[smodel.rate_sym().back()];
+    double last_rate = 0.;
+
+    if (!smodel.rate_sym().empty())
+    {
+      /* pick last non-fixed rate (they have non-negative rate_sym indices) */
+      auto idx = smodel.rate_sym().cend() - 1;
+      while (*idx < 0 && idx != smodel.rate_sym().cbegin()) idx--;
+      assert(*idx >= 0 && *idx < (int) srates.size());
+      last_rate = srates[*idx];
+    }
+    else
+      last_rate = srates.back();
+
+    assert(last_rate > 0.);
+
     for (auto& r: srates)
       r /= last_rate;
   }
@@ -378,7 +391,7 @@ void Model::init_model_opts(const std::string &model_opts, const corax_mixture_m
   /* set rate heterogeneity defaults from model */
   _num_ratecats = mix_model.ncomp;
   _num_submodels = mix_model.ncomp;
-  _rate_het = mix_model.mix_type;
+  _rate_het = (unsigned int) mix_model.mix_type;
 
   /* allocate space for all subst matrices */
   for (size_t i = 0; i < mix_model.ncomp; ++i)
@@ -452,7 +465,7 @@ void Model::init_model_opts(const std::string &model_opts, const corax_mixture_m
   }
   catch(parse_error& e)
   {
-    const string rstr(s, strchr(s, '+') - s);
+    const string rstr(s, (size_t) (strchr(s, '+') - s));
     throw runtime_error(string("Invalid substitution rate specification: ") + rstr);
   }
 
@@ -864,7 +877,7 @@ void Model::init_model_opts(const std::string &model_opts, const corax_mixture_m
     /* link rate categories to corresponding mixture components (R-matrix + freqs)*/
     if (_num_submodels == _num_ratecats)
     {
-      for (size_t i = 0; i < _num_ratecats; ++i)
+      for (unsigned int i = 0; i < _num_ratecats; ++i)
         _ratecat_submodels[i] = i;
     }
   }
@@ -883,7 +896,7 @@ std::string Model::to_string(bool print_params, unsigned int precision) const
   }
 
   if (precision)
-    model_string << fixed << setprecision(precision);
+    model_string << fixed << setprecision((int) precision);
 
   if (out_param_mode.at(CORAX_OPT_PARAM_SUBST_RATES) == ParamValue::user)
     print_param(model_string, submodel(0).uniq_subst_rates());
@@ -1073,7 +1086,7 @@ void Model::init_state_names() const
 
       if (popcnt == 1)
       {
-        auto idx = CORAX_STATE_CTZ(state);
+        size_t idx = (size_t) CORAX_STATE_CTZ(state);
         _state_names[idx] = state_name;
 //        printf("char: %s, state: %d, popcnt: %u\n", state_name.c_str(), idx, popcnt);
       }
@@ -1134,7 +1147,7 @@ void assign(corax_partition_t * partition, const Model& model)
     corax_set_category_weights(partition, model.ratecat_weights().data());
 
     /* now iterate over rate matrices and set all params */
-    for (size_t i = 0; i < partition->rate_matrices; ++i)
+    for (unsigned int i = 0; i < partition->rate_matrices; ++i)
     {
       /* set base frequencies */
       assert(!model.base_freqs(i).empty());
@@ -1183,7 +1196,7 @@ LogStream& operator<<(LogStream& stream, const Model& m)
       stream << ",  alpha: " << FMT_MOD(m.alpha()) << " ("
              << get_param_mode_str(m.param_mode(CORAX_OPT_PARAM_ALPHA)) << ")";
     stream << ",  weights&rates: ";
-    for (size_t i = 0; i < m.num_ratecats(); ++i)
+    for (unsigned int i = 0; i < m.num_ratecats(); ++i)
     {
       stream << "(" << FMT_MOD(m.ratecat_weights()[i]) << ","
              << FMT_MOD(m.ratecat_rates()[i]) << ") ";
@@ -1199,7 +1212,7 @@ LogStream& operator<<(LogStream& stream, const Model& m)
 
   stream << "   Base frequencies ("
          << get_param_mode_str(m.param_mode(CORAX_OPT_PARAM_FREQUENCIES)) << "): ";
-  for (size_t i = 0; i < m.num_submodels(); ++i)
+  for (unsigned int i = 0; i < m.num_submodels(); ++i)
   {
     if (m.num_submodels() > 1)
       stream << "\nM" << i << ": ";
@@ -1211,7 +1224,7 @@ LogStream& operator<<(LogStream& stream, const Model& m)
 
   stream << "   Substitution rates ("
          << get_param_mode_str(m.param_mode(CORAX_OPT_PARAM_SUBST_RATES)) << "): ";
-  for (size_t i = 0; i < m.num_submodels(); ++i)
+  for (unsigned int i = 0; i < m.num_submodels(); ++i)
   {
     if (m.num_submodels() > 1)
       stream << "\nM " << i << ": ";

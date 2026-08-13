@@ -37,7 +37,7 @@ public:
     if (_rate_sym.empty())
       return num_rates();
     else
-      return *std::max_element(_rate_sym.cbegin(), _rate_sym.cend()) + 1;
+      return (unsigned int) *std::max_element(_rate_sym.cbegin(), _rate_sym.cend()) + 1;
   }
 
   doubleVector uniq_subst_rates() const
@@ -48,7 +48,7 @@ public:
       for (size_t i = 0; i < _subst_rates.size(); ++i)
       {
         if (_rate_sym[i] >= 0)
-          uniq_rates[_rate_sym[i]] = _subst_rates[i];
+          uniq_rates[(unsigned int) _rate_sym[i]] = _subst_rates[i];
       }
       return uniq_rates;
     }
@@ -84,7 +84,10 @@ public:
 
       _subst_rates.resize(num_rates());
       for (size_t i = 0; i < _subst_rates.size(); ++i)
-        _subst_rates[i] = _rate_sym[i] < 0 ? CORAX_OPT_MIN_SUBST_RATE : v[_rate_sym[i]];
+      {
+        _subst_rates[i] = _rate_sym[i] < 0 ? CORAX_OPT_MIN_SUBST_RATE :
+                                             v[(unsigned int) _rate_sym[i]];
+      }
     }
     else
       subst_rates(v);

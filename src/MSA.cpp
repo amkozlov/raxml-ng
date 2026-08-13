@@ -11,11 +11,12 @@ MSA::MSA(const RangeList& rl) : _length(0), _states(0), _pll_msa(NULL), _dirty(f
 }
 
 MSA::MSA(const corax_msa_t *pll_msa) :
-    _length(0), _num_sites(pll_msa->length), _states(0), _pll_msa(nullptr)
+    _length(0), _num_sites((size_t) pll_msa->length), _states(0), _pll_msa(nullptr)
 {
   for (auto i = 0; i < pll_msa->count; ++i)
   {
-    append(string(pll_msa->sequence[i], pll_msa->length), pll_msa->label ? pll_msa->label[i] : "");
+    append(string(pll_msa->sequence[i], (size_t) pll_msa->length),
+           pll_msa->label ? pll_msa->label[i] : "");
   }
 
   update_pll_msa();
@@ -113,7 +114,7 @@ void MSA::compress_patterns(const corax_state_t * charmap, bool store_backmap)
 
   assert(_pll_msa->count && _pll_msa->length);
 
-  size_t uncompressed_length = _pll_msa->length;
+  size_t uncompressed_length = (size_t) _pll_msa->length;
   unsigned int * backmap_ptr = nullptr;
 
   if (store_backmap || !_weights.empty())
@@ -177,11 +178,11 @@ void MSA::update_pll_msa() const
 
   if (_dirty)
   {
-    _pll_msa->count = size();
-    _pll_msa->length = length();
+    _pll_msa->count = (int) size();
+    _pll_msa->length = (int) length();
 
     size_t i = 0;
-    _pll_msa->sequence = (char **) calloc(_pll_msa->count, sizeof(char *));
+    _pll_msa->sequence = (char **) calloc((size_t) _pll_msa->count, sizeof(char *));
     for (const auto& entry : _sequences)
     {
       _pll_msa->sequence[i] = (char *) entry.c_str();
@@ -192,7 +193,7 @@ void MSA::update_pll_msa() const
     if (!_labels.empty())
     {
       i = 0;
-      _pll_msa->label = (char **) calloc(_pll_msa->count, sizeof(char *));
+      _pll_msa->label = (char **) calloc((size_t) _pll_msa->count, sizeof(char *));
       for (const auto& entry : _labels)
       {
         _pll_msa->label[i] = (char *) entry.c_str();
@@ -220,12 +221,12 @@ void MSA::states(size_t states)
 
 ProbVector::const_iterator MSA::probs(size_t index, size_t site) const
 {
-  return _probs.at(index).cbegin() + site * _states;
+  return _probs.at(index).cbegin() + (doubleVector::difference_type) (site * _states);
 }
 
 ProbVector::iterator MSA::probs(size_t index, size_t site)
 {
-  return _probs.at(index).begin() + site * _states;
+  return _probs.at(index).begin() + (doubleVector::difference_type) (site * _states);
 }
 
 bool MSA::normalized() const
@@ -364,7 +365,7 @@ void MSA::remove_taxa(const IDSet& taxon_ids)
 void MSA::update_num_sites()
 {
   if (!_weights.empty())
-    _num_sites =  std::accumulate(_weights.begin(), _weights.end(), 0);
+    _num_sites =  std::accumulate(_weights.begin(), _weights.end(), 0ul);
 }
 
 void MSA::weights(const WeightVector& v)
