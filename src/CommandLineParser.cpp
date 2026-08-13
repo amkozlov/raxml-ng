@@ -124,19 +124,21 @@ static std::string get_cmdline(int argc, char** argv)
 void CommandLineParser::check_options(Options &opts)
 {
   /* check for mandatory options for each command */
-  if (opts.command == Command::evaluate || opts.command == Command::search ||
-      opts.command == Command::bootstrap || opts.command == Command::all ||
-      opts.command == Command::terrace || opts.command == Command::check ||
-      opts.command == Command::parse || opts.command == Command::start ||
-      opts.command == Command::ancestral || opts.command == Command::modeltest)
+  if (opts.command == Command::evaluate  || opts.command == Command::search    ||
+      opts.command == Command::bootstrap || opts.command == Command::all       ||
+      opts.command == Command::bsmsa     || opts.command == Command::terrace   ||
+      opts.command == Command::check     || opts.command == Command::parse     ||
+      opts.command == Command::start     || opts.command == Command::ancestral ||
+      opts.command == Command::sitelh    || opts.command == Command::pythia    ||
+      opts.command == Command::modeltest || opts.command == Command::mutmap)
   {
     if (opts.msa_file.empty())
       throw OptionException("You must specify a multiple alignment file with --msa switch");
   }
 
-  if (opts.command == Command::evaluate || opts.command == Command::support ||
-      opts.command == Command::terrace || opts.command == Command::rfdist ||
-      opts.command == Command::sitelh || opts.command == Command::ancestral ||
+  if (opts.command == Command::evaluate || opts.command == Command::support   ||
+      opts.command == Command::terrace  || opts.command == Command::rfdist    ||
+      opts.command == Command::sitelh   || opts.command == Command::ancestral ||
       opts.command == Command::consense)
   {
     if (opts.tree_file.empty() && (opts.start_trees.count(StartingTree::user) || opts.start_trees.empty()))
