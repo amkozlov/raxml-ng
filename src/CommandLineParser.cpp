@@ -113,6 +113,18 @@ static struct option long_options[] =
   { 0, 0, 0, 0 }
 };
 
+static bool read_uint(const char* str, unsigned int& dest, int minval = 0)
+{
+  int dummy_int;
+  if ((sscanf(str, "%d", &dummy_int) == 1) && (dummy_int >= minval))
+  {
+    dest = (unsigned int) dummy_int;
+    return true;
+  }
+  else
+    return false;
+}
+
 static std::string get_cmdline(int argc, char** argv)
 {
   ostringstream s;
@@ -408,7 +420,7 @@ void CommandLineParser::parse_bs_trees(Options &opts, const string& arg)
         if (sscanf(m.c_str(), "automre{%u}", &opts.num_bootstraps) != 1)
           opts.num_bootstraps = 1000;
       }
-      else if (sscanf(m.c_str(), "%u", &opts.num_bootstraps) != 1 || opts.num_bootstraps == 0)
+      else if (!read_uint(m.c_str(), opts.num_bootstraps, 1))
       {
         throw InvalidOptionValueException("Invalid number of bootstrap replicates: " + string(arg));
       }
@@ -869,7 +881,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
 
       case 18: /* random seed */
-        if (sscanf(optarg, "%u", &opts.random_seed) != 1)
+        if (!read_uint(optarg, opts.random_seed))
         {
           throw InvalidOptionValueException("Invalid random seed: " + string(optarg) +
                                             ", please provide a non-negative integer!");
@@ -882,9 +894,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.num_threads = 0;
           sscanf(optarg, "auto{%u}", &opts.num_threads_max);
         }
-        else if (sscanf(optarg, "%u", &opts.num_threads) != 1 || opts.num_threads == 0)
+        else if (!read_uint(optarg, opts.num_threads, 1))
         {
-          throw InvalidOptionValueException("Invalid number of threads: %s " + string(optarg) +
+          throw InvalidOptionValueException("Invalid number of threads: " + string(optarg) +
                                             ", please provide a positive integer number or `auto`!");
         }
         /* if fixed number of threads is given, we should never exceed it */
@@ -1135,8 +1147,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       case 42:  /* precision */
         {
-          unsigned int prec = 0;
-          if (sscanf(optarg, "%u", &prec) != 1 || prec == 0)
+          int prec = 0;
+          if (sscanf(optarg, "%d", &prec) != 1 || prec <= 0)
           {
             throw InvalidOptionValueException("Invalid precision: " + string(optarg) +
                                               ", please provide a positive integer number!");
@@ -1144,7 +1156,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           else
           {
             opts.precision.clear();
-            opts.precision[LogElement::all] = prec;
+            opts.precision[LogElement::all] = (unsigned int) prec;
           }
         }
         break;
@@ -1400,7 +1412,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.num_workers = 0;
           sscanf(optarg, "auto{%u}", &opts.num_workers_max);
         }
-        else if (sscanf(optarg, "%u", &opts.num_workers) != 1 || opts.num_workers == 0)
+        else if (!read_uint(optarg, opts.num_workers, 1))
         {
           throw InvalidOptionValueException("Invalid number of workers: " + string(optarg) +
                                             ", please provide a positive integer number or 'auto'!");
@@ -1504,7 +1516,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 66: /* number of SH replicates */
         if (optarg)
         {
-          if (sscanf(optarg, "%u", &opts.num_sh_reps) != 1 || opts.num_sh_reps == 0)
+          if (!read_uint(optarg, opts.num_sh_reps, 1))
           {
             throw InvalidOptionValueException("Invalid number of SH replicates: " + string(optarg) +
                 ", please provide a positive integer number!");
