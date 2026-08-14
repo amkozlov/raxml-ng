@@ -476,14 +476,11 @@ std::string sysutil_realpath(const std::string& path)
     {
       case EACCES:
         throw ios_base::failure("Can't access file: " + path);
-        break;
       case ENOENT:
         throw ios_base::failure("File doesn't exist: " + path);
-        break;
       case ELOOP:
       case ENAMETOOLONG:
         throw ios_base::failure("Path too long or too many symlinks: " + path);
-        break;
       default:
         throw ios_base::failure("Unknown I/O error: " + path);
     }

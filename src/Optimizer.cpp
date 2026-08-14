@@ -78,34 +78,27 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
   {
     case TopologyOptMethod::classic:
       return optimize_topology_standard(treeinfo, cm);
-      break;
     case TopologyOptMethod::adaptive:
       if (cm.checkp_file().pythia_score >= 0.)
         return optimize_topology_adaptive(treeinfo, cm);
       else
         return optimize_topology_standard(treeinfo, cm);
-      break;
     case TopologyOptMethod::adafast:
       if (cm.checkp_file().pythia_score >= 0.)
         return optimize_topology_adaptive(treeinfo, cm);
       else
         return optimize_topology_standard(treeinfo, cm);
-      break;
     case TopologyOptMethod::rapidBS:
       return optimize_topology_rbs(treeinfo, cm);
-      break;
     case TopologyOptMethod::nniRound:
       return optimize_topology_nni(treeinfo, cm);
-      break;
     case TopologyOptMethod::simplified:
       return optimize_topology_adaptive(treeinfo, cm);
-      break;
     case TopologyOptMethod::none:
       return evaluate(treeinfo, cm);
-      break;
     default:
       assert(0);
-      return -INFINITY;
+      return (double) -INFINITY;
   }
 }
 
@@ -231,7 +224,7 @@ double Optimizer::optimize_topology_standard(TreeInfo& treeinfo, CheckpointManag
     spr_params.thorough = 0;
     spr_params.radius_min = 1;
     spr_params.radius_max = best_fast_radius;
-    spr_params.ntopol_keep = _spr_ntopol_keep;
+    spr_params.ntopol_keep = (unsigned int) _spr_ntopol_keep;
     spr_params.subtree_cutoff = _spr_cutoff;
     spr_params.reset_cutoff_info(loglh);
   }

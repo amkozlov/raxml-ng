@@ -5,8 +5,8 @@
 
 constexpr double FreerateHeuristic::NO_SCORE_PRESENT; /* Required in C++14, remove when upgrading to C++17 */
 
-FreerateHeuristic::FreerateHeuristic(unsigned int min_cats, unsigned int max_cats, RateHeterogeneityType type)
-    : type{type}, min_categories{min_cats}, max_categories{max_cats}, score_map{}
+FreerateHeuristic::FreerateHeuristic(unsigned int min_cats, unsigned int max_cats, RateHeterogeneityType ratehet_type)
+    : type{ratehet_type}, min_categories{min_cats}, max_categories{max_cats}, score_map{}
 {
   assert(min_categories <= max_categories);
 }

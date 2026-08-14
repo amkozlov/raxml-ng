@@ -309,6 +309,7 @@ corax_mixture_model_t * Model::init_mix_model(const std::string &model_name)
         coraxlib_check_error("ERROR model initialization |" + model_name + "|");
       else
         throw runtime_error("Invalid model name: " + model_name);
+      assert(0);
     }
 
     /* create pseudo-mixture with 1 component */

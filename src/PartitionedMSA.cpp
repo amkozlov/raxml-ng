@@ -20,6 +20,7 @@ PartitionedMSA& PartitionedMSA::operator=(PartitionedMSA&& other)
   _unassigned_sites = std::move(other._unassigned_sites);
   _subst_linkage = std::move(other._subst_linkage);
   _freqs_linkage = std::move(other._freqs_linkage);
+  _difficulty_score = other._difficulty_score;
    return *this;
 }
 

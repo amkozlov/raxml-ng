@@ -16,24 +16,24 @@ public:
   PartitionedMSA& operator=(PartitionedMSA&& other);
 
   // getters
-  const MSA& full_msa() const { return (part_count() == 1) ? _part_list.at(0).msa() : _full_msa; };
-  const MSA& part_msa(size_t index) const { return _part_list.at(index).msa(); };
-  const PartitionInfo& part_info(size_t index) const { return _part_list.at(index); };
-  const Model& model(size_t index) const { return _part_list.at(index).model(); };
+  const MSA& full_msa() const { return (part_count() == 1) ? _part_list.at(0).msa() : _full_msa; }
+  const MSA& part_msa(size_t index) const { return _part_list.at(index).msa(); }
+  const PartitionInfo& part_info(size_t index) const { return _part_list.at(index); }
+  const Model& model(size_t index) const { return _part_list.at(index).model(); }
   ModelCRefMap models() const;
-  const std::vector<PartitionInfo>& part_list() const { return _part_list; };
-  std::vector<PartitionInfo>& part_list() { return _part_list; };
-  const NameList& taxon_names()  const { return _taxon_names; };
+  const std::vector<PartitionInfo>& part_list() const { return _part_list; }
+  std::vector<PartitionInfo>& part_list() { return _part_list; }
+  const NameList& taxon_names()  const { return _taxon_names; }
   bool has_taxon(const std::string& taxon_name, bool with_dups = false) const;
   const NameIdMap& taxon_id_map() const { return _taxon_id_map; }
-  const IDVector& unassigned_sites()  const { return _unassigned_sites; };
+  const IDVector& unassigned_sites()  const { return _unassigned_sites; }
 
   size_t full_msa_site(size_t index, size_t site) const;
   const uintVector& site_part_map(bool force_update = false) const;
   IdPairVector full_to_parted_sitemap() const;
 
-  size_t taxon_count() const { return _taxon_names.size(); };
-  size_t part_count() const { return _part_list.size(); };
+  size_t taxon_count() const { return _taxon_names.size(); }
+  size_t part_count() const { return _part_list.size(); }
   size_t total_sites() const;
   size_t total_patterns() const;
   size_t total_length() const;
@@ -46,13 +46,13 @@ public:
 
   // setters
   void full_msa(MSA&& msa);
-  void part_msa(size_t index, MSA&& msa) { _part_list.at(index).msa(std::move(msa)); };
+  void part_msa(size_t index, MSA&& msa) { _part_list.at(index).msa(std::move(msa)); }
   void part_msa(size_t index, const corax_msa_t * pll_msa)
   {
     _part_list.at(index).msa(MSA(pll_msa));
-  };
-  void model(size_t index, Model&& m) { _part_list.at(index).model(std::move(m)); };
-  void model(size_t index, const Model& m) { _part_list.at(index).model(m); };
+  }
+  void model(size_t index, Model&& m) { _part_list.at(index).model(std::move(m)); }
+  void model(size_t index, const Model& m) { _part_list.at(index).model(m); }
 
   double difficulty_score() const { return _difficulty_score; }
   void difficulty_score(double score) { _difficulty_score = score; }
@@ -70,7 +70,7 @@ public:
 
   // operations
   void init_single_model(DataType data_type, const std::string &model_string);
-  void append_part_info(PartitionInfo&& part_info) { _part_list.push_back(std::move(part_info)); };
+  void append_part_info(PartitionInfo&& part_info) { _part_list.push_back(std::move(part_info)); }
 
   template <class... Args>
   void emplace_part_info (Args&&... args)

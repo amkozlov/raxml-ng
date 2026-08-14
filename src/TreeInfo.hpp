@@ -44,8 +44,10 @@ struct sh_support_params
   double sh_epsilon;
   std::vector<unsigned int *> bsrep_site_weights;
 
-  sh_support_params(size_t bsnum, size_t partnum) : num_bootstraps((unsigned int) bsnum),
-                                                    bsrep_site_weights(bsnum * partnum)
+  sh_support_params(size_t bsnum, size_t partnum) :
+    num_bootstraps((unsigned int) bsnum),
+    tolerance(1.0), lh_epsilon(10.), sh_epsilon(RAXML_SH_ALRT_EPSILON),
+    bsrep_site_weights(bsnum * partnum)
   {}
 };
 

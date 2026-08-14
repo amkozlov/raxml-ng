@@ -17,9 +17,9 @@ namespace std
 
 struct TreeBranch
 {
-  TreeBranch() : left_node_id(0), right_node_id(0), length(0.) {};
-  TreeBranch(size_t left_node_id, size_t right_node_id, double length) :
-    left_node_id(left_node_id), right_node_id(right_node_id), length(length) {};
+  TreeBranch() : left_node_id(0), right_node_id(0), length(0.) {}
+  TreeBranch(size_t left_node_id_, size_t right_node_id_, double length_) :
+    left_node_id(left_node_id_), right_node_id(right_node_id_), length(length_) {}
 
   size_t left_node_id;
   size_t right_node_id;
@@ -54,14 +54,14 @@ public:
   BasicTree(size_t num_tips) : _num_tips(num_tips) {}
   virtual ~BasicTree() {}
 
-  bool empty() const { return _num_tips == 0; };
-  virtual bool binary() const { return true; };
-  virtual size_t num_tips() const { return _num_tips; };
-  virtual size_t num_inner() const { return _num_tips - 2; };
-  virtual size_t num_nodes() const { return num_tips() + num_inner(); };
-  virtual size_t num_subnodes() const { return num_branches() * 2; };
-  virtual size_t num_branches() const { return _num_tips ? _num_tips + _num_tips - 3 : 0; };
-  virtual size_t num_splits() const { return num_branches() - _num_tips; };
+  bool empty() const { return _num_tips == 0; }
+  virtual bool binary() const { return true; }
+  virtual size_t num_tips() const { return _num_tips; }
+  virtual size_t num_inner() const { return _num_tips - 2; }
+  virtual size_t num_nodes() const { return num_tips() + num_inner(); }
+  virtual size_t num_subnodes() const { return num_branches() * 2; }
+  virtual size_t num_branches() const { return _num_tips ? _num_tips + _num_tips - 3 : 0; }
+  virtual size_t num_splits() const { return num_branches() - _num_tips; }
 
 protected:
   size_t _num_tips;
@@ -86,7 +86,7 @@ public:
   Tree (Tree&& other);
   Tree& operator=(Tree&& other);
 
-  virtual ~Tree();
+  virtual ~Tree() override;
 
   static Tree buildRandom(size_t num_tips, const char * const* tip_labels, unsigned int random_seed);
   static Tree buildRandom(const NameList& taxon_names, unsigned int random_seed);
@@ -144,9 +144,9 @@ public:
                             unsigned int random_seed, unsigned int * score);
 
 public:
-  bool binary() const;
-  size_t num_inner() const;
-  size_t num_branches() const;
+  bool binary() const override;
+  size_t num_inner() const override;
+  size_t num_branches() const override;
 
 protected:
   PllUTreeUniquePtr _pll_utree;
@@ -183,8 +183,8 @@ public:
   const_iterator begin() const { return _trees.cbegin(); }
   const_iterator end() const { return _trees.cend(); }
 
-  void clear() { _trees.clear(); };
-  void insert(size_t index, const ScoredTopology& t) { _trees[index] = t; };
+  void clear() { _trees.clear(); }
+  void insert(size_t index, const ScoredTopology& t) { _trees[index] = t; }
 
 private:
   container_type _trees;

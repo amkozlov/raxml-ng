@@ -30,9 +30,9 @@ public:
   typedef typename container::iterator        iterator;
   typedef typename container::const_iterator  const_iterator;
 
-  MSA() : _length(0), _num_sites(0), _states(0), _pll_msa(nullptr), _dirty(false) {};
+  MSA() : _length(0), _num_sites(0), _states(0), _pll_msa(nullptr), _dirty(false) {}
   MSA(const size_t num_sites) : _length(0), _num_sites(num_sites),
-      _states(0), _pll_msa(nullptr), _dirty(false) {};
+      _states(0), _pll_msa(nullptr), _dirty(false) {}
   MSA(const RangeList& rl);
 
   MSA(const corax_msa_t * pll_msa);
@@ -58,7 +58,7 @@ public:
   const corax_msa_t * pll_msa() const;
   corax_msa_t* pll_msa_nonconst() const;
 
-  const container& labels() const { return _labels; };
+  const container& labels() const { return _labels; }
   const std::string& label(size_t index) const { return _labels.at(index); }
   const std::string& at(const std::string& label) const
   { return _sequences.at(_label_id_map.at(label)); }

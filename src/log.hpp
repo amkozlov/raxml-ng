@@ -48,7 +48,7 @@ struct TimeStamp
 
 struct ProgressInfo
 {
-  ProgressInfo(double loglh) : loglh(loglh) {};
+  ProgressInfo(double llh) : loglh(llh) {}
 
   double loglh;
 };
@@ -58,10 +58,10 @@ typedef std::vector<std::ostream*> StreamList;
 class LogStream
 {
 public:
-  LogStream() {};
-  LogStream(const StreamList& streams) : _streams(streams) {};
+  LogStream() {}
+  LogStream(const StreamList& streams) : _streams(streams) {}
 
-  StreamList& streams() { return _streams;};
+  StreamList& streams() { return _streams;}
 
   void add_stream(std::ostream* stream);
 

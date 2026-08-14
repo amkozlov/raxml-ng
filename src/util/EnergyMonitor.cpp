@@ -16,23 +16,23 @@ static inline string  pkg_subdomain_path(int pkg_id, int sub_id)
   return  pkg_energy_path(pkg_id) + "/intel-rapl:" + to_string(pkg_id) + ":" + to_string(sub_id);
 }
 
-static inline string  pkg_name_fname(string pkg_path)
+static inline string  pkg_name_fname(const string& pkg_path)
 {
   return  pkg_path + "/name";
 }
 
-static inline string  pkg_energy_fname(string pkg_path)
+static inline string  pkg_energy_fname(const string& pkg_path)
 {
   return  pkg_path + "/energy_uj";
 }
 
-static inline string  pkg_energy_range_fname(string pkg_path)
+static inline string  pkg_energy_range_fname(const string& pkg_path)
 {
   return  pkg_path + "/max_energy_range_uj";
 }
 
 template<typename T>
-static inline T read_value(string fname)
+static inline T read_value(const string& fname)
 {
   T val;
   ifstream fs(fname);

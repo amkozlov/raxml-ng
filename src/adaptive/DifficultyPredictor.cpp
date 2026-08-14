@@ -74,7 +74,7 @@ double DifficultyPredictor::predict_difficulty(unsigned int n_trees)
   unsigned int n_taxa = (unsigned int) _parsimony_msa_ptr->part_msa().taxon_count();
   
   // init seeds
-  intVector seeds(n_trees);
+  uintVector seeds(n_trees);
   for (unsigned int i = 0; i < n_trees; ++i)
     seeds[i] = (unsigned int) rand();
 

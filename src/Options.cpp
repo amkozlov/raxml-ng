@@ -7,22 +7,22 @@
 
 using namespace std;
 
-SupportMetricSet BS_METRICS_WITH_ML_TREES   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
-                                              BranchSupportMetric::tbe, BranchSupportMetric::gcf,
-                                              BranchSupportMetric::ic1, BranchSupportMetric::ica};
+static SupportMetricSet BS_METRICS_WITH_ML_TREES   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
+                                                     BranchSupportMetric::tbe, BranchSupportMetric::gcf,
+                                                     BranchSupportMetric::ic1, BranchSupportMetric::ica};
 
-SupportMetricSet BS_METRICS_WITH_PB_TREES   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
-                                              BranchSupportMetric::tbe, BranchSupportMetric::ebg,
-                                              BranchSupportMetric::pbs, BranchSupportMetric::gcf,
-                                              BranchSupportMetric::ic1, BranchSupportMetric::ica};
+static SupportMetricSet BS_METRICS_WITH_PB_TREES   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
+                                                     BranchSupportMetric::tbe, BranchSupportMetric::ebg,
+                                                     BranchSupportMetric::pbs, BranchSupportMetric::gcf,
+                                                     BranchSupportMetric::ic1, BranchSupportMetric::ica};
 
-SupportMetricSet BS_METRICS_WITH_PARS_TREES { BranchSupportMetric::ps };
+static SupportMetricSet BS_METRICS_WITH_PARS_TREES { BranchSupportMetric::ps };
 
-SupportMetricSet BS_METRICS_WITH_MSA_REPS   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
-                                              BranchSupportMetric::tbe, BranchSupportMetric::ebg,
-                                              BranchSupportMetric::pbs, BranchSupportMetric::sh_alrt,
-                                              BranchSupportMetric::gcf,
-                                              BranchSupportMetric::ic1, BranchSupportMetric::ica };
+static SupportMetricSet BS_METRICS_WITH_MSA_REPS   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
+                                                     BranchSupportMetric::tbe, BranchSupportMetric::ebg,
+                                                     BranchSupportMetric::pbs, BranchSupportMetric::sh_alrt,
+                                                     BranchSupportMetric::gcf,
+                                                     BranchSupportMetric::ic1, BranchSupportMetric::ica };
 
 Options::Options() : opt_version(RAXML_OPT_VERSION), cmdline(""), command(Command::none),
 use_tip_inner(true), use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false),
@@ -381,19 +381,14 @@ string Options::simd_arch_name() const
 #else
       return "NONE (scalar)";
 #endif
-      break;
     case CORAX_ATTRIB_ARCH_SSE:
       return "SSE3";
-      break;
     case CORAX_ATTRIB_ARCH_AVX:
       return "AVX";
-      break;
     case CORAX_ATTRIB_ARCH_AVX2:
       return "AVX2";
-      break;
     case CORAX_ATTRIB_ARCH_AVX512:
       return "AVX512";
-      break;
     default:
       return "UNKNOWN";
   }
@@ -405,13 +400,10 @@ string Options::consense_type_name() const
   {
     case 0:
       return "MRE";
-      break;
     case 50:
       return "MR";
-      break;
     case 100:
       return "STRICT";
-      break;
     default:
       return "MR" + to_string(consense_cutoff);
   }

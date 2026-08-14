@@ -94,22 +94,21 @@ bool VCFStream::vcf_file(const std::string& fname)
 }
 
 
-static VCFLikelihoodMode detect_likelihood_mode(VCFStream& stream, bcf_hdr_t *hdr)
+static VCFLikelihoodMode detect_likelihood_mode(const VCFStream& stream, bcf_hdr_t *hdr)
 {
   VCFLikelihoodMode lh_mode = VCFLikelihoodMode::none;
 
-  bcf_hrec_t * hrec = NULL;
-  if (stream.use_normalized_gl() && (hrec = bcf_hdr_get_hrec(hdr, BCF_HL_FMT, "ID", "G10N", NULL)) != NULL)
+  if (stream.use_normalized_gl() && (bcf_hdr_get_hrec(hdr, BCF_HL_FMT, "ID", "G10N", NULL)) != NULL)
   {
     lh_mode = VCFLikelihoodMode::g10n;
   }
-  else if ((hrec = bcf_hdr_get_hrec(hdr, BCF_HL_FMT, "ID", "G10", NULL)) != NULL)
+  else if ((bcf_hdr_get_hrec(hdr, BCF_HL_FMT, "ID", "G10", NULL)) != NULL)
     lh_mode = VCFLikelihoodMode::g10;
-  else if ((hrec = bcf_hdr_get_hrec(hdr, BCF_HL_FMT, "ID", "PL", NULL)) != NULL)
+  else if ((bcf_hdr_get_hrec(hdr, BCF_HL_FMT, "ID", "PL", NULL)) != NULL)
     lh_mode = VCFLikelihoodMode::pl;
-  else if ((hrec = bcf_hdr_get_hrec(hdr, BCF_HL_FMT, "ID", "FPL", NULL)) != NULL)
+  else if ((bcf_hdr_get_hrec(hdr, BCF_HL_FMT, "ID", "FPL", NULL)) != NULL)
     lh_mode = VCFLikelihoodMode::fpl;
-  else if ((hrec = bcf_hdr_get_hrec(hdr, BCF_HL_FMT, "ID", "GL", NULL)) != NULL)
+  else if ((bcf_hdr_get_hrec(hdr, BCF_HL_FMT, "ID", "GL", NULL)) != NULL)
     lh_mode = VCFLikelihoodMode::gl;
   else
     lh_mode = VCFLikelihoodMode::none;
@@ -415,7 +414,7 @@ void set_g10_probs(MSA& msa, SNVRecord& snv, size_t snv_id, size_t sample_id)
   if (gl_underflow)
   {
 #ifdef _RAXML_VCF_DEBUG
-    printf("taxon: %s, SNV: %lu, GL: ", msa.label(sample_id).c_str(), snv_id);
+    printf("taxon: %s, SNV: %llu, GL: ", msa.label(sample_id).c_str(), snv_id);
     for (size_t k = 0; k < 10; ++k)
       printf("%lf ", gt_g10[k]);
     printf("\n");
@@ -434,8 +433,8 @@ void set_gl_probs(MSA& msa, SNVRecord& snv, size_t snv_id, size_t sample_id)
   auto site_probs = msa.probs(sample_id, snv_id);
   auto gt_gl = snv.sample_lh + sample_id * snv.pl_per_sample;
 
-  for (size_t k = 0; k < msa.states(); ++k)
-    site_probs[k] = 0.;
+  for (size_t i = 0; i < msa.states(); ++i)
+    site_probs[i] = 0.;
 
 #ifdef _RAXML_VCF_DEBUG
   printf("GL: ");
@@ -468,8 +467,8 @@ void set_pl_probs(MSA& msa, SNVRecord& snv, size_t snv_id, size_t sample_id)
   auto site_probs = msa.probs(sample_id, snv_id);
   auto gt_pl = snv.sample_plh + sample_id * snv.pl_per_sample;
 
-  for (size_t k = 0; k < msa.states(); ++k)
-    site_probs[k] = 0.;
+  for (size_t i = 0; i < msa.states(); ++i)
+    site_probs[i] = 0.;
 
 #ifdef _RAXML_VCF_DEBUG
   printf("PL: ");
@@ -603,7 +602,7 @@ void set_sample_probs(MSA& msa, SNVRecord& snv, size_t snv_id, size_t sample_id,
 #ifdef _RAXML_VCF_DEBUG
   if (sample_id < 4)
   {
-    printf("site: %lu, sample: %lu, gt: %c  phased: %d,  probs: ", snv_id, sample_id, c, phased);
+    printf("site: %llu, sample: %llu, gt: %c  phased: %d,  probs: ", snv_id, sample_id, c, phased);
     for (unsigned int k = 0; k < msa_states; ++k)
       printf("%s=%lf ", haploid ? gt4_inv_map[k] : gt16_inv_map[k], site_probs[k]);
     printf("\n");

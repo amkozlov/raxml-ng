@@ -87,7 +87,7 @@ const RateHeterogeneitySelection fast_rate_heterogeneity_selection{
 class RateHeterogeneityDescriptor
 {
 public:
-  RateHeterogeneityDescriptor(RateHeterogeneityType type, unsigned int count) : type{type}, category_count{count} {}
+  RateHeterogeneityDescriptor(RateHeterogeneityType type_, unsigned int count) : type{type_}, category_count{count} {}
 
   RateHeterogeneityDescriptor(const RateHeterogeneityDescriptor &other) = default;
 
@@ -136,8 +136,8 @@ public:
   std::string matrix_name;
   BaseFrequencyType base_frequency;
 
-  SubstitutionModelDescriptor(std::string matrix_name, BaseFrequencyType base_frequency)
-      : matrix_name{matrix_name}, base_frequency{base_frequency}
+  SubstitutionModelDescriptor(std::string matrix_name_, BaseFrequencyType base_frequency_)
+      : matrix_name{matrix_name_}, base_frequency{base_frequency_}
   {
   }
 
@@ -174,10 +174,10 @@ public:
   SubstitutionModelDescriptor substitution_model;
   RateHeterogeneityDescriptor rate_heterogeneity;
 
-  ModelDescriptor(DataType datatype, string matrix_name, const BaseFrequencyType frequency_type,
-                  const RateHeterogeneityType rate_heterogeneity, unsigned int rate_categories = 1)
-      : datatype(datatype), substitution_model(matrix_name, frequency_type),
-        rate_heterogeneity(rate_heterogeneity, rate_categories)
+  ModelDescriptor(DataType datatype_, string matrix_name_, const BaseFrequencyType frequency_type_,
+                  const RateHeterogeneityType rate_heterogeneity_, unsigned int rate_categories = 1)
+      : datatype(datatype_), substitution_model(matrix_name_, frequency_type_),
+        rate_heterogeneity(rate_heterogeneity_, rate_categories)
   {
   }
 

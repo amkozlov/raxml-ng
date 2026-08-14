@@ -173,7 +173,7 @@ public:
   std::vector<std::string> modeltest_subst_models;
   bool modeltest_json_output;
 
-  bool coarse() const { return num_workers > 1; };
+  bool coarse() const { return num_workers > 1; }
   bool auto_model() const {
       return command == Command::modeltest || \
             (strcasecmp(model_file.c_str(), "auto") == 0) || \

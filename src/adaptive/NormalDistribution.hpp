@@ -35,20 +35,20 @@ class StandardNormalDistribution : public StatisticalDistribution {
   virtual ~StandardNormalDistribution();
 
   // Distribution functions
-  virtual double pdf(const double& x) const;
-  virtual double cdf(const double& x) const;
+  virtual double pdf(const double& x) const override;
+  virtual double cdf(const double& x) const override;
 
   // Inverse cumulative distribution function (aka the probit function)
-  virtual double inv_cdf(const double& quantile) const;
+  virtual double inv_cdf(const double& quantile) const override;
   
   // Descriptive stats
-  virtual double mean() const;   // equal to 0
-  virtual double var() const;    // equal to 1 
-  virtual double stdev() const;  // equal to 1
+  virtual double mean() const override;   // equal to 0
+  virtual double var() const override;    // equal to 1
+  virtual double stdev() const override;  // equal to 1
 
   // Obtain a sequence of random draws from the standard normal distribution
   virtual void random_draws(const std::vector<double>& uniform_draws,
-                            std::vector<double>& dist_draws);
+                            std::vector<double>& dist_draws) override;
 };
 
 #endif /* RAXML_ADAPTIVE_NORMALDISTRIBUTION_HPP_ */

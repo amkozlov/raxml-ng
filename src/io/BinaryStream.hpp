@@ -21,8 +21,8 @@ public:
   }
 
   /* can be used to distinguish between versions or flavors of a binary format */
-  uint32_t version() const { return _version; };
-  void version(uint32_t ver) { _version = ver; };
+  uint32_t version() const { return _version; }
+  void version(uint32_t ver) { _version = ver; }
 
   void get(void *data, size_t size) { read(data, size); }
   void put(const void *data, size_t size) { write(data, size); }
@@ -46,12 +46,12 @@ public:
   size_t pos() const { return _pos; }
   void reset() { _pos = 0; }
 
-  void write(const void * /* data */, size_t size)
+  void write(const void * /* data */, size_t size) override
   {
     _pos += size;
   }
 
-  virtual void read(void *data, size_t size)
+  virtual void read(void *data, size_t size) override
   {
     memset(data, 0, size);
     _pos += size;
@@ -99,7 +99,7 @@ public:
   }
 
 public:
-  void write(const void *data, size_t size)
+  void write(const void *data, size_t size) override
   {
     if (_ptr + size > _buf + _size)
       throw std::out_of_range("BinaryStream::put");
@@ -108,7 +108,7 @@ public:
     _ptr += size;
   }
 
-  void read(void *data, size_t size)
+  void read(void *data, size_t size) override
   {
     if (_ptr + size > _buf + _size)
       throw std::out_of_range("BinaryStream::get");
@@ -131,8 +131,12 @@ public:
     BasicBinaryStream(), _fstream(fname, std::ios::binary | mode) {}
 
 public:
-  void write(const void *data, size_t size) { _fstream.write((char*) data, (std::streamsize) size); }
-  void read(void *data, size_t size)
+  void write(const void *data, size_t size) override
+  {
+    _fstream.write((char*) data, (std::streamsize) size);
+  }
+
+  void read(void *data, size_t size) override
   {
     if (data)
       _fstream.read((char*) data, (std::streamsize) size);

@@ -13,7 +13,7 @@ class Heuristics
     public:
         Heuristics(size_t partition_count, HeuristicSelection selection,
                    const std::vector<RateHeterogeneityDescriptor> selected_rhas,
-                   const SubstitutionModelDescriptor &reference_model,
+                   const SubstitutionModelDescriptor &reference_matrix,
                    unsigned int min_freerate_categories, unsigned int max_freerate_categories,
                    double significant_ic_difference, RHASHeuristicMode rhas_mode);
         void update(size_t partition, const ModelDescriptor &candidate_model, double score);
@@ -28,7 +28,7 @@ class Heuristics
 
         const HeuristicSelection selection;
         const SubstitutionModelDescriptor reference_matrix;
-        bool invariant_freerate_enabled;
+//        bool invariant_freerate_enabled;
         std::vector<RateHeterogeneityDescriptor> selected_rhas;
         std::vector<RHASHeuristic> rhas_heuristics;
         std::vector<FreerateHeuristic> freerate_heuristics;

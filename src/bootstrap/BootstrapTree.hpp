@@ -8,8 +8,7 @@ class BootstrapTree : public SupportTree
 public:
   BootstrapTree (const Tree& tree);
 
-  virtual
-  ~BootstrapTree ();
+  virtual ~BootstrapTree() override;
 };
 
 #endif /* RAXML_BOOTSTRAP_BOOTSTRAPTREE_HPP_ */

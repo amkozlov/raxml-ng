@@ -400,7 +400,7 @@ bool check_msa_global(const MSA& msa, const Options& opts)
   corax_msa_stats_t * stats = corax_msa_compute_stats(msa.pll_msa(),
                                                         4,
                                                         corax_map_nt, // map is not used here
-                                                        NULL,
+                                                        nullptr,
                                                         stats_mask);
 
   coraxlib_check_error("ERROR computing MSA stats");
@@ -505,7 +505,7 @@ bool check_msa(RaxmlInstance& instance)
     corax_msa_stats_t * stats = corax_msa_compute_stats(pll_msa,
                                                           4,
                                                           corax_map_nt, // map is not used here
-                                                          NULL,
+                                                          nullptr,
                                                           stats_mask);
 
     coraxlib_check_error("ERROR computing MSA stats");
@@ -747,8 +747,10 @@ void check_models(const RaxmlInstance& instance)
         throw runtime_error("Partition \"" + pinfo.name() +
                             "\": You specified LG4M or LG4X model with shared stationary based frequencies (" +
                             model.to_string(false) + ").\n"
-                            "Please be warned, that this is against the idea of LG4 models and hence it's not recommended!" + "\n"
-                            "If you know what you're doing, you can add --force command line switch to disable this safety check.");
+                            "Please be warned, that this is against the idea of LG4 models "
+                            "and hence it's not recommended!" + "\n"
+                            "If you know what you're doing, you can add --force command line switch "
+                            "to disable this safety check.");
       }
     }
 
@@ -1088,7 +1090,7 @@ void check_options_perf(RaxmlInstance& instance)
   instance.opts.bootstop_interval = std::max(opts.bootstop_interval, opts.num_workers * 2);
 }
 
-void check_oversubscribe(RaxmlInstance& instance)
+void check_oversubscribe(const RaxmlInstance& instance)
 {
   const auto& opts = instance.opts;
   if (opts.safety_checks.isset(SafetyCheck::perf_threads))
@@ -1336,7 +1338,7 @@ void load_msa(RaxmlInstance& instance)
 void write_binary_msa_file(RaxmlInstance& instance, bool update = false)
 {
   const auto& opts = instance.opts;
-  auto& parted_msa = *instance.parted_msa;
+  const auto& parted_msa = *instance.parted_msa;
 
   if (ParallelContext::master_rank() &&
       !instance.opts.use_prob_msa && !instance.opts.binary_msa_file().empty())
@@ -1829,7 +1831,7 @@ void load_constraint(RaxmlInstance& instance)
   }
 }
 
-void thread_start_trees(RaxmlInstance& instance, TreeList& tree_list, StartingTree st_tree_type,
+void thread_start_trees(const RaxmlInstance& instance, TreeList& tree_list, StartingTree st_tree_type,
                         const uintVector& seeds, size_t offset, bool bootstrap = false)
 {
   for (size_t i = 0; i < seeds.size(); ++i)
@@ -1842,7 +1844,7 @@ void thread_start_trees(RaxmlInstance& instance, TreeList& tree_list, StartingTr
 void build_trees_parallel(RaxmlInstance& instance, TreeList& tree_list, StartingTree tree_type,
                           size_t tree_count, unsigned int num_threads, bool bootstrap = false)
 {
-  auto& opts = instance.opts;
+  const auto& opts = instance.opts;
   auto old_size = tree_list.size();
   tree_list.resize(old_size + tree_count);
 
@@ -1981,7 +1983,7 @@ void build_start_trees(RaxmlInstance& instance, unsigned int num_threads = 0)
 
 void predict_msa_difficulty(RaxmlInstance& instance)
 {
-  auto & opts = instance.opts;
+  const auto& opts = instance.opts;
   auto diff_pred = instance.msa_diff_predictor;
   double difficulty = instance.parted_msa->difficulty_score();
 
@@ -2189,7 +2191,7 @@ void generate_bootstraps(RaxmlInstance& instance, const CheckpointFile& checkp)
       {
         for (size_t i = 0; i < trees_to_generate; ++i)
         {
-          auto tree = generate_tree(instance, StartingTree::parsimony, rand());
+          auto tree = generate_tree(instance, StartingTree::parsimony, (unsigned int) rand());
           instance.pars_trees.emplace_back(std::move(tree));
         }
       }
@@ -2376,7 +2378,7 @@ void autoselect_models(RaxmlInstance& instance, CheckpointManager &cm)
     /* no starting trees -> use a first tree from pars_trees, generate if needed */
     if (instance.pars_trees.empty())
     {
-      auto tree = generate_tree(instance, StartingTree::parsimony, rand());
+      auto tree = generate_tree(instance, StartingTree::parsimony, (unsigned int)  rand());
       instance.pars_trees.emplace_back(std::move(tree));
     }
   }
@@ -2738,7 +2740,7 @@ bool check_bootstop(const RaxmlInstance& instance, const TreeTopologyList& bs_tr
 
     if (bs_num % opts.bootstop_interval == 0 || bs_num == bs_trees.size())
     {
-      converged = bootstop_checker->converged(rand());
+      converged = bootstop_checker->converged((unsigned int) rand());
 
       if (print)
       {
@@ -4011,7 +4013,7 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   /* init template tree */
   srand(instance.opts.random_seed);
-  instance.random_tree = generate_tree(instance, StartingTree::random, rand());
+  instance.random_tree = generate_tree(instance, StartingTree::random, (unsigned int) rand());
 
   // read start trees from file to avoid re-generation
   // NOTE: doesn't work for OLD constrained tree search

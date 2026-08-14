@@ -63,7 +63,7 @@ protected:
   double consensus_wrf_distance(const splitEntryVector& splits1, const splitEntryVector& splits2,
                                 const uintVector& support1, const uintVector& support2);
 
-  virtual bool check_convergence(RandomGenerator& gen);
+  virtual bool check_convergence(RandomGenerator& gen) override;
 
 private:
   double _wrf_cutoff;

@@ -13,9 +13,9 @@ class NewickStream : public std::fstream
 {
 public:
   NewickStream(const std::string& fname) : std::fstream(fname, std::ios::out),
-    _brlens(true), _brlabs(false) {};
+    _brlens(true), _brlabs(false) {}
   NewickStream(const std::string& fname, std::ios_base::openmode mode) :
-    std::fstream(fname, mode), _brlens(true), _brlabs(false) {};
+    std::fstream(fname, mode), _brlens(true), _brlabs(false) {}
 
   bool brlens() const { return _brlens; }
   void brlens(bool v) { _brlens = v; }
@@ -34,9 +34,9 @@ public:
   MSAFileStream(const std::string& fname, DataType data_type = DataType::autodetect) :
     _fname(fname), _data_type(data_type) {}
 
-  const std::string& fname() const { return _fname; };
-  DataType data_type() const { return _data_type; };
-  unsigned int num_states() const { return DatatypeStates.at(_data_type); };
+  const std::string& fname() const { return _fname; }
+  DataType data_type() const { return _data_type; }
+  unsigned int num_states() const { return DatatypeStates.at(_data_type); }
 
 private:
   std::string _fname;
@@ -167,12 +167,12 @@ class FileIOStream : public std::fstream
 {
 public:
   FileIOStream(const std::string& fname, std::ios_base::openmode mode = std::ios::out) :
-    std::fstream(fname, mode), _delim("\t"), _precision(6) {};
+    std::fstream(fname, mode), _delim("\t"), _precision(6) {}
 
-  const std::string& delim() { return _delim; };
-  void delim(const std::string& del) { _delim = del; };
-  unsigned int precision() { return _precision; };
-  void precision(unsigned int prec) { _precision = prec; };
+  const std::string& delim() { return _delim; }
+  void delim(const std::string& del) { _delim = del; }
+  unsigned int precision() { return _precision; }
+  void precision(unsigned int prec) { _precision = prec; }
 
 protected:
   std::string _delim;
@@ -182,9 +182,9 @@ protected:
 class AncestralProbStream : public FileIOStream
 {
 public:
-  AncestralProbStream(const std::string& fname) : FileIOStream(fname) {};
+  AncestralProbStream(const std::string& fname) : FileIOStream(fname) {}
   AncestralProbStream(const std::string& fname, std::ios_base::openmode mode) :
-    FileIOStream(fname, mode) {};
+    FileIOStream(fname, mode) {}
 };
 
 class AncestralStateStream : public FileIOStream
@@ -192,7 +192,7 @@ class AncestralStateStream : public FileIOStream
 public:
   AncestralStateStream(const std::string& fname) : FileIOStream(fname) {};
   AncestralStateStream(const std::string& fname, std::ios_base::openmode mode) :
-    FileIOStream(fname, mode) {};
+    FileIOStream(fname, mode) {}
 };
 
 class MutationMapListStream : public FileIOStream
@@ -200,7 +200,7 @@ class MutationMapListStream : public FileIOStream
 public:
   MutationMapListStream(const std::string& fname) : FileIOStream(fname) {};
   MutationMapListStream(const std::string& fname, std::ios_base::openmode mode) :
-    FileIOStream(fname, mode) {};
+    FileIOStream(fname, mode) {}
 };
 
 NewickStream& operator<<(NewickStream& stream, const corax_unode_t& root);

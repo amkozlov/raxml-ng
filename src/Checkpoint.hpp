@@ -53,7 +53,7 @@ struct SearchState
 class checkpoint_error : public std::runtime_error
 {
 public:
-  checkpoint_error(const std::string& msg = "") : std::runtime_error("Failed to load checkpoint!\n" + msg) {};
+  checkpoint_error(const std::string& msg = "") : std::runtime_error("Failed to load checkpoint!\n" + msg) {}
 };
 
 class incompatible_checkpoint_error : public checkpoint_error
@@ -64,7 +64,7 @@ public:
     checkpoint_error("Incompatible values for '" + field + "'" +
                      (ckp_val.empty() ? "." : ": checkpoint = " + ckp_val + ", cmdline = " + cmd_val) +
                      "\nRemove the checkpoint file or re-run with --redo option.")
-    {};
+    {}
 };
 
 
@@ -110,7 +110,7 @@ struct CheckpointFile
   MLTree best_tree() const;
   Tree tree() const;
 
-  void write_tmp_tree(const Tree& tree, const std::string fname, bool append = false) const;
+  void write_tmp_tree(const Tree& tree, const std::string& fname, bool append = false) const;
   void write_tmp_best_tree() const;
   void write_tmp_ml_tree(const Tree& tree) const;
   void write_tmp_bs_tree(const Tree& tree) const;
@@ -188,7 +188,7 @@ private:
 
   bool minimum_time_exceeded() const {
       return (std::chrono::steady_clock::now() - timestamp_last_checkpoint) > RAXML_CKP_MIN_INTERVAL;
-  };
+  }
 
   mutable std::chrono::time_point<std::chrono::steady_clock> timestamp_last_checkpoint;
 };

@@ -130,8 +130,10 @@ void MSA::compress_patterns(const corax_state_t * charmap, bool store_backmap)
   if (!w)
     coraxlib_check_error("Pattern compression failed: ", true);
 
+  assert(_pll_msa->length > 0);
+
   /* set new, compressed length which has been updated in pll_msa */
-  _length = _pll_msa->length;
+  _length = (size_t) _pll_msa->length;
 
   if (_weights.empty())
     _weights = WeightVector(w, w + _pll_msa->length);

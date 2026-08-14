@@ -34,7 +34,7 @@ class StoppingCriterion {
         std::vector<double *> get_vec(size_t group_id, size_t local_thread_id, bool plnl);
 
     protected:
-        int part_count;
+        size_t part_count;
         unsigned int total_sites;
         unsigned int* sites;
 
@@ -58,7 +58,7 @@ class StoppingCriterion {
         double *epsilon;
         double *p_value;
 
-        int seed;
+        unsigned int seed;
         
         std::pair<int, int> find_by_site_index(unsigned int site_index);
         

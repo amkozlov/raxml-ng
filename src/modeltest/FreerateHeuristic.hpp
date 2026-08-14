@@ -54,7 +54,7 @@ class FreerateHeuristic
 {
 public:
   FreerateHeuristic(unsigned int min_cats, unsigned int max_cats,
-                    RateHeterogeneityType type = RateHeterogeneityType::FREE_RATE);
+                    RateHeterogeneityType ratehet_type = RateHeterogeneityType::FREE_RATE);
 
   void update(const ModelDescriptor &candidate_model, double score);
 
@@ -77,9 +77,9 @@ private:
     std::vector<double> scores;
     bool converged;
 
-    score_entry(unsigned int min_categories, unsigned int max_categories)
+    score_entry(unsigned int min_cats, unsigned int max_cats)
         : ncat_skip_threshold(std::numeric_limits<unsigned int>::max()),
-          scores(std::max(0, static_cast<int>(max_categories) - static_cast<int>(min_categories) + 1),
+          scores(std::max(0, static_cast<int>(max_cats) - static_cast<int>(min_cats) + 1),
                  NO_SCORE_PRESENT),
           converged(false)
     {

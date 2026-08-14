@@ -21,13 +21,13 @@ StoppingCriterion::StoppingCriterion(shared_ptr<PartitionedMSA> parted_msa,
         total_patterns = parted_msa->total_patterns();
         
         patterns = new unsigned int[part_count];
-        for(int i = 0; i < part_count; ++i)
+        for(size_t i = 0; i < part_count; ++i)
             patterns[i] = parted_msa->part_info(i).length();
 
         pattern_weights.resize(n_groups);
         for(auto &pa : pattern_weights){
             pa.resize(part_count);
-            for(int i = 0; i < part_count; ++i)
+            for(size_t i = 0; i < part_count; ++i)
                 pa[i] = new unsigned int[patterns[i]];
         }
     }
@@ -35,7 +35,7 @@ StoppingCriterion::StoppingCriterion(shared_ptr<PartitionedMSA> parted_msa,
     // sites
     total_sites = parted_msa->total_sites();
     sites = new unsigned int[part_count];
-    for(int i = 0; i < part_count; ++i)
+    for(size_t i = 0; i < part_count; ++i)
         sites[i] = pattern_compression ? 0 : parted_msa->part_info(i).length();
     
     epsilon = new double[n_groups];
@@ -75,7 +75,7 @@ StoppingCriterion::~StoppingCriterion(){
     if(pattern_compression) {
         
         for(auto & pa : pattern_weights){
-            for(int i = 0; i < part_count; ++i)
+            for(size_t i = 0; i < part_count; ++i)
                 delete[] pa[i];
             
             pa.clear();
@@ -128,7 +128,7 @@ void StoppingCriterion::initialize_uncompressed(TreeInfo * treeinfo){
             ParallelContext::UniqueLock lock;
             
             if(!sites_uncompressed_initialized[ParallelContext::local_thread_id()]){
-                for(int part = 0; part < part_count; part++)
+                for(size_t part = 0; part < part_count; part++)
                     if(treeinfo->pll_treeinfo().partitions[part])
                         sites[part] += treeinfo->pll_treeinfo().partitions[part]->pattern_weight_sum;
                 
@@ -149,14 +149,14 @@ void StoppingCriterion::initialize_uncompressed(TreeInfo * treeinfo){
     
                 for(auto &p_lnl : persite_lnl_uncompressed){
                     p_lnl.resize(part_count);
-                    for(int part = 0; part < part_count; ++part)
+                    for(size_t part = 0; part < part_count; ++part)
                         p_lnl[part] = new double[sites[part]];
                 }
 
                 if(kh_test_case){
                     for(auto &p_lnl : persite_lnl_uncompressed_new){
                         p_lnl.resize(part_count);
-                        for(int part = 0; part < part_count; ++part)
+                        for(size_t part = 0; part < part_count; ++part)
                             p_lnl[part] = new double[sites[part]];
                     }
                 }
@@ -178,7 +178,7 @@ void StoppingCriterion::initialize_persite_vector(vector<vector<double *>> &vec)
     
     for(auto &p_lnl : vec){
         p_lnl.resize(part_count);
-        for(int part = 0; part < part_count; ++part)
+        for(size_t part = 0; part < part_count; ++part)
             p_lnl[part] = new double[lengths_array[part]];
     }
 }
@@ -186,7 +186,7 @@ void StoppingCriterion::initialize_persite_vector(vector<vector<double *>> &vec)
 void StoppingCriterion::clear_persite_lnl_vector(){
     
     for(auto &p_lnl : persite_lnl){
-        for(int part = 0; part < part_count; ++part)
+        for(size_t part = 0; part < part_count; ++part)
             delete[] p_lnl[part];
         
         p_lnl.clear();
@@ -197,7 +197,7 @@ void StoppingCriterion::clear_persite_lnl_vector(){
     if(pattern_compression){
         
         for(auto &p_lnl : persite_lnl_uncompressed){
-            for(int part = 0; part < part_count; ++part)
+            for(size_t part = 0; part < part_count; ++part)
                 delete[] p_lnl[part];
             
             p_lnl.clear();
@@ -208,7 +208,7 @@ void StoppingCriterion::clear_persite_lnl_vector(){
 
     if(kh_test_case){
         for(auto &p_lnl : persite_lnl_new){
-            for(int part = 0; part < part_count; ++part)
+            for(size_t part = 0; part < part_count; ++part)
                 delete[] p_lnl[part];
             
             p_lnl.clear();
@@ -217,7 +217,7 @@ void StoppingCriterion::clear_persite_lnl_vector(){
 
         if(pattern_compression){
             for(auto &p_lnl : persite_lnl_uncompressed_new){
-                for(int part = 0; part < part_count; ++part)
+                for(size_t part = 0; part < part_count; ++part)
                     delete[] p_lnl[part];
                 
                 p_lnl.clear();
@@ -242,7 +242,7 @@ void StoppingCriterion::set_thread_offset(TreeInfo* treeinfo, const PartitionAss
     
     {
         ParallelContext::GroupLock lock;
-        int part = 0;
+        size_t part = 0;
         
         for (const auto& pa: part_assignment){
             
@@ -308,7 +308,7 @@ void StoppingCriterion::store_uncompressed(bool plnl_old){
         vector<unsigned int*> weights = 
             pattern_weights[ParallelContext::group_id()];
 
-        for(int part = 0; part < part_count; ++part){
+        for(size_t part = 0; part < part_count; ++part){
             int dest_index = 0;
             
             for(unsigned int i = 0; i < patterns[part]; ++i){
@@ -346,7 +346,7 @@ void StoppingCriterion::set_increasing_moves(unsigned long _moves){
 
     assert(count_spr_moves);
 
-    int group_id = ParallelContext::group_id();
+    auto group_id = ParallelContext::group_id();
     if(ParallelContext::group_master_thread()) increasing_moves[group_id] = _moves;
     ParallelContext::barrier();
 
@@ -357,10 +357,10 @@ std::pair<int, int> StoppingCriterion::find_by_site_index(unsigned int site_inde
     int pIndex = -1, sIndex = -1; 
     unsigned int cur_sites = 0;
 
-    for(int i = 0; i < part_count; ++i){
+    for(size_t i = 0; i < part_count; ++i){
         cur_sites += sites[i];
         if(cur_sites > site_index){
-            pIndex = i;
+            pIndex = (int) i;
             sIndex = site_index - (cur_sites - sites[i]); 
             break;
         }
@@ -372,7 +372,7 @@ std::pair<int, int> StoppingCriterion::find_by_site_index(unsigned int site_inde
 // statistical tests
 void NoiseSamplingTest::run_test() {
 
-    int group_id = ParallelContext::group_id();
+    auto group_id = ParallelContext::group_id();
     assert(count_spr_moves == false);
 
     double _epsilon = 0;
@@ -380,8 +380,8 @@ void NoiseSamplingTest::run_test() {
 
     if(rell) {
         
-        int site_index, exp;
-        int rell_size = 1000;
+        unsigned int site_index, exp;
+        unsigned int rell_size = 1000;
         double * rell_dist = new double[rell_size];
         double * logl_diff_dist = new double[rell_size];
 
@@ -394,17 +394,20 @@ void NoiseSamplingTest::run_test() {
                 double rell_loglh = 0;
                 for (i = 0; i<total_sites; i++){
                     
-                    site_index =  rand() % total_sites;
+                    site_index = (unsigned int) rand() % total_sites;
                     std::pair<int, int> p = find_by_site_index(site_index);
-                    rell_loglh += persite_lnl_uncompressed[group_id][p.first][p.second];
+                    assert(p.first >= 0 && p.second >= 0);
+                    auto p_id = (unsigned int) p.first;
+                    auto s_id = (unsigned int) p.second;
+                    rell_loglh += persite_lnl_uncompressed[group_id][p_id][s_id];
                 }
 
                 rell_dist[exp] = rell_loglh;
             }
 
             for(exp = 0; exp < rell_size; exp++){
-                int ind1 = rand() % rell_size;
-                int ind2 = rand() % rell_size;
+                auto ind1 = (unsigned int) rand() % rell_size;
+                auto ind2 = (unsigned int) rand() % rell_size;
                 logl_diff_dist[exp] = fabs(rell_dist[ind1] - rell_dist[ind2]);
             }
         }
@@ -422,7 +425,7 @@ void NoiseSamplingTest::run_test() {
         double stdev = 0;
         double mean = old_loglh[group_id] / total_sites;
 
-        for (int part = 0; part < part_count; ++part)
+        for (size_t part = 0; part < part_count; ++part)
             for(i = 0; i < sites[part]; ++i)
                 stdev += pow(persite_lnl_uncompressed[group_id][part][i] - mean, 2);
 
@@ -438,7 +441,7 @@ void NoiseSamplingTest::run_test() {
 
 void KHStoppingTest::run_test(){
     
-    int group_id = ParallelContext::group_id();
+    auto group_id = ParallelContext::group_id();
     double ret_val = 0, L = old_loglh[group_id], NL = new_loglh[group_id];
     unsigned int i, pos = 0;
     
@@ -450,7 +453,7 @@ void KHStoppingTest::run_test(){
     double* logl_diffs = new double[total_sites];
     double mean = 0;
 
-    for(int part = 0; part < part_count; ++part){
+    for(size_t part = 0; part < part_count; ++part){
         unsigned int part_sites = sites[part];
 
         for(i = 0; i<part_sites; ++i){
