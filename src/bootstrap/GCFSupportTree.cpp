@@ -26,7 +26,7 @@ static corax_split_t induced_split(corax_split_t ref_split, IDVector id_map)
     if (ref_split[elem] & (1u << offset))
      tip_ids.push_back(i);
   }
-  return corax_utree_split_from_tips(tip_ids.data(), tip_ids.size(), id_map_size);
+  return corax_utree_split_from_tips(tip_ids.data(), (unsigned int) tip_ids.size(), id_map_size);
 }
 
 void GCFSupportTree::add_replicate_tree(const Tree& tree)

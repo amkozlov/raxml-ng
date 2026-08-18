@@ -19,6 +19,8 @@ struct MLTree
   double loglh;
   Tree tree;
   ModelMap models;
+
+  MLTree(): loglh(-INFINITY) {}
 };
 
 enum class CheckpointStep
@@ -126,7 +128,7 @@ struct CheckpointFile
 class CheckpointManager
 {
 public:
-  CheckpointManager(const Options& opts);
+  explicit CheckpointManager(const Options& opts);
 
   const CheckpointFile& checkp_file() const { return _checkp_file;  }
 

@@ -51,7 +51,7 @@ typedef std::vector<corax_unode_t*> PllNodeVector;
 class BasicTree
 {
 public:
-  BasicTree(size_t num_tips) : _num_tips(num_tips) {}
+  explicit BasicTree(size_t num_tips) : _num_tips(num_tips) {}
   virtual ~BasicTree() {}
 
   bool empty() const { return _num_tips == 0; }

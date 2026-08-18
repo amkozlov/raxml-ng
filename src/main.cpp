@@ -4185,7 +4185,7 @@ int internal_main(int argc, char** argv, void* comm)
 
     ParallelContext::init_mpi(argc, argv, comm);
 
-    opts.num_ranks = ParallelContext::num_ranks();
+    opts.num_ranks = (unsigned int) ParallelContext::num_ranks();
 
     logger().add_log_stream(&cout);
 

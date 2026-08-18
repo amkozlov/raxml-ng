@@ -10,18 +10,7 @@ typedef std::unordered_map<corax_state_t,std::string> StateNameMap;
 class SubstitutionModel
 {
 public:
-  SubstitutionModel(const corax_subst_model_t& sm) :
-    _states(sm.states), _name(sm.name)
-  {
-    if (sm.freqs)
-      _base_freqs.assign(sm.freqs, sm.freqs + sm.states);
-    if (sm.rates)
-      _subst_rates.assign(sm.rates, sm.rates + sm.states*(sm.states-1)/2);
-    if (sm.rate_sym)
-      _rate_sym.assign(sm.rate_sym, sm.rate_sym + sm.states*(sm.states-1)/2);
-    if (sm.freq_sym)
-      _freq_sym.assign(sm.freq_sym, sm.freq_sym + sm.states);
-  }
+  SubstitutionModel(const corax_subst_model_t& sm);
 
   // getters
   unsigned int states() const;
@@ -31,67 +20,14 @@ public:
   const intVector& rate_sym() const { return _rate_sym; }
   const intVector& freq_sym() const { return _freq_sym; }
 
-  unsigned int num_rates() const  { return _states*(_states-1)/2; }
-  unsigned int num_uniq_rates() const
-  {
-    if (_rate_sym.empty())
-      return num_rates();
-    else
-      return (unsigned int) *std::max_element(_rate_sym.cbegin(), _rate_sym.cend()) + 1;
-  }
-
-  doubleVector uniq_subst_rates() const
-  {
-    if (!_rate_sym.empty())
-    {
-      doubleVector uniq_rates(num_uniq_rates());
-      for (size_t i = 0; i < _subst_rates.size(); ++i)
-      {
-        if (_rate_sym[i] >= 0)
-          uniq_rates[(unsigned int) _rate_sym[i]] = _subst_rates[i];
-      }
-      return uniq_rates;
-    }
-    else
-      return _subst_rates;
-  }
-
+  unsigned int num_rates() const;
+  unsigned int num_uniq_rates() const;
+  doubleVector uniq_subst_rates() const;
 
   // setters
-  void base_freqs(const doubleVector& v)
-  {
-//    std::cout << "expected: " << _states << ", got: " << v.size() << std::endl;
-    if (v.size() != _states)
-      throw std::invalid_argument("Invalid size of base_freqs vector!");
-
-    _base_freqs = v;
-  }
-
-  void subst_rates(const doubleVector& v)
-  {
-    if (v.size() != num_rates())
-      throw std::invalid_argument("Invalid size of subst_rates vector!");
-
-    _subst_rates = v;
-  }
-
-  void uniq_subst_rates(const doubleVector& v)
-  {
-    if (!_rate_sym.empty())
-    {
-      if (v.size() != num_uniq_rates())
-        throw std::invalid_argument("Invalid size of subst_rates vector!");
-
-      _subst_rates.resize(num_rates());
-      for (size_t i = 0; i < _subst_rates.size(); ++i)
-      {
-        _subst_rates[i] = _rate_sym[i] < 0 ? CORAX_OPT_MIN_SUBST_RATE :
-                                             v[(unsigned int) _rate_sym[i]];
-      }
-    }
-    else
-      subst_rates(v);
-  }
+  void base_freqs(const doubleVector& v);
+  void subst_rates(const doubleVector& v);
+  void uniq_subst_rates(const doubleVector& v);
 
 private:
   unsigned int _states;
@@ -222,7 +158,7 @@ private:
   void init_model_opts(const std::string& model_opts, const corax_mixture_model_t& mix_model);
   void init_state_names() const;
   void set_user_srates(doubleVector& srates, bool normalize = true);
-  void set_user_freqs(doubleVector& freqs);
+  void set_user_freqs(const doubleVector& freqs);
 };
 
 struct ModelEvaluation {

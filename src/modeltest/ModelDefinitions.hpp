@@ -136,7 +136,7 @@ public:
   std::string matrix_name;
   BaseFrequencyType base_frequency;
 
-  SubstitutionModelDescriptor(std::string matrix_name_, BaseFrequencyType base_frequency_)
+  SubstitutionModelDescriptor(const std::string& matrix_name_, BaseFrequencyType base_frequency_)
       : matrix_name{matrix_name_}, base_frequency{base_frequency_}
   {
   }

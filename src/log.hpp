@@ -48,7 +48,7 @@ struct TimeStamp
 
 struct ProgressInfo
 {
-  ProgressInfo(double llh) : loglh(llh) {}
+  explicit ProgressInfo(double llh) : loglh(llh) {}
 
   double loglh;
 };
@@ -59,7 +59,7 @@ class LogStream
 {
 public:
   LogStream() {}
-  LogStream(const StreamList& streams) : _streams(streams) {}
+  explicit LogStream(const StreamList& streams) : _streams(streams) {}
 
   StreamList& streams() { return _streams;}
 

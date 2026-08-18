@@ -142,6 +142,92 @@ static void print_param(ostringstream& s, const std::vector<T>& vec)
   s << "}";
 }
 
+
+/* SubstitutionModel */
+
+SubstitutionModel::SubstitutionModel(const corax_subst_model_t& sm) :
+  _states(sm.states), _name(sm.name)
+{
+  if (sm.freqs)
+    _base_freqs.assign(sm.freqs, sm.freqs + sm.states);
+  if (sm.rates)
+    _subst_rates.assign(sm.rates, sm.rates + sm.states*(sm.states-1)/2);
+  if (sm.rate_sym)
+    _rate_sym.assign(sm.rate_sym, sm.rate_sym + sm.states*(sm.states-1)/2);
+  if (sm.freq_sym)
+    _freq_sym.assign(sm.freq_sym, sm.freq_sym + sm.states);
+}
+
+unsigned int SubstitutionModel::num_rates() const
+{
+  return _states*(_states-1)/2;
+}
+
+unsigned int SubstitutionModel::num_uniq_rates() const
+{
+  if (_rate_sym.empty())
+    return num_rates();
+  else
+    return (unsigned int) *std::max_element(_rate_sym.cbegin(), _rate_sym.cend()) + 1;
+}
+
+doubleVector SubstitutionModel::uniq_subst_rates() const
+{
+  if (!_rate_sym.empty())
+  {
+    doubleVector uniq_rates(num_uniq_rates());
+    for (size_t i = 0; i < _subst_rates.size(); ++i)
+    {
+      if (_rate_sym[i] >= 0)
+        uniq_rates[(unsigned int) _rate_sym[i]] = _subst_rates[i];
+    }
+    return uniq_rates;
+  }
+  else
+    return _subst_rates;
+}
+
+
+// setters
+void SubstitutionModel::base_freqs(const doubleVector& v)
+{
+//    std::cout << "expected: " << _states << ", got: " << v.size() << std::endl;
+  if (v.size() != _states)
+    throw std::invalid_argument("Invalid size of base_freqs vector!");
+
+  _base_freqs = v;
+}
+
+void SubstitutionModel::subst_rates(const doubleVector& v)
+{
+  if (v.size() != num_rates())
+    throw std::invalid_argument("Invalid size of subst_rates vector!");
+
+  _subst_rates = v;
+}
+
+void SubstitutionModel::uniq_subst_rates(const doubleVector& v)
+{
+  if (!_rate_sym.empty())
+  {
+    if (v.size() != num_uniq_rates())
+      throw std::invalid_argument("Invalid size of subst_rates vector!");
+
+    _subst_rates.resize(num_rates());
+    for (size_t i = 0; i < _subst_rates.size(); ++i)
+    {
+      _subst_rates[i] = _rate_sym[i] < 0 ? CORAX_OPT_MIN_SUBST_RATE :
+                                           v[(unsigned int) _rate_sym[i]];
+    }
+  }
+  else
+    subst_rates(v);
+}
+
+
+
+/* Model */
+
 Model::Model (DataType data_type, const std::string &model_string) :
     _data_type(data_type), _custom_charmap(nullptr)
 {
@@ -354,7 +440,7 @@ void Model::set_user_srates(doubleVector& srates, bool normalize)
   _param_mode[CORAX_OPT_PARAM_SUBST_RATES] = ParamValue::user;
 }
 
-void Model::set_user_freqs(doubleVector& freqs)
+void Model::set_user_freqs(const doubleVector& freqs)
 {
   bool invalid = false;
   for (auto v: freqs)

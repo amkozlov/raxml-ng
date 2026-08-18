@@ -31,9 +31,9 @@ public:
   typedef typename container::const_iterator  const_iterator;
 
   MSA() : _length(0), _num_sites(0), _states(0), _pll_msa(nullptr), _dirty(false) {}
-  MSA(const size_t num_sites) : _length(0), _num_sites(num_sites),
+  explicit MSA(const size_t num_sites) : _length(0), _num_sites(num_sites),
       _states(0), _pll_msa(nullptr), _dirty(false) {}
-  MSA(const RangeList& rl);
+  explicit MSA(const RangeList& rl);
 
   MSA(const corax_msa_t * pll_msa);
   MSA(MSA&& other);

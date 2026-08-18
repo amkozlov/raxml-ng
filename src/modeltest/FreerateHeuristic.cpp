@@ -85,7 +85,7 @@ int FreerateHeuristic::optimal_category_count(const SubstitutionModelDescriptor 
   if (it == score_map.cend() || !it->second.converged)
     return -1;
 
-  return it->second.ncat_skip_threshold - 1;
+  return (int) it->second.ncat_skip_threshold - 1;
 }
 
 void FreerateHeuristic::clear() { score_map.clear(); }

@@ -71,3 +71,7 @@ PartitionAssignmentList SimpleLoadBalancer::compute_assignments(const PartitionA
 
   return part_assign;
 }
+
+LoadBalancerException::LoadBalancerException(const std::string& message) :
+    RaxmlException(message)
+{}

@@ -1,8 +1,8 @@
 #include "Heuristics.hpp"
 
 
-Heuristics::Heuristics(size_t partition_count, HeuristicSelection selection,
-                       const std::vector<RateHeterogeneityDescriptor> selected_rhas,
+Heuristics::Heuristics(size_t partition_count, const HeuristicSelection &selection,
+                       const std::vector<RateHeterogeneityDescriptor> &selected_rhas,
                        const SubstitutionModelDescriptor &reference_matrix,
                        unsigned int min_freerate_categories, unsigned int max_freerate_categories,
                        double significant_ic_difference, RHASHeuristicMode rhas_mode)
@@ -20,7 +20,6 @@ Heuristics::Heuristics(size_t partition_count, HeuristicSelection selection,
     {
         rhas_heuristics.at(p).set_partition_index(p);
     }
-
 }
 
 void Heuristics::update(size_t partition, const ModelDescriptor &candidate_model, double score)

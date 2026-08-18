@@ -46,7 +46,7 @@ protected:
 class LoadBalancerException : public RaxmlException
 {
 public:
-  LoadBalancerException(const std::string& message) : RaxmlException(message) {}
+  LoadBalancerException(const std::string& message);
 };
 
 

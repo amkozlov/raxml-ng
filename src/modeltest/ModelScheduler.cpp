@@ -157,7 +157,7 @@ ModelScheduler::ModelScheduler(
   globally_init_evaluation_index();
 }
 
-void ModelScheduler::read_from_checkpoint(CheckpointManager &checkpoint_manager)
+void ModelScheduler::read_from_checkpoint(const CheckpointManager &checkpoint_manager)
 {
   const auto t0 = global_timer().elapsed_seconds();
 

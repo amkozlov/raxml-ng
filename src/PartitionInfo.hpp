@@ -113,30 +113,19 @@ private:
 class InvalidPartitionRangeException : public RaxmlException
 {
 public:
-  InvalidPartitionRangeException(const PartitionInfo& pinfo) :
-    RaxmlException("")
-  {
-    _message = format_message("Invalid range in partition %s: %s",
-                              pinfo.name().c_str(), pinfo.range_string().c_str());
-  }
+  InvalidPartitionRangeException(const PartitionInfo& pinfo);
 };
 
 class MultiplePartitionForSiteException : public RaxmlException
 {
 public:
-  MultiplePartitionForSiteException(const PartitionInfo& pinfo1, size_t site) :
-    RaxmlException(""), _site(site), part1_name(pinfo1.name())
-  { }
+  MultiplePartitionForSiteException(const PartitionInfo& pinfo1, size_t site);
 
   size_t site() const { return _site; }
 
   void pinfo2(const PartitionInfo& pinfo2) { part2_name = pinfo2.name(); }
 
-  virtual void update_message() const override
-  {
-    _message = format_message("Alignment site %u assigned to multiple partitions: "
-        "\"%s\" and \"%s\"!", _site, part1_name.c_str(), part2_name.c_str());
-  }
+  virtual void update_message() const override;
 
 private:
   size_t _site;
@@ -147,25 +136,14 @@ private:
 class MissingPartitionForSiteException : public RaxmlException
 {
 public:
-  MissingPartitionForSiteException() : RaxmlException("")
-  { }
+  MissingPartitionForSiteException();
 
   size_t count() const { return _unassigned_sites.size(); }
   const std::vector<size_t>& sites() const { return _unassigned_sites; }
 
   void add_unassigned_site(size_t site) { _unassigned_sites.push_back(site); }
 
-  virtual void update_message() const override
-  {
-    std::stringstream ss;
-    ss << "Found " << _unassigned_sites.size() <<
-        " alignment site(s) which are not assigned to any partition:" << std::endl;
-    for (auto s: _unassigned_sites)
-      ss << s << " ";
-
-    ss << std::endl << "Please fix your data!";
-    _message = ss.str();
-  }
+  virtual void update_message() const override;
 
 private:
   std::vector<size_t> _unassigned_sites;

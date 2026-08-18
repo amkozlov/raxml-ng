@@ -125,7 +125,7 @@ static void fill_queues(BalancerState& s)
   }
 }
 
-static bool can_fill_bin(BalancerState& s,  stack<PartitionAssignment *>& q, double add_weight,
+static bool can_fill_bin(const BalancerState& s,  stack<PartitionAssignment *>& q, double add_weight,
     double per_site_weight)
 {
   if (!q.size())

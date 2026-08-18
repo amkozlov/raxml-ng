@@ -16,13 +16,15 @@ StoppingCriterion::StoppingCriterion(shared_ptr<PartitionedMSA> parted_msa,
     // patterns
     pattern_compression = parted_msa->total_patterns() > 0 ? true : false;
 
-    if(pattern_compression)
+    assert(parted_msa->total_sites() < (size_t) numeric_limits<unsigned int>::max());
+
+    if (pattern_compression)
     {   
-        total_patterns = parted_msa->total_patterns();
+        total_patterns = (unsigned int) parted_msa->total_patterns();
         
         patterns = new unsigned int[part_count];
         for(size_t i = 0; i < part_count; ++i)
-            patterns[i] = parted_msa->part_info(i).length();
+            patterns[i] = (unsigned int) parted_msa->part_info(i).length();
 
         pattern_weights.resize(n_groups);
         for(auto &pa : pattern_weights){
@@ -33,10 +35,10 @@ StoppingCriterion::StoppingCriterion(shared_ptr<PartitionedMSA> parted_msa,
     }
 
     // sites
-    total_sites = parted_msa->total_sites();
+    total_sites = (unsigned int) parted_msa->total_sites();
     sites = new unsigned int[part_count];
     for(size_t i = 0; i < part_count; ++i)
-        sites[i] = pattern_compression ? 0 : parted_msa->part_info(i).length();
+        sites[i] = pattern_compression ? 0 : (unsigned int) parted_msa->part_info(i).length();
     
     epsilon = new double[n_groups];
     p_value = new double[n_groups];
@@ -357,13 +359,15 @@ std::pair<int, int> StoppingCriterion::find_by_site_index(unsigned int site_inde
     int pIndex = -1, sIndex = -1; 
     unsigned int cur_sites = 0;
 
-    for(size_t i = 0; i < part_count; ++i){
-        cur_sites += sites[i];
-        if(cur_sites > site_index){
-            pIndex = (int) i;
-            sIndex = site_index - (cur_sites - sites[i]); 
-            break;
-        }
+    for(size_t i = 0; i < part_count; ++i)
+    {
+      cur_sites += sites[i];
+      if(cur_sites > site_index)
+      {
+          pIndex = (int) i;
+          sIndex = (int) (site_index - (cur_sites - sites[i]));
+          break;
+      }
     }
 
     return std::make_pair(pIndex, sIndex);

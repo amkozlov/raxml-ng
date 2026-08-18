@@ -712,13 +712,16 @@ void build_clv(ProbVector::const_iterator probs, size_t sites, const WeightVecto
   const auto states = partition->states;
   auto clvp = clv.begin();
 
-  for (size_t i = 0; i < sites; ++i) {
-    if (weights.empty() || weights[seq_offset + i] > 0) {
+  for (size_t i = 0; i < sites; ++i)
+  {
+    if (weights.empty() || weights[seq_offset + i] > 0)
+    {
       double sum = 0.;
-      for (size_t j = 0; j < states; ++j)
+      for (auto j = 0U; j < states; ++j)
         sum += probs[j];
 
-      for (size_t j = 0; j < states; ++j) {
+      for (auto j = 0U; j < states; ++j)
+      {
         if (sum > 0.)
           clvp[j] = normalize ? probs[j] / sum : probs[j];
         else
@@ -799,7 +802,7 @@ void set_partition_tips(const Options &opts, const MSA &msa, const IDVector &tip
     // we need a coraxlib function for that!
     auto clv_size = comp_weights.size() * partition->states;
     std::vector<double> tmp_clv(clv_size);
-    for (size_t tip_id = 0; tip_id < partition->tips; ++tip_id) {
+    for (auto tip_id = 0U; tip_id < partition->tips; ++tip_id) {
       auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
       auto prob_start = msa.probs(seq_id, pstart);
       build_clv(prob_start, plen, weights, pstart, partition, normalize, tmp_clv);
@@ -807,7 +810,7 @@ void set_partition_tips(const Options &opts, const MSA &msa, const IDVector &tip
     }
   } else {
     std::vector<char> bs_seq(plen);
-    for (size_t tip_id = 0; tip_id < partition->tips; ++tip_id) {
+    for (auto tip_id = 0U; tip_id < partition->tips; ++tip_id) {
       auto seq_id = tip_msa_idmap.empty() ? tip_id : tip_msa_idmap[tip_id];
       const char *full_seq = msa.at(seq_id).c_str();
       size_t pos = 0;
