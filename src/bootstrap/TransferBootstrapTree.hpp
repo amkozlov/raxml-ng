@@ -7,11 +7,11 @@ class TransferBootstrapTree : public SupportTree
 {
 public:
   TransferBootstrapTree(const Tree& tree, bool naive = false);
-  virtual ~TransferBootstrapTree();
+  virtual ~TransferBootstrapTree() override;
 
 protected:
   virtual void get_replicate_supports(const corax_unode_t& root,
-                                      PllSplitSharedPtr& splits, doubleVector& support);
+                                      PllSplitSharedPtr& splits, doubleVector& support) override;
 
 private:
   corax_tbe_split_info_t * _split_info;

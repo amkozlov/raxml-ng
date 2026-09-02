@@ -2,6 +2,7 @@ cmake_minimum_required (VERSION 3.5...3.20 FATAL_ERROR)
 
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES  ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(RAXML_BINARY_NAME "raxml-ng" CACHE STRING "Custom RAxML-NG binary name")
 set(USE_CORAXLIB_CMAKE ON CACHE BOOL "Use CMake to build Coraxlib")
@@ -23,6 +24,8 @@ set(USE_GMP OFF CACHE BOOL "Use GNU Multiple precision (GMP) library ")
 
 set(USE_EBG ON CACHE BOOL "Use Educated Bootstrap Guesser (EBG) ")
 
+option(USE_JSON "Enable RAxML-NG JSON output" ON)
+
 set(ENABLE_PTHREADS ${USE_PTHREADS})
 
 if(USE_TERRAPHAST)
@@ -39,18 +42,16 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # set these flags globally for all subprojects (libpll etc.)
-set(CMAKE_CXX_FLAGS_DEBUG "-O3 -ggdb" CACHE INTERNAL "")
+set(CMAKE_CXX_FLAGS_DEBUG "-Og -ggdb -g3 -grecord-gcc-switches -fno-omit-frame-pointer -fno-inline" CACHE INTERNAL "")
+set(CMAKE_C_FLAGS_DEBUG "-Og -ggdb -g3 -grecord-gcc-switches -fno-omit-frame-pointer -fno-inline" CACHE INTERNAL "")
+
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -ggdb -g3 -grecord-gcc-switches -fno-omit-frame-pointer -fno-inline" CACHE INTERNAL "")
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O3 -ggdb -g3 -grecord-gcc-switches -fno-omit-frame-pointer -fno-inline" CACHE INTERNAL "")
+
 set (CMAKE_CXX_FLAGS_RELEASE  "-O3"    CACHE INTERNAL "")
-set(CMAKE_C_FLAGS_DEBUG "-O3 -ggdb" CACHE INTERNAL "")
 set (CMAKE_C_FLAGS_RELEASE  "-O3"    CACHE INTERNAL "")
 
-option(DEBUG_INFO "Compile with debug info" OFF)
-if (DEBUG_INFO)
-    set (CMAKE_C_FLAGS_RELEASE  "${CMAKE_C_FLAGS_RELEASE} -ggdb -grecord-gcc-switches"    CACHE INTERNAL "")
-    set (CMAKE_CXX_FLAGS_RELEASE  "${CMAKE_CXX_FLAGS_RELEASE} -ggdb -grecord-gcc-switches"    CACHE INTERNAL "")
-endif()
-
-option(ENABLE_SANITIZERS "Use UBSan and Thread Sanitizer" OFF)
+option(ENABLE_SANITIZERS "Enable address sanitizer" OFF)
 
 if (ENABLE_SANITIZERS)
     set(SANITIZER "address")
@@ -60,7 +61,6 @@ if (ENABLE_SANITIZERS)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=${SANITIZER}" CACHE INTERNAL "")
 endif() 
 
-option(USE_JSON "Enable RAxML-NG JSON output" ON)
 
 project (raxml-ng C CXX)
 
@@ -101,6 +101,12 @@ endif()
 
 message (STATUS "Building ${CMAKE_BUILD_TYPE}")
 
+string(TOUPPER "${CMAKE_BUILD_TYPE}" BUILD_TYPE_UPPERCASE)
+
+if(NOT (BUILD_TYPE_UPPERCASE MATCHES "^(DEBUG|RELEASE|RELWITHDEBINFO)$"))
+    message(FATAL_ERROR "Unknown build type: ${CMAKE_BUILD_TYPE}. Supported options: Debug, RelWithDebInfo, Release")
+endif()
+
 set (WARN_FLAGS               "-Wall -Wextra")
 set (CMAKE_CXX_FLAGS          "${CMAKE_CXX_FLAGS} -std=c++11 ${WARN_FLAGS}")
 
@@ -132,7 +138,7 @@ if(USE_VCF)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_RAXML_VCF")
 endif()
 
-message(STATUS "Using flags: ${CMAKE_CXX_FLAGS}")
+message(STATUS "Using flags: ${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${BUILD_TYPE_UPPERCASE}}")
 
 # build dependencies
 set(RAXML_LOCALDEPS_DIR ${PROJECT_BINARY_DIR}/localdeps)

@@ -15,8 +15,7 @@ public:
   SplitsTree (SplitsTree&& other);
   SplitsTree& operator=(SplitsTree&& other);
 
-  virtual
-  ~SplitsTree ();
+  virtual ~SplitsTree() override;
 
   virtual void add_replicate_tree(const Tree& tree);
   void add_splits(const SplitsTree& other);

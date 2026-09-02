@@ -19,99 +19,111 @@ using namespace std;
 
 static struct option long_options[] =
 {
-  {"help",               no_argument,       0, 0 },  /*  0 */
-  {"version",            no_argument,       0, 0 },  /*  1 */
-  {"evaluate",           no_argument,       0, 0 },  /*  2 */
-  {"search",             no_argument,       0, 0 },  /*  3 */
+  {"help",               no_argument,       nullptr, 0 },  /*  0 */
+  {"version",            no_argument,       nullptr, 0 },  /*  1 */
+  {"evaluate",           no_argument,       nullptr, 0 },  /*  2 */
+  {"search",             no_argument,       nullptr, 0 },  /*  3 */
 
-  {"msa",                required_argument, 0, 0 },  /*  4 */
-  {"tree",               required_argument, 0, 0 },  /*  5 */
-  {"prefix",             required_argument, 0, 0 },  /*  6 */
-  {"model",              required_argument, 0, 0 },  /*  7 */
-  {"data-type",          required_argument, 0, 0 },  /*  8 */
+  {"msa",                required_argument, nullptr, 0 },  /*  4 */
+  {"tree",               required_argument, nullptr, 0 },  /*  5 */
+  {"prefix",             required_argument, nullptr, 0 },  /*  6 */
+  {"model",              required_argument, nullptr, 0 },  /*  7 */
+  {"data-type",          required_argument, nullptr, 0 },  /*  8 */
 
-  {"opt-model",          required_argument, 0, 0 },  /*  9 */
-  {"opt-branches",       required_argument, 0, 0 },  /*  10 */
-  {"prob-msa",           required_argument, 0, 0 },  /*  11 */
-  {"pat-comp",           required_argument, 0, 0 },  /*  12 */
-  {"tip-inner",          required_argument, 0, 0 },  /*  13 */
-  {"brlen",              required_argument, 0, 0 },  /*  14 */
-  {"spr-radius",         required_argument, 0, 0 },  /*  15 */
-  {"spr-cutoff",         required_argument, 0, 0 },  /*  16 */
-  {"lh-epsilon",         required_argument, 0, 0 },  /*  17 */
+  {"opt-model",          required_argument, nullptr, 0 },  /*  9 */
+  {"opt-branches",       required_argument, nullptr, 0 },  /*  10 */
+  {"prob-msa",           required_argument, nullptr, 0 },  /*  11 */
+  {"pat-comp",           required_argument, nullptr, 0 },  /*  12 */
+  {"tip-inner",          required_argument, nullptr, 0 },  /*  13 */
+  {"brlen",              required_argument, nullptr, 0 },  /*  14 */
+  {"spr-radius",         required_argument, nullptr, 0 },  /*  15 */
+  {"spr-cutoff",         required_argument, nullptr, 0 },  /*  16 */
+  {"lh-epsilon",         required_argument, nullptr, 0 },  /*  17 */
 
-  {"seed",               required_argument, 0, 0 },  /*  18 */
-  {"threads",            required_argument, 0, 0 },  /*  19 */
-  {"simd",               required_argument, 0, 0 },  /*  20 */
+  {"seed",               required_argument, nullptr, 0 },  /*  18 */
+  {"threads",            required_argument, nullptr, 0 },  /*  19 */
+  {"simd",               required_argument, nullptr, 0 },  /*  20 */
 
-  {"msa-format",         required_argument, 0, 0 },  /*  21 */
-  {"rate-scalers",       required_argument, 0, 0 },  /*  22 */
-  {"log",                required_argument, 0, 0 },  /*  23 */
+  {"msa-format",         required_argument, nullptr, 0 },  /*  21 */
+  {"rate-scalers",       required_argument, nullptr, 0 },  /*  22 */
+  {"log",                required_argument, nullptr, 0 },  /*  23 */
 
-  {"bootstrap",          no_argument,       0, 0 },  /*  24 */
-  {"all",                no_argument,       0, 0 },  /*  25 */
-  {"bs-trees",           required_argument, 0, 0 },  /*  26 */
-  {"redo",               no_argument,       0, 0 },  /*  27 */
-  {"force",              optional_argument, 0, 0 },  /*  28 */
+  {"bootstrap",          no_argument,       nullptr, 0 },  /*  24 */
+  {"all",                no_argument,       nullptr, 0 },  /*  25 */
+  {"bs-trees",           required_argument, nullptr, 0 },  /*  26 */
+  {"redo",               no_argument,       nullptr, 0 },  /*  27 */
+  {"force",              optional_argument, nullptr, 0 },  /*  28 */
 
-  {"site-repeats",       required_argument, 0, 0 },  /*  29 */
-  {"support",            no_argument,       0, 0 },  /*  30 */
-  {"terrace",            no_argument,       0, 0 },  /*  31 */
-  {"terrace-maxsize",    required_argument, 0, 0 },  /*  32 */
-  {"check",              no_argument,       0, 0 },  /*  33 */
-  {"parse",              no_argument,       0, 0 },  /*  34 */
+  {"site-repeats",       required_argument, nullptr, 0 },  /*  29 */
+  {"support",            no_argument,       nullptr, 0 },  /*  30 */
+  {"terrace",            no_argument,       nullptr, 0 },  /*  31 */
+  {"terrace-maxsize",    required_argument, nullptr, 0 },  /*  32 */
+  {"check",              no_argument,       nullptr, 0 },  /*  33 */
+  {"parse",              no_argument,       nullptr, 0 },  /*  34 */
 
-  {"blopt",              required_argument, 0, 0 },  /*  35 */
-  {"blmin",              required_argument, 0, 0 },  /*  36 */
-  {"blmax",              required_argument, 0, 0 },  /*  37 */
+  {"blopt",              required_argument, nullptr, 0 },  /*  35 */
+  {"blmin",              required_argument, nullptr, 0 },  /*  36 */
+  {"blmax",              required_argument, nullptr, 0 },  /*  37 */
 
-  {"tree-constraint",    required_argument, 0, 0 },  /*  38 */
-  {"nofiles",            optional_argument, 0, 0 },  /*  39 */
-  {"start",              no_argument,       0, 0 },  /*  40 */
-  {"loglh",              no_argument,       0, 0 },  /*  41 */
-  {"precision",          required_argument, 0, 0 },  /*  42 */
-  {"outgroup",           required_argument, 0, 0 },  /*  43 */
+  {"tree-constraint",    required_argument, nullptr, 0 },  /*  38 */
+  {"nofiles",            optional_argument, nullptr, 0 },  /*  39 */
+  {"start",              no_argument,       nullptr, 0 },  /*  40 */
+  {"loglh",              no_argument,       nullptr, 0 },  /*  41 */
+  {"precision",          required_argument, nullptr, 0 },  /*  42 */
+  {"outgroup",           required_argument, nullptr, 0 },  /*  43 */
 
-  {"bs-cutoff",          required_argument, 0, 0 },  /*  44 */
-  {"bsconverge",         no_argument,       0, 0 },  /*  45 */
-  {"extra",              required_argument, 0, 0 },  /*  46 */
-  {"bs-metric",          required_argument, 0, 0 },  /*  47 */
+  {"bs-cutoff",          required_argument, nullptr, 0 },  /*  44 */
+  {"bsconverge",         no_argument,       nullptr, 0 },  /*  45 */
+  {"extra",              required_argument, nullptr, 0 },  /*  46 */
+  {"bs-metric",          required_argument, nullptr, 0 },  /*  47 */
 
-  {"search1",            no_argument, 0, 0 },        /*  48 */
-  {"bsmsa",              no_argument, 0, 0 },        /*  49 */
-  {"rfdist",             optional_argument, 0, 0 },  /*  50 */
-  {"rf",                 optional_argument, 0, 0 },  /*  51 */
-  {"consense",           optional_argument, 0, 0 },  /*  52 */
-  {"ancestral",          optional_argument, 0, 0 },  /*  53 */
+  {"search1",            no_argument,       nullptr, 0 },  /*  48 */
+  {"bsmsa",              no_argument,       nullptr, 0 },  /*  49 */
+  {"rfdist",             optional_argument, nullptr, 0 },  /*  50 */
+  {"rf",                 optional_argument, nullptr, 0 },  /*  51 */
+  {"consense",           optional_argument, nullptr, 0 },  /*  52 */
+  {"ancestral",          optional_argument, nullptr, 0 },  /*  53 */
 
-  {"workers",            required_argument, 0, 0 },  /*  54 */
-  {"sitelh",             no_argument, 0, 0 },        /*  55 */
-  {"site-weights",       required_argument, 0, 0 },  /*  56 */
-  {"bs-write-msa",       no_argument, 0, 0 },        /*  57 */
-  {"lh-epsilon-triplet", required_argument, 0, 0 },  /*  58 */
-  {"adaptive",           optional_argument, 0, 0 },  /*  59 */
-  {"pythia-trees",       required_argument, 0, 0 },  /*  60 */
-  {"nni-tolerance",      required_argument, 0, 0 },  /*  61 */
-  {"nni-epsilon",        required_argument, 0, 0 },  /*  62 */
-  {"pythia",             optional_argument, 0, 0 },  /*  63 */
-  {"pt",                 optional_argument, 0, 0 },  /*  64 */
-  {"sh",                 optional_argument, 0, 0 },  /*  65 */
-  {"sh-reps",            required_argument, 0, 0 },  /*  66 */
-  {"sh-epsilon",         required_argument, 0, 0 },  /*  67 */
-  {"opt-topology",       required_argument, 0, 0 },  /*  68 */
-  {"stop-rule",          required_argument, 0, 0 },  /*  69 */
-  {"ebg",                no_argument,       0, 0 },  /*  70 */
-  {"fast",               no_argument,       0, 0 },  /*  71 */
-  {"allfast",            no_argument,       0, 0 },  /*  72 */
-  {"opt-freerate",       required_argument, 0, 0 },  /*  73 */
-  {"gcf",                optional_argument, 0, 0 },  /*  74 */
-  {"modeltest",          optional_argument, 0, 0 },  /*  75 */
-  {"moose",              optional_argument, 0, 0 },  /*  76 */
-  {"moose-options",      required_argument, 0, 0 },  /*  77 */
-  {"mutmap",             optional_argument, 0, 0 },  /*  78 */
+  {"workers",            required_argument, nullptr, 0 },  /*  54 */
+  {"sitelh",             no_argument,       nullptr, 0 },  /*  55 */
+  {"site-weights",       required_argument, nullptr, 0 },  /*  56 */
+  {"bs-write-msa",       no_argument,       nullptr, 0 },  /*  57 */
+  {"lh-epsilon-triplet", required_argument, nullptr, 0 },  /*  58 */
+  {"adaptive",           optional_argument, nullptr, 0 },  /*  59 */
+  {"pythia-trees",       required_argument, nullptr, 0 },  /*  60 */
+  {"nni-tolerance",      required_argument, nullptr, 0 },  /*  61 */
+  {"nni-epsilon",        required_argument, nullptr, 0 },  /*  62 */
+  {"pythia",             optional_argument, nullptr, 0 },  /*  63 */
+  {"pt",                 optional_argument, nullptr, 0 },  /*  64 */
+  {"sh",                 optional_argument, nullptr, 0 },  /*  65 */
+  {"sh-reps",            required_argument, nullptr, 0 },  /*  66 */
+  {"sh-epsilon",         required_argument, nullptr, 0 },  /*  67 */
+  {"opt-topology",       required_argument, nullptr, 0 },  /*  68 */
+  {"stop-rule",          required_argument, nullptr, 0 },  /*  69 */
+  {"ebg",                no_argument,       nullptr, 0 },  /*  70 */
+  {"fast",               no_argument,       nullptr, 0 },  /*  71 */
+  {"allfast",            no_argument,       nullptr, 0 },  /*  72 */
+  {"opt-freerate",       required_argument, nullptr, 0 },  /*  73 */
+  {"gcf",                optional_argument, nullptr, 0 },  /*  74 */
+  {"modeltest",          optional_argument, nullptr, 0 },  /*  75 */
+  {"moose",              optional_argument, nullptr, 0 },  /*  76 */
+  {"moose-options",      required_argument, nullptr, 0 },  /*  77 */
+  {"mutmap",             optional_argument, nullptr, 0 },  /*  78 */
 
   { 0, 0, 0, 0 }
 };
+
+static bool read_uint(const char* str, unsigned int& dest, int minval = 0)
+{
+  int dummy_int;
+  if ((sscanf(str, "%d", &dummy_int) == 1) && (dummy_int >= minval))
+  {
+    dest = (unsigned int) dummy_int;
+    return true;
+  }
+  else
+    return false;
+}
 
 static std::string get_cmdline(int argc, char** argv)
 {
@@ -124,19 +136,21 @@ static std::string get_cmdline(int argc, char** argv)
 void CommandLineParser::check_options(Options &opts)
 {
   /* check for mandatory options for each command */
-  if (opts.command == Command::evaluate || opts.command == Command::search ||
-      opts.command == Command::bootstrap || opts.command == Command::all ||
-      opts.command == Command::terrace || opts.command == Command::check ||
-      opts.command == Command::parse || opts.command == Command::start ||
-      opts.command == Command::ancestral || opts.command == Command::modeltest)
+  if (opts.command == Command::evaluate  || opts.command == Command::search    ||
+      opts.command == Command::bootstrap || opts.command == Command::all       ||
+      opts.command == Command::bsmsa     || opts.command == Command::terrace   ||
+      opts.command == Command::check     || opts.command == Command::parse     ||
+      opts.command == Command::start     || opts.command == Command::ancestral ||
+      opts.command == Command::sitelh    || opts.command == Command::pythia    ||
+      opts.command == Command::modeltest || opts.command == Command::mutmap)
   {
     if (opts.msa_file.empty())
       throw OptionException("You must specify a multiple alignment file with --msa switch");
   }
 
-  if (opts.command == Command::evaluate || opts.command == Command::support ||
-      opts.command == Command::terrace || opts.command == Command::rfdist ||
-      opts.command == Command::sitelh || opts.command == Command::ancestral ||
+  if (opts.command == Command::evaluate || opts.command == Command::support   ||
+      opts.command == Command::terrace  || opts.command == Command::rfdist    ||
+      opts.command == Command::sitelh   || opts.command == Command::ancestral ||
       opts.command == Command::consense)
   {
     if (opts.tree_file.empty() && (opts.start_trees.count(StartingTree::user) || opts.start_trees.empty()))
@@ -177,7 +191,8 @@ void CommandLineParser::check_options(Options &opts)
              !opts.bs_metrics.count(BranchSupportMetric::ps) &&
              !opts.bs_metrics.count(BranchSupportMetric::pbs))
     {
-      throw OptionException("Invalid --bs-metric value! Only FBP, RBS, PS or PBS are supported.");
+      if (opts.tree_file.empty())
+        throw OptionException("This branch support metric requires a fixed reference tree, please use the --tree option!");
     }
 
     /* autMRE not implemented (and probably not needed) for parsimony-based bootstrapping */
@@ -274,7 +289,7 @@ void CommandLineParser::compute_num_searches(Options &opts)
   {
     assert(!opts.start_trees.empty());
 
-    auto def_tree_count = 10;
+    size_t def_tree_count = 10;
     for (auto& it: opts.start_trees)
     {
       if (it.first == StartingTree::user)
@@ -288,7 +303,8 @@ void CommandLineParser::compute_num_searches(Options &opts)
     for (const auto& it: opts.start_trees)
       opts.num_searches += it.second;
   }
-  else if (opts.command == Command::parse || opts.command == Command::check)
+  else if (opts.command == Command::parse || opts.command == Command::check ||
+           opts.command == Command::bootstrap)
   {
     /* ignore random and parsimony starting trees in check/parse mode */
     opts.start_trees.clear();
@@ -404,7 +420,7 @@ void CommandLineParser::parse_bs_trees(Options &opts, const string& arg)
         if (sscanf(m.c_str(), "automre{%u}", &opts.num_bootstraps) != 1)
           opts.num_bootstraps = 1000;
       }
-      else if (sscanf(m.c_str(), "%u", &opts.num_bootstraps) != 1 || opts.num_bootstraps == 0)
+      else if (!read_uint(m.c_str(), opts.num_bootstraps, 1))
       {
         throw InvalidOptionValueException("Invalid number of bootstrap replicates: " + string(arg));
       }
@@ -526,8 +542,8 @@ void CommandLineParser::parse_modeltest_options(Options &opts, const string& arg
           "Error, minimum number of FreeRate categories higher than maximum: " + mopt_val);
       }
 
-      opts.free_rate_min_categories = cmin;
-      opts.free_rate_max_categories = cmax;
+      opts.free_rate_min_categories =  (unsigned int) cmin;
+      opts.free_rate_max_categories =  (unsigned int) cmax;
     }
     else if (mopt_name == "ic-delta")
     {
@@ -595,7 +611,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* if no command specified, default to --adaptive (or --help if no args were given) */
   opts.command = (argc > 1) ? Command::search : Command::help;
   opts.start_trees.clear();
-  opts.random_seed = (long)time(NULL);
+  opts.random_seed = (unsigned int) time(nullptr);
 
   /* compress alignment patterns by default */
   opts.use_pattern_compression = true;
@@ -728,7 +744,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
     if (!optarg
         && optind < argc // make sure optind is valid
         && long_options[option_index].has_arg == optional_argument // and has optional argument
-        && NULL != argv[optind] // make sure it's not a null string
+        && nullptr != argv[optind] // make sure it's not a null string
         && '\0' != argv[optind][0] // ... or an empty string
         && '-' != argv[optind][0] // ... or another option
        )
@@ -865,7 +881,11 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
 
       case 18: /* random seed */
-        opts.random_seed = atol(optarg);
+        if (!read_uint(optarg, opts.random_seed))
+        {
+          throw InvalidOptionValueException("Invalid random seed: " + string(optarg) +
+                                            ", please provide a non-negative integer!");
+        }
         break;
 
       case 19:  /* number of threads */
@@ -874,9 +894,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.num_threads = 0;
           sscanf(optarg, "auto{%u}", &opts.num_threads_max);
         }
-        else if (sscanf(optarg, "%u", &opts.num_threads) != 1 || opts.num_threads == 0)
+        else if (!read_uint(optarg, opts.num_threads, 1))
         {
-          throw InvalidOptionValueException("Invalid number of threads: %s " + string(optarg) +
+          throw InvalidOptionValueException("Invalid number of threads: " + string(optarg) +
                                             ", please provide a positive integer number or `auto`!");
         }
         /* if fixed number of threads is given, we should never exceed it */
@@ -1076,7 +1096,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
                                             ", please provide a positive real number.");
         }
         if (opts.precision.empty() && opts.brlen_min < 1.)
-          opts.precision[LogElement::brlen] = ceil(-1 * log10(opts.brlen_min));
+          opts.precision[LogElement::brlen] = (unsigned int) ceil(-1 * log10(opts.brlen_min));
         break;
       case 37: /* max brlen */
         if(sscanf(optarg, "%lf", &opts.brlen_max) != 1 || opts.brlen_max <= 0.)
@@ -1127,8 +1147,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       case 42:  /* precision */
         {
-          unsigned int prec = 0;
-          if (sscanf(optarg, "%u", &prec) != 1 || prec == 0)
+          int prec = 0;
+          if (sscanf(optarg, "%d", &prec) != 1 || prec <= 0)
           {
             throw InvalidOptionValueException("Invalid precision: " + string(optarg) +
                                               ", please provide a positive integer number!");
@@ -1136,7 +1156,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           else
           {
             opts.precision.clear();
-            opts.precision[LogElement::all] = prec;
+            opts.precision[LogElement::all] = (unsigned int) prec;
           }
         }
         break;
@@ -1392,7 +1412,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.num_workers = 0;
           sscanf(optarg, "auto{%u}", &opts.num_workers_max);
         }
-        else if (sscanf(optarg, "%u", &opts.num_workers) != 1 || opts.num_workers == 0)
+        else if (!read_uint(optarg, opts.num_workers, 1))
         {
           throw InvalidOptionValueException("Invalid number of workers: " + string(optarg) +
                                             ", please provide a positive integer number or 'auto'!");
@@ -1496,7 +1516,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 66: /* number of SH replicates */
         if (optarg)
         {
-          if (sscanf(optarg, "%u", &opts.num_sh_reps) != 1 || opts.num_sh_reps == 0)
+          if (!read_uint(optarg, opts.num_sh_reps, 1))
           {
             throw InvalidOptionValueException("Invalid number of SH replicates: " + string(optarg) +
                 ", please provide a positive integer number!");

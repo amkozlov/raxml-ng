@@ -62,8 +62,8 @@ bool ConsensusTree::compute_support()
 
   /* build final split system */
   corax_split_system_t * split_system = corax_utree_split_consensus(_pll_splits_hash,
-                                                                   _num_tips,
-                                                                   _cutoff);
+                                                                    (unsigned int) _num_tips,
+                                                                    _cutoff);
 
   if (!split_system)
     coraxlib_check_error("Failed to create consensus tree (pllmod_utree_split_consensus)");
@@ -74,8 +74,8 @@ bool ConsensusTree::compute_support()
 
   /* build tree from splits */
   corax_consensus_utree_t * cons_tree = corax_utree_from_splits(split_system,
-                                                               _num_tips,
-                                                               (char * const *) tip_labels_cstr().data());
+                                                                (unsigned int)  _num_tips,
+                                                                (char * const *) tip_labels_cstr().data());
 
   if (!cons_tree)
     coraxlib_check_error("Failed to create consensus tree (pllmod_utree_from_splits)");
@@ -84,7 +84,7 @@ bool ConsensusTree::compute_support()
                << " internal branches." << endl;
 
   /* set consensus tree topology */
-  pll_utree(_num_tips, *cons_tree->tree);
+  pll_utree((unsigned int) _num_tips, *cons_tree->tree);
 
   /* map pll_unodes to splits */
   if (cons_tree->branch_count > 0)

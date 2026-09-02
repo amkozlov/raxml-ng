@@ -223,3 +223,38 @@ void assign(Model& model, const PartitionStats& stats)
       assert(0);
   }
 }
+
+
+InvalidPartitionRangeException::InvalidPartitionRangeException(const PartitionInfo& pinfo) :
+  RaxmlException("")
+{
+  _message = format_message("Invalid range in partition %s: %s",
+                            pinfo.name().c_str(), pinfo.range_string().c_str());
+}
+
+
+MultiplePartitionForSiteException::MultiplePartitionForSiteException(const PartitionInfo& pinfo1, size_t site) :
+  RaxmlException(""), _site(site), part1_name(pinfo1.name())
+{}
+
+void MultiplePartitionForSiteException::update_message() const
+{
+  _message = format_message("Alignment site %u assigned to multiple partitions: "
+      "\"%s\" and \"%s\"!", _site, part1_name.c_str(), part2_name.c_str());
+}
+
+
+MissingPartitionForSiteException::MissingPartitionForSiteException() : RaxmlException("")
+{ }
+
+void MissingPartitionForSiteException::update_message() const
+{
+  std::stringstream ss;
+  ss << "Found " << _unassigned_sites.size() <<
+      " alignment site(s) which are not assigned to any partition:" << std::endl;
+  for (auto s: _unassigned_sites)
+    ss << s << " ";
+
+  ss << std::endl << "Please fix your data!";
+  _message = ss.str();
+}

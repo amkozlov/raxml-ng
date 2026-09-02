@@ -8,7 +8,7 @@
 #include "util/SafetyCheck.hpp"
 #include "modeltest/ModelDefinitions.hpp"
 
-constexpr int RAXML_OPT_VERSION = 5;
+constexpr int RAXML_OPT_VERSION = 6;
 
 struct OutputFileNames
 {
@@ -101,7 +101,7 @@ public:
   LogLevel log_level;
   FileFormat msa_format;
   DataType data_type;
-  long random_seed;
+  unsigned int random_seed;
   StartingTreeMap start_trees;
   double lh_epsilon;
   double lh_epsilon_brlen_triplet;
@@ -173,7 +173,7 @@ public:
   std::vector<std::string> modeltest_subst_models;
   bool modeltest_json_output;
 
-  bool coarse() const { return num_workers > 1; };
+  bool coarse() const { return num_workers > 1; }
   bool auto_model() const {
       return command == Command::modeltest || \
             (strcasecmp(model_file.c_str(), "auto") == 0) || \

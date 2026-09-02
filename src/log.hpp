@@ -48,7 +48,7 @@ struct TimeStamp
 
 struct ProgressInfo
 {
-  ProgressInfo(double loglh) : loglh(loglh) {};
+  explicit ProgressInfo(double llh) : loglh(llh) {}
 
   double loglh;
 };
@@ -58,10 +58,10 @@ typedef std::vector<std::ostream*> StreamList;
 class LogStream
 {
 public:
-  LogStream() {};
-  LogStream(const StreamList& streams) : _streams(streams) {};
+  LogStream() {}
+  explicit LogStream(const StreamList& streams) : _streams(streams) {}
 
-  StreamList& streams() { return _streams;};
+  StreamList& streams() { return _streams;}
 
   void add_stream(std::ostream* stream);
 
@@ -129,9 +129,9 @@ Logging& logger();
 
 #define LOG_PROGRESS(loglh) LOG_PROGR << ProgressInfo(loglh)
 
-#define FMT_LH(lh) setprecision(logger().precision(LogElement::loglh)) << lh
-#define FMT_MOD(p) setprecision(logger().precision(LogElement::model)) << p
-#define FMT_BL(bl) setprecision(logger().precision(LogElement::brlen)) << bl
+#define FMT_LH(lh) setprecision((int) logger().precision(LogElement::loglh)) << lh
+#define FMT_MOD(p) setprecision((int) logger().precision(LogElement::model)) << p
+#define FMT_BL(bl) setprecision((int) logger().precision(LogElement::brlen)) << bl
 #define FMT_PREC2(val) setprecision(2) << val
 #define FMT_PREC3(val) setprecision(3) << val
 #define FMT_PREC6(val) setprecision(6) << val

@@ -15,7 +15,7 @@ char * newick_print_cb(const corax_unode_t * node)
   char * newick;
   if (asprintf(&newick, "%s:%.*lf",
            node->label ? node->label : "" , precision, node->length) < 0)
-    return NULL;
+    return nullptr;
 
   return newick;
 }
@@ -28,7 +28,7 @@ char * newick_pmat_cb(const corax_unode_t * node)
   if (asprintf(&newick, "%s:%.*lf[%u]",
            node->label ? node->label : "" , precision,
            node->length, node->pmatrix_index) < 0)
-    return NULL;
+    return nullptr;
 
   return newick;
 }

@@ -26,27 +26,27 @@ class SimpleLoadBalancer : public LoadBalancer
 {
 protected:
   virtual PartitionAssignmentList compute_assignments(const PartitionAssignment& part_sizes,
-                                                      size_t num_procs);
+                                                      size_t num_procs) override;
 };
 
 class KassianLoadBalancer : public LoadBalancer
 {
 protected:
   virtual PartitionAssignmentList compute_assignments(const PartitionAssignment& part_sizes,
-                                                      size_t num_procs);
+                                                      size_t num_procs) override;
 };
 
 class BenoitLoadBalancer : public LoadBalancer
 {
 protected:
   virtual PartitionAssignmentList compute_assignments(const PartitionAssignment& part_sizes,
-                                                      size_t num_procs);
+                                                      size_t num_procs) override;
 };
 
 class LoadBalancerException : public RaxmlException
 {
 public:
-  LoadBalancerException(const std::string& message) : RaxmlException(message) {}
+  LoadBalancerException(const std::string& message);
 };
 
 

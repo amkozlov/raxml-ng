@@ -1,12 +1,15 @@
 #include "AncestralStates.hpp"
 
+constexpr double HALF_PROB = 0.5;
+constexpr double DEF_PROB_EPS = 0.1;
+
 using namespace std;
 
 AncestralStates::AncestralStates(size_t nodes, size_t states, size_t sites) :
     num_nodes(nodes), num_states(states), ambiguity(true)
 {
   part_num_sites.push_back(sites);
-  prob_eps = num_states > 0 ? 0.5 / num_states : 0.1;
+  prob_eps = num_states > 0 ? HALF_PROB / num_states : DEF_PROB_EPS;
 }
 
 AncestralStates::AncestralStates(size_t nodes, const PartitionedMSA& part_msa) :
@@ -27,7 +30,7 @@ AncestralStates::AncestralStates(size_t nodes, const PartitionedMSA& part_msa) :
   // TODO move out of here?
   allocate_probs();
 
-  prob_eps = 0.5 / num_states;
+  prob_eps = HALF_PROB / num_states;
 }
 
 void AncestralStates::allocate_probs()
@@ -64,9 +67,10 @@ std::string AncestralStates::ml_state(size_t node_idx, size_t site_idx, size_t p
 
   assert(probvec.size() == part_num_sites[part_idx] * num_states);
 
-  auto prob = probvec.cbegin() + site_idx * num_states;
-  size_t mstate = 0;
-  for (size_t k = 1; k < num_states; ++k)
+  doubleVector::difference_type nstates = (doubleVector::difference_type) num_states;
+  doubleVector::difference_type k, mstate = 0;
+  auto prob = probvec.cbegin() + site_idx * nstates;
+  for (k = 1; k < nstates; ++k)
   {
     if (prob[k] > prob[mstate])
       mstate = k;
@@ -75,7 +79,7 @@ std::string AncestralStates::ml_state(size_t node_idx, size_t site_idx, size_t p
   corax_state_t astate = 0;
   corax_state_t state = 1;
 
-  for (size_t k = 0; k < num_states; ++k)
+  for (k = 0; k < nstates; ++k)
   {
     if (prob[k] + prob_eps > prob[mstate])
       astate |= state;

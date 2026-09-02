@@ -14,33 +14,34 @@ static corax_split_t induced_split(corax_split_t ref_split, IDVector id_map)
 {
   uintVector tip_ids;
   unsigned int split_size   = sizeof(corax_split_base_t) * 8;
+  unsigned int id_map_size = (unsigned int) id_map.size();
 
-  tip_ids.reserve(id_map.size());
-  for (unsigned int i = 0; i < id_map.size(); ++i)
+  tip_ids.reserve(id_map_size);
+  for (unsigned int i = 0; i < id_map_size; ++i)
   {
-    auto ref_id = id_map[i];
+    auto ref_id = (unsigned int) id_map[i];
     unsigned int elem   = ref_id / split_size;
     unsigned int offset = ref_id % split_size;
 
     if (ref_split[elem] & (1u << offset))
      tip_ids.push_back(i);
   }
-  return corax_utree_split_from_tips(tip_ids.data(), tip_ids.size(), id_map.size());
+  return corax_utree_split_from_tips(tip_ids.data(), (unsigned int) tip_ids.size(), id_map_size);
 }
 
 void GCFSupportTree::add_replicate_tree(const Tree& tree)
 {
-  auto gene_tip_count = tree.num_tips();
+  auto gene_tip_count = (unsigned int)  tree.num_tips();
 
   PllSplitSharedPtr splits(corax_utree_split_create((corax_unode_t*) &tree.pll_utree_root(),
-                                                    tree.num_tips(),
+                                                    (unsigned int)  tree.num_tips(),
                                                     nullptr),
                            corax_utree_split_destroy);
 
   bitv_hashtable_t * gene_splits_hash = corax_utree_split_hashtable_insert(nullptr,
                                                          splits.get(),
                                                          gene_tip_count,
-                                                         tree.num_splits(),
+                                                         (unsigned int)  tree.num_splits(),
                                                          nullptr,
                                                          false);
 

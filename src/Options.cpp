@@ -7,21 +7,22 @@
 
 using namespace std;
 
-SupportMetricSet BS_METRICS_WITH_ML_TREES   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
-                                              BranchSupportMetric::tbe,
-                                              BranchSupportMetric::ic1, BranchSupportMetric::ica};
+static SupportMetricSet BS_METRICS_WITH_ML_TREES   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
+                                                     BranchSupportMetric::tbe, BranchSupportMetric::gcf,
+                                                     BranchSupportMetric::ic1, BranchSupportMetric::ica};
 
-SupportMetricSet BS_METRICS_WITH_PB_TREES   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
-                                              BranchSupportMetric::tbe, BranchSupportMetric::ebg,
-                                              BranchSupportMetric::pbs,
-                                              BranchSupportMetric::ic1, BranchSupportMetric::ica};
+static SupportMetricSet BS_METRICS_WITH_PB_TREES   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
+                                                     BranchSupportMetric::tbe, BranchSupportMetric::ebg,
+                                                     BranchSupportMetric::pbs, BranchSupportMetric::gcf,
+                                                     BranchSupportMetric::ic1, BranchSupportMetric::ica};
 
-SupportMetricSet BS_METRICS_WITH_PARS_TREES { BranchSupportMetric::ps };
+static SupportMetricSet BS_METRICS_WITH_PARS_TREES { BranchSupportMetric::ps };
 
-SupportMetricSet BS_METRICS_WITH_MSA_REPS   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
-                                              BranchSupportMetric::tbe, BranchSupportMetric::ebg,
-                                              BranchSupportMetric::pbs, BranchSupportMetric::sh_alrt,
-                                              BranchSupportMetric::ic1, BranchSupportMetric::ica };
+static SupportMetricSet BS_METRICS_WITH_MSA_REPS   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
+                                                     BranchSupportMetric::tbe, BranchSupportMetric::ebg,
+                                                     BranchSupportMetric::pbs, BranchSupportMetric::sh_alrt,
+                                                     BranchSupportMetric::gcf,
+                                                     BranchSupportMetric::ic1, BranchSupportMetric::ica };
 
 Options::Options() : opt_version(RAXML_OPT_VERSION), cmdline(""), command(Command::none),
 use_tip_inner(true), use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false),
@@ -148,6 +149,7 @@ void Options::set_default_outfiles()
 
 std::string Options::checkp_file() const
 {
+//  if (num_workers != 1 && ParallelContext::num_ranks() > 1)
   if (coarse() && ParallelContext::num_ranks() > 1)
     return outfile_names.checkpoint + "." + to_string(ParallelContext::rank_id());
   else
@@ -215,7 +217,8 @@ bool Options::result_files_exist() const
       return sysutil_file_exists(best_tree_file()) || sysutil_file_exists(best_tree_collapsed_file()) ||
              sysutil_file_exists(best_model_file()) ||sysutil_file_exists(partition_trees_file());
     case Command::bootstrap:
-      return sysutil_file_exists(bootstrap_trees_file());
+      return sysutil_file_exists(bootstrap_trees_file()) ||
+             (!tree_file.empty() && sysutil_file_exists(support_tree_file()));
     case Command::all:
       return sysutil_file_exists(best_tree_file()) || sysutil_file_exists(bootstrap_trees_file()) ||
              sysutil_file_exists(support_tree_file()) || sysutil_file_exists(best_model_file()) ||
@@ -261,7 +264,8 @@ void Options::remove_result_files() const
   if (command == Command::bootstrap || command == Command::all)
     sysutil_file_remove(bootstrap_trees_file());
 
-  if (command == Command::support || command == Command::all)
+  if (command == Command::support || command == Command::all ||
+      (command == Command::bootstrap && !tree_file.empty()))
     sysutil_file_remove(support_tree_file());
 
   if (command == Command::terrace)
@@ -377,19 +381,14 @@ string Options::simd_arch_name() const
 #else
       return "NONE (scalar)";
 #endif
-      break;
     case CORAX_ATTRIB_ARCH_SSE:
       return "SSE3";
-      break;
     case CORAX_ATTRIB_ARCH_AVX:
       return "AVX";
-      break;
     case CORAX_ATTRIB_ARCH_AVX2:
       return "AVX2";
-      break;
     case CORAX_ATTRIB_ARCH_AVX512:
       return "AVX512";
-      break;
     default:
       return "UNKNOWN";
   }
@@ -401,13 +400,10 @@ string Options::consense_type_name() const
   {
     case 0:
       return "MRE";
-      break;
     case 50:
       return "MR";
-      break;
     case 100:
       return "STRICT";
-      break;
     default:
       return "MR" + to_string(consense_cutoff);
   }

@@ -16,23 +16,23 @@ static inline string  pkg_subdomain_path(int pkg_id, int sub_id)
   return  pkg_energy_path(pkg_id) + "/intel-rapl:" + to_string(pkg_id) + ":" + to_string(sub_id);
 }
 
-static inline string  pkg_name_fname(string pkg_path)
+static inline string  pkg_name_fname(const string& pkg_path)
 {
   return  pkg_path + "/name";
 }
 
-static inline string  pkg_energy_fname(string pkg_path)
+static inline string  pkg_energy_fname(const string& pkg_path)
 {
   return  pkg_path + "/energy_uj";
 }
 
-static inline string  pkg_energy_range_fname(string pkg_path)
+static inline string  pkg_energy_range_fname(const string& pkg_path)
 {
   return  pkg_path + "/max_energy_range_uj";
 }
 
 template<typename T>
-static inline T read_value(string fname)
+static inline T read_value(const string& fname)
 {
   T val;
   ifstream fs(fname);
@@ -52,7 +52,7 @@ EnergyMonitor::EnergyMonitor ()
   _active = false;
 #endif
   _consumed_joules = 0;
-  _last_update_ts = time(NULL);
+  _last_update_ts = time(nullptr);
 }
 
 void EnergyMonitor::reset()
@@ -63,7 +63,7 @@ void EnergyMonitor::reset()
 
 void EnergyMonitor::update(double interval)
 {
-  if (!_active || (interval > 0. && time(NULL) - _last_update_ts  < interval))
+  if (!_active || (interval > 0. && time(nullptr) - _last_update_ts  < interval))
     return;
 
   for(auto& pkg: _pkg_list)
@@ -77,7 +77,7 @@ void EnergyMonitor::update(double interval)
     pkg.last_energy_uj = energy_uj;
     _consumed_joules += diff_uj / 1e6f; // convert to Joules
   }
-  _last_update_ts = time(NULL);
+  _last_update_ts = time(nullptr);
 }
 
 double EnergyMonitor::consumed_joules(bool do_update)

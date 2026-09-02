@@ -39,14 +39,16 @@ static void init(BalancerState& s, const PartitionAssignment& part_sizes, size_t
   // Sort the partitions by size in ascending order
   for (auto const& range: part_sizes)
     s.sorted_partitions.push_back(&range);
+
   sort(s.sorted_partitions.begin(), s.sorted_partitions.end(),
        [](const PartitionRange *r1, const PartitionRange *r2)
           { return (r1->weight() < r2->weight());} );
 
-  double total_weight =   part_sizes.weight();
-  double total_sites =   part_sizes.length();
-  double max_site_weight = 0.;
+  double total_weight    = part_sizes.weight();
+  size_t total_sites     = part_sizes.length();
+  double max_site_weight = 0;
   double min_site_weight = FLT_MAX;
+
   s.total_remaining = total_sites;
   for (auto const& range: part_sizes)
   {
@@ -123,7 +125,7 @@ static void fill_queues(BalancerState& s)
   }
 }
 
-static bool can_fill_bin(BalancerState& s,  stack<PartitionAssignment *>& q, double add_weight,
+static bool can_fill_bin(const BalancerState& s,  stack<PartitionAssignment *>& q, double add_weight,
     double per_site_weight)
 {
   if (!q.size())
@@ -166,7 +168,7 @@ static void fill_bin(BalancerState& s,  stack<PartitionAssignment *>& q)
   else
   {
     double opt_toassign = (s.opt_bin_weight - bin->weight()) / partition->per_site_weight;
-    toassign = (s.rest_over_weight > 0.) ? ceil(opt_toassign) : floor(opt_toassign);
+    toassign = (size_t) ((s.rest_over_weight > 0.) ? ceil(opt_toassign) : floor(opt_toassign));
     toassign = std::min(toassign, s.remaining);
 //    printf("opt/cur_wgt/opt_add/add/qsize: %f / %f / %f / %u / %u\n",
 //           s.opt_bin_weight, bin->weight(), opt_toassign, toassign, q.size());

@@ -109,6 +109,7 @@ message(STATUS "Includes: ${RAXML_INCLUDES}")
 
 target_include_directories(raxml_module PRIVATE ${RAXML_INCLUDES})
 target_link_libraries(raxml_module PUBLIC ${RAXML_LIBS})
+target_compile_definitions(raxml_module PRIVATE $<$<CONFIG:DEBUG>:_RAXML_DEBUG_BUILD=1>)
 
 if (BUILD_AS_LIBRARY AND NOT APPLE)
   target_link_libraries(raxml_module PUBLIC gcc_s gcc)

@@ -9,14 +9,13 @@ public:
   EbgSupportTree (const Tree& tree);
   EbgSupportTree (const Tree& tree, const TreeList& pars_trees, const TreeList& pars_boot_trees);
 
-  virtual
-  ~EbgSupportTree ();
+  virtual  ~EbgSupportTree() override;
 
   void add_parsimony_trees(const TreeList& treelist);
   void add_parsimony_boostrap_trees(const TreeList& treelist);
 
 protected:
-  virtual bool compute_support();
+  virtual bool compute_support() override;
 
 private:
   BootstrapTree _ps_tree;

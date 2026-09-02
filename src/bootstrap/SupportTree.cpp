@@ -7,7 +7,7 @@ char * support_fmt_pct(double support)
   char *str;
   int size_alloced = asprintf(&str, "%u", (unsigned int) round(support * 100.));
 
-  return size_alloced >= 0 ? str : NULL;
+  return size_alloced >= 0 ? str : nullptr;
 }
 
 char * support_fmt_prop(double support)
@@ -17,7 +17,7 @@ char * support_fmt_prop(double support)
   char * str;
   int size_alloced = asprintf(&str, "%.*lf", precision, support);
 
-  return size_alloced >= 0 ? str : NULL;
+  return size_alloced >= 0 ? str : nullptr;
 }
 
 
@@ -34,7 +34,7 @@ void SupportTree::normalize_support_in_hashtable()
   for (unsigned int i = 0; i < _pll_splits_hash->table_size; ++i)
   {
     bitv_hash_entry_t * e =  _pll_splits_hash->table[i];
-    while (e != NULL)
+    while (e != nullptr)
     {
       e->support /= _num_bs_trees;
       e = e->next;
@@ -49,7 +49,7 @@ void SupportTree::collect_support()
   for (unsigned int i = 0; i < _pll_splits_hash->table_size; ++i)
   {
     bitv_hash_entry_t * e =  _pll_splits_hash->table[i];
-    while (e != NULL)
+    while (e != nullptr)
     {
       _support[e->bip_number] = e->support;
       e = e->next;

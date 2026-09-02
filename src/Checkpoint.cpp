@@ -50,7 +50,7 @@ MLTree CheckpointFile::best_tree() const
   return result;
 }
 
-void CheckpointFile::write_tmp_tree(const Tree& tree, const std::string fname, bool append) const
+void CheckpointFile::write_tmp_tree(const Tree& tree, const std::string& fname, bool append) const
 {
   if (ParallelContext::group_master())
   {
@@ -231,7 +231,7 @@ void CheckpointManager::remove_backup() const
 SearchState& CheckpointManager::search_state()
 {
   return checkpoint().search_state;
-};
+}
 
 void CheckpointManager::reset_search_state()
 {
@@ -241,7 +241,7 @@ void CheckpointManager::reset_search_state()
     checkpoint().reset_search_state();
 
   ParallelContext::thread_barrier();
-};
+}
 
 void CheckpointManager::save_ml_tree()
 {

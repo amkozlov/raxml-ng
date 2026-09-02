@@ -10,8 +10,7 @@ class SupportTree : public SplitsTree
 public:
   SupportTree (const Tree& tree = Tree());
 
-  virtual
-  ~SupportTree ();
+  virtual ~SupportTree() override;
 
   virtual bool compute_support();
   void draw_support(bool support_in_pct = true);

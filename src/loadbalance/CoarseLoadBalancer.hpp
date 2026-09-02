@@ -29,7 +29,7 @@ class SimpleCoarseLoadBalancer : public CoarseLoadBalancer
 {
 protected:
   virtual CoarseAssignmentList compute_assignments(const CoarseAssignment& search_ids,
-                                                   size_t num_workers);
+                                                   size_t num_workers) override;
 };
 
 

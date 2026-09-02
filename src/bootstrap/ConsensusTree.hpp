@@ -8,10 +8,9 @@ class ConsensusTree : public SupportTree
 public:
   ConsensusTree (const TreeList& trees, unsigned int consense_cutoff);
   ConsensusTree (const SplitsTree& splits, unsigned int consense_cutoff);
-  virtual
-  ~ConsensusTree ();
+  virtual ~ConsensusTree() override;
 
-  virtual bool compute_support();
+  virtual bool compute_support() override;
 
 protected:
   void init_cutoff(unsigned int consense_cutoff);

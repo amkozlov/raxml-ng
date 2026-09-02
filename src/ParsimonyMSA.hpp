@@ -14,8 +14,8 @@ public:
   virtual
   ~ParsimonyMSA ();
 
-  const PartitionedMSA& part_msa() const { return *_pars_msa; };
-  const NameList& taxon_names()  const { return _pars_msa->taxon_names(); };
+  const PartitionedMSA& part_msa() const { return *_pars_msa; }
+  const NameList& taxon_names()  const { return _pars_msa->taxon_names(); }
   const std::vector<corax_partition*>& pll_partitions() const { return _pll_partitions; }
 
   /* Estimated memory footprint of parsimony structure, in bytes */

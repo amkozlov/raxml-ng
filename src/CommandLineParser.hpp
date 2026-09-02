@@ -29,7 +29,7 @@ public:
 class CommandLineParser
 {
 public:
-  CommandLineParser() {};
+  CommandLineParser() {}
   ~CommandLineParser() = default;
 
   void parse_options(int argc, char** argv, Options &opts);

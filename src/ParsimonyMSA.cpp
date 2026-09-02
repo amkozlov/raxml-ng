@@ -114,10 +114,10 @@ void ParsimonyMSA::create_pll_partitions(unsigned int attributes,
     const auto& msa = pinfo.msa();
     const auto& weights = site_weights.empty() ? msa.weights() : site_weights.at(p);
 
-    auto partition = corax_partition_create(_pars_msa->taxon_count(),
+    auto partition = corax_partition_create((unsigned int) _pars_msa->taxon_count(),
                                              0,   /* number of CLVs */
                                              model.num_states(),
-                                             msa.length(),
+                                             (unsigned int) msa.length(),
                                              1,
                                              1, /* pmatrix count */
                                              1,  /* rate_cats */
@@ -131,7 +131,7 @@ void ParsimonyMSA::create_pll_partitions(unsigned int attributes,
     /* set tip states */
     for (size_t j = 0; j < msa.size(); ++j)
     {
-      corax_set_tip_states(partition, j, model.charmap(), msa.at(j).c_str());
+      corax_set_tip_states(partition, (unsigned int) j, model.charmap(), msa.at(j).c_str());
     }
 
     _pll_partitions.push_back(partition);

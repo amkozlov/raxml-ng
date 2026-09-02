@@ -62,9 +62,9 @@ enum class Command
 };
 
 const std::string CommandNames[] = {"none", "help", "version", "evaluate", "search", "bootstrap",
-                                    "all", "support", "bsconverge", "bsmsa", "terrace", "check",
-                                    "parse", "start", "rfdist", "consense", "ancestral", "sitelh",
-                                    "pythia", "modeltest", "mutmap" };
+                                        "all", "support", "bsconverge", "bsmsa", "terrace", "check",
+                                        "parse", "start", "rfdist", "consense", "ancestral", "sitelh",
+                                        "pythia", "modeltest", "mutmap" };
 
 enum class FileFormat
 {
@@ -258,21 +258,21 @@ public:
   {
   }
 
-  virtual const char* what() const noexcept
+  virtual const char* what() const noexcept override
   { return message().c_str(); }
 
   virtual const std::string& message() const
-  { update_message(); return _message; };
+  { update_message(); return _message; }
 
 protected:
   mutable std::string _message;
 
-  virtual void update_message() const { };
+  virtual void update_message() const { }
 
   template<typename ... Args>
   std::string format_message(const std::string& fmt, Args ... args) const
   {
-    size_t size = std::snprintf(nullptr, 0, fmt.c_str(), args ...) + 1;
+    size_t size = (size_t) std::snprintf(nullptr, 0, fmt.c_str(), args ...) + 1;
     std::string msg;
     msg.resize(size);
     std::snprintf(&msg[0], size, fmt.c_str(), args ...);

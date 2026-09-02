@@ -13,7 +13,7 @@
 #include <regex>
 #include <stdexcept>
 
-
+using namespace std;
 using namespace testing;
 
 ModelDescriptor C(const std::string &s, const DataType datatype = DataType::dna) {
