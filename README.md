@@ -2,6 +2,8 @@
 
 [![Build Status](https://www.travis-ci.org/amkozlov/raxml-ng.svg?branch=master)](https://www.travis-ci.org/amkozlov/raxml-ng) [![DOI](https://zenodo.org/badge/75947982.svg)](https://zenodo.org/badge/latestdoi/75947982) [![License](https://img.shields.io/badge/license-AGPL-blue.svg)](http://www.gnu.org/licenses/agpl-3.0.en.html)
 
+**NOTE: Please open new issues and pull requests in our primary repository on CodeBerg : https://codeberg.org/amkozlov/raxml-ng**
+
 ## Introduction
 
 RAxML-NG is a phylogenetic tree inference tool which uses maximum-likelihood (ML) optimality criterion. Its search heuristic is based on iteratively performing a series of Subtree Pruning and Regrafting (SPR) moves, which allows to quickly navigate to the best-known ML tree. RAxML-NG is a successor of RAxML (Stamatakis 2014) and leverages the highly optimized likelihood computation implemented in [`coraxlib`](https://codeberg.org/Exelixis-Lab/coraxlib).
@@ -13,10 +15,10 @@ Documentation: [github wiki](https://codeberg.org/amkozlov/raxml-ng/wiki)
 ## Installation instructions
 
 * For most desktop Unix/Linux and macOS systems, the easiest way to install RAxML-NG is by using the pre-compiled binary:  
-[**Download 64-bit Linux binary**](https://codeberg.org/amkozlov/raxml-ng/releases/download/2.0.2/raxml-ng_v2.0.2_linux_x86_64.zip)  
-[**Download 64-bit macOS binary**](https://codeberg.org/amkozlov/raxml-ng/releases/download/2.0.2/raxml-ng_v2.0.2_macos.zip)   
+[**Download 64-bit Linux binary**](https://codeberg.org/amkozlov/raxml-ng/releases/download/2.0.3/raxml-ng_v2.0.3_linux_x86_64.zip)  
+[**Download 64-bit macOS binary**](https://codeberg.org/amkozlov/raxml-ng/releases/download/2.0.3/raxml-ng_v2.0.3_macos.zip)   
 
-* On Windows, you can use [linux binary](https://codeberg.org/amkozlov/raxml-ng/releases/download/2.0.2/raxml-ng_v2.0.2_linux_x86_64.zip) via [Windows Subsystem for Linux](https://ubuntu.com/wsl), but performance might be lower than with native Linux execution. 
+* On Windows, you can use [linux binary](https://codeberg.org/amkozlov/raxml-ng/releases/download/2.0.3/raxml-ng_v2.0.3_linux_x86_64.zip) via [Windows Subsystem for Linux](https://ubuntu.com/wsl), but performance might be lower than with native Linux execution. 
 
 * If neither of the above options worked for you, please clone this repository and build RAxML-NG from scratch.
 
