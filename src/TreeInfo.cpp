@@ -576,6 +576,12 @@ double TreeInfo::spr_round(spr_round_params &params)
                                params.total_moves,
                                params.increasing_moves);
 
+  if (corax_errno == CORAX_OPT_ERROR_NEWTON_WORSE_LK)
+  {
+    throw runtime_error(string(corax_errmsg) +
+                        "\nHINT:  Please try to re-run with \"--blopt nr_safe\"");
+  }
+
   coraxlib_check_error("ERROR in SPR round");
 
   if (params.total_moves) {

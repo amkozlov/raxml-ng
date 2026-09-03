@@ -22,7 +22,7 @@ public:
     OptionException("")
   {
     _message.reserve(format.size() + value.size());
-    sprintf(&_message[0], format.c_str(), value.c_str());
+    snprintf(&_message[0], _message.capacity(), format.c_str(), value.c_str());
   }
 };
 

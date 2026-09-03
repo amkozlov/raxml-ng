@@ -187,7 +187,7 @@ void print_banner()
   LOG_INFO << "Contributors: Diego Darriba, Tomas Flouri, Benoit Morel, "
               "Sarah Lutteropp, Ben Bettisworth," << endl <<
               "              Julia Haag, Anastasis Togkousidis, Julius Wiegert, Christoph Stelz." << endl;
-  LOG_INFO << "Latest version: https://github.com/amkozlov/raxml-ng" << endl;
+  LOG_INFO << "Latest version: https://codeberg.org/amkozlov/raxml-ng" << endl;
   LOG_INFO << "Questions/problems/suggestions? "
               "Please visit: https://groups.google.com/forum/#!forum/raxml" << endl << endl;
 
