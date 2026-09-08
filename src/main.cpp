@@ -59,6 +59,7 @@
 #include "adaptive/DifficultyPredictor.hpp"
 #include "adaptive/StoppingCriterion.hpp"
 #include "modeltest/ModelTest.hpp"
+#include "git_version.h"
 
 #ifdef _RAXML_TERRAPHAST
 #include "terraces/TerraceWrapper.hpp"
@@ -181,8 +182,11 @@ void thread_infer_model(RaxmlInstance& instance, CheckpointManager& cm);
 
 void print_banner()
 {
-  LOG_INFO << endl << "RAxML-NG v. " << RAXML_VERSION << " released on " << RAXML_DATE <<
-      " by The Exelixis Lab." << endl;
+  LOG_INFO << endl << "RAxML-NG v. " << RAXML_VERSION << " released on " << RAXML_DATE;
+#ifdef RAXML_COMMIT_HASH
+      LOG_INFO << " (commit " << RAXML_COMMIT_HASH << ")";
+#endif
+  LOG_INFO << " by The Exelixis Lab." << endl;
   LOG_INFO << "Developed by: Oleksiy M. Kozlov and Alexandros Stamatakis." << endl;
   LOG_INFO << "Contributors: Diego Darriba, Tomas Flouri, Benoit Morel, "
               "Sarah Lutteropp, Ben Bettisworth," << endl <<

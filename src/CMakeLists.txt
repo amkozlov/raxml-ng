@@ -158,3 +158,14 @@ add_custom_command(TARGET raxml_module
                    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:raxml_module> ${PROJECT_SOURCE_DIR}/bin/$<TARGET_FILE_NAME:raxml_module>)
 
 install(TARGETS raxml_module DESTINATION bin)
+
+add_custom_target(git_version_h ALL
+    COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+        -DBINARY_DIR=${CMAKE_BINARY_DIR}
+        -P ${CMAKE_SOURCE_DIR}/cmake/GenerateVersionHeader.cmake
+    BYPRODUCTS ${CMAKE_BINARY_DIR}/generated/git_version.h
+    COMMENT "Checking git commit hash"
+)
+target_include_directories(raxml_module PRIVATE ${CMAKE_BINARY_DIR}/generated)
+add_dependencies(raxml_module git_version_h)
