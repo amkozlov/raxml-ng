@@ -1,4 +1,5 @@
 #include "CommandLineParser.hpp"
+#include "ModelConstants.hpp"
 #include "Options.hpp"
 #include "common.h"
 #include "corax/core/partition.h"
@@ -562,7 +563,7 @@ void CommandLineParser::parse_modeltest_options(Options &opts, const string& arg
           selection.clear();
           break;
         }
-        else if (heuristic == std::string("rhas") or heuristic == std::string("rhas-all"))
+        else if (heuristic == std::string("rhas") || heuristic == std::string("rhas-all"))
         {
           selection.insert(HeuristicType::RHAS);
           opts.modeltest_rhas_heuristic_mode = RHASHeuristicMode::AllSignficantCategoryCounts;
@@ -604,8 +605,25 @@ void CommandLineParser::parse_modeltest_options(Options &opts, const string& arg
     {
       opts.modeltest_subst_models = split_string(mopt_val, ',');
     }
-    else if (mopt_name == "gamma_modes") {
-      opts.modeltest_gamma_modes = true;
+    else if (mopt_name == "gamma-modes") {
+      if (mopt_val == "all") {
+        opts.modeltest_gamma_modes = ALL_GAMMA_MODES;
+      } else if (!mopt_val.empty()) {
+          opts.modeltest_gamma_modes.clear();
+          for (const auto &gamma_mode_label: split_string(mopt_val, ',')) {
+              auto entry = GAMMA_HUMAN_LABEL_MODE_MAP.find(gamma_mode_label);
+              auto shortcut_entry = GAMMA_LABEL_MODE_MAP.find(gamma_mode_label.empty() ? 0 : gamma_mode_label.at(0));
+              if (entry != GAMMA_HUMAN_LABEL_MODE_MAP.cend()) {
+                  opts.modeltest_gamma_modes.insert(entry->second);
+              } else if (shortcut_entry != GAMMA_LABEL_MODE_MAP.cend()) {
+                  opts.modeltest_gamma_modes.insert(shortcut_entry->second);
+              } else {
+                  throw InvalidOptionValueException("Unknown mode specified for modeltest option 'gamma-modes': '" + gamma_mode_label + "'");
+              }
+          }
+      } else {
+          throw InvalidOptionValueException("Must supply value to modeltest option 'gamma-modes'");
+      }
     }
     else
       throw InvalidOptionValueException("Unknown modeltest option: '" + mopt_name + "'");
@@ -1808,6 +1826,7 @@ void CommandLineParser::print_help()
             "      rhas=VAL1,VAL2,...                     list of rate heterogeneity across sites (RHAS) models (default: R,I+R,E,I,G,I+G)\n"
             "      substitution-models=VAL1,VAL2,...      list of substitutions models (default: all supported)\n"
             "      heuristics=VAL1,VAL2,... | off         heuristics to skip models (default: rhas,freerate)\n"
+            "      gamma-modes=all|[median,][mean,]...    list of gamma modes to test (default: all supported)\n"
             "\n"
             "Topology search options:\n"
             "  --opt-topology        classic | adaptive   topology optimization method (default: adaptive)\n"

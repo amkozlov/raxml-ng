@@ -169,10 +169,10 @@ public:
   HeuristicSelection modeltest_heuristics;
   double modeltest_significant_ic_delta;
   RateHeterogeneitySelection modeltest_rhas;
+  GammaModeSelection modeltest_gamma_modes;
   RHASHeuristicMode modeltest_rhas_heuristic_mode;
   std::vector<std::string> modeltest_subst_models;
   bool modeltest_json_output;
-  bool modeltest_gamma_modes;
 
   bool coarse() const { return num_workers > 1; }
   bool auto_model() const {

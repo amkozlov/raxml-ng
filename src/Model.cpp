@@ -1,4 +1,5 @@
 #include "Model.hpp"
+#include "ModelConstants.hpp"
 #include "corax/corax_model.h"
 #include "corax/model/gamma.h"
 
@@ -9,8 +10,6 @@ const vector<int> ALL_MODEL_PARAMS = {CORAX_OPT_PARAM_FREQUENCIES, CORAX_OPT_PAR
                                       CORAX_OPT_PARAM_FREE_RATES, CORAX_OPT_PARAM_RATE_WEIGHTS,
                                       CORAX_OPT_PARAM_BRANCH_LEN_SCALER,
                                       CORAX_OPT_PARAM_BRANCHES_ITERATIVE};
-
-
 // TODO move it out of here
 class parse_error : public runtime_error
 {
@@ -744,25 +743,11 @@ void Model::init_model_opts(const std::string &model_opts, const corax_mixture_m
           else if (_num_ratecats == 1)
             _num_ratecats = 4;
 
-          if (ss.peek() == 'a' || ss.peek() == 'A')
-          {
-            ss.get();
-            _gamma_mode = CORAX_GAMMA_RATES_MEDIAN;
-          }
-          else if (ss.peek() == 'm' || ss.peek() == 'M')
-          {
-            ss.get();
-            _gamma_mode = CORAX_GAMMA_RATES_MEAN;
-          }
-          else if (ss.peek() == 'o' || ss.peek() == 'O')
-          {
-            ss.get();
-            _gamma_mode = CORAX_GAMMA_RATES_WEIGHTS_LLOYD_MAX;
-          }
-          else if (ss.peek() == 'q' || ss.peek() == 'Q')
-          {
-            ss.get();
-            _gamma_mode = CORAX_GAMMA_RATES_WEIGHTS_LAGUERRE;
+          /* read gamma mode (if any) */
+          const auto &gamma_mode = GAMMA_LABEL_MODE_MAP.find(static_cast<char>(std::tolower(ss.peek())));
+          if (gamma_mode != GAMMA_LABEL_MODE_MAP.cend()) {
+              ss.get();
+              _gamma_mode = gamma_mode->second;
           }
 
           if (read_param(ss, _alpha))
@@ -1041,8 +1026,9 @@ std::string Model::to_string(bool print_params, unsigned int precision) const
     if (_rate_het == CORAX_UTIL_MIXTYPE_GAMMA)
     {
       model_string << "+G" << _num_ratecats;
-      // TODO: add lloyd max convention here
-      model_string << (_gamma_mode == CORAX_GAMMA_RATES_MEDIAN ? "a" : "m");
+        
+      model_string << GAMMA_MODE_LABEL_MAP.at(_gamma_mode);
+
       if (out_param_mode.at(CORAX_OPT_PARAM_ALPHA) == ParamValue::user)
         model_string << "{" << _alpha << "}";
     }
@@ -1291,10 +1277,7 @@ LogStream& operator<<(LogStream& stream, const Model& m)
   if (m.num_ratecats() > 1)
   {
     stream << " (" << m.num_ratecats() << " cats, ";
-    stream << ((m.gamma_mode() == CORAX_GAMMA_RATES_MEDIAN) ? "median" :
-               (m.gamma_mode() == CORAX_GAMMA_RATES_MEAN) ? "mean" :
-               (m.gamma_mode() == CORAX_GAMMA_RATES_WEIGHTS_LLOYD_MAX) ? "opt" :
-               (m.gamma_mode() == CORAX_GAMMA_RATES_WEIGHTS_LAGUERRE) ? "laguerre" : "unknown mode");
+    stream << GAMMA_MODE_HUMAN_LABEL_MAP.at(m.gamma_mode());
     stream << ")";
 
     if (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA )

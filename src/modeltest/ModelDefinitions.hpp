@@ -1,19 +1,18 @@
 #pragma once
-#include "corax/model/gamma.h"
+
 #include <cassert>
 #include <stdexcept>
 #include <type_traits>
-#ifndef MODEL_DEFS_H
-#define MODEL_DEFS_H
-
-#include <corax/corax.h>
-
-#include "../types.hpp"
-
 #include <array>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#include <corax/corax.h>
+
+#include "../types.hpp"
+#include "../ModelConstants.hpp"
+
 
 class unsupported_datatype_error : public std::logic_error
 {
@@ -34,6 +33,8 @@ constexpr auto N_DNA_MODEL_MATRICES = 11;
 using std::array;
 using std::string;
 using std::unordered_map;
+
+using GammaModeSelection = std::set<int>;
 
 enum class BaseFrequencyType
 {
@@ -89,7 +90,7 @@ class RateHeterogeneityDescriptor
 {
 public:
   RateHeterogeneityDescriptor(RateHeterogeneityType type, unsigned int count,
-                              unsigned int gamma_mode = CORAX_GAMMA_RATES_MEAN)
+                              int gamma_mode = CORAX_GAMMA_RATES_MEAN)
       : type{type}, category_count{count}, gamma_mode{gamma_mode}
   {
   }
@@ -98,11 +99,11 @@ public:
 
   RateHeterogeneityType type;
   unsigned int category_count;
-  unsigned int gamma_mode;
+  int gamma_mode;
 
   std::string label() const
   {
-    const size_t lookup_index = static_cast<size_t>(type);
+    const auto lookup_index = static_cast<size_t>(type);
 
     switch (type) {
     case RateHeterogeneityType::UNIFORM:
@@ -111,25 +112,8 @@ public:
       return "+" + rate_heterogeneity_label.at(lookup_index);
     case RateHeterogeneityType::GAMMA:
     case RateHeterogeneityType::INVARIANT_GAMMA: {
-        std::string result {"+" + rate_heterogeneity_label.at(lookup_index) + std::to_string(category_count)};
+        std::string result {"+" + rate_heterogeneity_label.at(lookup_index) + std::to_string(category_count) + GAMMA_MODE_LABEL_MAP.at(gamma_mode) };
 
-        // TODO: extract into proper function unified with other RAxML-NG code
-        switch (gamma_mode) {
-            case CORAX_GAMMA_RATES_MEAN:
-                result += "m";
-                break;
-            case CORAX_GAMMA_RATES_MEDIAN:
-                result += "a";
-                break;
-            case CORAX_GAMMA_RATES_WEIGHTS_LLOYD_MAX:
-                result += "o";
-                break;
-            case CORAX_GAMMA_RATES_WEIGHTS_LAGUERRE:
-                result += "q";
-                break;
-            default:
-                throw std::invalid_argument("Unknown gamma mode");
-        }
         return result;
     }
 
@@ -138,6 +122,7 @@ public:
       return "+" + rate_heterogeneity_label.at(lookup_index) + std::to_string(category_count);
     default:
       assert(0);
+      throw std::runtime_error("Unknown rate heterogeneity type");
     }
   }
 
@@ -362,5 +347,3 @@ inline std::vector<string> moose_matrix_names(const DataType datatype)
 
   return {};
 }
-
-#endif
