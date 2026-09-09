@@ -143,7 +143,7 @@ public:
 
   bool operator==(const RateHeterogeneityDescriptor &other) const
   {
-    return type == other.type && category_count == other.category_count;
+    return type == other.type && category_count == other.category_count && gamma_mode == other.gamma_mode;
   }
 };
 
