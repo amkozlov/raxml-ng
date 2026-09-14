@@ -53,7 +53,8 @@ void Heuristics::update(size_t partition, const ModelDescriptor &candidate_model
 bool Heuristics::can_skip(size_t partition, const ModelDescriptor &candidate_model) const
 {
     if (enabled(HeuristicType::FREERATE) &&
-            freerate_heuristics.at(partition).can_skip(candidate_model)) {
+            (freerate_heuristics.at(partition).can_skip(candidate_model) ||
+             invariant_freerate_heuristics.at(partition).can_skip(candidate_model))) {
         return true;
     }
 

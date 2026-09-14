@@ -178,6 +178,50 @@ TEST(ICModelTest, InvariantFreerateHeuristic) {
     EXPECT_TRUE(h.can_skip(C("GTR+F+I+R13")));
 }
 
+TEST(ICModelTest, FreerateHeuristicsInvarMixed) {
+    Heuristics h(1, {HeuristicType::FREERATE}, {
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::FREE_RATE, 4),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::FREE_RATE, 5),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::FREE_RATE, 6),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::FREE_RATE, 7),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::FREE_RATE, 8),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::INVARIANT_FREE_RATE, 4),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::INVARIANT_FREE_RATE, 5),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::INVARIANT_FREE_RATE, 6),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::INVARIANT_FREE_RATE, 7),
+                    RateHeterogeneityDescriptor(RateHeterogeneityType::INVARIANT_FREE_RATE, 8)
+                    },  SubstitutionModelDescriptor("JC", BaseFrequencyType::ESTIMATED),
+                    4, 8,
+                    10,
+                    RHASHeuristicMode::OnlyOptimalCategoryCount);
+
+    h.update(0, C("K81+R5"), 100.0);
+    h.update(0, C("K81+R6"), 110.0);
+    EXPECT_FALSE(h.can_skip(0, C("K81+R4")));
+    EXPECT_TRUE(h.can_skip(0, C("K81+R7"))); // don't need to test R7, because of regression when going from 5 to 6 categories.
+    EXPECT_FALSE(h.can_skip(0, C("K81+I+R4")));
+    EXPECT_FALSE(h.can_skip(0, C("K81+I+R7")));
+    h.update(0, C("K81+R4"), 105.0);
+    // now heuristic for freerate converged, but not for invariant freerate
+    EXPECT_TRUE(h.can_skip(0, C("K81+R4")));
+    EXPECT_TRUE(h.can_skip(0, C("K81+R8")));
+    EXPECT_FALSE(h.can_skip(0, C("K81+I+R4")));
+    EXPECT_FALSE(h.can_skip(0, C("K81+I+R5")));
+    EXPECT_FALSE(h.can_skip(0, C("K81+I+R6")));
+    EXPECT_FALSE(h.can_skip(0, C("K81+I+R7")));
+    EXPECT_FALSE(h.can_skip(0, C("K81+I+R8")));
+
+    h.update(0, C("K81+I+R6"), 200.0);
+    h.update(0, C("K81+I+R7"), 220.0);
+    EXPECT_FALSE(h.can_skip(0, C("K81+I+R5")));
+    EXPECT_TRUE(h.can_skip(0, C("K81+I+R8")));
+    h.update(0, C("K81+I+R5"), 201.0);
+    EXPECT_FALSE(h.can_skip(0, C("K81+I+R4")));
+    EXPECT_TRUE(h.can_skip(0, C("K81+I+R8")));
+    h.update(0, C("K81+I+R4"), 202.0);
+    EXPECT_TRUE(h.can_skip(0, C("K81+I+R8")));
+}
+
 TEST(ICModelTest, RHASFreerateHeuristicCombined) {
     std::vector<RateHeterogeneityDescriptor> selected_rhas {
                     RateHeterogeneityDescriptor(RateHeterogeneityType::UNIFORM, 1),
