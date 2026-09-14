@@ -1,0 +1,75 @@
+cff-version: 1.2.0
+title: RAxML-NG
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Oleksiy M.
+    family-names: Kozlov
+    orcid: 'https://orcid.org/0000-0001-7394-2718'
+  - given-names: Alexandros
+    family-names: Stamatakis
+    orcid: 'https://orcid.org/0000-0003-0353-0691'
+  - given-names: Diego
+    family-names: Darriba
+    orcid: 'https://orcid.org/0000-0001-5482-3932'
+  - given-names: Tomas
+    family-names: Flouri
+    orcid: 'https://orcid.org/0000-0002-8474-9507'
+  - given-names: Benoit
+    family-names: Morel
+    orcid: 'https://orcid.org/0000-0001-6286-4419'
+  - given-names: Sarah
+    family-names: Lutteropp
+    orcid: 'https://orcid.org/0000-0002-1300-5631'
+  - given-names: Ben
+    family-names: Bettisworth
+    orcid: 'https://orcid.org/0000-0002-9130-6878'
+  - given-names: Julia
+    family-names: Haag
+    orcid: 'https://orcid.org/0000-0002-7493-3917'
+  - given-names: Anastasis
+    family-names: Togkousidis
+    orcid: 'https://orcid.org/0000-0002-7493-3917'
+  - given-names: Julius
+    family-names: Wiegert
+    orcid: 'https://orcid.org/0009-0003-4518-1749'
+  - given-names: Christoph
+    family-names: Stelz
+    orcid: 'https://orcid.org/0009-0004-7980-1202'
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.593079
+repository-code: 'https://codeberg.org/amkozlov/raxml-ng'
+url: 'https://raxml.ng'
+keywords:
+  - bioinformatics
+  - maximum-likelihood
+  - mpi
+  - phylogenetics
+  - pthreads
+license: AGPL-3.0
+preferred-citation:
+  type: article
+  title: "RAxML-NG 2: Automatic model selection, novel tree search heuristics, and fast branch support metrics"
+  doi: "10.64898/2026.09.09.750097"
+  authors:
+    - family-names: Kozlov
+      given-names: Oleksiy
+      orcid: http://orcid.org/0000-0001-7394-2718
+    - family-names: Togkousidis
+      given-names: Anastasis
+      orcid: http://orcid.org/0000-0003-4306-3709
+    - family-names: Stelz
+      given-names: Christoph
+      orcid: http://orcid.org/0009-0004-7980-1202
+    - family-names: Höhler
+      given-names: Dimitri
+      orcid: http://orcid.org/0000-0002-4144-6709
+    - family-names: Wiegert
+      given-names: Julius
+      orcid: http://orcid.org/0009-0003-4518-1749
+    - family-names: Stamatakis
+      given-names: Alexandros
+      orcid: http://orcid.org/0000-0003-0353-0691
