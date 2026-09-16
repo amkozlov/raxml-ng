@@ -571,6 +571,12 @@ void CommandLineParser::parse_modeltest_options(Options &opts, const string& arg
         {
           selection.insert(HeuristicType::RHAS);
           opts.modeltest_rhas_heuristic_mode = RHASHeuristicMode::OnlyOptimalCategoryCount;
+          opts.modeltest_significant_ic_delta = 0;
+        }
+        else if (heuristic == std::string("rhas-best-category-count"))
+        {
+          selection.insert(HeuristicType::RHAS);
+          opts.modeltest_rhas_heuristic_mode = RHASHeuristicMode::OnlyOptimalCategoryCount;
         }
         else if (heuristic == std::string("freerate"))
           selection.insert(HeuristicType::FREERATE);
