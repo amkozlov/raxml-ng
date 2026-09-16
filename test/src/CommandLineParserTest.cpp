@@ -29,7 +29,7 @@ void parse_options(string &cmd, CommandLineParser &parser, Options &opts,
   char * argv[MAX_ARGS];
 
   cmdline_to_argv(&cmd[0], argc, argv);
-  mutx.Lock();
+  mutx.lock();
   try
   {
     parser.parse_options(argc, argv, opts);
@@ -39,7 +39,7 @@ void parse_options(string &cmd, CommandLineParser &parser, Options &opts,
   {
     EXPECT_TRUE(except_throw) << "Exception: " << e.what() << std::endl;
   }
-  mutx.Unlock();
+  mutx.unlock();
 }
 
 void compare_opts(const Options& opts1, const Options& opts2)
