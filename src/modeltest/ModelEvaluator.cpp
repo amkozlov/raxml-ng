@@ -268,25 +268,26 @@ bool ModelEvaluator::copy_rhas_parameters(const ModelEvaluator *const other)
   auto rhas = _candidate_model->rate_heterogeneity.type;
 
   assert(other_model.num_ratecats() == this_model.num_ratecats());
+  if (this->thread_id() == 0) {
+    if (rhas == RateHeterogeneityType::INVARIANT_FREE_RATE ||
+        rhas == RateHeterogeneityType::INVARIANT ||
+        rhas == RateHeterogeneityType::INVARIANT_GAMMA)
+    {
+        this_model.pinv(other_model.pinv());
+    }
 
-  if (rhas == RateHeterogeneityType::INVARIANT_FREE_RATE ||
-      rhas == RateHeterogeneityType::INVARIANT ||
-      rhas == RateHeterogeneityType::INVARIANT_GAMMA)
-  {
-    this_model.pinv(other_model.pinv());
-  }
+    if (rhas == RateHeterogeneityType::INVARIANT_GAMMA ||
+        rhas == RateHeterogeneityType::GAMMA)
+    {
+        this_model.alpha(other_model.alpha());
+    }
 
-  if (rhas == RateHeterogeneityType::INVARIANT_GAMMA ||
-      rhas == RateHeterogeneityType::GAMMA)
-  {
-    this_model.alpha(other_model.alpha());
-  }
-
-  if (rhas == RateHeterogeneityType::FREE_RATE ||
-      rhas == RateHeterogeneityType::INVARIANT_FREE_RATE)
-  {
-    this_model.ratecat_rates(other_model.ratecat_rates());
-    this_model.ratecat_weights(other_model.ratecat_weights());
+    if (rhas == RateHeterogeneityType::FREE_RATE ||
+        rhas == RateHeterogeneityType::INVARIANT_FREE_RATE)
+    {
+        this_model.ratecat_rates(other_model.ratecat_rates());
+        this_model.ratecat_weights(other_model.ratecat_weights());
+    }
   }
 
   return true;

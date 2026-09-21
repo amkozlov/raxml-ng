@@ -197,6 +197,7 @@ const vector<Model>& ModelTest::optimize_model()
                         << evaluator->get_result().model.to_string(true) << endl;
         }
     }
+    evaluator->barrier();
 
     TreeInfo treeinfo(options, tree, msa, tip_msa_idmap, assignment, evaluator->partition_index(), model);
 
