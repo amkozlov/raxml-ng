@@ -4,4 +4,4 @@
 [submodule "libs/coraxlib"]
 	path = libs/coraxlib
 	url = ../../Exelixis-Lab/coraxlib.git
-	branch = dev
+	branch = feature/gamma-fix-2
