@@ -29,13 +29,13 @@ std::set<A> all_keys_of_map(const std::map<A, B> &source) {
 const std::map<int, char> GAMMA_MODE_LABEL_MAP {
     {CORAX_GAMMA_RATES_MEAN, 'm'},
     {CORAX_GAMMA_RATES_MEDIAN, 'a'},
-    {CORAX_GAMMA_RATES_WEIGHTS_LLOYD_MAX, 'o'},
+    {CORAX_GAMMA_RATES_WEIGHTS_LLOYD_MAX, 's'},
     {CORAX_GAMMA_RATES_WEIGHTS_LAGUERRE, 'q'},
 };
 const std::map<int, std::string> GAMMA_MODE_HUMAN_LABEL_MAP {
     {CORAX_GAMMA_RATES_MEAN, "mean"},
     {CORAX_GAMMA_RATES_MEDIAN, "median"},
-    {CORAX_GAMMA_RATES_WEIGHTS_LLOYD_MAX, "opt"},
+    {CORAX_GAMMA_RATES_WEIGHTS_LLOYD_MAX, "DGM-star"},
     {CORAX_GAMMA_RATES_WEIGHTS_LAGUERRE, "laguerre"},
 };
 const std::map<char, int> GAMMA_LABEL_MODE_MAP = swap_map(GAMMA_MODE_LABEL_MAP);
