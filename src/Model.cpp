@@ -237,9 +237,12 @@ Model::Model (DataType data_type, const std::string &model_string) :
   init_from_string(model_string_tmp);
 }
 
-const corax_state_t * Model::charmap() const
+const corax_state_t * Model::charmap(bool strict /* = false */) const
 {
-  return _custom_charmap ? _custom_charmap.get() : DatatypeCharmaps.at(_data_type);
+  if (_custom_charmap)
+    return _custom_charmap.get();
+  else
+    return strict ? DatatypeCharmapsStrict.at(_data_type) : DatatypeCharmaps.at(_data_type);
 }
 
 void Model::init_from_string(const std::string &model_string)

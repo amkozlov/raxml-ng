@@ -109,6 +109,16 @@ const std::unordered_map<DataType,const corax_state_t*,EnumClassHash>  DatatypeC
   {DataType::genotype16, corax_map_gt16}
 };
 
+/* More restrictive maps, e.g. do not allow non-standard amino acids */
+const std::unordered_map<DataType,const corax_state_t*,EnumClassHash>  DatatypeCharmapsStrict
+{
+  {DataType::dna, corax_map_nt},
+  {DataType::protein, corax_map_aa_strict},
+  {DataType::binary, corax_map_bin},
+  {DataType::genotype10, corax_map_gt10},
+  {DataType::genotype16, corax_map_gt16}
+};
+
 const std::unordered_map<DataType,std::string,EnumClassHash>  DatatypePrefix
 {
   {DataType::dna, "DNA"},
