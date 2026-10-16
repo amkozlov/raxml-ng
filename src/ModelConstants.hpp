@@ -1,43 +1,62 @@
 #pragma once
 
-#include <map>
+#include "corax/model/gamma.h"
+#include "types.hpp"
 #include <string>
+#include <strings.h>
 #include <set>
-#include <corax/corax.h>
+#include <array>
+#include <optional>
 
-template <typename A, typename B>
-std::map<B, A> swap_map(const std::map<A, B> &source) {
-    std::map<B, A> target;
+/**
+ * Class to resolve from and to labels for different Gamma modes (mean, median, star, ...)
+ */
+class GammaModes
+{
+public:
+  /** Try to get coraxlib attribute for gamma mode from supplied string. */
+  [[nodiscard]]
+  static std::optional<int> from_string(const std::string &s); 
 
-    for (const auto &e : source) {
-        target[e.second] = e.first;
-    }
+  /** Try to get coraxlib attribute for gamma mode from supplied character. */
+  static std::optional<int> from_char(int character);
 
-    return target;
-}
-template <typename A, typename B>
-std::set<A> all_keys_of_map(const std::map<A, B> &source) {
-    std::set<A> target;
+  /** Get short flag for gamma mode */
+  [[nodiscard]]
+  inline static char flag(int mode) {
+    return labels.at(mode).flag;
+  }
 
-    for (const auto &e : source) {
-        target.insert(e.first);
-    }
+  /** Get human readable label for gamma mode */
+  [[nodiscard]]
+  inline static std::string label(int mode) {
+    return {labels.at(mode).label};
+  }
+  
+  /** Get set of all gamma modes */
+  [[nodiscard]]
+  static std::set<int> all();
 
-    return target;
-}
+  /* Get a comma-separated list of allowed gamma mode labels for use in help texts*/
+  [[nodiscard]]
+  static std::string all_labels();
 
-const std::map<int, char> GAMMA_MODE_LABEL_MAP {
-    {CORAX_GAMMA_RATES_MEAN, 'm'},
-    {CORAX_GAMMA_RATES_MEDIAN, 'a'},
-    {CORAX_GAMMA_RATES_WEIGHTS_LLOYD_MAX, 's'},
-    {CORAX_GAMMA_RATES_WEIGHTS_LAGUERRE, 'q'},
+
+private:
+  struct label_entry_t {
+    int mode;
+    const char *label;
+    char flag;
+  };
+
+  static constexpr std::array<label_entry_t, 4> labels {{
+    {CORAX_GAMMA_RATES_MEAN, "mean", 'm'},
+    {CORAX_GAMMA_RATES_MEDIAN, "median", 'a'},
+    {CORAX_GAMMA_RATES_WEIGHTS_LLOYD_MAX, "star", 's'},
+    {CORAX_GAMMA_RATES_WEIGHTS_LAGUERRE, "laguerre", 'q'},
+  }};
+
+
+  static_assert(labels.front().mode == 0 && labels.back().mode == labels.size() - 1,
+      "list of labels must be indexable by mode");
 };
-const std::map<int, std::string> GAMMA_MODE_HUMAN_LABEL_MAP {
-    {CORAX_GAMMA_RATES_MEAN, "mean"},
-    {CORAX_GAMMA_RATES_MEDIAN, "median"},
-    {CORAX_GAMMA_RATES_WEIGHTS_LLOYD_MAX, "DGM-star"},
-    {CORAX_GAMMA_RATES_WEIGHTS_LAGUERRE, "laguerre"},
-};
-const std::map<char, int> GAMMA_LABEL_MODE_MAP = swap_map(GAMMA_MODE_LABEL_MAP);
-const std::map<std::string, int> GAMMA_HUMAN_LABEL_MODE_MAP = swap_map(GAMMA_MODE_HUMAN_LABEL_MAP);
-const std::set<int> ALL_GAMMA_MODES = all_keys_of_map(GAMMA_MODE_LABEL_MAP);

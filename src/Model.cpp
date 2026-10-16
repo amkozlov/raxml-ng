@@ -744,10 +744,10 @@ void Model::init_model_opts(const std::string &model_opts, const corax_mixture_m
             _num_ratecats = 4;
 
           /* read gamma mode (if any) */
-          const auto &gamma_mode = GAMMA_LABEL_MODE_MAP.find(static_cast<char>(std::tolower(ss.peek())));
-          if (gamma_mode != GAMMA_LABEL_MODE_MAP.cend()) {
+          const auto gamma_mode = GammaModes::from_char(ss.peek());
+          if (gamma_mode) {
               ss.get();
-              _gamma_mode = gamma_mode->second;
+              _gamma_mode = gamma_mode.value();
           }
 
           if (read_param(ss, _alpha))
@@ -1027,7 +1027,7 @@ std::string Model::to_string(bool print_params, unsigned int precision) const
     {
       model_string << "+G" << _num_ratecats;
         
-      model_string << GAMMA_MODE_LABEL_MAP.at(_gamma_mode);
+      model_string << GammaModes::flag(_gamma_mode);
 
       if (out_param_mode.at(CORAX_OPT_PARAM_ALPHA) == ParamValue::user)
         model_string << "{" << _alpha << "}";
@@ -1277,7 +1277,7 @@ LogStream& operator<<(LogStream& stream, const Model& m)
   if (m.num_ratecats() > 1)
   {
     stream << " (" << m.num_ratecats() << " cats, ";
-    stream << GAMMA_MODE_HUMAN_LABEL_MAP.at(m.gamma_mode());
+    stream << GammaModes::label(m.gamma_mode());
     stream << ")";
 
     if (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA )

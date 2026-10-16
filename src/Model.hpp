@@ -119,6 +119,10 @@ public:
       _param_mode[param] = mode;
   }
 
+  void gamma_mode(int gamma_mode) {
+      _gamma_mode = gamma_mode;
+  }
+
   /* initialization */
   void init_from_string(const std::string& model_string);
 

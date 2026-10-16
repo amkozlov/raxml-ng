@@ -112,7 +112,7 @@ public:
       return "+" + rate_heterogeneity_label.at(lookup_index);
     case RateHeterogeneityType::GAMMA:
     case RateHeterogeneityType::INVARIANT_GAMMA: {
-        std::string result {"+" + rate_heterogeneity_label.at(lookup_index) + std::to_string(category_count) + GAMMA_MODE_LABEL_MAP.at(gamma_mode) };
+        std::string result {"+" + rate_heterogeneity_label.at(lookup_index) + std::to_string(category_count) + GammaModes::flag(gamma_mode) };
 
         return result;
     }

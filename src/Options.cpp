@@ -1,5 +1,6 @@
 #include "Options.hpp"
 #include "ModelConstants.hpp"
+#include "corax/model/gamma.h"
 #include "modeltest/ModelDefinitions.hpp"
 #include "modeltest/RHASHeuristic.hpp"
 #include "types.hpp"
@@ -39,7 +40,7 @@ random_seed(0), start_trees(), lh_epsilon(DEF_LH_EPSILON), lh_epsilon_brlen_trip
 spr_radius(-1), spr_cutoff(1.0),
 brlen_linkage(CORAX_BRLEN_SCALED), brlen_opt_method(CORAX_OPT_BLO_NEWTON_FAST),
 brlen_min(RAXML_BRLEN_MIN), brlen_max(RAXML_BRLEN_MAX), brlen_reset_usertree(false), use_pars_brlen(true),
-num_searches(1), terrace_maxsize(100),
+override_gamma_mode(), num_searches(1), terrace_maxsize(100),
 num_bootstraps(1000), bootstop_criterion(BootstopCriterion::none), bootstop_cutoff(RAXML_BOOTSTOP_CUTOFF),
 bootstop_interval(RAXML_BOOTSTOP_INTERVAL), bootstop_permutations(RAXML_BOOTSTOP_PERMUTES),
 tbe_naive(false), consense_cutoff(ConsenseCutoff::MR), tree_file(""), constraint_tree_file(""),
@@ -51,7 +52,7 @@ num_sh_reps(RAXML_SH_ALRT_REPS), sh_epsilon(RAXML_SH_ALRT_EPSILON),
 free_rate_min_categories(2), free_rate_max_categories(10), free_rate_opt_method(FreerateOptMethod::AUTO),
 model_selection_criterion(InformationCriterion::bic), modeltest_heuristics({HeuristicType::FREERATE, HeuristicType::RHAS}),
 modeltest_significant_ic_delta(10.0), modeltest_rhas(default_rate_heterogeneity_selection),
-modeltest_rhas_heuristic_mode(RHASHeuristicMode::AllSignficantCategoryCounts), modeltest_gamma_modes(ALL_GAMMA_MODES)
+modeltest_gamma_modes(GammaModes::all()), modeltest_rhas_heuristic_mode(RHASHeuristicMode::AllSignficantCategoryCounts)
 {
 #ifdef _RAXML_JSON
   modeltest_json_output = true;

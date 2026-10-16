@@ -110,6 +110,7 @@ static struct option long_options[] =
   {"moose",              optional_argument, nullptr, 0 },  /*  76 */
   {"moose-options",      required_argument, nullptr, 0 },  /*  77 */
   {"mutmap",             optional_argument, nullptr, 0 },  /*  78 */
+  {"gamma-mode",         required_argument, nullptr, 0 },  /*  79 */
 
   { 0, 0, 0, 0 }
 };
@@ -607,19 +608,16 @@ void CommandLineParser::parse_modeltest_options(Options &opts, const string& arg
     }
     else if (mopt_name == "gamma-modes") {
       if (mopt_val == "all") {
-        opts.modeltest_gamma_modes = ALL_GAMMA_MODES;
+        opts.modeltest_gamma_modes = GammaModes::all();
       } else if (!mopt_val.empty()) {
           opts.modeltest_gamma_modes.clear();
           for (const auto &gamma_mode_label: split_string(mopt_val, ',')) {
-              auto entry = GAMMA_HUMAN_LABEL_MODE_MAP.find(gamma_mode_label);
-              auto shortcut_entry = GAMMA_LABEL_MODE_MAP.find(gamma_mode_label.empty() ? 0 : gamma_mode_label.at(0));
-              if (entry != GAMMA_HUMAN_LABEL_MODE_MAP.cend()) {
-                  opts.modeltest_gamma_modes.insert(entry->second);
-              } else if (shortcut_entry != GAMMA_LABEL_MODE_MAP.cend()) {
-                  opts.modeltest_gamma_modes.insert(shortcut_entry->second);
-              } else {
-                  throw InvalidOptionValueException("Unknown mode specified for modeltest option 'gamma-modes': '" + gamma_mode_label + "'");
+              auto mode = GammaModes::from_string(gamma_mode_label);
+              if (!mode) {
+                  throw InvalidOptionValueException("Unknown mode specified for modeltest option 'gamma-modes': '" + gamma_mode_label + "'. "
+                                                    "Possible options are " + GammaModes::all_labels());
               }
+              opts.modeltest_gamma_modes.insert(mode.value());
           }
       } else {
           throw InvalidOptionValueException("Must supply value to modeltest option 'gamma-modes'");
@@ -628,6 +626,18 @@ void CommandLineParser::parse_modeltest_options(Options &opts, const string& arg
     else
       throw InvalidOptionValueException("Unknown modeltest option: '" + mopt_name + "'");
   }
+}
+
+void CommandLineParser::parse_gamma_mode(Options &opts, const string& arg) {
+  opts.override_gamma_mode.enabled = true;
+  
+  const auto gamma_mode = GammaModes::from_string(arg);
+  if (!gamma_mode) {
+    throw InvalidOptionValueException("Unknown gamma-mode specified: '" + arg + "'. "
+                                      "Possible options are " + GammaModes::all_labels());
+  }
+
+  opts.override_gamma_mode.mode = gamma_mode.value();
 }
 
 void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
@@ -1664,6 +1674,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.use_repeats = false;
         opts.use_tip_inner = true;
         num_commands++;
+        break;
+      case 79: /* gamma-mode */
+        parse_gamma_mode(opts, std::string(optarg));
         break;
       default:
         throw  OptionException("Internal error in option parsing");

@@ -25,6 +25,7 @@
 #include <memory>
 
 #include <corax/corax.h>
+#include "corax/corax_model.h"
 #include "difficulty.h"
 
 #include "version.h"
@@ -1011,6 +1012,7 @@ void check_options_early(Options& opts)
     LOG_WARN << endl << "WARNING: The --workers option is ignored in model selection mode."
              << endl << endl;
   }
+
 }
 
 void check_options(RaxmlInstance& instance)
@@ -1050,6 +1052,15 @@ void check_options(RaxmlInstance& instance)
           "and fall back to per-site scalers." << endl << endl;
       instance.opts.use_rate_scalers = true;
     }
+  }
+
+  if (opts.command == Command::modeltest && opts.override_gamma_mode.enabled) {
+    LOG_WARN << endl << "WARNING: --gamma-mode does not affect MOOSE, please use --moose-options gamma-modes= instead."
+             << endl << endl;
+  }
+
+  if (opts.override_gamma_mode.enabled && instance.opts.msa_format == FileFormat::binary) {
+    throw runtime_error( "ERROR: --gamma-mode does not work with RBA files. Please recreate the RBA file with the correct gamma model instead.");
   }
 }
 
@@ -2020,6 +2031,32 @@ void predict_msa_difficulty(RaxmlInstance& instance)
   }
 }
 
+void override_gamma_model_if_needed(RaxmlInstance& instance)
+{
+  const auto &override_gamma = instance.opts.override_gamma_mode;
+
+  if (override_gamma.enabled == false) return;
+
+  bool no_gamma_partitions = true;
+
+  for (auto &part : instance.parted_msa->part_list()) {
+    auto &model = part.model();
+    if (model.ratehet_mode() != CORAX_UTIL_MIXTYPE_GAMMA) continue;
+
+    no_gamma_partitions = false;
+    model.gamma_mode(override_gamma.mode);
+  }
+
+  if (no_gamma_partitions) {
+    const auto part_count = instance.parted_msa->part_count();
+    LOG_WARN << endl
+      << "WARNING: "
+      << ((part_count > 1) ? "MSA does not contain partitions with a gamma model, --gamma-mode will not be effective."
+                            : "The specified model is not a gamma model, --gamma-mode will not be effective.")
+      << endl << endl;
+  }
+}
+
 void load_parted_msa(RaxmlInstance& instance)
 {
   init_part_info(instance);
@@ -2031,6 +2068,8 @@ void load_parted_msa(RaxmlInstance& instance)
 
   // use MSA sequences IDs as "normalized" tip IDs in all trees
   instance.tip_id_map = instance.parted_msa->taxon_id_map();
+
+  override_gamma_model_if_needed(instance);
 
   predict_msa_difficulty(instance);
 
