@@ -1830,6 +1830,7 @@ void CommandLineParser::print_help()
             "  --prob-msa     on | off                    use probabilistic alignment (works with CATG and VCF)\n"
             "  --lh-epsilon   VALUE                       log-likelihood epsilon for optimization/tree search (default: 10)\n"
             "  --opt-freerate bfgs | em-bfgs | em-brent   optimization method for FreeRates (default: auto)\n"
+            "  --gamma-mode   mean | median | star        override discretization method for gamma models\n"
             "\n"
             "Model selection options:\n"
             "  --moose-options OPT=VAL/OPT=VAL/...        list of MOdel Optimization and SElection options separated by '/'\n"
