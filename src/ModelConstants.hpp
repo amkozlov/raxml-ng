@@ -49,11 +49,10 @@ private:
     char flag;
   };
 
-  static constexpr std::array<label_entry_t, 4> labels {{
+  static constexpr std::array<label_entry_t, 3> labels {{
     {CORAX_GAMMA_RATES_MEAN, "mean", 'm'},
     {CORAX_GAMMA_RATES_MEDIAN, "median", 'a'},
-    {CORAX_GAMMA_RATES_WEIGHTS_LLOYD_MAX, "star", 's'},
-    {CORAX_GAMMA_RATES_WEIGHTS_LAGUERRE, "laguerre", 'q'},
+    {CORAX_GAMMA_RATES_WEIGHTS_LLOYD_MAX, "star", 's'}
   }};
 
 
