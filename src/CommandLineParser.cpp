@@ -323,6 +323,7 @@ void CommandLineParser::set_fast_options(Options &opts)
   opts.use_pars_spr = true;
   opts.free_rate_opt_method = FreerateOptMethod::EM_BRENT;
   opts.modeltest_rhas_heuristic_mode = RHASHeuristicMode::OnlyOptimalCategoryCount;
+  opts.modeltest_significant_ic_delta = 0;
   opts.modeltest_rhas = fast_rate_heterogeneity_selection;
   if (opts.command == Command::all)
   {
