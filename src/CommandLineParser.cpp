@@ -1,4 +1,5 @@
 #include "CommandLineParser.hpp"
+#include "ModelConstants.hpp"
 #include "Options.hpp"
 #include "common.h"
 #include "corax/core/partition.h"
@@ -109,6 +110,7 @@ static struct option long_options[] =
   {"moose",              optional_argument, nullptr, 0 },  /*  76 */
   {"moose-options",      required_argument, nullptr, 0 },  /*  77 */
   {"mutmap",             optional_argument, nullptr, 0 },  /*  78 */
+  {"gamma-mode",         required_argument, nullptr, 0 },  /*  79 */
 
   { 0, 0, 0, 0 }
 };
@@ -321,6 +323,7 @@ void CommandLineParser::set_fast_options(Options &opts)
   opts.use_pars_spr = true;
   opts.free_rate_opt_method = FreerateOptMethod::EM_BRENT;
   opts.modeltest_rhas_heuristic_mode = RHASHeuristicMode::OnlyOptimalCategoryCount;
+  opts.modeltest_significant_ic_delta = 0;
   opts.modeltest_rhas = fast_rate_heterogeneity_selection;
   if (opts.command == Command::all)
   {
@@ -562,7 +565,7 @@ void CommandLineParser::parse_modeltest_options(Options &opts, const string& arg
           selection.clear();
           break;
         }
-        else if (heuristic == std::string("rhas") or heuristic == std::string("rhas-all"))
+        else if (heuristic == std::string("rhas") || heuristic == std::string("rhas-all"))
         {
           selection.insert(HeuristicType::RHAS);
           opts.modeltest_rhas_heuristic_mode = RHASHeuristicMode::AllSignficantCategoryCounts;
@@ -591,11 +594,11 @@ void CommandLineParser::parse_modeltest_options(Options &opts, const string& arg
       RateHeterogeneitySelection selection;
       for (const auto &rhas : split_string(mopt_val, ','))
       {
-          const auto &effective_rhas_name = (rhas == "E" ? "" : rhas);
-          const auto &it = std::find(rate_heterogeneity_label.cbegin(), rate_heterogeneity_label.cend(), effective_rhas_name);
-          if (it == rate_heterogeneity_label.cend())
-              throw InvalidOptionValueException("Invalid modeltest rate-heterogeneity model: '" + rhas + "'");
-          selection.insert(static_cast<RateHeterogeneityType>(std::distance(rate_heterogeneity_label.cbegin(), it)));
+        const auto &effective_rhas_name = (rhas == "E" ? "" : rhas);
+        const auto &it = std::find(rate_heterogeneity_label.cbegin(), rate_heterogeneity_label.cend(), effective_rhas_name);
+        if (it == rate_heterogeneity_label.cend())
+            throw InvalidOptionValueException("Invalid modeltest rate-heterogeneity model: '" + rhas + "'");
+        selection.insert(static_cast<RateHeterogeneityType>(std::distance(rate_heterogeneity_label.cbegin(), it)));
       }
 
       opts.modeltest_rhas = selection;
@@ -604,9 +607,46 @@ void CommandLineParser::parse_modeltest_options(Options &opts, const string& arg
     {
       opts.modeltest_subst_models = split_string(mopt_val, ',');
     }
+    else if (mopt_name == "gamma-modes")
+    {
+      if (mopt_val == "all") {
+        opts.modeltest_gamma_modes = GammaModes::all();
+      }
+      else if (!mopt_val.empty())
+      {
+        opts.modeltest_gamma_modes.clear();
+        for (const auto &gamma_mode_label: split_string(mopt_val, ','))
+        {
+          auto mode = GammaModes::from_string(gamma_mode_label);
+          if (!mode)
+          {
+            throw InvalidOptionValueException("Unknown mode specified for modeltest option 'gamma-modes': '"
+                                              + gamma_mode_label + "'. "
+                                              "Possible options are " + GammaModes::all_labels());
+          }
+          opts.modeltest_gamma_modes.insert(mode.value());
+        }
+      } else {
+        throw InvalidOptionValueException("Must supply value to modeltest option 'gamma-modes'");
+      }
+    }
     else
       throw InvalidOptionValueException("Unknown modeltest option: '" + mopt_name + "'");
   }
+}
+
+void CommandLineParser::parse_gamma_mode(Options &opts, const string& arg)
+{
+  opts.override_gamma_mode.enabled = true;
+  
+  const auto gamma_mode = GammaModes::from_string(arg);
+  if (!gamma_mode)
+  {
+    throw InvalidOptionValueException("Unknown gamma-mode specified: '" + arg + "'. "
+                                      "Possible options are " + GammaModes::all_labels());
+  }
+
+  opts.override_gamma_mode.mode = gamma_mode.value();
 }
 
 void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
@@ -1644,6 +1684,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.use_tip_inner = true;
         num_commands++;
         break;
+      case 79: /* gamma-mode */
+        parse_gamma_mode(opts, std::string(optarg));
+        break;
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -1796,6 +1839,7 @@ void CommandLineParser::print_help()
             "  --prob-msa     on | off                    use probabilistic alignment (works with CATG and VCF)\n"
             "  --lh-epsilon   VALUE                       log-likelihood epsilon for optimization/tree search (default: 10)\n"
             "  --opt-freerate bfgs | em-bfgs | em-brent   optimization method for FreeRates (default: auto)\n"
+            "  --gamma-mode   mean | median | star        override discretization method for Gamma RHAS models\n"
             "\n"
             "Model selection options:\n"
             "  --moose-options OPT=VAL/OPT=VAL/...        list of MOdel Optimization and SElection options separated by '/'\n"
@@ -1805,6 +1849,7 @@ void CommandLineParser::print_help()
             "      rhas=VAL1,VAL2,...                     list of rate heterogeneity across sites (RHAS) models (default: R,I+R,E,I,G,I+G)\n"
             "      substitution-models=VAL1,VAL2,...      list of substitutions models (default: all supported)\n"
             "      heuristics=VAL1,VAL2,... | off         heuristics to skip models (default: rhas,freerate)\n"
+            "      gamma-modes=all|[median,][mean,]...    list of gamma modes to test (default: all supported)\n"
             "\n"
             "Topology search options:\n"
             "  --opt-topology        classic | adaptive   topology optimization method (default: adaptive)\n"

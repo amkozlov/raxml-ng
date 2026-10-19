@@ -255,7 +255,7 @@ const size_t &ModelEvaluator::proposed_thread_count() const
 
 bool ModelEvaluator::copy_rhas_parameters(const ModelEvaluator *const other)
 {
-  double results_present = (other != nullptr) && (other->get_status() == EvaluationStatus::FINISHED) ? 1 : 0;
+  double results_present = ((other != nullptr) && (other->get_status() == EvaluationStatus::FINISHED)) ? 1 : 0;
   // Synchronize evaluation status of equivalent reference model to circumvent race condition where its evaluation
   // concludes inbetween two threads trying to access the evaluation results.
   ModelEvaluator::reduce(this, &results_present, 1, CORAX_REDUCE_MAX);

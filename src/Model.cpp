@@ -1,4 +1,7 @@
 #include "Model.hpp"
+#include "ModelConstants.hpp"
+#include "corax/corax_model.h"
+#include "corax/model/gamma.h"
 
 using namespace std;
 
@@ -7,8 +10,6 @@ const vector<int> ALL_MODEL_PARAMS = {CORAX_OPT_PARAM_FREQUENCIES, CORAX_OPT_PAR
                                       CORAX_OPT_PARAM_FREE_RATES, CORAX_OPT_PARAM_RATE_WEIGHTS,
                                       CORAX_OPT_PARAM_BRANCH_LEN_SCALER,
                                       CORAX_OPT_PARAM_BRANCHES_ITERATIVE};
-
-
 // TODO move it out of here
 class parse_error : public runtime_error
 {
@@ -463,6 +464,15 @@ void Model::set_user_freqs(const doubleVector& freqs)
   _param_mode[CORAX_OPT_PARAM_FREQUENCIES] = ParamValue::user;
 }
 
+void Model::recompute_ratecats()
+{
+  if (ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA)
+  {
+    assert(_ratecat_rates.size() ==  _num_ratecats);
+    corax_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(),
+                             _ratecat_weights.data(), _gamma_mode);
+  }
+}
 
 void Model::init_model_opts(const std::string &model_opts, const corax_mixture_model_t& mix_model)
 {
@@ -745,15 +755,12 @@ void Model::init_model_opts(const std::string &model_opts, const corax_mixture_m
           else if (_num_ratecats == 1)
             _num_ratecats = 4;
 
-          if (ss.peek() == 'a' || ss.peek() == 'A')
+          /* read gamma mode (if any) */
+          const auto gamma_mode = GammaModes::from_char(ss.peek());
+          if (gamma_mode)
           {
             ss.get();
-            _gamma_mode = CORAX_GAMMA_RATES_MEDIAN;
-          }
-          else if (ss.peek() == 'm' || ss.peek() == 'M')
-          {
-            ss.get();
-            _gamma_mode = CORAX_GAMMA_RATES_MEAN;
+            _gamma_mode = gamma_mode.value();
           }
 
           if (read_param(ss, _alpha))
@@ -944,7 +951,7 @@ void Model::init_model_opts(const std::string &model_opts, const corax_mixture_m
       case CORAX_UTIL_MIXTYPE_GAMMA:
         /* compute the discretized category rates from a gamma distribution
            with given alpha shape and store them in rate_cats  */
-        corax_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _gamma_mode);
+        corax_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _ratecat_weights.data(), _gamma_mode);
         if (_param_mode[CORAX_OPT_PARAM_ALPHA] == ParamValue::undefined)
           _param_mode[CORAX_OPT_PARAM_ALPHA] = ParamValue::ML;
         break;
@@ -953,7 +960,7 @@ void Model::init_model_opts(const std::string &model_opts, const corax_mixture_m
         if (_param_mode[CORAX_OPT_PARAM_FREE_RATES] == ParamValue::undefined)
         {
           /* use GAMMA rates as initial values -> can be changed */
-          corax_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _gamma_mode);
+          corax_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _ratecat_weights.data(), _gamma_mode);
           _param_mode[CORAX_OPT_PARAM_FREE_RATES] = ParamValue::ML;
         }
         if (_param_mode[CORAX_OPT_PARAM_RATE_WEIGHTS] == ParamValue::undefined)
@@ -1032,7 +1039,9 @@ std::string Model::to_string(bool print_params, unsigned int precision) const
     if (_rate_het == CORAX_UTIL_MIXTYPE_GAMMA)
     {
       model_string << "+G" << _num_ratecats;
-      model_string << (_gamma_mode == CORAX_GAMMA_RATES_MEDIAN ? "a" : "m");
+        
+      model_string << GammaModes::flag(_gamma_mode);
+
       if (out_param_mode.at(CORAX_OPT_PARAM_ALPHA) == ParamValue::user)
         model_string << "{" << _alpha << "}";
     }
@@ -1266,7 +1275,7 @@ static string get_ratehet_mode_str(const Model& m)
     return "NONE";
   else
     return (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA) ? "GAMMA" :
-            (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_FREE) ? "FREE" : "FIXED";
+           (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_FREE) ? "FREE" : "FIXED";
 }
 
 LogStream& operator<<(LogStream& stream, const Model& m)
@@ -1280,9 +1289,11 @@ LogStream& operator<<(LogStream& stream, const Model& m)
   stream << "   Rate heterogeneity: " << get_ratehet_mode_str(m);
   if (m.num_ratecats() > 1)
   {
-    stream << " (" << m.num_ratecats() << " cats, " <<
-        (m.gamma_mode() == CORAX_GAMMA_RATES_MEDIAN ? "median" : "mean") << ")";
-    if (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA)
+    stream << " (" << m.num_ratecats() << " cats, ";
+    stream << GammaModes::label(m.gamma_mode());
+    stream << ")";
+
+    if (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA )
       stream << ",  alpha: " << FMT_MOD(m.alpha()) << " ("
              << get_param_mode_str(m.param_mode(CORAX_OPT_PARAM_ALPHA)) << ")";
     stream << ",  weights&rates: ";

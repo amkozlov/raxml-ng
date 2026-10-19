@@ -8,7 +8,7 @@
 #include "util/SafetyCheck.hpp"
 #include "modeltest/ModelDefinitions.hpp"
 
-constexpr int RAXML_OPT_VERSION = 6;
+constexpr int RAXML_OPT_VERSION = 7;
 
 struct OutputFileNames
 {
@@ -49,6 +49,21 @@ struct OutputFileNames
   std::string tmp_best_tree;
   std::string tmp_ml_trees;
   std::string tmp_bs_trees;
+};
+
+class GammaModeOverride {
+public:
+  bool enabled;
+  int mode;
+
+  GammaModeOverride() : enabled(false), mode(CORAX_GAMMA_RATES_MEAN) {};
+
+  bool operator==(const GammaModeOverride &other) const {
+      return enabled == other.enabled && mode == other.mode;
+  }
+  bool operator!=(const GammaModeOverride &other) const {
+      return !(*this == other);
+  }
 };
 
 class Options
@@ -114,6 +129,8 @@ public:
   bool brlen_reset_usertree;
   bool use_pars_brlen;
 
+  GammaModeOverride override_gamma_mode;
+  
   unsigned int num_searches;
   unsigned long long terrace_maxsize;
 
@@ -169,6 +186,7 @@ public:
   HeuristicSelection modeltest_heuristics;
   double modeltest_significant_ic_delta;
   RateHeterogeneitySelection modeltest_rhas;
+  GammaModeSelection modeltest_gamma_modes;
   RHASHeuristicMode modeltest_rhas_heuristic_mode;
   std::vector<std::string> modeltest_subst_models;
   bool modeltest_json_output;

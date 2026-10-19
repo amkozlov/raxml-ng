@@ -2,6 +2,7 @@
 #include <stdio.h>
 
 #include "Checkpoint.hpp"
+#include "ModelConstants.hpp"
 #include "ParallelContext.hpp"
 #include "io/binary_io.hpp"
 #include "io/file_io.hpp"
@@ -107,6 +108,16 @@ bool CheckpointFile::compatible(const Options& old_opts, bool throw_error) const
     errfield = "command";
     ckp_val = "--" + CommandNames[static_cast<size_t>(old_opts.command)];
     cmd_val = "--" + CommandNames[static_cast<size_t>(opts.command)];
+  }
+
+  if (opts.override_gamma_mode != old_opts.override_gamma_mode)
+  {
+    errfield = "gamma-mode";
+    ckp_val = old_opts.override_gamma_mode.enabled ? "--gamma-mode=" + GammaModes::label(old_opts.override_gamma_mode.mode)
+                                                    : "(absent)";
+
+    cmd_val = opts.override_gamma_mode.enabled ? "--gamma-mode=" + GammaModes::label(opts.override_gamma_mode.mode)
+                                                    : "(absent)";
   }
 
   if (!errfield.empty() && throw_error)

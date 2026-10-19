@@ -25,6 +25,7 @@
 #include <memory>
 
 #include <corax/corax.h>
+#include "corax/corax_model.h"
 #include "difficulty.h"
 
 #include "version.h"
@@ -112,6 +113,8 @@ struct RaxmlInstance
   // bootstopping convergence test, only autoMRE is supported for now
   unique_ptr<BootstopCheckMRE> bootstop_checker;
   bool bs_converged;
+
+  bool resumed_from_checkpoint;
   RaxmlRunPhase run_phase;
   double used_wh;
 
@@ -153,7 +156,7 @@ struct RaxmlInstance
   RaxmlWorker& get_worker() { return workers.at(ParallelContext::local_group_id()); }
 
   RaxmlInstance() : num_threads_parsimony(0), pars_spr_enabled(false), bs_converged(false),
-      run_phase(RaxmlRunPhase::start), used_wh(0), num_threads_modeltest(0) {}
+      resumed_from_checkpoint(false), run_phase(RaxmlRunPhase::start), used_wh(0), num_threads_modeltest(0) {}
 };
 
 struct RaxmlWorker
@@ -1045,6 +1048,7 @@ void check_options_early(Options& opts)
     LOG_WARN << endl << "WARNING: The --workers option is ignored in model selection mode."
              << endl << endl;
   }
+
 }
 
 void check_options(RaxmlInstance& instance)
@@ -1084,6 +1088,19 @@ void check_options(RaxmlInstance& instance)
           "and fall back to per-site scalers." << endl << endl;
       instance.opts.use_rate_scalers = true;
     }
+  }
+
+  if (opts.command == Command::modeltest && opts.override_gamma_mode.enabled)
+  {
+    LOG_WARN << endl << "WARNING: --gamma-mode does not affect MOOSE, please use --moose-options gamma-modes= instead."
+             << endl << endl;
+  }
+
+  if (opts.override_gamma_mode.enabled && instance.opts.msa_format == FileFormat::binary &&
+      !instance.resumed_from_checkpoint)
+  {
+    throw runtime_error( "--gamma-mode does not work with RBA files. "
+        "Please recreate the RBA file with the correct gamma model instead.");
   }
 }
 
@@ -1667,6 +1684,7 @@ void load_checkpoint(RaxmlInstance &instance, CheckpointManager &cm)
 
   if (cm.read())
   {
+    instance.resumed_from_checkpoint = true;
     LOG_INFO << "NOTE: Loaded checkpoint file: " << instance.opts.checkp_file() << endl;
   }
 }
@@ -2054,11 +2072,41 @@ void predict_msa_difficulty(RaxmlInstance& instance)
   }
 }
 
+void override_gamma_model_if_needed(RaxmlInstance& instance)
+{
+  const auto &override_gamma = instance.opts.override_gamma_mode;
+
+  if (override_gamma.enabled == false) return;
+
+  bool no_gamma_partitions = true;
+
+  for (auto &part : instance.parted_msa->part_list())
+  {
+    auto &model = part.model();
+    if (model.ratehet_mode() != CORAX_UTIL_MIXTYPE_GAMMA) continue;
+
+    no_gamma_partitions = false;
+    model.gamma_mode(override_gamma.mode);
+  }
+
+  if (no_gamma_partitions)
+  {
+    const auto part_count = instance.parted_msa->part_count();
+    LOG_WARN << endl
+      << "WARNING: "
+      << ((part_count > 1) ? "MSA does not contain partitions with a gamma model, --gamma-mode will not be effective."
+                            : "The specified model is not a gamma model, --gamma-mode will not be effective.")
+      << endl << endl;
+  }
+}
+
 void load_parted_msa(RaxmlInstance& instance)
 {
   init_part_info(instance);
 
   assert(instance.parted_msa);
+
+  override_gamma_model_if_needed(instance);
 
   if (instance.opts.msa_format != FileFormat::binary)
     load_msa(instance);
@@ -4036,6 +4084,7 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
     if (!instance.opts.auto_model())
       instance.opts.model_file = "";
     instance.opts.msa_format = FileFormat::binary;
+    instance.resumed_from_checkpoint = true;
   }
 
   // load MSA  

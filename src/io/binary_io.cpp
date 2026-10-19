@@ -576,6 +576,8 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Options& o)
 
   stream << o.stopping_rule;
 
+  stream << o.override_gamma_mode;
+
   return stream;
 }
 
@@ -636,6 +638,9 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, Options& o)
 
   if (o.opt_version >= 5)
     stream >> o.stopping_rule;
+
+  if (o.opt_version >= 7)
+    stream >> o.override_gamma_mode;
 
   return stream;
 }

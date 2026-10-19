@@ -8,6 +8,7 @@
 #include "ModelDefinitions.hpp"
 #include "ModelEvaluator.hpp"
 #include "ModelScheduler.hpp"
+#include "corax/model/gamma.h"
 #include "corax/tree/treeinfo.h"
 
 using namespace std;
@@ -60,7 +61,9 @@ vector<ModelDescriptor> ModelTest::generate_candidate_model_names(const DataType
             break;
           case RateHeterogeneityType::GAMMA:
           case RateHeterogeneityType::INVARIANT_GAMMA:
-            candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity, gamma_category_count);
+            for (const auto &gamma_mode : options.modeltest_gamma_modes) {
+                candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity, gamma_category_count, gamma_mode);
+            }
             break;
           default:
             candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity);
@@ -189,7 +192,8 @@ const vector<Model>& ModelTest::optimize_model()
                     reference_model.matrix_name,
                     reference_model.base_frequency,
                     evaluator->candidate_model().rate_heterogeneity.type,
-                    evaluator->candidate_model().rate_heterogeneity.category_count ) };
+                    evaluator->candidate_model().rate_heterogeneity.category_count,
+                    evaluator->candidate_model().rate_heterogeneity.gamma_mode) };
         const auto equivalent_reference = model_scheduler.get_by_descriptor(equivalent_reference_descriptor);
         const bool rhas_copied = evaluator->copy_rhas_parameters(equivalent_reference);
         if (rhas_copied) {

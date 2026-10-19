@@ -95,13 +95,7 @@ public:
   void alpha(double value)
   {
     _alpha = value;
-
-    /* IMPORTANT: re-compute per-category rates with the new alpha value */
-    if (ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA)
-    {
-      assert(_ratecat_rates.size() ==  _num_ratecats);
-      corax_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _gamma_mode);
-    }
+    recompute_ratecats(); /* IMPORTANT: re-compute per-category rates with the new alpha value */
   }
   void pinv(double value) { _pinv = value; }
   void brlen_scaler(double value) { _brlen_scaler = value; }
@@ -117,6 +111,12 @@ public:
   {
     if (param_mode(param) == ParamValue::undefined)
       _param_mode[param] = mode;
+  }
+
+  void gamma_mode(int gamma_mode)
+  {
+    _gamma_mode = gamma_mode;
+    recompute_ratecats(); /* IMPORTANT: re-compute per-category rates with the new alpha value */
   }
 
   /* initialization */
@@ -159,6 +159,7 @@ private:
   void init_state_names() const;
   void set_user_srates(doubleVector& srates, bool normalize = true);
   void set_user_freqs(const doubleVector& freqs);
+  void recompute_ratecats();
 };
 
 struct ModelEvaluation {
