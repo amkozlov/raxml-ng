@@ -57,7 +57,7 @@ public:
   unsigned int num_states() const { return _num_states; }
   std::string name() const { return _name; }
 
-  const corax_state_t* charmap() const;
+  const corax_state_t* charmap(bool strict = false) const;
   const NameList& state_names() const;            // non-ambiguous states only, eg A C G T
   const StateNameMap& full_state_namemap() const; // + ambiguous states, eg A C G T M R W S Y K -
 

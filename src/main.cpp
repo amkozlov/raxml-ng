@@ -533,10 +533,44 @@ bool check_msa(RaxmlInstance& instance)
   {
     /* check for invalid MSA characters */
     corax_msa_errors_t * errs = corax_msa_check(pinfo.msa().pll_msa(),
-                                                  pinfo.model().charmap());
+                                                pinfo.model().charmap(true));
 
     if (errs)
     {
+      if (errs->invalid_char_count > 0 && pinfo.model().data_type() == DataType::protein)
+      {
+        auto old_errs = errs;
+
+        /* try a relaxed map, e.g. allow non-standard amino acids */
+        auto relaxed_charmap = pinfo.model().charmap(false);
+        errs = corax_msa_check(pinfo.msa().pll_msa(), relaxed_charmap);
+
+        if (errs->invalid_char_count == 0)
+        {
+          unordered_set<char> invalid_chars;
+          auto namemap = pinfo.model().full_state_namemap();
+          LOG_WARN << endl;
+          LOG_WARN << "WARNING: ";
+          if (parted_msa.part_count() > 1)
+            LOG_WARN << "Partition " << part_num+1 << ": ";
+          LOG_WARN << "Non-standard amino acids found and replaced: ";
+          for (unsigned long c = 0; c < old_errs->invalid_char_count; ++c)
+          {
+            auto ic = old_errs->invalid_chars[c];
+            if (!invalid_chars.count(ic))
+            {
+              /* keep it simple for now, but */
+              auto mc = namemap[relaxed_charmap[(int) ic]];
+              mc = (mc == "*") ? "X" : mc;
+              LOG_WARN << (c > 0 ? ", " : "")  << ic << "->" << mc;
+              invalid_chars.insert(ic);
+            }
+          }
+          LOG_WARN << endl;
+        }
+        corax_msa_destroy_errors(old_errs);
+      }
+
       if (errs->invalid_char_count > 0)
       {
         msa_valid = false;
