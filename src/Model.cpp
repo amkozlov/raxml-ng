@@ -461,6 +461,15 @@ void Model::set_user_freqs(const doubleVector& freqs)
   _param_mode[CORAX_OPT_PARAM_FREQUENCIES] = ParamValue::user;
 }
 
+void Model::recompute_ratecats()
+{
+  if (ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA)
+  {
+    assert(_ratecat_rates.size() ==  _num_ratecats);
+    corax_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(),
+                             _ratecat_weights.data(), _gamma_mode);
+  }
+}
 
 void Model::init_model_opts(const std::string &model_opts, const corax_mixture_model_t& mix_model)
 {
@@ -745,9 +754,10 @@ void Model::init_model_opts(const std::string &model_opts, const corax_mixture_m
 
           /* read gamma mode (if any) */
           const auto gamma_mode = GammaModes::from_char(ss.peek());
-          if (gamma_mode) {
-              ss.get();
-              _gamma_mode = gamma_mode.value();
+          if (gamma_mode)
+          {
+            ss.get();
+            _gamma_mode = gamma_mode.value();
           }
 
           if (read_param(ss, _alpha))

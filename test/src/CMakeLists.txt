@@ -6,7 +6,7 @@ if(NOT GTEST_FOUND)
     return()
 endif()
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 message (STATUS "Building tests")
 

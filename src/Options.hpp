@@ -8,7 +8,7 @@
 #include "util/SafetyCheck.hpp"
 #include "modeltest/ModelDefinitions.hpp"
 
-constexpr int RAXML_OPT_VERSION = 6;
+constexpr int RAXML_OPT_VERSION = 7;
 
 struct OutputFileNames
 {

@@ -593,11 +593,11 @@ void CommandLineParser::parse_modeltest_options(Options &opts, const string& arg
       RateHeterogeneitySelection selection;
       for (const auto &rhas : split_string(mopt_val, ','))
       {
-          const auto &effective_rhas_name = (rhas == "E" ? "" : rhas);
-          const auto &it = std::find(rate_heterogeneity_label.cbegin(), rate_heterogeneity_label.cend(), effective_rhas_name);
-          if (it == rate_heterogeneity_label.cend())
-              throw InvalidOptionValueException("Invalid modeltest rate-heterogeneity model: '" + rhas + "'");
-          selection.insert(static_cast<RateHeterogeneityType>(std::distance(rate_heterogeneity_label.cbegin(), it)));
+        const auto &effective_rhas_name = (rhas == "E" ? "" : rhas);
+        const auto &it = std::find(rate_heterogeneity_label.cbegin(), rate_heterogeneity_label.cend(), effective_rhas_name);
+        if (it == rate_heterogeneity_label.cend())
+            throw InvalidOptionValueException("Invalid modeltest rate-heterogeneity model: '" + rhas + "'");
+        selection.insert(static_cast<RateHeterogeneityType>(std::distance(rate_heterogeneity_label.cbegin(), it)));
       }
 
       opts.modeltest_rhas = selection;
@@ -606,21 +606,27 @@ void CommandLineParser::parse_modeltest_options(Options &opts, const string& arg
     {
       opts.modeltest_subst_models = split_string(mopt_val, ',');
     }
-    else if (mopt_name == "gamma-modes") {
+    else if (mopt_name == "gamma-modes")
+    {
       if (mopt_val == "all") {
         opts.modeltest_gamma_modes = GammaModes::all();
-      } else if (!mopt_val.empty()) {
-          opts.modeltest_gamma_modes.clear();
-          for (const auto &gamma_mode_label: split_string(mopt_val, ',')) {
-              auto mode = GammaModes::from_string(gamma_mode_label);
-              if (!mode) {
-                  throw InvalidOptionValueException("Unknown mode specified for modeltest option 'gamma-modes': '" + gamma_mode_label + "'. "
-                                                    "Possible options are " + GammaModes::all_labels());
-              }
-              opts.modeltest_gamma_modes.insert(mode.value());
+      }
+      else if (!mopt_val.empty())
+      {
+        opts.modeltest_gamma_modes.clear();
+        for (const auto &gamma_mode_label: split_string(mopt_val, ','))
+        {
+          auto mode = GammaModes::from_string(gamma_mode_label);
+          if (!mode)
+          {
+            throw InvalidOptionValueException("Unknown mode specified for modeltest option 'gamma-modes': '"
+                                              + gamma_mode_label + "'. "
+                                              "Possible options are " + GammaModes::all_labels());
           }
+          opts.modeltest_gamma_modes.insert(mode.value());
+        }
       } else {
-          throw InvalidOptionValueException("Must supply value to modeltest option 'gamma-modes'");
+        throw InvalidOptionValueException("Must supply value to modeltest option 'gamma-modes'");
       }
     }
     else
@@ -628,11 +634,13 @@ void CommandLineParser::parse_modeltest_options(Options &opts, const string& arg
   }
 }
 
-void CommandLineParser::parse_gamma_mode(Options &opts, const string& arg) {
+void CommandLineParser::parse_gamma_mode(Options &opts, const string& arg)
+{
   opts.override_gamma_mode.enabled = true;
   
   const auto gamma_mode = GammaModes::from_string(arg);
-  if (!gamma_mode) {
+  if (!gamma_mode)
+  {
     throw InvalidOptionValueException("Unknown gamma-mode specified: '" + arg + "'. "
                                       "Possible options are " + GammaModes::all_labels());
   }
@@ -1830,7 +1838,7 @@ void CommandLineParser::print_help()
             "  --prob-msa     on | off                    use probabilistic alignment (works with CATG and VCF)\n"
             "  --lh-epsilon   VALUE                       log-likelihood epsilon for optimization/tree search (default: 10)\n"
             "  --opt-freerate bfgs | em-bfgs | em-brent   optimization method for FreeRates (default: auto)\n"
-            "  --gamma-mode   mean | median | star        override discretization method for gamma models\n"
+            "  --gamma-mode   mean | median | star        override discretization method for Gamma RHAS models\n"
             "\n"
             "Model selection options:\n"
             "  --moose-options OPT=VAL/OPT=VAL/...        list of MOdel Optimization and SElection options separated by '/'\n"

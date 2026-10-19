@@ -110,15 +110,15 @@ bool CheckpointFile::compatible(const Options& old_opts, bool throw_error) const
     cmd_val = "--" + CommandNames[static_cast<size_t>(opts.command)];
   }
 
-  if (opts.override_gamma_mode != old_opts.override_gamma_mode) {
+  if (opts.override_gamma_mode != old_opts.override_gamma_mode)
+  {
     errfield = "gamma-mode";
     ckp_val = old_opts.override_gamma_mode.enabled ? "--gamma-mode=" + GammaModes::label(old_opts.override_gamma_mode.mode)
                                                     : "(absent)";
 
-    cmd_val = old_opts.override_gamma_mode.enabled ? "--gamma-mode=" + GammaModes::label(old_opts.override_gamma_mode.mode)
+    cmd_val = opts.override_gamma_mode.enabled ? "--gamma-mode=" + GammaModes::label(opts.override_gamma_mode.mode)
                                                     : "(absent)";
   }
-
 
   if (!errfield.empty() && throw_error)
     throw incompatible_checkpoint_error(errfield, ckp_val, cmd_val);
