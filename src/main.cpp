@@ -197,7 +197,8 @@ void print_banner()
   LOG_INFO << "Developed by: Oleksiy M. Kozlov and Alexandros Stamatakis." << endl;
   LOG_INFO << "Contributors: Diego Darriba, Tomas Flouri, Benoit Morel, "
               "Sarah Lutteropp, Ben Bettisworth," << endl <<
-              "              Julia Haag, Anastasis Togkousidis, Julius Wiegert, Christoph Stelz." << endl;
+              "              Julia Haag, Anastasis Togkousidis, Julius Wiegert, Christoph Stelz," << endl <<
+              "              Johannes Hengstler." << endl;
   LOG_INFO << "Latest version: https://codeberg.org/amkozlov/raxml-ng" << endl;
   LOG_INFO << "Questions/problems/suggestions? "
               "Please visit: https://groups.google.com/forum/#!forum/raxml" << endl << endl;
@@ -2354,7 +2355,7 @@ void init_ancestral(RaxmlInstance& instance)
 
 void init_persite_loglh(RaxmlInstance& instance)
 {
-  if (instance.opts.command == Command::sitelh || instance.opts.command == Command::au_test)
+  if (instance.opts.command == Command::sitelh || instance.opts.command == Command::autest)
   {
     const auto& parted_msa = *instance.parted_msa;
 
@@ -3413,7 +3414,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
     }
   }
 
-  if (opts.command == Command::au_test)
+  if (opts.command == Command::autest)
   {
     assert(instance.au_test->is_finished());
 
@@ -3424,7 +3425,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
 
       for (unsigned int tree_num = 0; tree_num < instance.start_trees.size(); tree_num++) {
         const auto delim = "\t";
-        fs << tree_num << delim << p_values[tree_num] << endl;
+        fs << (tree_num+1) << delim << p_values[tree_num] << endl;
       }
 
       LOG_INFO << "\nAU p-values saved to: " << sysutil_realpath(opts.stat_tests_file()) << endl;
@@ -3749,7 +3750,7 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
 
     if (opts.command == Command::evaluate || opts.command == Command::sitelh ||
         opts.command == Command::ancestral || opts.command == Command::mutmap ||
-        opts.command == Command::au_test)
+        opts.command == Command::autest)
     { 
       // check if we have anything to optimize
       if (opts.optimize_brlen || opts.optimize_model)
@@ -4103,7 +4104,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
   if ((opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate || opts.command == Command::sitelh ||
       opts.command == Command::ancestral || opts.command == Command::mutmap ||
-      opts.command == Command::au_test) && !instance.start_trees.empty())
+      opts.command == Command::autest) && !instance.start_trees.empty())
   {
     thread_infer_ml(instance, cm);
     ParallelContext::global_barrier();
@@ -4579,7 +4580,7 @@ int internal_main(int argc, char** argv, void* comm)
         command_consense(instance);
         break;
       }
-      case Command::au_test:
+      case Command::autest:
       {
         cm.disable();
 

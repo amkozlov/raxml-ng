@@ -111,7 +111,7 @@ static struct option long_options[] =
   {"moose-options",      required_argument, nullptr, 0 },  /*  77 */
   {"mutmap",             optional_argument, nullptr, 0 },  /*  78 */
   {"gamma-mode",         required_argument, nullptr, 0 },  /*  79 */
-  {"au-test",            no_argument,       nullptr, 0 },  /*  80 */
+  {"autest",             optional_argument, nullptr, 0 },  /*  80 */
 
   { 0, 0, 0, 0 }
 };
@@ -146,7 +146,7 @@ void CommandLineParser::check_options(Options &opts)
       opts.command == Command::start     || opts.command == Command::ancestral ||
       opts.command == Command::sitelh    || opts.command == Command::pythia    ||
       opts.command == Command::modeltest || opts.command == Command::mutmap    ||
-      opts.command == Command::au_test)
+      opts.command == Command::autest)
   {
     if (opts.msa_file.empty())
       throw OptionException("You must specify a multiple alignment file with --msa switch");
@@ -155,7 +155,7 @@ void CommandLineParser::check_options(Options &opts)
   if (opts.command == Command::evaluate || opts.command == Command::support   ||
       opts.command == Command::terrace  || opts.command == Command::rfdist    ||
       opts.command == Command::sitelh   || opts.command == Command::ancestral ||
-      opts.command == Command::consense || opts.command == Command::au_test)
+      opts.command == Command::consense || opts.command == Command::autest)
   {
     if (opts.tree_file.empty() && (opts.start_trees.count(StartingTree::user) || opts.start_trees.empty()))
       throw OptionException("Please provide a valid Newick file as an argument of --tree option.");
@@ -290,7 +290,7 @@ void CommandLineParser::compute_num_searches(Options &opts)
       opts.command == Command::evaluate || opts.command == Command::start ||
       opts.command == Command::ancestral || opts.command == Command::sitelh ||
       opts.command == Command::modeltest || opts.command == Command::mutmap ||
-      opts.command == Command::au_test)
+      opts.command == Command::autest)
   {
     assert(!opts.start_trees.empty());
 
@@ -1691,8 +1691,16 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         parse_gamma_mode(opts, std::string(optarg));
         break;
       case 80: /* au test */
-        opts.command = Command::au_test;
+        opts.command = Command::autest;
         optarg_tree_required = true;
+        if (optarg)
+        {
+          if (!read_uint(optarg, opts.num_au_reps, 1))
+          {
+            throw InvalidOptionValueException("Invalid number of AU replicates: " + string(optarg) +
+                ", please provide a positive integer number!");
+          }
+        }
         num_commands++;
         break;
       default:
@@ -1792,6 +1800,7 @@ void CommandLineParser::print_help()
             "  --sitelh                                   print per-site log-likelihood values\n"
             "  --pythia                                   compute and print Pythia MSA difficulty score\n"
             "  --moose [ OPTIONS ]                        select best-fit MOdel Of Sequence Evolution (OPTIONS: see below)\n"
+            "  --autest [ REPS ]                          compare trees using the AU statistical test [with REPS replicates]\n"
             "\n"
             "Command shortcuts (mutually exclusive):\n"
             "  --search1                                  Alias for: --search --tree pars{1}\n"
@@ -1882,7 +1891,8 @@ void CommandLineParser::print_help()
             "                 gcf                         gcf = Gene concordance factor\n"
             "  --bs-write-msa on | off                    write all bootstrap alignments (default: OFF)\n"
             "\n"
-            "SH-like test options:\n"
+            "Statistical test options:\n"
+//            "  --au-reps      VALUE                       number of bootstrap replicates for AU test (default: 10000)\n"
             "  --sh-reps      VALUE                       number of bootstrap replicates for SH-aLRT test (default: 1000)\n"
             "  --sh-epsilon   VALUE                       log-likelihood epsilon for SH-aLRT test (default: 0.1)\n";
 

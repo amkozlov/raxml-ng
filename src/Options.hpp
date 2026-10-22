@@ -8,7 +8,7 @@
 #include "util/SafetyCheck.hpp"
 #include "modeltest/ModelDefinitions.hpp"
 
-constexpr int RAXML_OPT_VERSION = 7;
+constexpr int RAXML_OPT_VERSION = 8;
 
 struct OutputFileNames
 {
@@ -178,6 +178,8 @@ public:
   unsigned int num_sh_reps;
   double sh_epsilon;
 
+  /* AU test */
+  unsigned int num_au_reps;
 
   /* Modeltest */
   unsigned int free_rate_min_categories;

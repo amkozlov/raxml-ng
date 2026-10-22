@@ -52,6 +52,8 @@
 #define RAXML_SH_ALRT_REPS        1000
 #define RAXML_SH_ALRT_EPSILON     0.1
 
+#define RAXML_AU_REPS             10000
+
 #define RAXML_EBG_PS_TREES_NUM    1000
 #define RAXML_EBG_PBS_TREES_NUM   200
 

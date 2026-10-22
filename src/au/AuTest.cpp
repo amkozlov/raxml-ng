@@ -12,8 +12,7 @@ void AuTest::allocate_test_statistics(bool inplace) {
                                                  num_trees,
                                                  num_replicates.data(),
                                                  num_replicates.size())) {
-        // TODO handle properly
-        exit(-1);
+        throw std::runtime_error("Failed to allocate memory for the AU test.");
     }
 
     if (inplace) {
@@ -23,8 +22,7 @@ void AuTest::allocate_test_statistics(bool inplace) {
                                                      num_trees,
                                                      num_replicates.data(),
                                                      num_replicates.size())) {
-            // TODO handle properly
-            exit(-1);
+          throw std::runtime_error("Failed to allocate memory for the AU test.");
         }
     }
 }
@@ -144,8 +142,7 @@ void AuTest::reset_test_statistics() {
 
 doubleVector &AuTest::get_p_values() {
     if (!finished) {
-        LOG_ERROR << "please call calculate_p_values before calling get_p_values" << std::endl;
-        exit(-1);
+        throw std::runtime_error("AU test: please call calculate_p_values before calling get_p_values");
     }
 
     return p_values;

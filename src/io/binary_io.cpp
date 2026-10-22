@@ -578,6 +578,8 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Options& o)
 
   stream << o.override_gamma_mode;
 
+  stream << o.num_au_reps;
+
   return stream;
 }
 
@@ -641,6 +643,9 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, Options& o)
 
   if (o.opt_version >= 7)
     stream >> o.override_gamma_mode;
+
+  if (o.opt_version >= 8)
+    stream >> o.num_au_reps;
 
   return stream;
 }

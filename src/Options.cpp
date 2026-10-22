@@ -48,7 +48,7 @@ msa_file(""), model_file(""), weights_file(""), outfile_prefix(""),
 num_threads(1), num_threads_max(1), num_ranks(1), num_workers(1), num_workers_max(UINT_MAX),
 simd_arch(CORAX_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(LoadBalancing::benoit),
 diff_pred_pars_trees(RAXML_CPYTHIA_TREES_NUM), nni_tolerance(1.0), nni_epsilon(10),
-num_sh_reps(RAXML_SH_ALRT_REPS), sh_epsilon(RAXML_SH_ALRT_EPSILON),
+num_sh_reps(RAXML_SH_ALRT_REPS), sh_epsilon(RAXML_SH_ALRT_EPSILON), num_au_reps(RAXML_AU_REPS),
 free_rate_min_categories(2), free_rate_max_categories(10), free_rate_opt_method(FreerateOptMethod::AUTO),
 model_selection_criterion(InformationCriterion::bic), modeltest_heuristics({HeuristicType::FREERATE, HeuristicType::RHAS}),
 modeltest_significant_ic_delta(10.0), modeltest_rhas(default_rate_heterogeneity_selection),
@@ -139,7 +139,7 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.mut_map_tree, "mutationMapTree");
   set_default_outfile(outfile_names.mut_map_list, "mutationMapList");
   set_default_outfile(outfile_names.site_loglh, "siteLH");
-  set_default_outfile(outfile_names.stat_tests, "treeTests");
+  set_default_outfile(outfile_names.stat_tests, "statTests");
   set_default_outfile(outfile_names.modeltest_best_model, "moose.bestModel");
   if (modeltest_json_output)
     set_default_outfile(outfile_names.modeltest_json, "moose.json");
@@ -248,6 +248,8 @@ bool Options::result_files_exist() const
       return sysutil_file_exists(sitelh_file());
     case Command::modeltest:
       return sysutil_file_exists(modeltest_best_model_file());
+    case Command::autest:
+      return sysutil_file_exists(stat_tests_file());
     default:
       return false;
   }
@@ -316,6 +318,11 @@ void Options::remove_result_files() const
     sysutil_file_remove(modeltest_xml_file());
     sysutil_file_remove(modeltest_best_model_file());
   }
+
+  if (command == Command::autest)
+  {
+    sysutil_file_remove(stat_tests_file());
+  }
 }
 
 void Options::remove_tmp_files() const
@@ -371,6 +378,7 @@ std::string Options::ic_name() const
             return "BIC";
         default:
             assert(0);
+            return "UNKNOWN";
     }
 }
 
@@ -501,6 +509,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       break;
     case Command::modeltest:
       stream << "Model selection";
+      break;
+    case Command::autest:
+      stream << "AU test";
       break;
     default:
       break;
