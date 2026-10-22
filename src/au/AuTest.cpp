@@ -41,10 +41,10 @@ void AuTest::run_bootstrap(const size_t num_rows, const size_t offset) {
     // prepare matrix array with offset matrices
     // we collect subarray pointers in `test_statistics_views` and since corax expects double pointers,
     // we create another pointer array onto the subarrays in `test_statistics_pointers`
-    std::vector<double *> test_statistics_views(AU_DEFAULT_SCALES.size(), nullptr);
-    std::vector<double **> test_statistics_pointers(AU_DEFAULT_SCALES.size(), nullptr);
+    std::vector<double *> test_statistics_views(this->scales.size(), nullptr);
+    std::vector<double **> test_statistics_pointers(this->scales.size(), nullptr);
 
-    for (unsigned int scale_id = 0; scale_id < AU_DEFAULT_SCALES.size(); scale_id++) {
+    for (unsigned int scale_id = 0; scale_id < this->scales.size(); scale_id++) {
         test_statistics_views[scale_id] = corax_RELL_submatrix(test_statistics[scale_id], offset,
                                                                num_replicates[scale_id]);
         test_statistics_pointers[scale_id] = &test_statistics_views[scale_id];
@@ -70,8 +70,8 @@ void AuTest::run_bootstrap(const size_t num_rows, const size_t offset) {
                                         part_msa.num_patterns(),
                                         num_rows,
                                         num_replicates.data(),
-                                        AU_DEFAULT_SCALES.data(),
-                                        AU_DEFAULT_SCALES.size());
+                                        scales.data(),
+                                        scales.size());
     }
 
     // clean up
@@ -80,7 +80,7 @@ void AuTest::run_bootstrap(const size_t num_rows, const size_t offset) {
 
 void AuTest::finalize_test_statistics() {
     LOG_INFO_TS << "Calculating test statistics" << std::endl;
-    for (unsigned int id_scale = 0; id_scale < AU_DEFAULT_SCALES.size(); id_scale++) {
+    for (unsigned int id_scale = 0; id_scale < scales.size(); id_scale++) {
         corax_normalize_lnl_bootstrap(test_statistics[id_scale], normalized_statistics[id_scale],
                                       num_replicates[id_scale], num_trees);
     }
@@ -97,10 +97,10 @@ void AuTest::calculate_p_values() {
 
     // find the scale closest to 1.0
     int best_index = 0;
-    double best_score = fabs(1.0 - AU_DEFAULT_SCALES[best_index]);
-    for (size_t scale_index = 0; scale_index < AU_DEFAULT_SCALES.size(); scale_index++) {
-        if (best_score > fabs(1.0 - AU_DEFAULT_SCALES[scale_index])) {
-            best_score = fabs(1.0 - AU_DEFAULT_SCALES[scale_index]);
+    double best_score = fabs(1.0 - scales[best_index]);
+    for (size_t scale_index = 0; scale_index < scales.size(); scale_index++) {
+        if (best_score > fabs(1.0 - scales[scale_index])) {
+            best_score = fabs(1.0 - scales[scale_index]);
             best_index = scale_index;
         }
     }
@@ -110,9 +110,9 @@ void AuTest::calculate_p_values() {
         double p_value = 0.0;
         const int status = corax_au_p_value(normalized_statistics,
                          tree,
-                         AU_DEFAULT_SCALES.data(),
+                         scales.data(),
                          num_replicates.data(),
-                         AU_DEFAULT_SCALES.size(),
+                         scales.size(),
                          corax_bootstrap_expectation(normalized_statistics[best_index], num_replicates[best_index], tree),
                          &d,
                          &c,
