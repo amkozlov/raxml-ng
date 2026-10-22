@@ -2663,6 +2663,7 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree,
         sup_tree = make_shared<TransferBootstrapTree>(ref_tree, instance.opts.tbe_naive);
         add_replicate_trees = true;
         support_in_pct = false;
+//        support_in_pct = true;
       }
       else if (metric == BranchSupportMetric::ebg)
       {
@@ -2722,6 +2723,8 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree,
         /* do we have pre-extractred replicate splits? */
         if (!bs_splits.empty())
         {
+          assert(metric != BranchSupportMetric::tbe);
+          assert(metric != BranchSupportMetric::gcf);
           sup_tree->add_splits(bs_splits);
         }
         else if (!bs_trees.empty())
@@ -3177,6 +3180,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
       if (!sup_file.empty())
       {
         NewickStream nw(sup_file, std::ios::out);
+//        nw.brlens(false);
         nw << *it.second;
 
         std::string metric_name = "";

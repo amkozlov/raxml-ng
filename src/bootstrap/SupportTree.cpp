@@ -21,7 +21,8 @@ char * support_fmt_prop(double support)
 }
 
 
-SupportTree::SupportTree(const Tree& tree) : SplitsTree(tree, true)
+SupportTree::SupportTree(const Tree& tree, bool ref_splits_only /* = true */) :
+    SplitsTree(tree, ref_splits_only)
 {
 }
 
@@ -76,7 +77,7 @@ void SupportTree::draw_support(bool support_in_pct)
 
 //  printf("\n\n");
 //  for (size_t i = 0; i < num_splits(); ++i)
-//    printf("node_id %d, split_id %d\n", _node_split_map[i]->node_index, i);
+//    printf("node_id %d, split_id %d, support: %lf\n", _node_split_map[i]->node_index, i, _support[i]);
 //  printf("\n\n");
 
   corax_unode_t ** node_map = _node_split_map.empty() ? nullptr : _node_split_map.data();

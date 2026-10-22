@@ -8,7 +8,7 @@ typedef std::shared_ptr<corax_split_t> PllSplitSharedPtr;
 class SupportTree : public SplitsTree
 {
 public:
-  SupportTree (const Tree& tree = Tree());
+  SupportTree (const Tree& tree = Tree(),  bool ref_splits_only = true);
 
   virtual ~SupportTree() override;
 
