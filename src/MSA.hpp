@@ -30,10 +30,10 @@ public:
   typedef typename container::iterator        iterator;
   typedef typename container::const_iterator  const_iterator;
 
-  MSA() : _length(0), _num_sites(0), _states(0), _pll_msa(NULL), _dirty(false) {};
-  MSA(const unsigned int num_sites) : _length(0), _num_sites(num_sites),
-      _states(0), _pll_msa(nullptr), _dirty(false) {};
-  MSA(const RangeList& rl);
+  MSA() : _length(0), _num_sites(0), _states(0), _pll_msa(nullptr), _dirty(false) {}
+  explicit MSA(const size_t num_sites) : _length(0), _num_sites(num_sites),
+      _states(0), _pll_msa(nullptr), _dirty(false) {}
+  explicit MSA(const RangeList& rl);
 
   MSA(const corax_msa_t * pll_msa);
   MSA(MSA&& other);
@@ -58,7 +58,7 @@ public:
   const corax_msa_t * pll_msa() const;
   corax_msa_t* pll_msa_nonconst() const;
 
-  const container& labels() const { return _labels; };
+  const container& labels() const { return _labels; }
   const std::string& label(size_t index) const { return _labels.at(index); }
   const std::string& at(const std::string& label) const
   { return _sequences.at(_label_id_map.at(label)); }
@@ -80,7 +80,7 @@ public:
   void site_name(size_t index, const std::string& name);
   const NameList& site_names() const { return _site_names; }
 
-  void num_sites(const unsigned int sites) { _num_sites = sites; }
+  void num_sites(const size_t sites) { _num_sites = sites; }
   void weights(const WeightVector& v);
   void weights(WeightVector&& v);
   void site_pattern_map(const WeightVector& v);

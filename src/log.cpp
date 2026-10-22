@@ -107,9 +107,9 @@ LogStream& operator<<(LogStream& logstream, const time_t& t)
 
 LogStream& operator<<(LogStream& logstream, const TimeStamp& ts)
 {
-  const unsigned int hh = ts.secs / 3600;
-  const unsigned int mm = (ts.secs - hh * 3600) / 60;
-  const unsigned int ss = (ts.secs - hh * 3600 - mm * 60);
+  const unsigned int hh = (unsigned int) ts.secs / 3600;
+  const unsigned int mm = (unsigned int) (ts.secs - hh * 3600) / 60;
+  const unsigned int ss = (unsigned int) (ts.secs - hh * 3600 - mm * 60);
 
   logstream << setfill('0') << setw(2) << hh << ":" <<
                       setw(2) << mm << ":" <<

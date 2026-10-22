@@ -7,7 +7,7 @@ char * support_fmt_pct(double support)
   char *str;
   int size_alloced = asprintf(&str, "%u", (unsigned int) round(support * 100.));
 
-  return size_alloced >= 0 ? str : NULL;
+  return size_alloced >= 0 ? str : nullptr;
 }
 
 char * support_fmt_prop(double support)
@@ -17,11 +17,12 @@ char * support_fmt_prop(double support)
   char * str;
   int size_alloced = asprintf(&str, "%.*lf", precision, support);
 
-  return size_alloced >= 0 ? str : NULL;
+  return size_alloced >= 0 ? str : nullptr;
 }
 
 
-SupportTree::SupportTree(const Tree& tree) : SplitsTree(tree, true)
+SupportTree::SupportTree(const Tree& tree, bool ref_splits_only /* = true */) :
+    SplitsTree(tree, ref_splits_only)
 {
 }
 
@@ -34,7 +35,7 @@ void SupportTree::normalize_support_in_hashtable()
   for (unsigned int i = 0; i < _pll_splits_hash->table_size; ++i)
   {
     bitv_hash_entry_t * e =  _pll_splits_hash->table[i];
-    while (e != NULL)
+    while (e != nullptr)
     {
       e->support /= _num_bs_trees;
       e = e->next;
@@ -49,7 +50,7 @@ void SupportTree::collect_support()
   for (unsigned int i = 0; i < _pll_splits_hash->table_size; ++i)
   {
     bitv_hash_entry_t * e =  _pll_splits_hash->table[i];
-    while (e != NULL)
+    while (e != nullptr)
     {
       _support[e->bip_number] = e->support;
       e = e->next;
@@ -76,7 +77,7 @@ void SupportTree::draw_support(bool support_in_pct)
 
 //  printf("\n\n");
 //  for (size_t i = 0; i < num_splits(); ++i)
-//    printf("node_id %d, split_id %d\n", _node_split_map[i]->node_index, i);
+//    printf("node_id %d, split_id %d, support: %lf\n", _node_split_map[i]->node_index, i, _support[i]);
 //  printf("\n\n");
 
   corax_unode_t ** node_map = _node_split_map.empty() ? nullptr : _node_split_map.data();

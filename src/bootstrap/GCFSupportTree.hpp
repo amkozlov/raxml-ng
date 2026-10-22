@@ -7,11 +7,10 @@ class GCFSupportTree : public SupportTree
 {
 public:
   GCFSupportTree (const Tree& tree = Tree());
-  virtual
-  ~GCFSupportTree ();
+  virtual ~GCFSupportTree() override;
 
-  virtual void add_replicate_tree(const Tree& tree);
-  virtual bool compute_support();
+  virtual void add_replicate_tree(const Tree& tree) override;
+  virtual bool compute_support() override;
 
 private:
   uintVector _num_decisive_trees;

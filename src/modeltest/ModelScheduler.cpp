@@ -10,6 +10,7 @@
 #include <utility>
 #include <unistd.h>
 
+using namespace std;
 
 size_t determine_binary_candidates_size(const std::vector<ModelEvaluator> &evaluations)
 {
@@ -56,9 +57,11 @@ vector<ModelEvaluator> build_evaluators(const PartitionedMSA &msa,
     {
       const auto priority = prioritize_candidate_model(candidate_model, reference_model);
       const auto requested_thread_count = CORAX_MAX(1, resource_estimator(options, pinfo, candidate_model, priority));
-      const auto assigned_thread_count = ModelScheduler::pick_acceptable_thread_count(acceptable_thread_counts, requested_thread_count);
+      const auto assigned_thread_count = ModelScheduler::pick_acceptable_thread_count(acceptable_thread_counts,
+                                                                                      requested_thread_count);
       
-      LOG_DEBUG << "Candidate model " << candidate_model.descriptor() << " requested " << requested_thread_count << " threads, assigning " << assigned_thread_count << "\n";
+      LOG_DEBUG << "Candidate model " << candidate_model.descriptor() << " requested "
+                << requested_thread_count << " threads, assigning " << assigned_thread_count << "\n";
 
       evaluators.emplace_back(candidate_model, pinfo.stats(), p, priority, assigned_thread_count);
     }
@@ -68,7 +71,7 @@ vector<ModelEvaluator> build_evaluators(const PartitionedMSA &msa,
 }
 
 std::vector<RateHeterogeneityDescriptor> get_selected_rhas(const std::vector<ModelDescriptor> &candidate_models,
-                                                    const SubstitutionModelDescriptor &reference_model)
+                                                           const SubstitutionModelDescriptor &reference_model)
 {
   std::vector<RateHeterogeneityDescriptor> selected_rhas;
 
@@ -102,7 +105,7 @@ unsigned int max_descriptor_width(Iterator begin, Iterator end)
     ++it;
   }
 
-  return w;
+  return (unsigned int) w;
 }
 
 ModelScheduler::ModelScheduler(
@@ -154,7 +157,7 @@ ModelScheduler::ModelScheduler(
   globally_init_evaluation_index();
 }
 
-void ModelScheduler::read_from_checkpoint(CheckpointManager &checkpoint_manager)
+void ModelScheduler::read_from_checkpoint(const CheckpointManager &checkpoint_manager)
 {
   const auto t0 = global_timer().elapsed_seconds();
 
@@ -230,7 +233,8 @@ unsigned int ModelScheduler::recommended_thread_count() const
   return std::max(1U, thread_count);
 }
 
-void ModelScheduler::update_result(ModelEvaluator &evaluator, const ModelEvaluation& result, bool announce, bool write_checkpoint)
+void ModelScheduler::update_result(ModelEvaluator &evaluator, const ModelEvaluation& result,
+                                   bool announce, bool write_checkpoint)
 {
   std::lock_guard<std::mutex> lock(mutex_evaluation);
   _update_result(evaluator, result, announce, write_checkpoint);
@@ -241,21 +245,23 @@ void ModelScheduler::update_result(ModelEvaluator &evaluator, const ModelEvaluat
     const auto progress = _collect_progress();
     const auto n_finished = progress.at(static_cast<uint64_t>(EvaluationStatus::FINISHED));
     const auto n_total = evaluators.size() - progress.at(static_cast<uint64_t>(EvaluationStatus::SKIPPED));
-    const auto width = std::to_string(evaluators.size() + 1).size();
+    const int width = (int) std::to_string(evaluators.size() + 1).size();
 
     logger().logstream(LogLevel::progress, LogScope::thread) << RAXML_LOG_TIMESTAMP << std::setfill(' ')
         << "[" << setw(3) << evaluator.proposed_thread_count() << "T] " << "Evaluated model "
         << "(" << std::setw(width) << n_finished << "/" << std::setw(width) << n_total << ") "
-        << std::setw(candidate_model_descriptor_width) << std::left << evaluator.candidate_model().descriptor() << " " << right
+        << std::setw(candidate_model_descriptor_width) << std::left << evaluator.candidate_model().descriptor()
+        << " " << right
         << "LogLH = " << setw(15) << FMT_LH(evaluator.get_result().loglh) << "  "
         << options.ic_name() << " = " << FMT_LH(evaluator.get_result().ic_score) << endl;
   }
 }
 
-void ModelScheduler::_update_result(ModelEvaluator &evaluator, const ModelEvaluation &result, bool announce, bool write_checkpoint)
+void ModelScheduler::_update_result(ModelEvaluator &evaluator, const ModelEvaluation &result,
+                                    bool announce, bool write_checkpoint)
 {
   // TODO: replace calls to `std::distance` with `index` field inside ModelEvaluator
-  const uint64_t index = std::distance(evaluators.data(), std::addressof(evaluator));
+  const uint64_t index = static_cast<uint64_t>(std::distance(evaluators.data(), std::addressof(evaluator)));
 
   evaluator.store_result(result);
   heuristics.update(evaluator.partition_index(), evaluator.candidate_model(), evaluator.get_result().ic_score);
@@ -265,7 +271,8 @@ void ModelScheduler::_update_result(ModelEvaluator &evaluator, const ModelEvalua
   }
 
   if (write_checkpoint && ParallelContext::master_rank()) {
-    checkpoint_manager.update_and_write(PartitionCandidateModel { evaluator.partition_index(), evaluator.candidate_model() }, evaluator.get_result());
+    PartitionCandidateModel pcmodel{ evaluator.partition_index(), evaluator.candidate_model() };
+    checkpoint_manager.update_and_write(pcmodel, evaluator.get_result());
   }
 }
 
@@ -395,7 +402,9 @@ vector<size_t> ModelScheduler::determine_acceptable_thread_counts(size_t total_c
     return acceptable_thread_counts;
 }
 
-size_t ModelScheduler::pick_acceptable_thread_count(const vector<size_t> &acceptable_thread_counts, size_t requested_thread_count) {
+size_t ModelScheduler::pick_acceptable_thread_count(const vector<size_t> &acceptable_thread_counts,
+                                                    size_t requested_thread_count)
+{
     if (requested_thread_count == 1 || acceptable_thread_counts.empty()) {
         return requested_thread_count;
     }

@@ -1,4 +1,7 @@
 #include "Model.hpp"
+#include "ModelConstants.hpp"
+#include "corax/corax_model.h"
+#include "corax/model/gamma.h"
 
 using namespace std;
 
@@ -7,8 +10,6 @@ const vector<int> ALL_MODEL_PARAMS = {CORAX_OPT_PARAM_FREQUENCIES, CORAX_OPT_PAR
                                       CORAX_OPT_PARAM_FREE_RATES, CORAX_OPT_PARAM_RATE_WEIGHTS,
                                       CORAX_OPT_PARAM_BRANCH_LEN_SCALER,
                                       CORAX_OPT_PARAM_BRANCHES_ITERATIVE};
-
-
 // TODO move it out of here
 class parse_error : public runtime_error
 {
@@ -142,6 +143,92 @@ static void print_param(ostringstream& s, const std::vector<T>& vec)
   s << "}";
 }
 
+
+/* SubstitutionModel */
+
+SubstitutionModel::SubstitutionModel(const corax_subst_model_t& sm) :
+  _states(sm.states), _name(sm.name)
+{
+  if (sm.freqs)
+    _base_freqs.assign(sm.freqs, sm.freqs + sm.states);
+  if (sm.rates)
+    _subst_rates.assign(sm.rates, sm.rates + sm.states*(sm.states-1)/2);
+  if (sm.rate_sym)
+    _rate_sym.assign(sm.rate_sym, sm.rate_sym + sm.states*(sm.states-1)/2);
+  if (sm.freq_sym)
+    _freq_sym.assign(sm.freq_sym, sm.freq_sym + sm.states);
+}
+
+unsigned int SubstitutionModel::num_rates() const
+{
+  return _states*(_states-1)/2;
+}
+
+unsigned int SubstitutionModel::num_uniq_rates() const
+{
+  if (_rate_sym.empty())
+    return num_rates();
+  else
+    return (unsigned int) *std::max_element(_rate_sym.cbegin(), _rate_sym.cend()) + 1;
+}
+
+doubleVector SubstitutionModel::uniq_subst_rates() const
+{
+  if (!_rate_sym.empty())
+  {
+    doubleVector uniq_rates(num_uniq_rates());
+    for (size_t i = 0; i < _subst_rates.size(); ++i)
+    {
+      if (_rate_sym[i] >= 0)
+        uniq_rates[(unsigned int) _rate_sym[i]] = _subst_rates[i];
+    }
+    return uniq_rates;
+  }
+  else
+    return _subst_rates;
+}
+
+
+// setters
+void SubstitutionModel::base_freqs(const doubleVector& v)
+{
+//    std::cout << "expected: " << _states << ", got: " << v.size() << std::endl;
+  if (v.size() != _states)
+    throw std::invalid_argument("Invalid size of base_freqs vector!");
+
+  _base_freqs = v;
+}
+
+void SubstitutionModel::subst_rates(const doubleVector& v)
+{
+  if (v.size() != num_rates())
+    throw std::invalid_argument("Invalid size of subst_rates vector!");
+
+  _subst_rates = v;
+}
+
+void SubstitutionModel::uniq_subst_rates(const doubleVector& v)
+{
+  if (!_rate_sym.empty())
+  {
+    if (v.size() != num_uniq_rates())
+      throw std::invalid_argument("Invalid size of subst_rates vector!");
+
+    _subst_rates.resize(num_rates());
+    for (size_t i = 0; i < _subst_rates.size(); ++i)
+    {
+      _subst_rates[i] = _rate_sym[i] < 0 ? CORAX_OPT_MIN_SUBST_RATE :
+                                           v[(unsigned int) _rate_sym[i]];
+    }
+  }
+  else
+    subst_rates(v);
+}
+
+
+
+/* Model */
+
 Model::Model (DataType data_type, const std::string &model_string) :
     _data_type(data_type), _custom_charmap(nullptr)
 {
@@ -151,9 +238,12 @@ Model::Model (DataType data_type, const std::string &model_string) :
   init_from_string(model_string_tmp);
 }
 
-const corax_state_t * Model::charmap() const
+const corax_state_t * Model::charmap(bool strict /* = false */) const
 {
-  return _custom_charmap ? _custom_charmap.get() : DatatypeCharmaps.at(_data_type);
+  if (_custom_charmap)
+    return _custom_charmap.get();
+  else
+    return strict ? DatatypeCharmapsStrict.at(_data_type) : DatatypeCharmaps.at(_data_type);
 }
 
 void Model::init_from_string(const std::string &model_string)
@@ -309,6 +399,7 @@ corax_mixture_model_t * Model::init_mix_model(const std::string &model_name)
         coraxlib_check_error("ERROR model initialization |" + model_name + "|");
       else
         throw runtime_error("Invalid model name: " + model_name);
+      assert(0);
     }
 
     /* create pseudo-mixture with 1 component */
@@ -328,8 +419,21 @@ void Model::set_user_srates(doubleVector& srates, bool normalize)
   // normalize the rates
   if (normalize)
   {
-    auto last_rate = smodel.rate_sym().empty() ?
-                                srates.back() : srates[smodel.rate_sym().back()];
+    double last_rate = 0.;
+
+    if (!smodel.rate_sym().empty())
+    {
+      /* pick last non-fixed rate (they have non-negative rate_sym indices) */
+      auto idx = smodel.rate_sym().cend() - 1;
+      while (*idx < 0 && idx != smodel.rate_sym().cbegin()) idx--;
+      assert(*idx >= 0 && *idx < (int) srates.size());
+      last_rate = srates[*idx];
+    }
+    else
+      last_rate = srates.back();
+
+    assert(last_rate > 0.);
+
     for (auto& r: srates)
       r /= last_rate;
   }
@@ -340,7 +444,7 @@ void Model::set_user_srates(doubleVector& srates, bool normalize)
   _param_mode[CORAX_OPT_PARAM_SUBST_RATES] = ParamValue::user;
 }
 
-void Model::set_user_freqs(doubleVector& freqs)
+void Model::set_user_freqs(const doubleVector& freqs)
 {
   bool invalid = false;
   for (auto v: freqs)
@@ -360,6 +464,15 @@ void Model::set_user_freqs(doubleVector& freqs)
   _param_mode[CORAX_OPT_PARAM_FREQUENCIES] = ParamValue::user;
 }
 
+void Model::recompute_ratecats()
+{
+  if (ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA)
+  {
+    assert(_ratecat_rates.size() ==  _num_ratecats);
+    corax_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(),
+                             _ratecat_weights.data(), _gamma_mode);
+  }
+}
 
 void Model::init_model_opts(const std::string &model_opts, const corax_mixture_model_t& mix_model)
 {
@@ -378,7 +491,7 @@ void Model::init_model_opts(const std::string &model_opts, const corax_mixture_m
   /* set rate heterogeneity defaults from model */
   _num_ratecats = mix_model.ncomp;
   _num_submodels = mix_model.ncomp;
-  _rate_het = mix_model.mix_type;
+  _rate_het = (unsigned int) mix_model.mix_type;
 
   /* allocate space for all subst matrices */
   for (size_t i = 0; i < mix_model.ncomp; ++i)
@@ -452,7 +565,7 @@ void Model::init_model_opts(const std::string &model_opts, const corax_mixture_m
   }
   catch(parse_error& e)
   {
-    const string rstr(s, strchr(s, '+') - s);
+    const string rstr(s, (size_t) (strchr(s, '+') - s));
     throw runtime_error(string("Invalid substitution rate specification: ") + rstr);
   }
 
@@ -642,15 +755,12 @@ void Model::init_model_opts(const std::string &model_opts, const corax_mixture_m
           else if (_num_ratecats == 1)
             _num_ratecats = 4;
 
-          if (ss.peek() == 'a' || ss.peek() == 'A')
+          /* read gamma mode (if any) */
+          const auto gamma_mode = GammaModes::from_char(ss.peek());
+          if (gamma_mode)
           {
             ss.get();
-            _gamma_mode = CORAX_GAMMA_RATES_MEDIAN;
-          }
-          else if (ss.peek() == 'm' || ss.peek() == 'M')
-          {
-            ss.get();
-            _gamma_mode = CORAX_GAMMA_RATES_MEAN;
+            _gamma_mode = gamma_mode.value();
           }
 
           if (read_param(ss, _alpha))
@@ -841,7 +951,7 @@ void Model::init_model_opts(const std::string &model_opts, const corax_mixture_m
       case CORAX_UTIL_MIXTYPE_GAMMA:
         /* compute the discretized category rates from a gamma distribution
            with given alpha shape and store them in rate_cats  */
-        corax_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _gamma_mode);
+        corax_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _ratecat_weights.data(), _gamma_mode);
         if (_param_mode[CORAX_OPT_PARAM_ALPHA] == ParamValue::undefined)
           _param_mode[CORAX_OPT_PARAM_ALPHA] = ParamValue::ML;
         break;
@@ -850,7 +960,7 @@ void Model::init_model_opts(const std::string &model_opts, const corax_mixture_m
         if (_param_mode[CORAX_OPT_PARAM_FREE_RATES] == ParamValue::undefined)
         {
           /* use GAMMA rates as initial values -> can be changed */
-          corax_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _gamma_mode);
+          corax_compute_gamma_cats(_alpha, _num_ratecats, _ratecat_rates.data(), _ratecat_weights.data(), _gamma_mode);
           _param_mode[CORAX_OPT_PARAM_FREE_RATES] = ParamValue::ML;
         }
         if (_param_mode[CORAX_OPT_PARAM_RATE_WEIGHTS] == ParamValue::undefined)
@@ -864,7 +974,7 @@ void Model::init_model_opts(const std::string &model_opts, const corax_mixture_m
     /* link rate categories to corresponding mixture components (R-matrix + freqs)*/
     if (_num_submodels == _num_ratecats)
     {
-      for (size_t i = 0; i < _num_ratecats; ++i)
+      for (unsigned int i = 0; i < _num_ratecats; ++i)
         _ratecat_submodels[i] = i;
     }
   }
@@ -883,7 +993,7 @@ std::string Model::to_string(bool print_params, unsigned int precision) const
   }
 
   if (precision)
-    model_string << fixed << setprecision(precision);
+    model_string << fixed << setprecision((int) precision);
 
   if (out_param_mode.at(CORAX_OPT_PARAM_SUBST_RATES) == ParamValue::user)
     print_param(model_string, submodel(0).uniq_subst_rates());
@@ -929,7 +1039,9 @@ std::string Model::to_string(bool print_params, unsigned int precision) const
     if (_rate_het == CORAX_UTIL_MIXTYPE_GAMMA)
     {
       model_string << "+G" << _num_ratecats;
-      model_string << (_gamma_mode == CORAX_GAMMA_RATES_MEDIAN ? "a" : "m");
+        
+      model_string << GammaModes::flag(_gamma_mode);
+
       if (out_param_mode.at(CORAX_OPT_PARAM_ALPHA) == ParamValue::user)
         model_string << "{" << _alpha << "}";
     }
@@ -1073,7 +1185,7 @@ void Model::init_state_names() const
 
       if (popcnt == 1)
       {
-        auto idx = CORAX_STATE_CTZ(state);
+        size_t idx = (size_t) CORAX_STATE_CTZ(state);
         _state_names[idx] = state_name;
 //        printf("char: %s, state: %d, popcnt: %u\n", state_name.c_str(), idx, popcnt);
       }
@@ -1134,7 +1246,7 @@ void assign(corax_partition_t * partition, const Model& model)
     corax_set_category_weights(partition, model.ratecat_weights().data());
 
     /* now iterate over rate matrices and set all params */
-    for (size_t i = 0; i < partition->rate_matrices; ++i)
+    for (unsigned int i = 0; i < partition->rate_matrices; ++i)
     {
       /* set base frequencies */
       assert(!model.base_freqs(i).empty());
@@ -1163,7 +1275,7 @@ static string get_ratehet_mode_str(const Model& m)
     return "NONE";
   else
     return (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA) ? "GAMMA" :
-            (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_FREE) ? "FREE" : "FIXED";
+           (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_FREE) ? "FREE" : "FIXED";
 }
 
 LogStream& operator<<(LogStream& stream, const Model& m)
@@ -1177,13 +1289,15 @@ LogStream& operator<<(LogStream& stream, const Model& m)
   stream << "   Rate heterogeneity: " << get_ratehet_mode_str(m);
   if (m.num_ratecats() > 1)
   {
-    stream << " (" << m.num_ratecats() << " cats, " <<
-        (m.gamma_mode() == CORAX_GAMMA_RATES_MEDIAN ? "median" : "mean") << ")";
-    if (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA)
+    stream << " (" << m.num_ratecats() << " cats, ";
+    stream << GammaModes::label(m.gamma_mode());
+    stream << ")";
+
+    if (m.ratehet_mode() == CORAX_UTIL_MIXTYPE_GAMMA )
       stream << ",  alpha: " << FMT_MOD(m.alpha()) << " ("
              << get_param_mode_str(m.param_mode(CORAX_OPT_PARAM_ALPHA)) << ")";
     stream << ",  weights&rates: ";
-    for (size_t i = 0; i < m.num_ratecats(); ++i)
+    for (unsigned int i = 0; i < m.num_ratecats(); ++i)
     {
       stream << "(" << FMT_MOD(m.ratecat_weights()[i]) << ","
              << FMT_MOD(m.ratecat_rates()[i]) << ") ";
@@ -1199,7 +1313,7 @@ LogStream& operator<<(LogStream& stream, const Model& m)
 
   stream << "   Base frequencies ("
          << get_param_mode_str(m.param_mode(CORAX_OPT_PARAM_FREQUENCIES)) << "): ";
-  for (size_t i = 0; i < m.num_submodels(); ++i)
+  for (unsigned int i = 0; i < m.num_submodels(); ++i)
   {
     if (m.num_submodels() > 1)
       stream << "\nM" << i << ": ";
@@ -1211,7 +1325,7 @@ LogStream& operator<<(LogStream& stream, const Model& m)
 
   stream << "   Substitution rates ("
          << get_param_mode_str(m.param_mode(CORAX_OPT_PARAM_SUBST_RATES)) << "): ";
-  for (size_t i = 0; i < m.num_submodels(); ++i)
+  for (unsigned int i = 0; i < m.num_submodels(); ++i)
   {
     if (m.num_submodels() > 1)
       stream << "\nM " << i << ": ";

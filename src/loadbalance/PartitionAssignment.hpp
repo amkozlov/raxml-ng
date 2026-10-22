@@ -9,10 +9,10 @@
 struct PartitionRange
 {
   PartitionRange() : part_id(0), start(0), length(0), per_site_weight(1.) {}
-  PartitionRange(size_t part_id, size_t start, size_t length, double site_weight = 1.):
-    part_id(part_id), start(start), length(length), per_site_weight(site_weight) {};
+  PartitionRange(size_t part_id_, size_t start_, size_t length_, double site_weight_ = 1.):
+    part_id(part_id_), start(start_), length(length_), per_site_weight(site_weight_) {}
 
-  bool master() const { return start == 0; };
+  bool master() const { return start == 0; }
   double weight() const { return length * per_site_weight; }
 
   size_t part_id;
@@ -38,7 +38,7 @@ struct PartitionAssignment
   {
     return std::find_if( _part_range_list.cbegin(),  _part_range_list.cend(),
                          [part_id](const PartitionRange& r) { return (r.part_id == part_id);} );
-  };
+  }
 
   void assign_sites(size_t partition_id, size_t offset, size_t length, double site_weight = 1.)
   {
@@ -47,10 +47,10 @@ struct PartitionAssignment
     _weight += length * site_weight;
   }
 
-  const_iterator begin() const { return _part_range_list.cbegin(); };
-  const_iterator end() const { return _part_range_list.cend(); };
-  iterator begin() { return _part_range_list.begin(); };
-  iterator end() { return _part_range_list.end(); };
+  const_iterator begin() const { return _part_range_list.cbegin(); }
+  const_iterator end() const { return _part_range_list.cend(); }
+  iterator begin() { return _part_range_list.begin(); }
+  iterator end() { return _part_range_list.end(); }
 
 private:
   container _part_range_list;

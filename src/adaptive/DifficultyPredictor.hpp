@@ -12,8 +12,6 @@
 #include <math.h>
 #include <memory.h>
 
-using namespace std;
-
 class DifficultyPredictor
 {
     private:
@@ -49,9 +47,9 @@ class DifficultyPredictor
         double avg_rrf() const { return _avg_rrf; }
 
         // difficulty prediction
-        double predict_difficulty(int n_trees);
+        double predict_difficulty(unsigned int n_trees);
         double predict_difficulty(const TreeList& pars_trees);
-        int num_start_trees(double difficulty, double amp, double mean = 0.5, double s = 0.2);
+        unsigned int num_start_trees(double difficulty, double amp, double mean = 0.5, double s = 0.2);
 
         // setters
         void compute_msa_features(ParsimonyMSA* _pmsa);

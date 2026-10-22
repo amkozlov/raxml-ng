@@ -16,9 +16,9 @@ class IcSupportTree : public SupportTree
 {
 public:
   IcSupportTree (const Tree& tree, bool icAll = false);
-  virtual ~IcSupportTree ();
+  virtual ~IcSupportTree() override;
 
-  virtual bool compute_support();
+  virtual bool compute_support() override;
 
 protected:
   bool _ic_all;

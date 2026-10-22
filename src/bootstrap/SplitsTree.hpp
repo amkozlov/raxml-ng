@@ -15,8 +15,7 @@ public:
   SplitsTree (SplitsTree&& other);
   SplitsTree& operator=(SplitsTree&& other);
 
-  virtual
-  ~SplitsTree ();
+  virtual ~SplitsTree() override;
 
   virtual void add_replicate_tree(const Tree& tree);
   void add_splits(const SplitsTree& other);
@@ -33,7 +32,7 @@ protected:
                                size_t num_splits = 0);
   void set_reference_tree();
 
-  virtual void get_replicate_supports(const corax_unode_t& root,
+  virtual void get_replicate_supports(const Tree& tree,
                                       PllSplitSharedPtr& splits, doubleVector& support);
 
 

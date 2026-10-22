@@ -1,18 +1,18 @@
 #pragma once
+
 #include <cassert>
 #include <stdexcept>
 #include <type_traits>
-#ifndef MODEL_DEFS_H
-#define MODEL_DEFS_H
-
-#include <corax/corax.h>
-
-#include "../types.hpp"
-
 #include <array>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#include <corax/corax.h>
+
+#include "../types.hpp"
+#include "../ModelConstants.hpp"
+
 
 class unsupported_datatype_error : public std::logic_error
 {
@@ -33,6 +33,8 @@ constexpr auto N_DNA_MODEL_MATRICES = 11;
 using std::array;
 using std::string;
 using std::unordered_map;
+
+using GammaModeSelection = std::set<int>;
 
 enum class BaseFrequencyType
 {
@@ -87,16 +89,21 @@ const RateHeterogeneitySelection fast_rate_heterogeneity_selection{
 class RateHeterogeneityDescriptor
 {
 public:
-  RateHeterogeneityDescriptor(RateHeterogeneityType type, unsigned int count) : type{type}, category_count{count} {}
+  RateHeterogeneityDescriptor(RateHeterogeneityType type, unsigned int count,
+                              int gamma_mode = CORAX_GAMMA_RATES_MEAN)
+      : type{type}, category_count{count}, gamma_mode{gamma_mode}
+  {
+  }
 
   RateHeterogeneityDescriptor(const RateHeterogeneityDescriptor &other) = default;
 
   RateHeterogeneityType type;
   unsigned int category_count;
+  int gamma_mode;
 
   std::string label() const
   {
-    const size_t lookup_index = static_cast<size_t>(type);
+    const auto lookup_index = static_cast<size_t>(type);
 
     switch (type) {
     case RateHeterogeneityType::UNIFORM:
@@ -104,18 +111,24 @@ public:
     case RateHeterogeneityType::INVARIANT:
       return "+" + rate_heterogeneity_label.at(lookup_index);
     case RateHeterogeneityType::GAMMA:
-    case RateHeterogeneityType::INVARIANT_GAMMA:
+    case RateHeterogeneityType::INVARIANT_GAMMA: {
+        std::string result {"+" + rate_heterogeneity_label.at(lookup_index) + std::to_string(category_count) + GammaModes::flag(gamma_mode) };
+
+        return result;
+    }
+
     case RateHeterogeneityType::FREE_RATE:
     case RateHeterogeneityType::INVARIANT_FREE_RATE:
       return "+" + rate_heterogeneity_label.at(lookup_index) + std::to_string(category_count);
     default:
       assert(0);
+      throw std::runtime_error("Unknown rate heterogeneity type");
     }
   }
 
   bool operator==(const RateHeterogeneityDescriptor &other) const
   {
-    return type == other.type && category_count == other.category_count;
+    return type == other.type && category_count == other.category_count && gamma_mode == other.gamma_mode;
   }
 };
 
@@ -136,8 +149,8 @@ public:
   std::string matrix_name;
   BaseFrequencyType base_frequency;
 
-  SubstitutionModelDescriptor(std::string matrix_name, BaseFrequencyType base_frequency)
-      : matrix_name{matrix_name}, base_frequency{base_frequency}
+  SubstitutionModelDescriptor(const std::string& matrix_name_, BaseFrequencyType base_frequency_)
+      : matrix_name{matrix_name_}, base_frequency{base_frequency_}
   {
   }
 
@@ -175,9 +188,9 @@ public:
   RateHeterogeneityDescriptor rate_heterogeneity;
 
   ModelDescriptor(DataType datatype, string matrix_name, const BaseFrequencyType frequency_type,
-                  const RateHeterogeneityType rate_heterogeneity, unsigned int rate_categories = 1)
+                  const RateHeterogeneityType rate_heterogeneity, unsigned int rate_categories = 1, unsigned int gamma_mode = CORAX_GAMMA_RATES_MEAN)
       : datatype(datatype), substitution_model(matrix_name, frequency_type),
-        rate_heterogeneity(rate_heterogeneity, rate_categories)
+        rate_heterogeneity(rate_heterogeneity, rate_categories, gamma_mode)
   {
   }
 
@@ -334,5 +347,3 @@ inline std::vector<string> moose_matrix_names(const DataType datatype)
 
   return {};
 }
-
-#endif

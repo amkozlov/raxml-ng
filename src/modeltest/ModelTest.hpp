@@ -12,9 +12,9 @@ public:
             CheckpointManager &checkpoint_manager);
 
   /* Optimize the model and return model name per partition */
-  const vector<Model>& optimize_model();
+  const std::vector<Model>& optimize_model();
   void print_results_to_file() const;
-  vector<vector<ModelEvaluation const *>> get_results() const;
+  std::vector<std::vector<ModelEvaluation const *>> get_results() const;
 
   unsigned int recommended_thread_count() const;
 
@@ -26,16 +26,16 @@ private:
   const Tree &tree;
   const IDVector &tip_msa_idmap;
 
-  vector<Model> best_model_per_part;
+  std::vector<Model> best_model_per_part;
 
   ModelScheduler model_scheduler;
 
-  using PartitionModelResults = vector<ModelEvaluation const *>;
+  using PartitionModelResults = std::vector<ModelEvaluation const *>;
   
   static void sort_by_score(PartitionModelResults &results);
 
-  vector<ModelDescriptor> generate_candidate_model_names(const DataType &dt) const;
-  vector<PartitionModelResults> _results;
+  std::vector<ModelDescriptor> generate_candidate_model_names(const DataType &dt) const;
+  std::vector<PartitionModelResults> _results;
 };
 
 #endif // MODELTEST_HPP_

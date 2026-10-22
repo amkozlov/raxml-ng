@@ -225,7 +225,7 @@ string PartitionedMSAView::part_sequence(size_t taxon_id, size_t part_id, bool u
       auto orig_seq = msa.at(orig_id);
       string seq;
       seq.reserve(part_len);
-      auto pos = 0;
+      size_t pos = 0;
       auto ex = _excluded_sites[part_id].begin();
       while (ex != _excluded_sites[part_id].end())
       {

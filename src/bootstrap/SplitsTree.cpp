@@ -55,15 +55,15 @@ SplitsTree::~SplitsTree ()
 void SplitsTree::init_hashtable(unsigned int slot_count)
 {
   assert(!_pll_splits_hash && _num_tips > 0);
-  _pll_splits_hash = corax_utree_split_hashtable_create(_num_tips, slot_count);
+  _pll_splits_hash = corax_utree_split_hashtable_create((unsigned int) _num_tips, slot_count);
 }
 
 PllSplitSharedPtr SplitsTree::extract_splits_from_tree(const corax_unode_t& root,
                                                        corax_unode_t ** node_split_map)
 {
   PllSplitSharedPtr splits(corax_utree_split_create((corax_unode_t*) &root,
-                                                       _num_tips,
-                                                       node_split_map),
+                                                    (unsigned int)  _num_tips,
+                                                    node_split_map),
                            corax_utree_split_destroy);
 
   return splits;
@@ -75,8 +75,8 @@ void SplitsTree::add_splits_to_hashtable(const PllSplitSharedPtr& splits,
 {
   _pll_splits_hash = corax_utree_split_hashtable_insert(_pll_splits_hash,
                                                          splits.get(),
-                                                         _num_tips,
-                                                         num_splits ? num_splits : this->num_splits(),
+                                                         (unsigned int)  _num_tips,
+                                                         (unsigned int) (num_splits ? num_splits : this->num_splits()),
                                                          support.empty() ? nullptr: support.data(),
                                                          update_only);
 }
@@ -94,11 +94,11 @@ void SplitsTree::set_reference_tree()
   add_splits_to_hashtable(_ref_splits, support, false);
 }
 
-void SplitsTree::get_replicate_supports(const corax_unode_t& root,
-                                         PllSplitSharedPtr& splits, doubleVector& support)
+void SplitsTree::get_replicate_supports(const Tree& tree,
+                                        PllSplitSharedPtr& splits, doubleVector& support)
 {
   /* by default, do not modify support vector -> every split gets support +1 */
-  RAXML_UNUSED(root);
+  RAXML_UNUSED(tree);
   RAXML_UNUSED(splits);
   RAXML_UNUSED(support);
 }
@@ -118,12 +118,15 @@ void SplitsTree::add_replicate_tree(const Tree& tree)
 //               << "   reference splits: " << num_splits() << endl;
 
   doubleVector support;
-  get_replicate_supports(root, splits, support);
+  get_replicate_supports(tree, splits, support);
 
-  /* In general, both reference and replicate tree can be multifucated (unresolved),
+  /* special case TBE: we get support values for every REF split! */
+  auto splits_to_add = support.empty() ? tree.num_splits() : support.size();
+
+  /* In general, both reference and replicate tree can be multifurcated (unresolved),
    * and hence they can contain different number of splits.
    * Therefore, we need to specify the the number of replicate tree splits below. */
-  add_splits_to_hashtable(splits, support, _ref_splits_only, tree.num_splits());
+  add_splits_to_hashtable(splits, support, _ref_splits_only, splits_to_add);
 //  LOG_DEBUG_TS << "Added replicate trees: " << _num_bs_trees << endl;
 }
 

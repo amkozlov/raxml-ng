@@ -1,6 +1,7 @@
 #ifdef _RAXML_JSON
 #include "json.hpp"
 
+using namespace std;
 
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;

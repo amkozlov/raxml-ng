@@ -12,10 +12,10 @@
 class NewickStream : public std::fstream
 {
 public:
-  NewickStream(const std::string& fname) : std::fstream(fname, std::ios::out),
-    _brlens(true), _brlabs(false) {};
+  explicit NewickStream(const std::string& fname) : std::fstream(fname, std::ios::out),
+    _brlens(true), _brlabs(false) {}
   NewickStream(const std::string& fname, std::ios_base::openmode mode) :
-    std::fstream(fname, mode), _brlens(true), _brlabs(false) {};
+    std::fstream(fname, mode), _brlens(true), _brlabs(false) {}
 
   bool brlens() const { return _brlens; }
   void brlens(bool v) { _brlens = v; }
@@ -31,12 +31,12 @@ private:
 class MSAFileStream
 {
 public:
-  MSAFileStream(const std::string& fname, DataType data_type = DataType::autodetect) :
+  explicit MSAFileStream(const std::string& fname, DataType data_type = DataType::autodetect) :
     _fname(fname), _data_type(data_type) {}
 
-  const std::string& fname() const { return _fname; };
-  DataType data_type() const { return _data_type; };
-  unsigned int num_states() const { return DatatypeStates.at(_data_type); };
+  const std::string& fname() const { return _fname; }
+  DataType data_type() const { return _data_type; }
+  unsigned int num_states() const { return DatatypeStates.at(_data_type); }
 
 private:
   std::string _fname;
@@ -46,7 +46,7 @@ private:
 class PhylipStream : public MSAFileStream
 {
 public:
-  PhylipStream(const std::string& fname, bool interleaved = true) :
+  explicit PhylipStream(const std::string& fname, bool interleaved = true) :
     MSAFileStream(fname), _interleaved(interleaved) {}
 
   bool interleaved() const { return _interleaved; }
@@ -57,7 +57,7 @@ private:
 class FastaStream : public MSAFileStream
 {
 public:
-  FastaStream(const std::string& fname, bool long_labels = false) :
+  explicit FastaStream(const std::string& fname, bool long_labels = false) :
     MSAFileStream(fname), _long_labels(long_labels) {}
 
   bool long_labels() const { return _long_labels; }
@@ -120,7 +120,7 @@ public:
   typedef std::tuple<PartitionedMSA&, RBAElement, PartitionAssignment*> RBAOutput;
 
 public:
-  RBAStream(const std::string& fname) : MSAFileStream(fname) {}
+  explicit RBAStream(const std::string& fname) : MSAFileStream(fname) {}
 
   static bool rba_file(const std::string& fname, bool check_version = false);
   static uint32_t rba_version(const std::string& fname);
@@ -129,7 +129,7 @@ public:
 class RaxmlPartitionStream : public std::fstream
 {
 public:
-  RaxmlPartitionStream(const std::string& fname, bool use_range_string = false) :
+  explicit RaxmlPartitionStream(const std::string& fname, bool use_range_string = false) :
     std::fstream(fname, std::ios::out), _offset(0), _print_model_params(false),
     _use_range_string(use_range_string), _ignore_range(false) {}
   RaxmlPartitionStream(const std::string& fname, std::ios_base::openmode mode) :
@@ -166,13 +166,13 @@ private:
 class FileIOStream : public std::fstream
 {
 public:
-  FileIOStream(const std::string& fname, std::ios_base::openmode mode = std::ios::out) :
-    std::fstream(fname, mode), _delim("\t"), _precision(6) {};
+  explicit FileIOStream(const std::string& fname, std::ios_base::openmode mode = std::ios::out) :
+    std::fstream(fname, mode), _delim("\t"), _precision(6) {}
 
-  const std::string& delim() { return _delim; };
-  void delim(const std::string& del) { _delim = del; };
-  unsigned int precision() { return _precision; };
-  void precision(unsigned int prec) { _precision = prec; };
+  const std::string& delim() { return _delim; }
+  void delim(const std::string& del) { _delim = del; }
+  unsigned int precision() { return _precision; }
+  void precision(unsigned int prec) { _precision = prec; }
 
 protected:
   std::string _delim;
@@ -182,25 +182,25 @@ protected:
 class AncestralProbStream : public FileIOStream
 {
 public:
-  AncestralProbStream(const std::string& fname) : FileIOStream(fname) {};
+  explicit AncestralProbStream(const std::string& fname) : FileIOStream(fname) {}
   AncestralProbStream(const std::string& fname, std::ios_base::openmode mode) :
-    FileIOStream(fname, mode) {};
+    FileIOStream(fname, mode) {}
 };
 
 class AncestralStateStream : public FileIOStream
 {
 public:
-  AncestralStateStream(const std::string& fname) : FileIOStream(fname) {};
+  explicit AncestralStateStream(const std::string& fname) : FileIOStream(fname) {};
   AncestralStateStream(const std::string& fname, std::ios_base::openmode mode) :
-    FileIOStream(fname, mode) {};
+    FileIOStream(fname, mode) {}
 };
 
 class MutationMapListStream : public FileIOStream
 {
 public:
-  MutationMapListStream(const std::string& fname) : FileIOStream(fname) {};
+  explicit MutationMapListStream(const std::string& fname) : FileIOStream(fname) {};
   MutationMapListStream(const std::string& fname, std::ios_base::openmode mode) :
-    FileIOStream(fname, mode) {};
+    FileIOStream(fname, mode) {}
 };
 
 NewickStream& operator<<(NewickStream& stream, const corax_unode_t& root);

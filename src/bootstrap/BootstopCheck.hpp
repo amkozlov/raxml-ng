@@ -31,7 +31,7 @@ protected:
 public:
   void add_bootstrap_tree(const Tree& tree);
 
-  bool converged(unsigned long random_seed = 0);
+  bool converged(unsigned int random_seed = 0);
 
   size_t num_bs_trees() const { return _num_bs_trees; }
   size_t max_bs_trees() const { return _max_bs_trees; }
@@ -63,7 +63,7 @@ protected:
   double consensus_wrf_distance(const splitEntryVector& splits1, const splitEntryVector& splits2,
                                 const uintVector& support1, const uintVector& support2);
 
-  virtual bool check_convergence(RandomGenerator& gen);
+  virtual bool check_convergence(RandomGenerator& gen) override;
 
 private:
   double _wrf_cutoff;

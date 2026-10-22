@@ -22,14 +22,14 @@ public:
     OptionException("")
   {
     _message.reserve(format.size() + value.size());
-    sprintf(&_message[0], format.c_str(), value.c_str());
+    snprintf(&_message[0], _message.capacity(), format.c_str(), value.c_str());
   }
 };
 
 class CommandLineParser
 {
 public:
-  CommandLineParser() {};
+  CommandLineParser() {}
   ~CommandLineParser() = default;
 
   void parse_options(int argc, char** argv, Options &opts);
@@ -43,6 +43,7 @@ private:
   void parse_bs_trees(Options &opts, const std::string& arg);
   void parse_consense_cutoff(Options &opts, const char* optarg);
   void parse_modeltest_options(Options &opts, const string& arg);
+  void parse_gamma_mode(Options &opts, const string& arg);
 };
 
 #endif /* SRC_COMMANDLINEPARSER_HPP_ */

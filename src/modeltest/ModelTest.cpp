@@ -8,7 +8,10 @@
 #include "ModelDefinitions.hpp"
 #include "ModelEvaluator.hpp"
 #include "ModelScheduler.hpp"
+#include "corax/model/gamma.h"
 #include "corax/tree/treeinfo.h"
+
+using namespace std;
 
 static thread_local std::unique_ptr<std::ofstream> thread_log;
 #define LOG_THREAD_TS                                                                                                  \
@@ -58,7 +61,9 @@ vector<ModelDescriptor> ModelTest::generate_candidate_model_names(const DataType
             break;
           case RateHeterogeneityType::GAMMA:
           case RateHeterogeneityType::INVARIANT_GAMMA:
-            candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity, gamma_category_count);
+            for (const auto &gamma_mode : options.modeltest_gamma_modes) {
+                candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity, gamma_category_count, gamma_mode);
+            }
             break;
           default:
             candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity);
@@ -90,13 +95,14 @@ size_t modeltest_estimate_cores(const Options &options, const PartitionInfo &pin
    */
   size_t elems_per_core = priority > EvaluationPriority::NORMAL ? 4000 : 80000;
 
-  const size_t naive_cores = CORAX_MAX(round(static_cast<double>(taxon_clv_size) / elems_per_core), 1.);
+  double corr_elems_per_core = static_cast<double>(elems_per_core);
+  const size_t naive_cores = CORAX_MAX(round(static_cast<double>(taxon_clv_size) / corr_elems_per_core), 1.);
   if (naive_cores <= 8)
-    elems_per_core /= 4. - log2(naive_cores);
+    corr_elems_per_core /= 4. - log2(naive_cores);
   else
-    elems_per_core *= log2(naive_cores) - 2;
+    corr_elems_per_core *= log2(naive_cores) - 2;
 
-  return CORAX_MAX(round(static_cast<double>(taxon_clv_size) / elems_per_core), 1.);
+  return CORAX_MAX(round(static_cast<double>(taxon_clv_size) / corr_elems_per_core), 1.);
 }
 
 ModelTest::ModelTest(const Options &original_options, const PartitionedMSA &msa, const Tree &tree,
@@ -186,7 +192,8 @@ const vector<Model>& ModelTest::optimize_model()
                     reference_model.matrix_name,
                     reference_model.base_frequency,
                     evaluator->candidate_model().rate_heterogeneity.type,
-                    evaluator->candidate_model().rate_heterogeneity.category_count ) };
+                    evaluator->candidate_model().rate_heterogeneity.category_count,
+                    evaluator->candidate_model().rate_heterogeneity.gamma_mode) };
         const auto equivalent_reference = model_scheduler.get_by_descriptor(equivalent_reference_descriptor);
         const bool rhas_copied = evaluator->copy_rhas_parameters(equivalent_reference);
         if (rhas_copied) {
@@ -194,6 +201,7 @@ const vector<Model>& ModelTest::optimize_model()
                         << evaluator->get_result().model.to_string(true) << endl;
         }
     }
+    evaluator->barrier();
 
     TreeInfo treeinfo(options, tree, msa, tip_msa_idmap, assignment, evaluator->partition_index(), model);
 
@@ -249,17 +257,23 @@ const vector<Model>& ModelTest::optimize_model()
 
     best_model_per_part.clear();
 
-    LOG_INFO << endl << "Best model(s):" << endl;
+    if (ParallelContext::master())
+      LOG_INFO << endl << "Best model(s):" << endl;
+
     _results = model_scheduler.collect_finished_results_by_partition();
 
     for (auto p = 0U; p < msa.part_count(); ++p)
     {
       sort_by_score(_results.at(p));
       const auto &best_model = _results[p].at(0);
-      logger().logstream(LogLevel::result, LogScope::thread)
-          << "Partition #" << p << ": " << best_model->model.to_string()
-          << " (LogLH = " << FMT_LH(best_model->loglh)
-          << "  BIC = " << FMT_LH(best_model->ic_score) << ")" << endl;
+
+      if (ParallelContext::master())
+      {
+        logger().logstream(LogLevel::result, LogScope::thread)
+            << "Partition #" << p << ": " << best_model->model.to_string()
+            << " (LogLH = " << FMT_LH(best_model->loglh)
+            << "  BIC = " << FMT_LH(best_model->ic_score) << ")" << endl;
+      }
 
       best_model_per_part.emplace_back(best_model->model);
     }

@@ -4,7 +4,7 @@ using namespace std;
 AncestralProbStream& operator<<(AncestralProbStream& stream, const AncestralStates& ancestral)
 {
   auto delim = stream.delim();
-  stream << fixed << setprecision(stream.precision());
+  stream << fixed << setprecision((int) stream.precision());
 
   auto num_parts = ancestral.num_parts();
 
@@ -52,7 +52,7 @@ AncestralProbStream& operator<<(AncestralProbStream& stream, const AncestralStat
 AncestralStateStream& operator<<(AncestralStateStream& stream, const AncestralStates& ancestral)
 {
   auto delim = stream.delim();
-  stream << fixed << setprecision(stream.precision());
+  stream << fixed << setprecision((int) stream.precision());
 
   auto num_parts = ancestral.num_parts();
   assert(ancestral.probs.size() == num_parts);
@@ -72,7 +72,7 @@ AncestralStateStream& operator<<(AncestralStateStream& stream, const AncestralSt
 MutationMapListStream& operator<<(MutationMapListStream& stream, const MutationMap& mutmap)
 {
   auto delim = stream.delim();
-  stream << fixed << setprecision(stream.precision());
+  stream << fixed << setprecision((int) stream.precision());
 
   stream << "Branch" << delim << "MuCount" << delim << "MuSites" << endl;
 

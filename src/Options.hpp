@@ -8,7 +8,7 @@
 #include "util/SafetyCheck.hpp"
 #include "modeltest/ModelDefinitions.hpp"
 
-constexpr int RAXML_OPT_VERSION = 5;
+constexpr int RAXML_OPT_VERSION = 7;
 
 struct OutputFileNames
 {
@@ -50,6 +50,21 @@ struct OutputFileNames
   std::string tmp_best_tree;
   std::string tmp_ml_trees;
   std::string tmp_bs_trees;
+};
+
+class GammaModeOverride {
+public:
+  bool enabled;
+  int mode;
+
+  GammaModeOverride() : enabled(false), mode(CORAX_GAMMA_RATES_MEAN) {};
+
+  bool operator==(const GammaModeOverride &other) const {
+      return enabled == other.enabled && mode == other.mode;
+  }
+  bool operator!=(const GammaModeOverride &other) const {
+      return !(*this == other);
+  }
 };
 
 class Options
@@ -102,7 +117,7 @@ public:
   LogLevel log_level;
   FileFormat msa_format;
   DataType data_type;
-  long random_seed;
+  unsigned int random_seed;
   StartingTreeMap start_trees;
   double lh_epsilon;
   double lh_epsilon_brlen_triplet;
@@ -115,6 +130,8 @@ public:
   bool brlen_reset_usertree;
   bool use_pars_brlen;
 
+  GammaModeOverride override_gamma_mode;
+  
   unsigned int num_searches;
   unsigned long long terrace_maxsize;
 
@@ -170,11 +187,12 @@ public:
   HeuristicSelection modeltest_heuristics;
   double modeltest_significant_ic_delta;
   RateHeterogeneitySelection modeltest_rhas;
+  GammaModeSelection modeltest_gamma_modes;
   RHASHeuristicMode modeltest_rhas_heuristic_mode;
   std::vector<std::string> modeltest_subst_models;
   bool modeltest_json_output;
 
-  bool coarse() const { return num_workers > 1; };
+  bool coarse() const { return num_workers > 1; }
   bool auto_model() const {
       return command == Command::modeltest || \
             (strcasecmp(model_file.c_str(), "auto") == 0) || \

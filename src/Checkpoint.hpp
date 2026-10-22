@@ -10,8 +10,8 @@
 #include <unordered_map>
 #include <chrono>
 
-constexpr int RAXML_CKP_VERSION = 8;
-constexpr int RAXML_CKP_MIN_SUPPORTED_VERSION = 7;
+constexpr int RAXML_CKP_VERSION = 9;
+constexpr int RAXML_CKP_MIN_SUPPORTED_VERSION = 9;
 constexpr auto RAXML_CKP_MIN_INTERVAL = std::chrono::seconds(1);
 
 struct MLTree
@@ -19,6 +19,8 @@ struct MLTree
   double loglh;
   Tree tree;
   ModelMap models;
+
+  MLTree(): loglh(-INFINITY) {}
 };
 
 enum class CheckpointStep
@@ -42,18 +44,18 @@ struct SearchState
   CheckpointStep step;
   double loglh;
 
-  int iteration;
+  unsigned int iteration;
   nni_round_params nni_params;
   spr_round_params spr_params;
   
-  int fast_spr_radius;
-  int slow_spr_radius;
+  unsigned int fast_spr_radius;
+  unsigned int slow_spr_radius;
 };
 
-class checkpoint_error : public runtime_error
+class checkpoint_error : public std::runtime_error
 {
 public:
-  checkpoint_error(const std::string& msg = "") : std::runtime_error("Failed to load checkpoint!\n" + msg) {};
+  checkpoint_error(const std::string& msg = "") : std::runtime_error("Failed to load checkpoint!\n" + msg) {}
 };
 
 class incompatible_checkpoint_error : public checkpoint_error
@@ -64,7 +66,7 @@ public:
     checkpoint_error("Incompatible values for '" + field + "'" +
                      (ckp_val.empty() ? "." : ": checkpoint = " + ckp_val + ", cmdline = " + cmd_val) +
                      "\nRemove the checkpoint file or re-run with --redo option.")
-    {};
+    {}
 };
 
 
@@ -110,7 +112,7 @@ struct CheckpointFile
   MLTree best_tree() const;
   Tree tree() const;
 
-  void write_tmp_tree(const Tree& tree, const std::string fname, bool append = false) const;
+  void write_tmp_tree(const Tree& tree, const std::string& fname, bool append = false) const;
   void write_tmp_best_tree() const;
   void write_tmp_ml_tree(const Tree& tree) const;
   void write_tmp_bs_tree(const Tree& tree) const;
@@ -126,7 +128,7 @@ struct CheckpointFile
 class CheckpointManager
 {
 public:
-  CheckpointManager(const Options& opts);
+  explicit CheckpointManager(const Options& opts);
 
   const CheckpointFile& checkp_file() const { return _checkp_file;  }
 
@@ -188,7 +190,7 @@ private:
 
   bool minimum_time_exceeded() const {
       return (std::chrono::steady_clock::now() - timestamp_last_checkpoint) > RAXML_CKP_MIN_INTERVAL;
-  };
+  }
 
   mutable std::chrono::time_point<std::chrono::steady_clock> timestamp_last_checkpoint;
 };

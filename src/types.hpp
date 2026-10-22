@@ -63,9 +63,9 @@ enum class Command
 };
 
 const std::string CommandNames[] = {"none", "help", "version", "evaluate", "search", "bootstrap",
-                                    "all", "support", "bsconverge", "bsmsa", "terrace", "check",
-                                    "parse", "start", "rfdist", "consense", "ancestral", "sitelh",
-                                    "pythia", "modeltest", "mutmap" };
+                                        "all", "support", "bsconverge", "bsmsa", "terrace", "check",
+                                        "parse", "start", "rfdist", "consense", "ancestral", "sitelh",
+                                        "pythia", "modeltest", "mutmap" };
 
 enum class FileFormat
 {
@@ -105,6 +105,16 @@ const std::unordered_map<DataType,const corax_state_t*,EnumClassHash>  DatatypeC
 {
   {DataType::dna, corax_map_nt},
   {DataType::protein, corax_map_aa},
+  {DataType::binary, corax_map_bin},
+  {DataType::genotype10, corax_map_gt10},
+  {DataType::genotype16, corax_map_gt16}
+};
+
+/* More restrictive maps, e.g. do not allow non-standard amino acids */
+const std::unordered_map<DataType,const corax_state_t*,EnumClassHash>  DatatypeCharmapsStrict
+{
+  {DataType::dna, corax_map_nt},
+  {DataType::protein, corax_map_aa_strict},
   {DataType::binary, corax_map_bin},
   {DataType::genotype10, corax_map_gt10},
   {DataType::genotype16, corax_map_gt16}
@@ -259,21 +269,21 @@ public:
   {
   }
 
-  virtual const char* what() const noexcept
+  virtual const char* what() const noexcept override
   { return message().c_str(); }
 
   virtual const std::string& message() const
-  { update_message(); return _message; };
+  { update_message(); return _message; }
 
 protected:
   mutable std::string _message;
 
-  virtual void update_message() const { };
+  virtual void update_message() const { }
 
   template<typename ... Args>
   std::string format_message(const std::string& fmt, Args ... args) const
   {
-    size_t size = std::snprintf(nullptr, 0, fmt.c_str(), args ...) + 1;
+    size_t size = (size_t) std::snprintf(nullptr, 0, fmt.c_str(), args ...) + 1;
     std::string msg;
     msg.resize(size);
     std::snprintf(&msg[0], size, fmt.c_str(), args ...);

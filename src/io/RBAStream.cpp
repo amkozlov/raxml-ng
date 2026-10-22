@@ -136,7 +136,7 @@ RBAStream& operator>>(RBAStream& stream, RBAStream::RBAOutput out)
   bool load_meta = (elem == RBAStream::RBAElement::metadata || elem == RBAStream::RBAElement::all);
   bool load_seq = (elem == RBAStream::RBAElement::seqdata || elem == RBAStream::RBAElement::all);
 
-  auto ensure_equal = [](string name, size_t a, size_t b) -> void
+  auto ensure_equal = [](const string& name, size_t a, size_t b) -> void
       {
         if (a != b)
         {
@@ -153,13 +153,9 @@ RBAStream& operator>>(RBAStream& stream, RBAStream::RBAOutput out)
   }
 
   // msa difficulty (pythia)
+  double pythia_score = -1.;
   if (header.version >= 3)
-  {
-    double pythia_score;
     bos >> pythia_score;
-    if (load_meta)
-      part_msa.difficulty_score(pythia_score);
-  }
 
   NameList taxon_names(header.taxon_count, "");
   for (auto& taxon: taxon_names)
@@ -175,6 +171,10 @@ RBAStream& operator>>(RBAStream& stream, RBAStream::RBAOutput out)
   if (load_meta)
   {
     part_msa = PartitionedMSA(taxon_names);
+
+    if (pythia_score >= 0.)
+      part_msa.difficulty_score(pythia_score);
+
     for (const auto& d: dup_seq_map)
       part_msa.mark_dup_seq(d.first, d.second);
   }

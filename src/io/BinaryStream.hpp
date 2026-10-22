@@ -9,7 +9,7 @@
 class BasicBinaryStream
 {
 public:
-  virtual ~BasicBinaryStream() {}
+  virtual ~BasicBinaryStream();
 
   template<typename T>
   T get()
@@ -21,16 +21,16 @@ public:
   }
 
   /* can be used to distinguish between versions or flavors of a binary format */
-  uint32_t version() const { return _version; };
-  void version(uint32_t ver) { _version = ver; };
+  uint32_t version() const { return _version; }
+  void version(uint32_t ver) { _version = ver; }
 
   void get(void *data, size_t size) { read(data, size); }
   void put(const void *data, size_t size) { write(data, size); }
   void skip(size_t size) { read(nullptr, size); }
 
 public:
-  virtual void read(void *data, size_t size) = 0;
   virtual void write(const void *data, size_t size) = 0;
+  virtual void read(void *data, size_t size) = 0;
 
 protected:
   uint32_t _version;
@@ -41,21 +41,13 @@ protected:
 class BinaryNullStream : public BasicBinaryStream
 {
 public:
-  BinaryNullStream(): BasicBinaryStream(), _pos(0) {}
+  BinaryNullStream();
 
   size_t pos() const { return _pos; }
   void reset() { _pos = 0; }
 
-  void write(const void * /* data */, size_t size)
-  {
-    _pos += size;
-  }
-
-  virtual void read(void *data, size_t size)
-  {
-    memset(data, 0, size);
-    _pos += size;
-  }
+  virtual void write(const void * /* data */, size_t size) override;
+  virtual void read(void *data, size_t size) override;
 
 private:
   size_t _pos;
@@ -64,18 +56,13 @@ private:
 class BinaryStream : public BasicBinaryStream
 {
 public:
-  BinaryStream(char * buf, size_t size) : BasicBinaryStream()
-  {
-    _buf = buf;
-    _ptr = buf;
-    _size = size;
-  }
+  BinaryStream(char * buf, size_t size);
 
-  ~BinaryStream() {}
+  ~BinaryStream() override {}
 
   const char* buf() { return _buf; }
   size_t size() const { return _size; }
-  size_t pos() const { return _ptr - _buf;}
+  size_t pos() const { return (size_t) (_ptr - _buf);}
   char* reset() { _ptr = _buf; return _buf; }
 
   template<typename T>
@@ -99,24 +86,8 @@ public:
   }
 
 public:
-  void write(const void *data, size_t size)
-  {
-    if (_ptr + size > _buf + _size)
-      throw std::out_of_range("BinaryStream::put");
-
-    memcpy(_ptr, data, size);
-    _ptr += size;
-  }
-
-  void read(void *data, size_t size)
-  {
-    if (_ptr + size > _buf + _size)
-      throw std::out_of_range("BinaryStream::get");
-
-    if (data)
-      memcpy(data, _ptr, size);
-    _ptr += size;
-  }
+  void write(const void *data, size_t size) override;
+  void read(void *data, size_t size) override;
 
 private:
   char * _buf;
@@ -131,14 +102,8 @@ public:
     BasicBinaryStream(), _fstream(fname, std::ios::binary | mode) {}
 
 public:
-  void write(const void *data, size_t size) { _fstream.write((char*) data, size); }
-  void read(void *data, size_t size)
-  {
-    if (data)
-      _fstream.read((char*) data, size);
-    else
-      _fstream.seekg(size, std::ios_base::cur);
-  }
+  void write(const void *data, size_t size) override;
+  void read(void *data, size_t size) override;
 
   bool good() const { return _fstream.good(); }
 

@@ -40,6 +40,8 @@ release/
 .cproject
 .project
 .settings/
+.vscode
+.devcontainer
 
 # python scripts
 *.py
@@ -50,5 +52,3 @@ release/
 
 # TODO file
 todo.txt
-.vscode
-.devcontainer
