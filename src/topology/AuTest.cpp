@@ -156,7 +156,24 @@ const doubleVector& AuTest::get_p_values() const {
 
 double AuTest::p_value(unsigned int tree_num) const
 {
+  assert(tree_num < num_trees);
   return get_p_values().at(tree_num);
+}
+
+double AuTest::loglh(unsigned int tree_num) const
+{
+  assert(tree_num < num_trees);
+  double tree_loglh = 0;
+  for (unsigned int part_id = 0; part_id < msa->part_count(); part_id++)
+  {
+    const MSA &part_msa = msa->part_msa(part_id);
+
+    for (size_t s = 0; s < part_msa.num_patterns(); ++s)
+    {
+      tree_loglh += persite_loglh[tree_num][part_id][s];
+    }
+  }
+  return tree_loglh;
 }
 
 bool AuTest::is_plausible(unsigned int tree_num) const

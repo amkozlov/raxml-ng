@@ -37,6 +37,7 @@ struct OutputFileNames
   std::string bootstrap_msa;
   std::string rfdist;
   std::string stat_tests;
+  std::string plausible_trees;
   std::string cons_tree;
   std::string site_loglh;
   std::string asr_tree;
@@ -237,6 +238,7 @@ public:
   const std::string cons_tree_file() const { return outfile_names.cons_tree + consense_type_name(); }
   const std::string sitelh_file() const { return outfile_names.site_loglh; }
   const std::string stat_tests_file() const { return outfile_names.stat_tests; }
+  const std::string plausible_trees_file() const { return outfile_names.plausible_trees; }
   const std::string asr_tree_file() const { return outfile_names.asr_tree; }
   const std::string asr_probs_file() const { return outfile_names.asr_probs; }
   const std::string asr_states_file() const { return outfile_names.asr_states; }

@@ -149,6 +149,11 @@ public:
     double p_value(unsigned int tree_num) const;
 
     /**
+     * @return log-likelihood for the tree `tree_num`
+     */
+    double loglh(unsigned int tree_num) const;
+
+    /**
      * Check if the tree belongs to the plausible set (= topology can not be excluded with confidence)
      *
      * @return true if the p-value for `tree_num` is above the significance cutoff (default: 0.05)

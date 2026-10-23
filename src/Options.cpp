@@ -140,6 +140,7 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.mut_map_list, "mutationMapList");
   set_default_outfile(outfile_names.site_loglh, "siteLH");
   set_default_outfile(outfile_names.stat_tests, "statTests");
+  set_default_outfile(outfile_names.plausible_trees, "plausibleTrees");
   set_default_outfile(outfile_names.modeltest_best_model, "moose.bestModel");
   if (modeltest_json_output)
     set_default_outfile(outfile_names.modeltest_json, "moose.json");
@@ -249,7 +250,7 @@ bool Options::result_files_exist() const
     case Command::modeltest:
       return sysutil_file_exists(modeltest_best_model_file());
     case Command::autest:
-      return sysutil_file_exists(stat_tests_file());
+      return sysutil_file_exists(stat_tests_file()) || sysutil_file_exists(plausible_trees_file());
     default:
       return false;
   }
@@ -322,6 +323,7 @@ void Options::remove_result_files() const
   if (command == Command::autest)
   {
     sysutil_file_remove(stat_tests_file());
+    sysutil_file_remove(plausible_trees_file());
   }
 }
 
