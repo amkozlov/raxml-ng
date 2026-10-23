@@ -4,8 +4,10 @@
 #include "corax/statistics/au.h"
 #include "corax/statistics/bootstrap.h"
 
+const unsigned int AU_DEFAULT_RUNS = 10;
 const doubleVector AU_DEFAULT_SCALES = {0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4};
 const uintVector AU_DEFAULT_REPS = {10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000};
+extern const double AU_DEFAULT_CUTOFF = 0.05;
 
 void AuTest::allocate_test_statistics(bool inplace) {
     if (!corax_RELL_allocate_multiscale_matrices(&test_statistics,
@@ -36,15 +38,15 @@ void AuTest::run_bootstrap(const size_t num_rows, const size_t offset) {
     finished = false;
 
     // some debug information
-    LOG_INFO_TS << "Run Bootstrapping..." << std::endl;
+    LOG_INFO_TS << "Run Bootstrapping (" << scales.size() << " x " << num_replicates[0] << " reps)... "  <<  std::endl;
 
     // prepare matrix array with offset matrices
     // we collect subarray pointers in `test_statistics_views` and since corax expects double pointers,
     // we create another pointer array onto the subarrays in `test_statistics_pointers`
-    std::vector<double *> test_statistics_views(this->scales.size(), nullptr);
-    std::vector<double **> test_statistics_pointers(this->scales.size(), nullptr);
+    std::vector<double *> test_statistics_views(scales.size(), nullptr);
+    std::vector<double **> test_statistics_pointers(scales.size(), nullptr);
 
-    for (unsigned int scale_id = 0; scale_id < this->scales.size(); scale_id++) {
+    for (unsigned int scale_id = 0; scale_id < scales.size(); scale_id++) {
         test_statistics_views[scale_id] = corax_RELL_submatrix(test_statistics[scale_id], offset,
                                                                num_replicates[scale_id]);
         test_statistics_pointers[scale_id] = &test_statistics_views[scale_id];
@@ -140,7 +142,11 @@ void AuTest::reset_test_statistics() {
 }
 
 
-doubleVector &AuTest::get_p_values() {
+bool AuTest::is_finished() const {
+    return finished;
+}
+
+const doubleVector& AuTest::get_p_values() const {
     if (!finished) {
         throw std::runtime_error("AU test: please call calculate_p_values before calling get_p_values");
     }
@@ -148,6 +154,12 @@ doubleVector &AuTest::get_p_values() {
     return p_values;
 }
 
-bool AuTest::is_finished() const {
-    return finished;
+double AuTest::p_value(unsigned int tree_num) const
+{
+  return get_p_values().at(tree_num);
+}
+
+bool AuTest::is_plausible(unsigned int tree_num) const
+{
+  return p_value(tree_num) > pvalue_cutoff;
 }

@@ -59,7 +59,7 @@
 #include "util/EnergyMonitor.hpp"
 #include "adaptive/DifficultyPredictor.hpp"
 #include "adaptive/StoppingCriterion.hpp"
-#include "au/AuTest.hpp"
+#include "topology/AuTest.hpp"
 #include "modeltest/ModelTest.hpp"
 #include "git_version.h"
 
@@ -3418,15 +3418,14 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
   {
     assert(instance.au_test->is_finished());
 
-    if (!opts.stat_tests_file().empty()) {
-      fstream fs(opts.stat_tests_file(), ios::out);
+    if (!opts.stat_tests_file().empty())
+    {
+      FileIOStream fs(opts.stat_tests_file(), ios::out);
+      fs.precision(logger().precision(LogElement::other));
 
-      auto p_values = instance.au_test->get_p_values();
+      assert(instance.au_test->get_p_values().size() == instance.start_trees.size());
 
-      for (unsigned int tree_num = 0; tree_num < instance.start_trees.size(); tree_num++) {
-        const auto delim = "\t";
-        fs << (tree_num+1) << delim << p_values[tree_num] << endl;
-      }
+      fs << *instance.au_test;
 
       LOG_INFO << "\nAU p-values saved to: " << sysutil_realpath(opts.stat_tests_file()) << endl;
     }
@@ -4587,7 +4586,10 @@ int internal_main(int argc, char** argv, void* comm)
         master_main(instance, cm);
         ParallelContext::finalize_threads();
 
-        instance.au_test = std::make_shared<AuTest>(instance.parted_msa, instance.persite_loglh, AU_DEFAULT_SCALES, AU_DEFAULT_REPS, opts.random_seed);
+        instance.au_test = std::make_shared<AuTest>(instance.parted_msa, instance.persite_loglh,
+                                                    opts.num_au_reps, opts.random_seed);
+        instance.au_test->significance_cutoff(opts.au_cutoff);
+
         command_au_test(instance);
         break;
       }

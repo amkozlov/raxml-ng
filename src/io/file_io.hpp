@@ -8,6 +8,7 @@
 #include "../bootstrap/BootstrapTree.hpp"
 #include "../bootstrap/BootstrapGenerator.hpp"
 #include "../PartitionedMSAView.hpp"
+#include "../topology/AuTest.hpp"
 
 class NewickStream : public std::fstream
 {
@@ -244,6 +245,8 @@ AncestralProbStream& operator<<(AncestralProbStream& stream, const AncestralStat
 AncestralStateStream& operator<<(AncestralStateStream& stream, const AncestralStates& ancestral);
 
 MutationMapListStream& operator<<(MutationMapListStream& stream, const MutationMap& mutmap);
+
+FileIOStream& operator<<(FileIOStream& stream, const AuTest& au_test);
 
 std::string to_newick_string_rooted(const Tree& tree, double root_brlen = 0.0);
 void to_newick_file(const corax_utree_t& tree, const std::string& fname);

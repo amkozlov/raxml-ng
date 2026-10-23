@@ -180,6 +180,7 @@ public:
 
   /* AU test */
   unsigned int num_au_reps;
+  double au_cutoff;
 
   /* Modeltest */
   unsigned int free_rate_min_categories;

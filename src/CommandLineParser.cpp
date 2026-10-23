@@ -111,7 +111,10 @@ static struct option long_options[] =
   {"moose-options",      required_argument, nullptr, 0 },  /*  77 */
   {"mutmap",             optional_argument, nullptr, 0 },  /*  78 */
   {"gamma-mode",         required_argument, nullptr, 0 },  /*  79 */
+
   {"autest",             optional_argument, nullptr, 0 },  /*  80 */
+  {"au-reps",            required_argument, nullptr, 0 },  /*  91 */
+  {"au-cutoff",          required_argument, nullptr, 0 },  /*  82 */
 
   { 0, 0, 0, 0 }
 };
@@ -1693,6 +1696,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 80: /* au test */
         opts.command = Command::autest;
         optarg_tree_required = true;
+        num_commands++;
+        /* fall through */
+      case 81: /* number of AU replicates */
         if (optarg)
         {
           if (!read_uint(optarg, opts.num_au_reps, 1))
@@ -1701,7 +1707,14 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
                 ", please provide a positive integer number!");
           }
         }
-        num_commands++;
+        break;
+      case 82: /* AU test signifoance cutoff */
+        if (sscanf(optarg, "%lf", &opts.au_cutoff) != 1 || opts.au_cutoff < 0. || opts.au_cutoff > 1.0)
+        {
+          throw InvalidOptionValueException("Invalid AU significance cutoff value: " +
+                                            string(optarg) +
+                                            ", please provide a number between 0.0 and 1.0.");
+        }
         break;
       default:
         throw  OptionException("Internal error in option parsing");
@@ -1892,7 +1905,8 @@ void CommandLineParser::print_help()
             "  --bs-write-msa on | off                    write all bootstrap alignments (default: OFF)\n"
             "\n"
             "Statistical test options:\n"
-//            "  --au-reps      VALUE                       number of bootstrap replicates for AU test (default: 10000)\n"
+            "  --au-reps      VALUE                       number of bootstrap replicates for AU test (default: " << RAXML_AU_REPS << ")\n"
+            "  --au-cutoff    VALUE                       p-value significance cutoff for AU test (default: " << RAXML_AU_CUTOFF << ")\n"
             "  --sh-reps      VALUE                       number of bootstrap replicates for SH-aLRT test (default: 1000)\n"
             "  --sh-epsilon   VALUE                       log-likelihood epsilon for SH-aLRT test (default: 0.1)\n";
 

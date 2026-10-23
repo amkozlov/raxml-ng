@@ -48,7 +48,7 @@ msa_file(""), model_file(""), weights_file(""), outfile_prefix(""),
 num_threads(1), num_threads_max(1), num_ranks(1), num_workers(1), num_workers_max(UINT_MAX),
 simd_arch(CORAX_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(LoadBalancing::benoit),
 diff_pred_pars_trees(RAXML_CPYTHIA_TREES_NUM), nni_tolerance(1.0), nni_epsilon(10),
-num_sh_reps(RAXML_SH_ALRT_REPS), sh_epsilon(RAXML_SH_ALRT_EPSILON), num_au_reps(RAXML_AU_REPS),
+num_sh_reps(RAXML_SH_ALRT_REPS), sh_epsilon(RAXML_SH_ALRT_EPSILON), num_au_reps(RAXML_AU_REPS), au_cutoff(RAXML_AU_CUTOFF),
 free_rate_min_categories(2), free_rate_max_categories(10), free_rate_opt_method(FreerateOptMethod::AUTO),
 model_selection_criterion(InformationCriterion::bic), modeltest_heuristics({HeuristicType::FREERATE, HeuristicType::RHAS}),
 modeltest_significant_ic_delta(10.0), modeltest_rhas(default_rate_heterogeneity_selection),
@@ -598,6 +598,11 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   if (opts.command == Command::consense)
   {
     stream << " (" << opts.consense_type_name() << ")";
+  }
+
+  if (opts.command == Command::autest)
+  {
+    stream << " (replicates: " << opts.num_au_reps << ", cutoff: " << opts.au_cutoff << ")";
   }
 
   /* end of run mode line */

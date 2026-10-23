@@ -8,6 +8,8 @@
 
 extern const doubleVector AU_DEFAULT_SCALES;
 extern const uintVector AU_DEFAULT_REPS;
+extern const unsigned int AU_DEFAULT_RUNS;
+extern const double AU_DEFAULT_CUTOFF;
 
 /**
  * Calculates RELL bootstrap replicates at different replicate sequence lengths in parallel, calculate empirical CDF
@@ -22,6 +24,13 @@ extern const uintVector AU_DEFAULT_REPS;
  */
 class AuTest {
 public:
+    AuTest(const std::shared_ptr<PartitionedMSA> &msa,
+           const std::vector<std::vector<doubleVector> > &persite_loglh,
+           unsigned int num_reps_per_run,
+           const int seed) : AuTest(msa, make_persite_vec(persite_loglh),
+                                    AU_DEFAULT_SCALES, uintVector(AU_DEFAULT_RUNS, num_reps_per_run), seed) {
+    }
+
     AuTest(const std::shared_ptr<PartitionedMSA> &msa,
            const std::vector<std::vector<doubleVector> > &persite_loglh,
            const doubleVector &scales,
@@ -42,7 +51,8 @@ public:
                               scales(std::move(scales)),
                               num_replicates(std::move(num_replicates)),
                               num_trees(persite_loglh.size()),
-                              seed(seed) {
+                              seed(seed),
+                              pvalue_cutoff(AU_DEFAULT_CUTOFF) {
     }
 
     // custom move constructor
@@ -55,7 +65,8 @@ public:
                                       scales(std::move(other.scales)),
                                       num_replicates(std::move(other.num_replicates)),
                                       num_trees(other.num_trees),
-                                      seed(other.seed) {
+                                      seed(other.seed),
+                                      pvalue_cutoff(other.pvalue_cutoff) {
         other.test_statistics = nullptr;
         other.normalized_statistics = nullptr;
     }
@@ -113,6 +124,11 @@ public:
     void finalize_test_statistics();
 
     /**
+     * Reset the test statistics to be able to re-run bootstrapping.
+     */
+    void reset_test_statistics();
+
+    /**
      * Calculate the p-values from the previously generated bootstrap replicates.
      * These are cheap to compute compared to bootstrapping, but require finalized test statistics, so they can either
      * be calculated on the master worker which holds all bootstrap matrices, or the bootstrap matrices need to be
@@ -125,17 +141,27 @@ public:
      *
      * @return A vector of p values, in the order of the rows of the persite log-likelihood matrix
      */
-    doubleVector &get_p_values();
+    const doubleVector &get_p_values() const;
 
     /**
-     * Reset the test statistics to be able to re-run bootstrapping.
+     * @return p-value for the tree `tree_num`
      */
-    void reset_test_statistics();
+    double p_value(unsigned int tree_num) const;
+
+    /**
+     * Check if the tree belongs to the plausible set (= topology can not be excluded with confidence)
+     *
+     * @return true if the p-value for `tree_num` is above the significance cutoff (default: 0.05)
+     */
+    bool is_plausible(unsigned int tree_num) const;
 
     /**
      * @return true, if the p-values have been calculated
      */
     [[nodiscard]] bool is_finished() const;
+
+    double significance_cutoff() const { return pvalue_cutoff; }
+    void significance_cutoff(double cutoff) { pvalue_cutoff = cutoff; }
 
 private:
     /**
@@ -189,6 +215,11 @@ private:
      * Random seed
      */
     int seed;
+
+    /**
+     * P-value cutoff for statistical significance (default: 0.05)
+     */
+    double pvalue_cutoff;
 
     static std::vector<std::vector<const double *> > make_persite_vec(
         const std::vector<std::vector<doubleVector> > &persite_loglh) {
