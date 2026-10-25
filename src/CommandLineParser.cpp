@@ -175,9 +175,9 @@ void CommandLineParser::check_options(Options &opts)
     if (opts.bs_metrics.empty())
       opts.bs_metrics.insert(BranchSupportMetric::fbp);
 
-    /* gCF works in Newick streaming mode only */
-    if (opts.bs_metrics.count(BranchSupportMetric::gcf))
-      opts.use_tree_streaming = true;;
+    /* TBE and gCF work in Newick streaming mode only */
+    if (opts.bs_metrics.count(BranchSupportMetric::tbe) || opts.bs_metrics.count(BranchSupportMetric::gcf))
+      opts.use_tree_streaming = true;
   }
 
   if (opts.command == Command::bootstrap)

@@ -19,12 +19,14 @@ TransferBootstrapTree::~TransferBootstrapTree()
     free(_split_info);
 }
 
-void TransferBootstrapTree::get_replicate_supports(const corax_unode_t& root,
+void TransferBootstrapTree::get_replicate_supports(const Tree& tree,
                                                    PllSplitSharedPtr& splits, doubleVector& support)
 {
     assert(_ref_splits);
 
     support.resize(num_splits());
+
+    const corax_unode_t& root = tree.pll_utree_root();
 
     // compute TBE
     if (_naive_method)
@@ -42,4 +44,8 @@ void TransferBootstrapTree::get_replicate_supports(const corax_unode_t& root,
                              support.data(),
                              _split_info);
     }
+
+    /* NB: With TBE, each replicate split can contribute support to multiple reference branches!
+     * Hence, we must update support for ALL ref branches, not just those found in the replicate! */
+    splits = _ref_splits;
 }

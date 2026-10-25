@@ -2802,6 +2802,11 @@ void command_support(RaxmlInstance& instance)
 
     LOG_INFO << "Reference tree size: " << to_string(ref_tree.num_tips()) << endl << endl;
 
+    if (!ref_tree.binary() && opts.bs_metrics.count(BranchSupportMetric::tbe))
+    {
+      throw runtime_error("Reference tree contains multifurcations, this is not supported for TBE!");
+    }
+
     /* In streaming mode, we will read bootstrap trees one-by-one later. */
     if (opts.use_tree_streaming)
       draw_bootstrap_support(instance, ref_tree, require_binary);
