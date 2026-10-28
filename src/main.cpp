@@ -3433,20 +3433,28 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
     if (!opts.plausible_trees_file().empty())
     {
       NewickStream nw(instance.opts.plausible_trees_file(), std::ios::out);
-      for (unsigned int tree_num = 0; tree_num < checkp.ml_trees.size(); ++tree_num)
+
+      assert(checkp.ml_trees.size() == instance.start_trees.size());
+
+      unsigned int pl_count = 0;
+      for (unsigned int tree_num = 0; tree_num < instance.start_trees.size(); ++tree_num)
       {
         if (!instance.au_test->is_plausible(tree_num))
           continue;
 
-        LOG_DEBUG << "Plausible tree #" << tree_num << " with p-value: " << instance.au_test->p_value(tree_num) << endl;
+        LOG_DEBUG << "Plausible tree #" << (tree_num+1) << " with p-value: "
+                  << instance.au_test->p_value(tree_num) << endl;
+
+        ++pl_count;
 
         Tree pl_tree = checkp.tree();
-        pl_tree.topology(checkp.ml_trees.at(tree_num).second);
+        pl_tree.topology(checkp.ml_trees.at(tree_num+1).second);
 //        postprocess_tree(instance, ml_tree);
         nw << pl_tree;
       }
 
-      LOG_INFO << "All plausible trees saved to: " << sysutil_realpath(opts.plausible_trees_file()) << endl;
+      LOG_INFO << "All plausible trees (" << pl_count << ") saved to: "
+               << sysutil_realpath(opts.plausible_trees_file()) << endl;
     }
   }
 
