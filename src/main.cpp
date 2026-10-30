@@ -691,13 +691,19 @@ bool check_msa(RaxmlInstance& instance)
         continue;
 
       ++dup_count;
-      parted_msa_view.exclude_taxon(p.second);
-      dups_to_remove.emplace_back(p.second);
+
+      /* leave at least 4 taxa as this is the minimum required for tree search */
+      bool to_remove = parted_msa_view.taxon_count() > 4;
+      if (to_remove)
+      {
+        parted_msa_view.exclude_taxon(p.second);
+        dups_to_remove.emplace_back(p.second);
+      }
 
       const auto orig_taxon_name = parted_msa.taxon_names().at(p.first);
       const auto dup_taxon_name = parted_msa.taxon_names().at(p.second);
 
-      if (opts.dup_seqs_action == AbnormalSequenceAction::regraft)
+      if (to_remove && opts.dup_seqs_action == AbnormalSequenceAction::regraft)
         parted_msa.mark_dup_seq(dup_taxon_name, p.first);
 
       LOG_WARN << "WARNING: Sequences " << orig_taxon_name << " and " << dup_taxon_name
@@ -713,11 +719,14 @@ bool check_msa(RaxmlInstance& instance)
           break;
         case AbnormalSequenceAction::regraft:
         case AbnormalSequenceAction::remove:
-          seqs_to_remove.insert(dups_to_remove.cbegin(), dups_to_remove.cend());
-          LOG_INFO << "NOTE: Duplicate sequences were removed, "
-                   << (opts.dup_seqs_action == AbnormalSequenceAction::regraft ?
-                         "but will be regrafted into" : "and will not appear in")
-                   << " the final tree." << endl;
+          if (!dups_to_remove.empty())
+          {
+            seqs_to_remove.insert(dups_to_remove.cbegin(), dups_to_remove.cend());
+            LOG_INFO << "NOTE: Duplicate sequences were removed, "
+                     << (opts.dup_seqs_action == AbnormalSequenceAction::regraft ?
+                           "but will be regrafted into" : "and will not appear in")
+                     << " the final tree." << endl;
+          }
           break;
         case AbnormalSequenceAction::error:
           LOG_ERROR << "ERROR: Duplicate sequences found! " << endl;
