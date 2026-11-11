@@ -50,7 +50,6 @@
 #include "bootstrap/EbgSupportTree.hpp"
 #include "bootstrap/ShSupportTree.hpp"
 #include "bootstrap/IcSupportTree.hpp"
-#include "bootstrap/GCFSupportTree.hpp"
 #include "bootstrap/ConsensusTree.hpp"
 #include "autotune/ResourceEstimator.hpp"
 #include "ICScoreCalculator.hpp"
@@ -59,6 +58,7 @@
 #include "util/EnergyMonitor.hpp"
 #include "adaptive/DifficultyPredictor.hpp"
 #include "adaptive/StoppingCriterion.hpp"
+#include "bootstrap/TCFSupportTree.hpp"
 #include "topology/AuTest.hpp"
 #include "modeltest/ModelTest.hpp"
 #include "git_version.h"
@@ -2720,9 +2720,9 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree,
         add_replicate_trees = true;
         support_in_pct = false;
       }
-      else if (metric == BranchSupportMetric::gcf)
+      else if (metric == BranchSupportMetric::tcf)
       {
-        sup_tree = make_shared<GCFSupportTree>(ref_tree);
+        sup_tree = make_shared<TCFSupportTree>(ref_tree);
         add_replicate_trees = true;
         support_in_pct = true;
         require_complete = false;
@@ -2738,7 +2738,7 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree,
         if (!bs_splits.empty())
         {
           assert(metric != BranchSupportMetric::tbe);
-          assert(metric != BranchSupportMetric::gcf);
+          assert(metric != BranchSupportMetric::tcf);
           sup_tree->add_splits(bs_splits);
         }
         else if (!bs_trees.empty())
@@ -2887,7 +2887,7 @@ void command_support(RaxmlInstance& instance)
   // TODO check whether this is a hard requirement or just implementation detail
   bool require_binary = opts.bs_metrics.count(BranchSupportMetric::ic1) ||
                         opts.bs_metrics.count(BranchSupportMetric::ica) ||
-                        opts.bs_metrics.count(BranchSupportMetric::gcf) ||
+                        opts.bs_metrics.count(BranchSupportMetric::tcf) ||
                         (opts.bs_metrics.count(BranchSupportMetric::tbe) && !opts.tbe_naive);
 
   assert(!opts.start_trees.empty());
@@ -3262,8 +3262,8 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
           metric_name = "Internode certainty (IC)";
         else if (it.first == BranchSupportMetric::ica)
           metric_name = "Internode certainty All (ICA)";
-        else if (it.first == BranchSupportMetric::gcf)
-          metric_name = "Gene concordance factor (gCF)";
+        else if (it.first == BranchSupportMetric::tcf)
+          metric_name = "Tree concordance factor (TCF)";
 
         if (it.first == BranchSupportMetric::ic1 || it.first == BranchSupportMetric::ica)
         {
@@ -4152,7 +4152,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
   if ((opts.command == Command::bootstrap || opts.command == Command::all))
   {
     if (opts.bs_metrics.count(BranchSupportMetric::fbp) || opts.bs_metrics.count(BranchSupportMetric::rbs) ||
-        opts.bs_metrics.count(BranchSupportMetric::tbe) || opts.bs_metrics.count(BranchSupportMetric::gcf) ||
+        opts.bs_metrics.count(BranchSupportMetric::tbe) || opts.bs_metrics.count(BranchSupportMetric::tcf) ||
         opts.bs_metrics.count(BranchSupportMetric::ic1) || opts.bs_metrics.count(BranchSupportMetric::ica))
     {
       thread_infer_bootstrap(instance, cm);

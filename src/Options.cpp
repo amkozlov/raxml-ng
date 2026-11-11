@@ -10,12 +10,12 @@
 using namespace std;
 
 static SupportMetricSet BS_METRICS_WITH_ML_TREES   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
-                                                     BranchSupportMetric::tbe, BranchSupportMetric::gcf,
+                                                     BranchSupportMetric::tbe, BranchSupportMetric::tcf,
                                                      BranchSupportMetric::ic1, BranchSupportMetric::ica};
 
 static SupportMetricSet BS_METRICS_WITH_PB_TREES   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
                                                      BranchSupportMetric::tbe, BranchSupportMetric::ebg,
-                                                     BranchSupportMetric::pbs, BranchSupportMetric::gcf,
+                                                     BranchSupportMetric::pbs, BranchSupportMetric::tcf,
                                                      BranchSupportMetric::ic1, BranchSupportMetric::ica};
 
 static SupportMetricSet BS_METRICS_WITH_PARS_TREES { BranchSupportMetric::ps };
@@ -23,7 +23,7 @@ static SupportMetricSet BS_METRICS_WITH_PARS_TREES { BranchSupportMetric::ps };
 static SupportMetricSet BS_METRICS_WITH_MSA_REPS   { BranchSupportMetric::fbp, BranchSupportMetric::rbs,
                                                      BranchSupportMetric::tbe, BranchSupportMetric::ebg,
                                                      BranchSupportMetric::pbs, BranchSupportMetric::sh_alrt,
-                                                     BranchSupportMetric::gcf,
+                                                     BranchSupportMetric::tcf,
                                                      BranchSupportMetric::ic1, BranchSupportMetric::ica };
 
 Options::Options() : opt_version(RAXML_OPT_VERSION), cmdline(""), command(Command::none),
@@ -127,7 +127,7 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.sh_support_tree, "supportSH");
   set_default_outfile(outfile_names.ic1_support_tree, "supportIC1");
   set_default_outfile(outfile_names.ica_support_tree, "supportICA");
-  set_default_outfile(outfile_names.gcf_support_tree, "supportGCF");
+  set_default_outfile(outfile_names.tcf_support_tree, "supportTCF");
   set_default_outfile(outfile_names.terrace, "terrace");
   set_default_outfile(outfile_names.binary_msa, "rba");
   set_default_outfile(outfile_names.bootstrap_msa, "bootstrapMSA");
@@ -185,8 +185,8 @@ const std::string& Options::support_tree_file(BranchSupportMetric bsm) const
       return outfile_names.ic1_support_tree;
     else if (bsm == BranchSupportMetric::ica)
       return outfile_names.ica_support_tree;
-    else if (bsm == BranchSupportMetric::gcf)
-      return outfile_names.gcf_support_tree;
+    else if (bsm == BranchSupportMetric::tcf)
+      return outfile_names.tcf_support_tree;
     else
       return outfile_names.support_tree;
   }
@@ -589,8 +589,8 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
         case BranchSupportMetric::ica:
           stream << "Internode Certainty All";
           break;
-        case BranchSupportMetric::gcf:
-          stream << "Gene Concordance Factor";
+        case BranchSupportMetric::tcf:
+          stream << "Tree Concordance Factor";
           break;
       }
     }

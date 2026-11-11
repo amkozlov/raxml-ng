@@ -105,7 +105,7 @@ static struct option long_options[] =
   {"fast",               no_argument,       nullptr, 0 },  /*  71 */
   {"allfast",            no_argument,       nullptr, 0 },  /*  72 */
   {"opt-freerate",       required_argument, nullptr, 0 },  /*  73 */
-  {"gcf",                optional_argument, nullptr, 0 },  /*  74 */
+  {"tcf",                optional_argument, nullptr, 0 },  /*  74 */
   {"modeltest",          optional_argument, nullptr, 0 },  /*  75 */
   {"moose",              optional_argument, nullptr, 0 },  /*  76 */
   {"moose-options",      required_argument, nullptr, 0 },  /*  77 */
@@ -183,7 +183,7 @@ void CommandLineParser::check_options(Options &opts)
       opts.bs_metrics.insert(BranchSupportMetric::fbp);
 
     /* TBE and gCF work in Newick streaming mode only */
-    if (opts.bs_metrics.count(BranchSupportMetric::tbe) || opts.bs_metrics.count(BranchSupportMetric::gcf))
+    if (opts.bs_metrics.count(BranchSupportMetric::tbe) || opts.bs_metrics.count(BranchSupportMetric::tcf))
       opts.use_tree_streaming = true;
   }
 
@@ -1397,7 +1397,12 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
             }
             else if (strncasecmp(m.c_str(), "gcf", 3) == 0)
             {
-              opts.bs_metrics.insert(BranchSupportMetric::gcf);
+              throw InvalidOptionValueException("gCF is now called TCF (tree concordance factor). "
+                  "Please use --bs-metric tcf");
+            }
+            else if (strncasecmp(m.c_str(), "tcf", 3) == 0)
+            {
+              opts.bs_metrics.insert(BranchSupportMetric::tcf);
             }
             else
             {
@@ -1661,10 +1666,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         } else
           throw InvalidOptionValueException("Unknown FreeRate optimization method: " + string(optarg));
         break;
-      case 74: /* gcf: compute gene concordance factors */
+      case 74: /* tcf: compute tree concordance factors */
         opts.command = Command::support;
         opts.bs_metrics.clear();
-        opts.bs_metrics.insert(BranchSupportMetric::gcf);
+        opts.bs_metrics.insert(BranchSupportMetric::tcf);
         opts.use_pythia = false;
         optarg_tree_required = true;
         if (optarg)
@@ -1824,7 +1829,7 @@ void CommandLineParser::print_help()
             "  --pt                                       Alias for: --pythia --nofiles --log result\n"
             "  --sh [ REPS ]                              Alias for: --all --opt-topology nni --bs-metric sh [ --sh-reps REPS ]\n"
             "  --ebg                                      Alias for: --all --bs-metric ebg --opt-topology off\n"
-            "  --gcf [ REF_TREE ]                         Alias for: --support --bs-metric gcf [ --tree REF_TREE ] \n"
+            "  --tcf [ REF_TREE ]                         Alias for: --support --bs-metric tcf [ --tree REF_TREE ] \n"
             "\n"
             "Input and output options:\n"
             "  --tree            rand{N} | pars{N} |      starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
@@ -1901,7 +1906,7 @@ void CommandLineParser::print_help()
             "                 ebg | tbe | sh              ebg = Educated bootstrap guesser, tbe = Transfer bootstrap estimate, sh = SH-like aLRT\n"
             "                 ps  | pbs |                 ps = Parsimony support, pbs = Parsimony bootstrap support\n"
             "                 ic1 | ica                   ic1 = Internode certainty (most prevalent), ica = Internode certainty (all)\n"
-            "                 gcf                         gcf = Gene concordance factor\n"
+            "                 tcf                         tcf = Tree concordance factor\n"
             "  --bs-write-msa on | off                    write all bootstrap alignments (default: OFF)\n"
             "\n"
             "Statistical test options:\n"

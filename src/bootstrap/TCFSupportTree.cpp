@@ -1,11 +1,11 @@
-#include "GCFSupportTree.hpp"
+#include "TCFSupportTree.hpp"
 
-GCFSupportTree::GCFSupportTree (const Tree& tree) : SupportTree(tree),
+TCFSupportTree::TCFSupportTree (const Tree& tree) : SupportTree(tree),
   _num_decisive_trees(tree.num_splits(), 0)
 {
 }
 
-GCFSupportTree::~GCFSupportTree ()
+TCFSupportTree::~TCFSupportTree ()
 {
 }
 
@@ -29,7 +29,7 @@ static corax_split_t induced_split(corax_split_t ref_split, IDVector id_map)
   return corax_utree_split_from_tips(tip_ids.data(), (unsigned int) tip_ids.size(), id_map_size);
 }
 
-void GCFSupportTree::add_replicate_tree(const Tree& tree)
+void TCFSupportTree::add_replicate_tree(const Tree& tree)
 {
   auto gene_tip_count = (unsigned int)  tree.num_tips();
 
@@ -97,7 +97,7 @@ void GCFSupportTree::add_replicate_tree(const Tree& tree)
   _num_bs_trees++;
 }
 
-bool GCFSupportTree::compute_support()
+bool TCFSupportTree::compute_support()
 {
   for (unsigned int i = 0; i < _pll_splits_hash->table_size; ++i)
   {

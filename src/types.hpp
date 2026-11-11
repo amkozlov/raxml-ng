@@ -175,7 +175,7 @@ enum class BranchSupportMetric
   pbs,
   ic1,
   ica,
-  gcf
+  tcf
 };
 
 typedef std::set<BranchSupportMetric> SupportMetricSet;

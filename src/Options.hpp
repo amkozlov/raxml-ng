@@ -31,7 +31,7 @@ struct OutputFileNames
   std::string sh_support_tree;
   std::string ic1_support_tree;
   std::string ica_support_tree;
-  std::string gcf_support_tree;
+  std::string tcf_support_tree;
   std::string terrace;
   std::string binary_msa;
   std::string bootstrap_msa;
