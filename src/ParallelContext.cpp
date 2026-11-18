@@ -267,6 +267,10 @@ void ParallelContext::finalize_threads(bool force)
     else
       t.join();
   }
+#else
+  RAXML_UNUSED(force);
+#endif
+
   _thread_groups.clear();
   _threads.clear();
 
@@ -275,9 +279,6 @@ void ParallelContext::finalize_threads(bool force)
   malloc_trim(0);
 #endif
 
-#else
-  RAXML_UNUSED(force);
-#endif
 }
 
 void ParallelContext::finalize_mpi(bool force)

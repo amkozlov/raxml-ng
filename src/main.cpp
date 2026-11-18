@@ -969,6 +969,13 @@ void check_options_early(Options& opts)
 {
   auto num_procs = opts.num_ranks * (opts.num_threads > 0 ? opts.num_threads : opts.num_threads_max);
 
+#ifndef _RAXML_PTHREADS
+  if (opts.num_threads > 1) {
+      throw OptionException("Requested more than one thread, but this version of RAxML-NG is not built with threading support.\n"
+                            "       Use --threads 1 or rebuild with cmake -DUSE_PTHREADS=ON.");
+  }
+#endif
+
   if (!opts.weights_file.empty() && !sysutil_file_exists(opts.weights_file))
     throw runtime_error("Site weights file not found: " + opts.weights_file);
 
